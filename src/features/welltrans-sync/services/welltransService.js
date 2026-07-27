@@ -21,6 +21,9 @@ export const saveWellTransSettings = (settings, actorId) =>
 export const queueWellTransSync = (tripIds, mode = 'selected') =>
   httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode });
 
+export const confirmWellTransApplied = logId =>
+  httpsCallable(functions, 'confirmWellTransApplied')({ logId });
+
 export const explainWellTransFailure = (log) => {
   if (!log) return 'Select a failed synchronization to review it.';
   const message = String(log.errorMessage || 'The automation worker did not provide a detailed error.');

@@ -681,7 +681,7 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
     const { payload, errors } = buildWellTransJobPayload(trip);
     if (errors.length) { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors }); continue; }
     const duplicate = await admin.firestore().collection("welltrans_sync_logs")
-      .where("tripId", "==", tripId).where("status", "in", ["pending", "processing", "completed"]).limit(1).get();
+      .where("tripId", "==", tripId).where("status", "in", ["pending", "processing", "awaiting_review", "completed"]).limit(1).get();
     if (!duplicate.empty && data?.mode !== "retry") { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors: ["Already queued or synchronized"] }); continue; }
     await admin.firestore().collection("welltrans_sync_logs").add({
       tripId, bookingId: payload.bookingId, status: "pending", stage: "queued",
@@ -698,6 +698,34 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   return { queued, rejected, rejectionDetails: rejectionDetails.slice(0, 50) };
+});
+
+exports.confirmWellTransApplied = functions.https.onCall(async (data, context) => {
+  await requireAdmin(context);
+  const logId = String(data?.logId || "");
+  if (!logId) throw new functions.https.HttpsError("invalid-argument", "A synchronization log ID is required.");
+  const ref = admin.firestore().doc(`welltrans_sync_logs/${logId}`);
+  await admin.firestore().runTransaction(async transaction => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Synchronization log not found.");
+    if (snapshot.data().status !== "awaiting_review") {
+      throw new functions.https.HttpsError("failed-precondition", "Only records awaiting manual review can be confirmed.");
+    }
+    transaction.update(ref, {
+      status: "completed", stage: "manually_applied", appliedBy: context.auth.uid,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  await admin.firestore().doc("welltrans_settings/primary").set({
+    lastSync: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await admin.firestore().collection("audit_logs").add({
+    action: "welltrans.sync.manually_applied", entityType: "broker_sync",
+    entityId: logId, actorId: context.auth.uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { confirmed: true };
 });
 
 exports.auditWellTransSettings = functions.firestore

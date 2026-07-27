@@ -97,11 +97,10 @@ async function processJob(job, existingSession = null) {
     await job.ref.update({ stage: 'matching_booking', updatedAt: FieldValue.serverTimestamp() });
     const result = await syncWellTransTrip(page, payload, settings.fieldMapping || {});
     await job.ref.update({
-      status: 'completed', stage: 'verified', completedAt: FieldValue.serverTimestamp(),
+      status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
       warnings: result.warnings || [],
     });
-    await db.doc('welltrans_settings/primary').set({ lastSync: FieldValue.serverTimestamp() }, { merge: true });
     return true;
   } catch (error) {
     let screenshot = '';

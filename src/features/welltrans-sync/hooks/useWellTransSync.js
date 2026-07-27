@@ -16,7 +16,10 @@ export const useWellTransSync = (trips = []) => {
     logs.forEach(log => { if (!map.has(log.tripId)) map.set(log.tripId, log); });
     return map;
   }, [logs]);
-  const readyTrips = useMemo(() => completedTrips.filter(trip => validateTripForWellTrans(trip).valid && latestByTrip.get(trip.id)?.status !== 'completed'), [completedTrips, latestByTrip]);
+  const readyTrips = useMemo(() => completedTrips.filter(trip =>
+    validateTripForWellTrans(trip).valid
+      && !['completed', 'awaiting_review'].includes(latestByTrip.get(trip.id)?.status)),
+  [completedTrips, latestByTrip]);
   const heartbeat = worker?.lastSeenAt?.toDate?.() || (worker?.lastSeenAt ? new Date(worker.lastSeenAt) : null);
   const workerOnline = Boolean(heartbeat && Date.now() - heartbeat.getTime() < 45000
     && ['online', 'calibrated'].includes(worker?.state));

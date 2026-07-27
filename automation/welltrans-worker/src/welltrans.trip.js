@@ -285,21 +285,10 @@ export async function syncWellTransTrip(page, payload) {
     ...(payload.dropoff.signatureCaptured
       ? [[dropoff, 'Signature Captured?', 'Rider Signature Received']] : []),
   ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
-  const changed = expected.some(([row, column, value]) => !equalCellValue(column, row.values?.[column], value));
-  let verifyGrid;
-  if (changed) {
-    const apply = page.getByRole('button', { name: 'Apply', exact: true }).last();
-    await apply.click();
-    await page.waitForTimeout(1000);
-    verifyGrid = page.locator(`${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`).last();
-    if (!await verifyGrid.count()) verifyGrid = await openEditItinerary(page);
-  } else {
-    verifyGrid = grid;
-  }
-
-  // TripSpark can keep the editor open after Apply; verify its refreshed values directly.
-  const verified = await gridModel(verifyGrid, payload.bookingId);
-  await closeEditorWithoutSaving(page);
+  // Human approval is mandatory. Never click Apply or close the staged editor.
+  // Verify only the values currently staged in the visible TripSpark grid.
+  await page.waitForTimeout(300);
+  const verified = await gridModel(grid, payload.bookingId);
   const verifiedPickup = verified.rows.filter(row => /^pickup$/i.test(row.activity));
   const verifiedDropoff = verified.rows.filter(row => /^dropoff$/i.test(row.activity));
   if (verifiedPickup.length !== 1 || verifiedDropoff.length !== 1) {
@@ -315,7 +304,7 @@ export async function syncWellTransTrip(page, payload) {
     throw new Error(`Post-save value verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
   }
   return {
-    selectedDate, changed, verified: true,
+    selectedDate, stagedForReview: true, verified: true,
     warnings: [
       ...(!pickupVehicleSet ? ['Pickup vehicle was left unchanged because no unique WellTrans match was found.'] : []),
       ...(!dropoffVehicleSet ? ['Dropoff vehicle was left unchanged because no unique WellTrans match was found.'] : []),
