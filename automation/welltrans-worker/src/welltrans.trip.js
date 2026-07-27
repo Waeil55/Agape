@@ -236,15 +236,15 @@ export async function syncWellTransTrip(page, payload) {
   await setTextCell(page, grid, model, pickup, 'Arrival Time', payload.pickup.arrival, true);
   await setTextCell(page, grid, model, pickup, 'Departure Time', payload.pickup.departure, true);
   await setTextCell(page, grid, model, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, true);
-  await setListCell(page, grid, model, pickup, 'Signature Captured?', 'Signature Not Requested');
 
   await setTextCell(page, grid, model, dropoff, 'Driver', payload.driver);
   const dropoffVehicleSet = await setTextCell(page, grid, model, dropoff, 'Vehicle', payload.vehicle);
   await setTextCell(page, grid, model, dropoff, 'Arrival Time', payload.dropoff.arrival, true);
   await setTextCell(page, grid, model, dropoff, 'Departure Time', payload.dropoff.departure);
   await setTextCell(page, grid, model, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, true);
-  await setListCell(page, grid, model, dropoff, 'Signature Captured?',
-    payload.dropoff.signatureCaptured ? 'Rider Signature Received' : 'Signature Not Requested');
+  if (payload.dropoff.signatureCaptured) {
+    await setListCell(page, grid, model, dropoff, 'Signature Captured?', 'Rider Signature Received');
+  }
 
   const expected = [
     [pickup, 'Driver', payload.driver],
@@ -252,14 +252,13 @@ export async function syncWellTransTrip(page, payload) {
     [pickup, 'Arrival Time', payload.pickup.arrival],
     [pickup, 'Departure Time', payload.pickup.departure],
     [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
-    [pickup, 'Signature Captured?', 'Signature Not Requested'],
     [dropoff, 'Driver', payload.driver],
     ...(dropoffVehicleSet ? [[dropoff, 'Vehicle', payload.vehicle]] : []),
     [dropoff, 'Arrival Time', payload.dropoff.arrival],
     [dropoff, 'Departure Time', payload.dropoff.departure],
     [dropoff, 'Mileage/Odometer', payload.dropoff.mileage],
-    [dropoff, 'Signature Captured?', payload.dropoff.signatureCaptured
-      ? 'Rider Signature Received' : 'Signature Not Requested'],
+    ...(payload.dropoff.signatureCaptured
+      ? [[dropoff, 'Signature Captured?', 'Rider Signature Received']] : []),
   ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
   const changed = expected.some(([row, column, value]) => !equalCellValue(column, row.values?.[column], value));
   if (changed) {
