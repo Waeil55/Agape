@@ -122,6 +122,33 @@ function equalCellValue(column, actual, expected) {
   return normalized(actual) === normalized(expected);
 }
 
+async function selectUniqueListOption(page, option, column) {
+  const visibleMatches = async locator => {
+    const matches = [];
+    for (let index = 0; index < await locator.count(); index += 1) {
+      if (await locator.nth(index).isVisible().catch(() => false)) matches.push(locator.nth(index));
+    }
+    return matches;
+  };
+  const exact = await visibleMatches(page.getByText(String(option), { exact: true }));
+  if (exact.length) {
+    await exact.at(-1).click();
+    return;
+  }
+  const contained = await visibleMatches(page.getByText(String(option), { exact: false }));
+  if (contained.length === 1) {
+    await contained[0].click();
+    return;
+  }
+  const visibleOptions = await page.locator(
+    '.EditorWidgets [role="option"]:visible, .EditorWidgets core\\:listitem:visible, '
+    + '.EditorWidgets .ListBoxItem:visible, .DropDownDialog:visible [title]',
+  ).evaluateAll(elements => elements.map(element =>
+    String(element.textContent || element.getAttribute('title') || '').trim()).filter(Boolean)).catch(() => []);
+  throw new Error(`${column} option "${option}" was ${contained.length > 1 ? 'ambiguous' : 'not found'}`
+    + `${visibleOptions.length ? `. Available values: ${[...new Set(visibleOptions)].slice(0, 20).join(', ')}` : ''}`);
+}
+
 async function setTextCell(page, grid, model, row, column, value, required = false) {
   if (value === undefined || value === null || value === '') {
     if (required) throw new Error(`${column} is required for ${row.activity}`);
@@ -140,9 +167,8 @@ async function setTextCell(page, grid, model, row, column, value, required = fal
   }
   if (await listbox.count()) {
     await listbox.locator('.dropdlgbutton').click({ force: true });
-    const choice = page.getByText(String(value), { exact: true }).last();
-    await choice.waitFor({ state: 'visible', timeout: 5000 });
-    await choice.click();
+    await page.waitForTimeout(250);
+    await selectUniqueListOption(page, value, column);
     return;
   }
   throw new Error(`${column} editor did not open for ${row.activity}`);
@@ -156,9 +182,8 @@ async function setListCell(page, grid, model, row, column, option) {
   await cell.dblclick({ force: true });
   const listbox = page.locator('.EditorWidgets core\\:listbox').last();
   await listbox.locator('.dropdlgbutton').click({ force: true });
-  const choice = page.getByText(option, { exact: true }).last();
-  await choice.waitFor({ state: 'visible', timeout: 5000 });
-  await choice.click();
+  await page.waitForTimeout(250);
+  await selectUniqueListOption(page, option, column);
 }
 
 async function closeEditorWithoutSaving(page) {
