@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase-admin/app';
+import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { performManualLogin } from './welltrans.login.js';
@@ -6,7 +6,11 @@ import { openWellTransBrowser } from './welltrans.browser.js';
 import { getSelectedPortalDate, syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
 import { validateTripForWellTrans } from '../../../src/features/welltrans-sync/utils/welltransMapping.js';
 
-initializeApp({ storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'agape-95c9f.firebasestorage.app' });
+initializeApp({
+  credential: applicationDefault(),
+  projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'agape-95c9f',
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'agape-95c9f.firebasestorage.app',
+});
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
