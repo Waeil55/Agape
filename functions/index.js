@@ -608,6 +608,93 @@ exports.auditChatRetentionPolicy = functions.firestore
     return null;
   });
 
+const normalizeWellTransBookingId = (trip = {}) =>
+  String(trip.bookingId || trip.tripId || trip.tripNumber || trip.id || "").trim().replace(/^TRIP-/i, "");
+
+const wellTransClock = (value) => {
+  if (!value) return "";
+  if (/^\d{1,2}:\d{2}$/.test(String(value).trim())) return String(value).trim().padStart(5, "0");
+  const date = value?.toDate?.() || new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-US", { timeZone: "America/Indiana/Indianapolis", hour12: false, hour: "2-digit", minute: "2-digit" });
+};
+
+const buildWellTransJobPayload = (trip = {}) => {
+  const bookingId = normalizeWellTransBookingId(trip);
+  const start = Number(trip.pickupOdometer || trip.startOdometer || trip.startMileage);
+  const end = Number(trip.dropoffOdometer || trip.endOdometer || trip.endMileage || trip.odometer);
+  const odometerMiles = Number.isFinite(start) && Number.isFinite(end) && start > 0 && end >= start ? end - start : null;
+  const fallbackMiles = Number(trip.actualDistance ?? trip.distance ?? trip.miles ?? trip.totalMiles);
+  const mileage = odometerMiles === null && Number.isFinite(fallbackMiles) && fallbackMiles >= 0 ? fallbackMiles : odometerMiles;
+  const payload = {
+    bookingId, tripId: String(trip.id || bookingId),
+    driver: trip.completedDriverName || trip.driverName || trip.driver || "",
+    vehicle: trip.completedVehicle || trip.vehicle || trip.vehicleName || "",
+    pickup: { arrival: wellTransClock(trip.pickupArrival || trip.arrivalTime || trip.arrivedPickupTime), departure: wellTransClock(trip.pickupDeparture || trip.departedPickupTime || trip.departureTime), mileage: 0, signatureCaptured: false },
+    dropoff: { arrival: wellTransClock(trip.dropoffArrival || trip.arrivalDropoffTime || trip.completedAt), departure: wellTransClock(trip.dropoffDeparture || trip.departedDropoffTime || trip.completedAt), mileage: mileage === null ? null : Number(mileage.toFixed(3)), signatureCaptured: Boolean(trip.signatureCaptured || trip.paperSignatureConfirmed || trip.signatureUrl || trip.signature) },
+  };
+  const errors = [];
+  if (!bookingId) errors.push("Trip has no Booking ID");
+  if (!["completed", "complete"].includes(String(trip.status || "").toLowerCase()) && !trip.completedAt) errors.push("Trip is not completed");
+  if (!payload.pickup.arrival) errors.push("Pickup arrival is missing");
+  if (!payload.pickup.departure) errors.push("Pickup departure is missing");
+  if (!payload.dropoff.arrival) errors.push("Dropoff arrival is missing");
+  if (payload.dropoff.mileage === null) errors.push("Mileage or valid odometer readings are missing");
+  return { payload, errors };
+};
+
+exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
+  await requireAdmin(context);
+  const settingsSnap = await admin.firestore().doc("welltrans_settings/primary").get();
+  const settings = settingsSnap.exists ? settingsSnap.data() : {};
+  if (!settings.enabled) throw new functions.https.HttpsError("failed-precondition", "WellTrans automation is disabled.");
+  if (!/^https:\/\//i.test(settings.portalUrl || "")) throw new functions.https.HttpsError("failed-precondition", "A secure WellTrans portal URL is required.");
+  const requestedIds = [...new Set((Array.isArray(data?.tripIds) ? data.tripIds : []).map(String))].slice(0, 500);
+  if (!requestedIds.length) throw new functions.https.HttpsError("invalid-argument", "Select at least one trip.");
+  let queued = 0;
+  let rejected = 0;
+  const rejectionDetails = [];
+  for (const tripId of requestedIds) {
+    const tripSnap = await admin.firestore().doc(`trips/${tripId}`).get();
+    if (!tripSnap.exists) { rejected++; rejectionDetails.push({ tripId, errors: ["Trip not found"] }); continue; }
+    const trip = { id: tripSnap.id, ...tripSnap.data() };
+    const { payload, errors } = buildWellTransJobPayload(trip);
+    if (errors.length) { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors }); continue; }
+    const duplicate = await admin.firestore().collection("welltrans_sync_logs")
+      .where("tripId", "==", tripId).where("status", "in", ["pending", "processing", "completed"]).limit(1).get();
+    if (!duplicate.empty && data?.mode !== "retry") { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors: ["Already queued or synchronized"] }); continue; }
+    await admin.firestore().collection("welltrans_sync_logs").add({
+      tripId, bookingId: payload.bookingId, status: "pending", stage: "queued",
+      startedAt: null, completedAt: null, errorMessage: "", screenshot: "",
+      syncedBy: context.auth.uid, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(), attempt: 0,
+      provider: "welltrans", automationMethod: "playwright", payload,
+    });
+    queued++;
+  }
+  await admin.firestore().collection("audit_logs").add({
+    action: "welltrans.sync.queued", entityType: "broker_sync", actorId: context.auth.uid,
+    mode: data?.mode || "selected", requested: requestedIds.length, queued, rejected,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { queued, rejected, rejectionDetails: rejectionDetails.slice(0, 50) };
+});
+
+exports.auditWellTransSettings = functions.firestore
+  .document("welltrans_settings/{settingsId}")
+  .onWrite(async (change, context) => {
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    await admin.firestore().collection("audit_logs").add({
+      action: "welltrans.settings.changed", entityType: "broker_sync_settings",
+      entityId: context.params.settingsId, actorId: after?.updatedBy || "unknown",
+      before: before ? { enabled: before.enabled, portalUrl: before.portalUrl, automationMethod: before.automationMethod, fieldMapping: before.fieldMapping } : null,
+      after: after ? { enabled: after.enabled, portalUrl: after.portalUrl, automationMethod: after.automationMethod, fieldMapping: after.fieldMapping } : null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return null;
+  });
+
 exports.createUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
   const ref = await admin.firestore().collection("users").add(data);

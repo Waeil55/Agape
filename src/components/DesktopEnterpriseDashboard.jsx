@@ -7,6 +7,7 @@ import {
   PanelRight,
   Eye, Hash, Route, Activity,
   CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
+  RefreshCw,
 } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { openMapLink } from '../utils/nativeActions';
@@ -29,6 +30,7 @@ const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
+const WellTransSyncPage = lazy(() => import('../features/welltrans-sync/components/WellTransSyncPage'));
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -287,6 +289,7 @@ const DesktopEnterpriseDashboard = ({
     { id: 'archives', label: 'Archives', icon: Archive, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'dispatcher', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
     { id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
+    { id: 'welltrans', label: 'WellTrans Sync', icon: RefreshCw, roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
   ].filter(item => item.roles.includes(role))
     .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
@@ -378,6 +381,7 @@ const DesktopEnterpriseDashboard = ({
       { id: 'schedule', label: 'Tools', icon: Route, active: activePanel === 'routePlanner' || showSequencerModal, action: () => setActivePanel('routePlanner') },
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
+      ...(role === 'admin' ? [{ id: 'welltrans', label: 'WellTrans', icon: RefreshCw, active: activePanel === 'welltrans', action: () => setActivePanel('welltrans') }] : []),
       { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
       { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
       { id: 'chat', label: unreadCount ? `Chat (${unreadCount > 99 ? '99+' : unreadCount})` : 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat'), badge: unreadCount },
@@ -1177,6 +1181,11 @@ const DesktopEnterpriseDashboard = ({
         />
         </Suspense></ErrorBoundary>
       );
+      case 'welltrans': return role === 'admin' ? (
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
+          <WellTransSyncPage trips={trips} role={role} />
+        </Suspense></ErrorBoundary>
+      ) : renderOperationsPage();
       case 'settings': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
         <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} deleteTrashedTrip={deleteTrashedTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} persistState={persistState} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
@@ -1257,7 +1266,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${['reports', 'admin', 'drive', 'chat'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${['reports', 'admin', 'drive', 'chat', 'welltrans'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat', 'welltrans'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1266,7 +1275,7 @@ const DesktopEnterpriseDashboard = ({
               </Suspense></ErrorBoundary>
             ) : (
               <div className={
-                activePanel === 'drive' || activePanel === 'admin'
+                activePanel === 'drive' || activePanel === 'admin' || activePanel === 'welltrans'
                   ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0'
                   : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>

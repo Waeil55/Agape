@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Shield, Truck, MapPin, Activity, CreditCard } from 'lucide-react';
+import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Shield, Truck, MapPin, Activity, CreditCard, RefreshCw } from 'lucide-react';
 
 const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
   const getInitials = (email) => {
@@ -12,6 +12,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
       title: "Organization",
       items: [
         { id: 'admin', icon: Users, label: 'User Management', desc: 'Dispatchers & Admins', color: 'text-indigo-600', bg: 'bg-indigo-50', adminOnly: true },
+        { id: 'welltrans', icon: RefreshCw, label: 'WellTrans Sync', desc: 'Broker automation center', color: 'text-cyan-700', bg: 'bg-cyan-50', adminOnly: true },
         { id: 'fleet', icon: Truck, label: 'Fleet & Drivers', desc: 'Vehicles, schedules, assignments', color: 'text-blue-600', bg: 'bg-blue-50' },
         { id: 'payroll', icon: CreditCard, label: 'Payroll', desc: 'Earnings & approvals', color: 'text-emerald-600', bg: 'bg-emerald-50' },
       ]

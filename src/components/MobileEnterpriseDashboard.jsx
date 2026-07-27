@@ -35,6 +35,7 @@ const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
+const WellTransSyncPage = lazy(() => import('../features/welltrans-sync/components/WellTransSyncPage'));
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center h-32">
@@ -369,6 +370,14 @@ const MobileEnterpriseDashboard = (props) => {
             </Suspense>
           </ErrorBoundary>
         </div>
+      );
+    }
+
+    if (subView === 'welltrans') {
+      return (
+        <SubViewWrapper title="WellTrans Sync" fullHeight>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><WellTransSyncPage trips={trips} role={role} /></Suspense></ErrorBoundary>
+        </SubViewWrapper>
       );
     }
 
