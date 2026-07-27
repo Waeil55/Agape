@@ -189,7 +189,21 @@ async function setListCell(page, grid, model, row, column, option) {
   const listbox = page.locator('.EditorWidgets core\\:listbox').last();
   await listbox.locator('.dropdlgbutton').click({ force: true });
   await page.waitForTimeout(250);
-  await selectUniqueListOption(page, option, column);
+  try {
+    await selectUniqueListOption(page, option, column);
+  } catch (error) {
+    // TripSpark's signature list renders its choices outside the accessible DOM.
+    // Its listbox supports keyboard type-ahead; verify the resulting cell before save.
+    if (column !== 'Signature Captured?') throw error;
+    await page.keyboard.type(option, { delay: 20 });
+    await page.keyboard.press('Enter');
+  }
+  await page.waitForTimeout(250);
+  const selected = await cell.evaluate(element =>
+    String(element.title || element.textContent || '').trim());
+  if (!equalCellValue(column, selected, option)) {
+    throw new Error(`${column} selection was not confirmed: expected "${option}", found "${selected}"`);
+  }
 }
 
 async function closeEditorWithoutSaving(page) {
