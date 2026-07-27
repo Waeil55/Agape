@@ -1,8 +1,8 @@
 import { openWellTransBrowser } from './welltrans.browser.js';
 import { saveEncryptedSession } from './cryptoSession.js';
 
-export async function performManualLogin({ keepOpen = false } = {}) {
-  const { browser, context, page } = await openWellTransBrowser({ headed: true, withoutSession: true });
+export async function performManualLogin({ keepOpen = false, reuseSession = false } = {}) {
+  const { browser, context, page } = await openWellTransBrowser({ headed: true, withoutSession: !reuseSession });
   await page.goto(process.env.WELLTRANS_PORTAL_URL, { waitUntil: 'domcontentloaded' });
   process.stdout.write('Complete WellTrans login, open TRIPS - ASSIGNED so the itinerary grid is visible, then press Enter here.\n');
   await new Promise(resolve => process.stdin.once('data', resolve));

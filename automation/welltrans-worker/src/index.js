@@ -337,7 +337,7 @@ async function main() {
   const stale = processing.docs.filter(item => (item.data().leaseExpiresAt?.toMillis?.() || Number.POSITIVE_INFINITY) < now);
   await Promise.all(stale.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete() })));
   const once = process.argv.includes('--once');
-  const session = await performManualLogin({ keepOpen: true });
+  const session = await performManualLogin({ keepOpen: true, reuseSession: true });
   try {
     const selectedDate = await getSelectedPortalDate(session.page);
     await publishHeartbeat('calibrated');

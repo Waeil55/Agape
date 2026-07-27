@@ -15,10 +15,20 @@ export async function getSelectedPortalDate(page) {
 }
 
 async function waitForAssignedTask(page) {
+  const grid = page.locator(`${GRID_SELECTOR}:visible`).first();
+  if (await grid.count()) return;
+
+  // TripSpark returns to its schedule calendar after closing an itinerary.
+  // The selected RunName remains present; Proceed restores the same locked task.
+  const proceed = page.getByRole('button', { name: 'Proceed', exact: true }).last();
+  if (await proceed.isVisible().catch(() => false)) {
+    await proceed.click();
+  }
   await page.waitForFunction(() =>
     Boolean(document.querySelector('.RunName')?.textContent?.trim()
-      && document.querySelector('core\\:grid[gridobject="Pass.UI.Grid.TripBrokerEventsGrid"]')),
-  null, { timeout: 45000 });
+      && [...document.querySelectorAll('core\\:grid[gridobject="Pass.UI.Grid.TripBrokerEventsGrid"]')]
+        .some(element => element.getClientRects().length > 0)),
+  null, { timeout: 30000 });
 }
 
 async function openEditItinerary(page) {
