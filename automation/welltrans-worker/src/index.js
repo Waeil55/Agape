@@ -71,6 +71,32 @@ async function claimJobById(logId) {
   });
 }
 
+async function publishDateReviewSummary(serviceDate) {
+  const snapshot = await db.collection('welltrans_sync_logs')
+    .where('serviceDate', '==', serviceDate).limit(500).get();
+  const latestByTrip = new Map();
+  for (const document of snapshot.docs) {
+    const data = document.data();
+    const current = latestByTrip.get(data.tripId);
+    const updatedAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
+    if (!current || updatedAt > current.updatedAt) {
+      latestByTrip.set(data.tripId, { status: data.status, updatedAt });
+    }
+  }
+  const summary = { total: latestByTrip.size, staged: 0, failed: 0, pending: 0, processing: 0 };
+  for (const item of latestByTrip.values()) {
+    if (item.status === 'awaiting_review') summary.staged += 1;
+    else if (Object.hasOwn(summary, item.status)) summary[item.status] += 1;
+  }
+  await db.doc('welltrans_worker_status/primary').set({
+    state: summary.staged > 0 && summary.pending === 0 && summary.processing === 0
+      ? 'review_ready' : 'calibrated',
+    selectedDate: serviceDate, reviewSummary: summary,
+    reviewSummaryAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return summary;
+}
+
 async function processJob(job, existingSession = null) {
   let browser = existingSession?.browser;
   let page = existingSession?.page;
@@ -357,7 +383,11 @@ async function main() {
       await publishHeartbeat('calibrated');
       const job = await claimNextJobForDate(selectedDate);
       if (job) await processJob(job, session);
-      else if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
+      else {
+        const summary = await publishDateReviewSummary(selectedDate);
+        process.stdout.write(`Review summary for ${selectedDate}: ${summary.staged} staged, ${summary.failed} failed, ${summary.pending} pending.\n`);
+        if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
+      }
     } while (!once);
   } catch (error) {
     console.error(error);

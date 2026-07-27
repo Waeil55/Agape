@@ -73,7 +73,8 @@ async function gridModel(grid, bookingId) {
     const bookingLeft = left('Booking Id');
     const activityLeft = left('Activity');
     const matches = cells.filter(cell =>
-      Number.parseFloat(cell.style.left) === bookingLeft && String(cell.title || '').trim() === String(booking).trim());
+      Number.parseFloat(cell.style.left) === bookingLeft
+      && String(cell.title || cell.textContent || '').trim() === String(booking).trim());
     const columnTitles = [
       'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
       'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
@@ -188,6 +189,7 @@ async function setTextCell(page, grid, model, row, column, value, required = fal
       return false;
     }
   }
+  if (column === 'Vehicle') return false;
   throw new Error(`${column} editor did not open for ${row.activity}`);
 }
 
@@ -204,10 +206,16 @@ async function setListCell(page, grid, model, row, column, option) {
     await selectUniqueListOption(page, option, column);
   } catch (error) {
     // TripSpark's signature list renders its choices outside the accessible DOM.
-    // Its listbox supports keyboard type-ahead; verify the resulting cell before save.
+    // "Rider Signature Received" is the confirmed first option. Click its first
+    // rendered row relative to the edited cell, then verify before review.
     if (column !== 'Signature Captured?') throw error;
-    await page.keyboard.type(option, { delay: 20 });
-    await page.keyboard.press('Enter');
+    const box = await cell.boundingBox();
+    if (box) {
+      await page.mouse.click(box.x + Math.min(80, box.width / 2), box.y + box.height + 12);
+    } else {
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Enter');
+    }
     await page.keyboard.press('Tab');
   }
   await page.waitForTimeout(250);
@@ -219,8 +227,13 @@ async function setListCell(page, grid, model, row, column, option) {
     await cell.dblclick({ force: true });
     const retryListbox = page.locator('.EditorWidgets core\\:listbox').last();
     await retryListbox.locator('.dropdlgbutton').click({ force: true });
-    await page.keyboard.press('Home');
-    await page.keyboard.press('Enter');
+    const retryBox = await cell.boundingBox();
+    if (retryBox) {
+      await page.mouse.click(retryBox.x + Math.min(80, retryBox.width / 2), retryBox.y + retryBox.height + 12);
+    } else {
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Enter');
+    }
     await page.keyboard.press('Tab');
     await page.waitForTimeout(250);
     selected = await cell.evaluate(element =>

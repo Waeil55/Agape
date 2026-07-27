@@ -22,8 +22,9 @@ export const useWellTransSync = (trips = []) => {
   [completedTrips, latestByTrip]);
   const heartbeat = worker?.lastSeenAt?.toDate?.() || (worker?.lastSeenAt ? new Date(worker.lastSeenAt) : null);
   const workerOnline = Boolean(heartbeat && Date.now() - heartbeat.getTime() < 45000
-    && ['online', 'calibrated'].includes(worker?.state));
-  const workerCalibrated = Boolean(workerOnline && worker?.state === 'calibrated' && worker?.selectedDate);
+    && ['online', 'calibrated', 'review_ready', 'review_error'].includes(worker?.state));
+  const workerCalibrated = Boolean(workerOnline
+    && ['calibrated', 'review_ready'].includes(worker?.state) && worker?.selectedDate);
   const workerStandby = Boolean(heartbeat && Date.now() - heartbeat.getTime() < 45000 && worker?.state === 'standby');
   return { settings, logs, worker, workerOnline, workerCalibrated, workerStandby, loading, completedTrips, readyTrips, latestByTrip };
 };
