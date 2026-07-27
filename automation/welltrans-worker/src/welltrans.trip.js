@@ -208,10 +208,24 @@ async function setListCell(page, grid, model, row, column, option) {
     if (column !== 'Signature Captured?') throw error;
     await page.keyboard.type(option, { delay: 20 });
     await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
   }
   await page.waitForTimeout(250);
-  const selected = await cell.evaluate(element =>
+  let selected = await cell.evaluate(element =>
     String(element.title || element.textContent || '').trim());
+  if (column === 'Signature Captured?' && !equalCellValue(column, selected, option)) {
+    // TripSpark can highlight a type-ahead result without committing it.
+    // Reopen the list, select its confirmed first value, and leave the editor.
+    await cell.dblclick({ force: true });
+    const retryListbox = page.locator('.EditorWidgets core\\:listbox').last();
+    await retryListbox.locator('.dropdlgbutton').click({ force: true });
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(250);
+    selected = await cell.evaluate(element =>
+      String(element.title || element.textContent || '').trim());
+  }
   if (!equalCellValue(column, selected, option)) {
     throw new Error(`${column} selection was not confirmed: expected "${option}", found "${selected}"`);
   }
