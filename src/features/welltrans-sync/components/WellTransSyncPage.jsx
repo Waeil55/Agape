@@ -16,7 +16,7 @@ const displayTime = value => {
 };
 
 const WellTransSyncPage = ({ trips = [], role = 'driver' }) => {
-  const { settings, logs, worker, workerOnline, workerStandby, loading, completedTrips, readyTrips, latestByTrip } = useWellTransSync(trips);
+  const { settings, logs, worker, workerOnline, workerCalibrated, workerStandby, loading, completedTrips, readyTrips, latestByTrip } = useWellTransSync(trips);
   const [selectedIds, setSelectedIds] = useState([]);
   const [tab, setTab] = useState('queue');
   const [draftSettings, setDraftSettings] = useState(null);
@@ -75,6 +75,7 @@ const WellTransSyncPage = ({ trips = [], role = 'driver' }) => {
           <button onClick={() => setTab('logs')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700">VIEW LOGS</button>
           <button onClick={() => { setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } }); setTab('settings'); }} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700"><Settings2 size={14} className="mr-1 inline" /> SETTINGS</button>
           {notice && <p className="flex w-full items-center gap-2 px-1 pt-1 text-xs font-bold text-slate-600"><AlertTriangle size={14} className="text-amber-500" />{notice}</p>}
+          {workerCalibrated && <p className="flex w-full items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800"><ShieldCheck size={14} />Worker is attached to the live WellTrans grid for {worker.selectedDate}. Only trips for this exact date can run.</p>}
           {!workerOnline && settings.enabled && <p className="flex w-full items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"><AlertTriangle size={14} />{workerStandby ? 'The worker is connected in safe standby. WellTrans writes remain locked until the TripSpark adapter passes its supervised test.' : 'The queue is enabled, but no active worker heartbeat is available. Queued jobs cannot update WellTrans until the Playwright worker is running.'}</p>}
         </section>
 

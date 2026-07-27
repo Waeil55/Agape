@@ -9,6 +9,11 @@ const portalDate = value => {
   return match ? `${match[3]}-${match[1]}-${match[2]}` : '';
 };
 
+export async function getSelectedPortalDate(page) {
+  await waitForAssignedTask(page);
+  return portalDate(await page.locator('.RunName').last().innerText());
+}
+
 async function waitForAssignedTask(page) {
   await page.waitForFunction(() =>
     Boolean(document.querySelector('.RunName')?.textContent?.trim()
@@ -51,42 +56,93 @@ async function gridModel(grid, bookingId) {
     const activityLeft = left('Activity');
     const matches = cells.filter(cell =>
       Number.parseFloat(cell.style.left) === bookingLeft && String(cell.title || '').trim() === String(booking).trim());
+    const columnTitles = [
+      'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
+      'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
+    ];
     return {
       columns: Object.fromEntries([
-        'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
-        'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
+        ...columnTitles,
       ].map(title => [title, left(title)])),
       rows: matches.map(cell => {
         const top = Number.parseFloat(cell.style.top);
         const activity = cells.find(candidate =>
           Number.parseFloat(candidate.style.left) === activityLeft
           && Number.parseFloat(candidate.style.top) === top)?.title?.trim() || '';
-        return { top, activity };
+        const values = Object.fromEntries(columnTitles.map(title => {
+          const valueCell = cells.find(candidate =>
+            Number.parseFloat(candidate.style.left) === left(title)
+            && Number.parseFloat(candidate.style.top) === top);
+          return [title, String(valueCell?.title || valueCell?.textContent || '').trim()];
+        }));
+        return { top, activity, values };
       }),
     };
   }, String(bookingId));
 }
 
-const cellAt = (grid, top, left) =>
-  grid.locator(`.GridCell[style*="top: ${top}px"][style*="left: ${left}px"]`).first();
+async function exactCell(grid, top, left) {
+  const cells = grid.locator('.GridCell');
+  const count = await cells.count();
+  for (let index = 0; index < count; index += 1) {
+    const cell = cells.nth(index);
+    const coordinates = await cell.evaluate(element => ({
+      top: Number.parseFloat(element.style.top),
+      left: Number.parseFloat(element.style.left),
+    }));
+    if (coordinates.top === top && coordinates.left === left) return cell;
+  }
+  return null;
+}
+
+const normalized = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+const normalizedTime = value => {
+  const match = String(value ?? '').trim().match(/(\d{1,2}):(\d{2})/);
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : normalized(value);
+};
+const normalizedNumber = value => String(value ?? '').replace(/[^\d.-]/g, '');
+
+function equalCellValue(column, actual, expected) {
+  if (column === 'Arrival Time' || column === 'Departure Time') {
+    return normalizedTime(actual) === normalizedTime(expected);
+  }
+  if (column === 'Mileage/Odometer') {
+    return normalizedNumber(actual) === normalizedNumber(expected);
+  }
+  return normalized(actual) === normalized(expected);
+}
 
 async function setTextCell(page, grid, model, row, column, value, required = false) {
   if (value === undefined || value === null || value === '') {
     if (required) throw new Error(`${column} is required for ${row.activity}`);
     return;
   }
-  const cell = cellAt(grid, row.top, model.columns[column]);
-  if (!await cell.count()) throw new Error(`${column} cell is unavailable for ${row.activity}`);
+  if (equalCellValue(column, row.values?.[column], value)) return;
+  const cell = await exactCell(grid, row.top, model.columns[column]);
+  if (!cell) throw new Error(`${column} cell is unavailable for ${row.activity}`);
   await cell.dblclick({ force: true });
-  const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"])').last();
-  await editor.waitFor({ state: 'attached', timeout: 5000 });
-  await editor.fill(String(value));
-  await page.keyboard.press('Tab');
+  const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
+  const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+  if (await editor.count()) {
+    await editor.fill(String(value));
+    await page.keyboard.press('Tab');
+    return;
+  }
+  if (await listbox.count()) {
+    await listbox.locator('.dropdlgbutton').click({ force: true });
+    const choice = page.getByText(String(value), { exact: true }).last();
+    await choice.waitFor({ state: 'visible', timeout: 5000 });
+    await choice.click();
+    return;
+  }
+  throw new Error(`${column} editor did not open for ${row.activity}`);
 }
 
 async function setListCell(page, grid, model, row, column, option) {
   if (!option) return;
-  const cell = cellAt(grid, row.top, model.columns[column]);
+  if (equalCellValue(column, row.values?.[column], option)) return;
+  const cell = await exactCell(grid, row.top, model.columns[column]);
+  if (!cell) throw new Error(`${column} cell is unavailable for ${row.activity}`);
   await cell.dblclick({ force: true });
   const listbox = page.locator('.EditorWidgets core\\:listbox').last();
   await listbox.locator('.dropdlgbutton').click({ force: true });
@@ -102,8 +158,7 @@ async function closeEditorWithoutSaving(page) {
 }
 
 export async function validateWellTransTrip(page, payload) {
-  await waitForAssignedTask(page);
-  const selectedDate = portalDate(await page.locator('.RunName').last().innerText());
+  const selectedDate = await getSelectedPortalDate(page);
   if (selectedDate !== payload.serviceDate) {
     throw new Error(`WellTrans schedule ${selectedDate || 'unknown'} does not match trip service date ${payload.serviceDate}`);
   }
@@ -119,8 +174,7 @@ export async function validateWellTransTrip(page, payload) {
 }
 
 export async function syncWellTransTrip(page, payload) {
-  await waitForAssignedTask(page);
-  const selectedDate = portalDate(await page.locator('.RunName').last().innerText());
+  const selectedDate = await getSelectedPortalDate(page);
   if (selectedDate !== payload.serviceDate) {
     throw new Error(`WellTrans schedule ${selectedDate || 'unknown'} does not match trip service date ${payload.serviceDate}`);
   }
@@ -151,20 +205,48 @@ export async function syncWellTransTrip(page, payload) {
   await setListCell(page, grid, model, dropoff, 'Signature Captured?',
     payload.dropoff.signatureCaptured ? 'Rider Signature Received' : 'Signature Not Requested');
 
-  const apply = page.getByRole('button', { name: 'Apply', exact: true }).last();
-  await apply.click();
-  await page.waitForFunction(
-    selector => document.querySelectorAll(selector).length === 1,
-    GRID_SELECTOR.replaceAll('\\\\', '\\'),
-    { timeout: 20000 },
-  );
+  const expected = [
+    [pickup, 'Driver', payload.driver],
+    [pickup, 'Vehicle', payload.vehicle],
+    [pickup, 'Arrival Time', payload.pickup.arrival],
+    [pickup, 'Departure Time', payload.pickup.departure],
+    [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
+    [pickup, 'Signature Captured?', 'Signature Not Requested'],
+    [dropoff, 'Driver', payload.driver],
+    [dropoff, 'Vehicle', payload.vehicle],
+    [dropoff, 'Arrival Time', payload.dropoff.arrival],
+    [dropoff, 'Departure Time', payload.dropoff.departure],
+    [dropoff, 'Mileage/Odometer', payload.dropoff.mileage],
+    [dropoff, 'Signature Captured?', payload.dropoff.signatureCaptured
+      ? 'Rider Signature Received' : 'Signature Not Requested'],
+  ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
+  const changed = expected.some(([row, column, value]) => !equalCellValue(column, row.values?.[column], value));
+  if (changed) {
+    const apply = page.getByRole('button', { name: 'Apply', exact: true }).last();
+    await apply.click();
+  } else {
+    await closeEditorWithoutSaving(page);
+  }
+  await page.locator(`${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`)
+    .waitFor({ state: 'hidden', timeout: 20000 });
 
   // Reopen and verify that the exact booking still has one row per activity.
   const verifyGrid = await openEditItinerary(page);
   const verified = await gridModel(verifyGrid, payload.bookingId);
   await closeEditorWithoutSaving(page);
-  if (verified.rows.filter(row => /^pickup$/i.test(row.activity)).length !== 1
-    || verified.rows.filter(row => /^dropoff$/i.test(row.activity)).length !== 1) {
-    throw new Error(`Post-save verification failed for Booking ${payload.bookingId}`);
+  const verifiedPickup = verified.rows.filter(row => /^pickup$/i.test(row.activity));
+  const verifiedDropoff = verified.rows.filter(row => /^dropoff$/i.test(row.activity));
+  if (verifiedPickup.length !== 1 || verifiedDropoff.length !== 1) {
+    throw new Error(`Post-save row verification failed for Booking ${payload.bookingId}`);
   }
+  const verificationExpected = expected.map(([row, column, value]) => [
+    /^pickup$/i.test(row.activity) ? verifiedPickup[0] : verifiedDropoff[0], column, value,
+  ]);
+  const mismatches = verificationExpected
+    .filter(([row, column, value]) => !equalCellValue(column, row.values?.[column], value))
+    .map(([row, column, value]) => `${row.activity} ${column}: expected "${value}", found "${row.values?.[column] || ''}"`);
+  if (mismatches.length) {
+    throw new Error(`Post-save value verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
+  }
+  return { selectedDate, changed, verified: true };
 }

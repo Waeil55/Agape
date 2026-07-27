@@ -3,7 +3,7 @@ import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
-import { syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
+import { getSelectedPortalDate, syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
 import { validateTripForWellTrans } from '../../../src/features/welltrans-sync/utils/welltransMapping.js';
 
 initializeApp({ storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'agape-95c9f.firebasestorage.app' });
@@ -25,10 +25,15 @@ const assertAllowedPortal = value => {
   return url.toString();
 };
 
-async function claimNextJob() {
-  const snapshot = await db.collection('welltrans_sync_logs').where('status', '==', 'pending').orderBy('createdAt', 'asc').limit(1).get();
-  if (snapshot.empty) return null;
-  const ref = snapshot.docs[0].ref;
+async function claimNextJobForDate(serviceDate) {
+  const snapshot = await db.collection('welltrans_sync_logs')
+    .where('status', '==', 'pending').orderBy('createdAt', 'asc').limit(500).get();
+  const candidate = snapshot.docs.find(document => {
+    const data = document.data();
+    return String(data.payload?.serviceDate || data.serviceDate || '').slice(0, 10) === serviceDate;
+  });
+  if (!candidate) return null;
+  const ref = candidate.ref;
   return db.runTransaction(async transaction => {
     const fresh = await transaction.get(ref);
     if (!fresh.exists || fresh.data().status !== 'pending') return null;
@@ -84,6 +89,7 @@ async function processJob(job, existingSession = null) {
     await syncWellTransTrip(page, payload, settings.fieldMapping || {});
     await job.ref.update({ status: 'completed', stage: 'verified', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '' });
     await db.doc('welltrans_settings/primary').set({ lastSync: FieldValue.serverTimestamp() }, { merge: true });
+    return true;
   } catch (error) {
     let screenshot = '';
     let screenshotError = '';
@@ -100,6 +106,7 @@ async function processJob(job, existingSession = null) {
       }
     }
     await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: `${String(error?.message || error)}${screenshotError}`.slice(0, 2000), screenshot });
+    return false;
   } finally {
     if (!existingSession) await browser?.close().catch(() => {});
   }
@@ -262,10 +269,10 @@ async function main() {
     return;
   }
   if (process.argv.includes('--standby')) {
-    do {
+    for (;;) {
       await publishHeartbeat('standby');
       await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
-    } while (true);
+    }
   }
   if (process.argv.includes('--dry-run')) {
     await publishHeartbeat('inspection');
@@ -319,13 +326,24 @@ async function main() {
   const stale = await db.collection('welltrans_sync_logs').where('status', '==', 'processing').where('leaseExpiresAt', '<', Timestamp.now()).get();
   await Promise.all(stale.docs.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete() })));
   const once = process.argv.includes('--once');
-  await publishHeartbeat();
-  do {
-    await publishHeartbeat();
-    const job = await claimNextJob();
-    if (job) await processJob(job);
-    else if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
-  } while (!once);
+  const session = await performManualLogin({ keepOpen: true });
+  try {
+    const selectedDate = await getSelectedPortalDate(session.page);
+    await publishHeartbeat('calibrated');
+    await db.doc('welltrans_worker_status/primary').set({
+      selectedDate, calibratedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    process.stdout.write(`Worker calibrated to WellTrans schedule ${selectedDate}. Only this date will be processed.\n`);
+    do {
+      await publishHeartbeat('calibrated');
+      const job = await claimNextJobForDate(selectedDate);
+      if (job) await processJob(job, session);
+      else if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
+    } while (!once);
+  } finally {
+    await publishHeartbeat('offline').catch(() => {});
+    await session.browser.close().catch(() => {});
+  }
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

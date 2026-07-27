@@ -12,6 +12,7 @@
     "dry-run": "node src/index.js --dry-run",
     "run-job": "node src/index.js --run-job",
     "calibrate-job": "node src/index.js --calibrate-job",
+    "calibrate-run": "node src/index.js",
     "start": "node src/index.js",
     "once": "node src/index.js --once",
     "check": "node --check src/index.js"
