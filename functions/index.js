@@ -684,7 +684,8 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
       .where("tripId", "==", tripId).where("status", "in", ["pending", "processing", "awaiting_review", "completed"]).limit(1).get();
     if (!duplicate.empty && data?.mode !== "retry") { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors: ["Already queued or synchronized"] }); continue; }
     await admin.firestore().collection("welltrans_sync_logs").add({
-      tripId, bookingId: payload.bookingId, status: "pending", stage: "queued",
+      tripId, bookingId: payload.bookingId, serviceDate: payload.serviceDate,
+      status: "pending", stage: "queued",
       startedAt: null, completedAt: null, errorMessage: "", screenshot: "",
       syncedBy: context.auth.uid, createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(), attempt: 0,

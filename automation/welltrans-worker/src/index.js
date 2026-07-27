@@ -30,9 +30,14 @@ const assertAllowedPortal = value => {
 };
 
 async function claimNextJobForDate(serviceDate) {
-  const snapshot = await db.collection('welltrans_sync_logs')
-    .where('status', '==', 'pending').limit(500).get();
-  const candidates = [...snapshot.docs].sort((left, right) => {
+  const datedSnapshot = await db.collection('welltrans_sync_logs')
+    .where('serviceDate', '==', serviceDate).limit(500).get();
+  const datedPending = datedSnapshot.docs.filter(document => document.data().status === 'pending');
+  const legacySnapshot = datedPending.length === 0
+    ? await db.collection('welltrans_sync_logs').where('status', '==', 'pending').limit(1000).get()
+    : null;
+  const sourceDocuments = datedPending.length === 0 ? legacySnapshot.docs : datedPending;
+  const candidates = [...sourceDocuments].sort((left, right) => {
     const leftTime = left.data().createdAt?.toMillis?.() || 0;
     const rightTime = right.data().createdAt?.toMillis?.() || 0;
     return leftTime - rightTime;
@@ -354,9 +359,16 @@ async function main() {
       if (job) await processJob(job, session);
       else if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
     } while (!once);
-  } finally {
-    await publishHeartbeat('offline').catch(() => {});
-    await session.browser.close().catch(() => {});
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+    process.stdout.write('\nThe worker encountered an error. The review browser will remain open until you close this PowerShell window.\n');
+    let keepReviewOpen = true;
+    while (keepReviewOpen) {
+      await publishHeartbeat('review_error').catch(() => {});
+      await sleep(10000);
+      keepReviewOpen = !session.browser.isConnected() ? false : keepReviewOpen;
+    }
   }
 }
 

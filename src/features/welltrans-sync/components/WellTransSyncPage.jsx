@@ -31,6 +31,10 @@ const WellTransSyncPage = ({ trips = [], role = 'driver' }) => {
     const date = asDate(trip.completedAt);
     return date && date.toLocaleDateString('en-CA') === todayKey;
   }), [completedTrips, todayKey]);
+  const workerDateReady = useMemo(() => readyTrips.filter(trip => {
+    const raw = String(trip.dateKey || trip.serviceDate || trip.tripDate || trip.scheduledDate || trip.pickupDate || trip.date || '');
+    return worker?.selectedDate && raw.slice(0, 10) === worker.selectedDate;
+  }), [readyTrips, worker?.selectedDate]);
   const successful = logs.filter(log => log.status === 'completed').length;
   const staged = logs.filter(log => log.status === 'awaiting_review').length;
   const failed = logs.filter(log => log.status === 'failed');
@@ -72,6 +76,7 @@ const WellTransSyncPage = ({ trips = [], role = 'driver' }) => {
 
         <section className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <button disabled={!settings.enabled || busy} onClick={() => runQueue(todayCompleted.map(trip => trip.id), 'today')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">{busy === 'today' ? <Loader2 size={14} className="inline animate-spin" /> : 'SYNC TODAY’S TRIPS'}</button>
+          <button disabled={!workerCalibrated || !workerDateReady.length || busy} onClick={() => runQueue(workerDateReady.map(trip => trip.id), 'worker-date')} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">{busy === 'worker-date' ? <Loader2 size={14} className="inline animate-spin" /> : `STAGE ${worker?.selectedDate || 'WORKER DATE'} (${workerDateReady.length})`}</button>
           <button disabled={!settings.enabled || !selectedIds.length || busy} onClick={() => runQueue(selectedIds, 'selected')} className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">SYNC SELECTED TRIPS</button>
           <button disabled={!readyTrips.length} onClick={() => setSelectedIds(readyTrips.map(trip => trip.id))} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-black text-blue-700 disabled:opacity-40">SELECT ALL READY ({readyTrips.length})</button>
           <button disabled={!settings.enabled || !failed.length || busy} onClick={() => runQueue(failed.map(log => log.tripId), 'retry')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700 disabled:opacity-40"><RefreshCw size={14} className="mr-1 inline" /> RETRY FAILED</button>

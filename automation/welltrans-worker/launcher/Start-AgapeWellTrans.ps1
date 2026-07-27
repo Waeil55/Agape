@@ -11,6 +11,7 @@ if (-not $createdNew) {
 
 $workerDirectory = Split-Path -Parent $PSScriptRoot
 $credentialPath = Join-Path $env:USERPROFILE 'AgapeSecrets\agape-worker-service-account.json'
+$logPath = Join-Path $env:USERPROFILE 'AgapeSecrets\welltrans-worker.log'
 
 if (-not (Test-Path -LiteralPath $credentialPath)) {
   throw "Agape Firebase credential was not found at $credentialPath"
@@ -30,6 +31,7 @@ if (-not $env:WELLTRANS_SESSION_KEY -or -not $env:WELLTRANS_SESSION_FILE -or -no
 
 Set-Location -LiteralPath $workerDirectory
 try {
+  Start-Transcript -Path $logPath -Append | Out-Null
   npm run calibrate-run
 
   if ($LASTEXITCODE -ne 0) {
@@ -38,6 +40,7 @@ try {
     Read-Host 'Press Enter to close'
   }
 } finally {
+  Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
   $workerMutex.ReleaseMutex()
   $workerMutex.Dispose()
 }
