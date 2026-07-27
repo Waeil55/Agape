@@ -652,7 +652,6 @@ const buildWellTransJobPayload = (trip = {}) => {
     return normalized && !normalized.includes("pending assignment") && !normalized.includes("medical transportation inc");
   };
   if (!assignmentValid(payload.driver)) errors.push("A valid assigned driver is missing");
-  if (!assignmentValid(payload.vehicle)) errors.push("A valid assigned vehicle is missing");
   if (!payload.pickup.departure) errors.push("Pickup departure is missing");
   if (!payload.dropoff.arrival) errors.push("Dropoff arrival is missing");
   if (payload.dropoff.mileage === null) errors.push("Mileage or valid odometer readings are missing");

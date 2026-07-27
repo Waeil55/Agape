@@ -30,4 +30,14 @@ describe('WellTrans mapping', () => {
     });
     expect(result.valid).toBe(true);
   });
+  it('allows an unavailable vehicle so the worker can leave WellTrans blank', () => {
+    const result = validateTripForWellTrans({
+      bookingId: '107405172', date: '2026-07-24', status: 'Completed',
+      driverId: 'DRV-GGQOR7', arrivalTime: '2026-07-24T10:00:00Z',
+      departedPickupTime: '2026-07-24T10:01:00Z', arrivalDropoffTime: '2026-07-24T10:30:00Z',
+      pickupOdometer: 262986, dropoffOdometer: 263003,
+    });
+    expect(result.valid).toBe(true);
+    expect(result.payload.vehicle).toBe('');
+  });
 });

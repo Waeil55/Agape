@@ -85,7 +85,6 @@ export const validateTripForWellTrans = (trip = {}) => {
   if (payload && !payload.pickup.arrival) errors.push('Pickup arrival is missing');
   if (payload && !payload.serviceDate) errors.push('Service date is missing');
   if (payload && !isOperationalAssignment(payload.driver) && !trip.driverId) errors.push('A valid assigned driver is missing');
-  if (payload && !isOperationalAssignment(payload.vehicle)) errors.push('A valid assigned vehicle is missing');
   if (payload && !payload.pickup.departure) errors.push('Pickup departure is missing');
   if (payload && !payload.dropoff.arrival) errors.push('Dropoff arrival is missing');
   if (payload && payload.dropoff.mileage === null) errors.push('Mileage or valid odometer readings are missing');
