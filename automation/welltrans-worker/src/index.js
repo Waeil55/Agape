@@ -31,8 +31,13 @@ const assertAllowedPortal = value => {
 
 async function claimNextJobForDate(serviceDate) {
   const snapshot = await db.collection('welltrans_sync_logs')
-    .where('status', '==', 'pending').orderBy('createdAt', 'asc').limit(500).get();
-  const candidate = snapshot.docs.find(document => {
+    .where('status', '==', 'pending').limit(500).get();
+  const candidates = [...snapshot.docs].sort((left, right) => {
+    const leftTime = left.data().createdAt?.toMillis?.() || 0;
+    const rightTime = right.data().createdAt?.toMillis?.() || 0;
+    return leftTime - rightTime;
+  });
+  const candidate = candidates.find(document => {
     const data = document.data();
     return String(data.payload?.serviceDate || data.serviceDate || '').slice(0, 10) === serviceDate;
   });
@@ -327,8 +332,10 @@ async function main() {
     await publishHeartbeat('standby');
     throw new Error('WellTrans writes are locked. Set WELLTRANS_ENABLE_WRITES=true only after the TripSpark adapter passes a supervised test.');
   }
-  const stale = await db.collection('welltrans_sync_logs').where('status', '==', 'processing').where('leaseExpiresAt', '<', Timestamp.now()).get();
-  await Promise.all(stale.docs.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete() })));
+  const processing = await db.collection('welltrans_sync_logs').where('status', '==', 'processing').limit(500).get();
+  const now = Date.now();
+  const stale = processing.docs.filter(item => (item.data().leaseExpiresAt?.toMillis?.() || Number.POSITIVE_INFINITY) < now);
+  await Promise.all(stale.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete() })));
   const once = process.argv.includes('--once');
   const session = await performManualLogin({ keepOpen: true });
   try {
