@@ -152,9 +152,9 @@ async function selectUniqueListOption(page, option, column) {
 async function setTextCell(page, grid, model, row, column, value, required = false) {
   if (value === undefined || value === null || value === '') {
     if (required) throw new Error(`${column} is required for ${row.activity}`);
-    return;
+    return false;
   }
-  if (equalCellValue(column, row.values?.[column], value)) return;
+  if (equalCellValue(column, row.values?.[column], value)) return true;
   const cell = await exactCell(grid, row.top, model.columns[column]);
   if (!cell) throw new Error(`${column} cell is unavailable for ${row.activity}`);
   await cell.dblclick({ force: true });
@@ -163,13 +163,19 @@ async function setTextCell(page, grid, model, row, column, value, required = fal
   if (await editor.count()) {
     await editor.fill(String(value));
     await page.keyboard.press('Tab');
-    return;
+    return true;
   }
   if (await listbox.count()) {
     await listbox.locator('.dropdlgbutton').click({ force: true });
     await page.waitForTimeout(250);
-    await selectUniqueListOption(page, value, column);
-    return;
+    try {
+      await selectUniqueListOption(page, value, column);
+      return true;
+    } catch (error) {
+      if (column !== 'Vehicle') throw error;
+      await page.keyboard.press('Escape').catch(() => {});
+      return false;
+    }
   }
   throw new Error(`${column} editor did not open for ${row.activity}`);
 }
@@ -226,14 +232,14 @@ export async function syncWellTransTrip(page, payload) {
   const pickup = pickupRows[0];
   const dropoff = dropoffRows[0];
   await setTextCell(page, grid, model, pickup, 'Driver', payload.driver);
-  await setTextCell(page, grid, model, pickup, 'Vehicle', payload.vehicle);
+  const pickupVehicleSet = await setTextCell(page, grid, model, pickup, 'Vehicle', payload.vehicle);
   await setTextCell(page, grid, model, pickup, 'Arrival Time', payload.pickup.arrival, true);
   await setTextCell(page, grid, model, pickup, 'Departure Time', payload.pickup.departure, true);
   await setTextCell(page, grid, model, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, true);
   await setListCell(page, grid, model, pickup, 'Signature Captured?', 'Signature Not Requested');
 
   await setTextCell(page, grid, model, dropoff, 'Driver', payload.driver);
-  await setTextCell(page, grid, model, dropoff, 'Vehicle', payload.vehicle);
+  const dropoffVehicleSet = await setTextCell(page, grid, model, dropoff, 'Vehicle', payload.vehicle);
   await setTextCell(page, grid, model, dropoff, 'Arrival Time', payload.dropoff.arrival, true);
   await setTextCell(page, grid, model, dropoff, 'Departure Time', payload.dropoff.departure);
   await setTextCell(page, grid, model, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, true);
@@ -242,13 +248,13 @@ export async function syncWellTransTrip(page, payload) {
 
   const expected = [
     [pickup, 'Driver', payload.driver],
-    [pickup, 'Vehicle', payload.vehicle],
+    ...(pickupVehicleSet ? [[pickup, 'Vehicle', payload.vehicle]] : []),
     [pickup, 'Arrival Time', payload.pickup.arrival],
     [pickup, 'Departure Time', payload.pickup.departure],
     [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
     [pickup, 'Signature Captured?', 'Signature Not Requested'],
     [dropoff, 'Driver', payload.driver],
-    [dropoff, 'Vehicle', payload.vehicle],
+    ...(dropoffVehicleSet ? [[dropoff, 'Vehicle', payload.vehicle]] : []),
     [dropoff, 'Arrival Time', payload.dropoff.arrival],
     [dropoff, 'Departure Time', payload.dropoff.departure],
     [dropoff, 'Mileage/Odometer', payload.dropoff.mileage],
@@ -283,5 +289,11 @@ export async function syncWellTransTrip(page, payload) {
   if (mismatches.length) {
     throw new Error(`Post-save value verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
   }
-  return { selectedDate, changed, verified: true };
+  return {
+    selectedDate, changed, verified: true,
+    warnings: [
+      ...(!pickupVehicleSet ? ['Pickup vehicle was left unchanged because no unique WellTrans match was found.'] : []),
+      ...(!dropoffVehicleSet ? ['Dropoff vehicle was left unchanged because no unique WellTrans match was found.'] : []),
+    ],
+  };
 }
