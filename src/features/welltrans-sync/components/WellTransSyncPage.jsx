@@ -16,7 +16,7 @@ const displayTime = value => {
 };
 
 const WellTransSyncPage = ({ trips = [], role = 'driver' }) => {
-  const { settings, logs, loading, completedTrips, readyTrips, latestByTrip } = useWellTransSync(trips);
+  const { settings, logs, worker, workerOnline, loading, completedTrips, readyTrips, latestByTrip } = useWellTransSync(trips);
   const [selectedIds, setSelectedIds] = useState([]);
   const [tab, setTab] = useState('queue');
   const [draftSettings, setDraftSettings] = useState(null);
@@ -61,7 +61,7 @@ const WellTransSyncPage = ({ trips = [], role = 'driver' }) => {
         <header className="rounded-3xl bg-slate-950 px-5 py-5 text-white shadow-xl sm:px-7">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-blue-300">Broker integrations · WellTrans</p><h1 className="mt-2 text-2xl font-black tracking-tight">WellTrans Automation Center</h1><p className="mt-2 max-w-2xl text-xs font-medium text-slate-300">Booking-ID-only matching, controlled field mapping, isolated retries, screenshots and immutable operational history.</p></div>
-            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><span className={`h-2.5 w-2.5 rounded-full ${settings.enabled ? 'bg-emerald-400' : 'bg-amber-400'}`} /><div><p className="text-[10px] font-bold uppercase text-slate-400">Engine</p><p className="text-xs font-black">{settings.enabled ? 'Enabled' : 'Disabled in Settings'}</p></div></div>
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><span className={`h-2.5 w-2.5 rounded-full ${settings.enabled && workerOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} /><div><p className="text-[10px] font-bold uppercase text-slate-400">Automation worker</p><p className="text-xs font-black">{!settings.enabled ? 'Queue disabled' : workerOnline ? `Online · ${worker?.workerId || 'connected'}` : 'Offline · jobs will remain queued'}</p></div></div>
           </div>
         </header>
 
@@ -70,10 +70,12 @@ const WellTransSyncPage = ({ trips = [], role = 'driver' }) => {
         <section className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <button disabled={!settings.enabled || busy} onClick={() => runQueue(todayCompleted.map(trip => trip.id), 'today')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">{busy === 'today' ? <Loader2 size={14} className="inline animate-spin" /> : 'SYNC TODAY’S TRIPS'}</button>
           <button disabled={!settings.enabled || !selectedIds.length || busy} onClick={() => runQueue(selectedIds, 'selected')} className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">SYNC SELECTED TRIPS</button>
+          <button disabled={!readyTrips.length} onClick={() => setSelectedIds(readyTrips.map(trip => trip.id))} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-black text-blue-700 disabled:opacity-40">SELECT ALL READY ({readyTrips.length})</button>
           <button disabled={!settings.enabled || !failed.length || busy} onClick={() => runQueue(failed.map(log => log.tripId), 'retry')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700 disabled:opacity-40"><RefreshCw size={14} className="mr-1 inline" /> RETRY FAILED</button>
           <button onClick={() => setTab('logs')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700">VIEW LOGS</button>
           <button onClick={() => { setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } }); setTab('settings'); }} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700"><Settings2 size={14} className="mr-1 inline" /> SETTINGS</button>
           {notice && <p className="flex w-full items-center gap-2 px-1 pt-1 text-xs font-bold text-slate-600"><AlertTriangle size={14} className="text-amber-500" />{notice}</p>}
+          {!workerOnline && settings.enabled && <p className="flex w-full items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"><AlertTriangle size={14} />The queue is enabled, but no worker heartbeat is available. Queued jobs cannot update WellTrans until the Playwright worker is running.</p>}
         </section>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">

@@ -12,6 +12,9 @@ export const subscribeWellTransSettings = (callback, onError) =>
 export const subscribeWellTransLogs = (callback, onError) =>
   onSnapshot(query(collection(db, 'welltrans_sync_logs'), orderBy('createdAt', 'desc')), snapshot => callback(snapshot.docs.slice(0, 250).map(item => ({ id: item.id, ...item.data() }))), onError);
 
+export const subscribeWellTransWorker = (callback, onError) =>
+  onSnapshot(doc(db, 'welltrans_worker_status', 'primary'), snapshot => callback(snapshot.exists() ? snapshot.data() : null), onError);
+
 export const saveWellTransSettings = (settings, actorId) =>
   setDoc(doc(db, 'welltrans_settings', 'primary'), { ...settings, updatedBy: actorId, updatedAt: new Date().toISOString() }, { merge: true });
 
