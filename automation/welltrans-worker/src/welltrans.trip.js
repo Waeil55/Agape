@@ -54,33 +54,28 @@ async function openEditItinerary(page) {
   return grid;
 }
 
+const normalizeBooking = value => String(value ?? '').trim().replace(/\s+/g, '').replace(/^TRIP-/i, '').toLowerCase();
+
 async function gridModel(grid, bookingId) {
-  await grid.evaluate(element => {
-    for (const scroller of element.querySelectorAll('.GridScroller')) {
-      if (scroller.scrollHeight > scroller.clientHeight) {
-        scroller.scrollTop = 0;
-        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-      }
-    }
-  });
-  await new Promise(resolve => setTimeout(resolve, 150));
-  return grid.evaluate((element, booking) => {
+  const normalizedTarget = normalizeBooking(bookingId);
+  const columnTitles = [
+    'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
+    'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
+  ];
+
+  const extractRows = (element, booking) => {
     const cells = [...element.querySelectorAll('.GridCell')];
     const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
     const left = title => Number.parseFloat(header(title)?.style.left);
     const bookingLeft = left('Booking Id');
     const activityLeft = left('Activity');
-    const matches = cells.filter(cell =>
-      Number.parseFloat(cell.style.left) === bookingLeft
-      && String(cell.title || cell.textContent || '').trim() === String(booking).trim());
-    const columnTitles = [
-      'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
-      'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
-    ];
+    const matches = cells.filter(cell => {
+      if (Number.parseFloat(cell.style.left) !== bookingLeft) return false;
+      const raw = String(cell.title || cell.textContent || '').trim();
+      return normalizeBooking(raw) === normalizeBooking(booking);
+    });
     return {
-      columns: Object.fromEntries([
-        ...columnTitles,
-      ].map(title => [title, left(title)])),
+      columns: Object.fromEntries(columnTitles.map(title => [title, left(title)])),
       rows: matches.map(cell => {
         const top = Number.parseFloat(cell.style.top);
         const activity = cells.find(candidate =>
@@ -95,7 +90,62 @@ async function gridModel(grid, bookingId) {
         return { top, activity, values };
       }),
     };
-  }, String(bookingId));
+  };
+
+  const tryExtract = () => grid.evaluate(extractRows, String(bookingId));
+
+  let result = await tryExtract();
+  if (result.rows.length > 0) return result;
+
+  const scrollerInfo = await grid.evaluate(element => {
+    for (const scroller of element.querySelectorAll('.GridScroller')) {
+      if (scroller.scrollHeight > scroller.clientHeight) {
+        return { scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight };
+      }
+    }
+    return null;
+  });
+
+  if (scrollerInfo) {
+    const step = Math.max(100, Math.floor(scrollerInfo.clientHeight * 0.7));
+    for (let offset = step; offset < scrollerInfo.scrollHeight; offset += step) {
+      await grid.evaluate((element, scrollOffset) => {
+        for (const scroller of element.querySelectorAll('.GridScroller')) {
+          if (scroller.scrollHeight > scroller.clientHeight) {
+            scroller.scrollTop = scrollOffset;
+            scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+          }
+        }
+      }, offset);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      result = await tryExtract();
+      if (result.rows.length > 0) return result;
+    }
+
+    await grid.evaluate(element => {
+      for (const scroller of element.querySelectorAll('.GridScroller')) {
+        if (scroller.scrollHeight > scroller.clientHeight) {
+          scroller.scrollTop = scroller.scrollHeight;
+          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        }
+      }
+    });
+    await new Promise(resolve => setTimeout(resolve, 200));
+    result = await tryExtract();
+    if (result.rows.length > 0) return result;
+
+    await grid.evaluate(element => {
+      for (const scroller of element.querySelectorAll('.GridScroller')) {
+        if (scroller.scrollHeight > scroller.clientHeight) {
+          scroller.scrollTop = 0;
+          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        }
+      }
+    });
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+
+  return await tryExtract();
 }
 
 async function exactCell(grid, top, left) {
