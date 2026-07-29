@@ -1,8 +1,9 @@
 const GRID_SELECTOR = 'core\\:grid[gridobject="Pass.UI.Grid.TripBrokerEventsGrid"]';
 const REQUIRED_COLUMNS = [
   'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
-  'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
+  'Departure Time', 'Mileage/Odometer', 'Signature Captured?', 'Signature Captured',
 ];
+const GRID_COLUMNS = [...REQUIRED_COLUMNS];
 
 const ACTIVITY_PICKUP = /^(pickup|pick\s*up|pu)$/i;
 const ACTIVITY_DROPOFF = /^(dropoff|drop\s*off|do|drop)$/i;
@@ -60,25 +61,18 @@ async function openEditItinerary(page) {
 const normalizeBooking = value => String(value ?? '').trim().replace(/\s+/g, '').replace(/^TRIP-/i, '').toLowerCase();
 
 async function gridModel(grid, bookingId) {
-  const columnTitles = [
-    'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
-    'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
-  ];
-
-  const extractAllCells = () => grid.evaluate((element) => {
+  const extractVisibleRows = () => grid.evaluate((element, columnTitles) => {
     const cells = [...element.querySelectorAll('.GridCell')];
     const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
     const left = title => Number.parseFloat(header(title)?.style.left);
     const columns = Object.fromEntries(columnTitles.map(title => [title, left(title)]));
     const bookingLeft = left('Booking Id');
-    const activityLeft = left('Activity');
     const rowMap = new Map();
     for (const cell of cells) {
-      const cellLeft = Number.parseFloat(cell.style.left);
       const cellTop = Number.parseFloat(cell.style.top);
       if (cellTop === 0 || !Number.isFinite(cellTop)) continue;
       const raw = String(cell.title || cell.textContent || '').trim();
-      if (cellLeft === bookingLeft) {
+      if (Number.parseFloat(cell.style.left) === bookingLeft) {
         const key = String(cellTop);
         if (!rowMap.has(key)) rowMap.set(key, { top: cellTop, bookingRaw: raw, values: {} });
         rowMap.get(key).bookingRaw = raw;
@@ -86,7 +80,6 @@ async function gridModel(grid, bookingId) {
       }
     }
     for (const cell of cells) {
-      const cellLeft = Number.parseFloat(cell.style.left);
       const cellTop = Number.parseFloat(cell.style.top);
       if (cellTop === 0 || !Number.isFinite(cellTop)) continue;
       const key = String(cellTop);
@@ -102,14 +95,9 @@ async function gridModel(grid, bookingId) {
       row.activity = row.values['Activity'] || '';
     }
     return { columns, rows: [...rowMap.values()] };
-  });
+  }, GRID_COLUMNS);
 
-  const matchRows = (allRows, target) => {
-    const normalizedTarget = normalizeBooking(target);
-    return allRows.filter(row => normalizeBooking(row.bookingRaw) === normalizedTarget);
-  };
-
-  const scrollGridTo = async (offset) => grid.evaluate((element, scrollOffset) => {
+  const scrollGridTo = offset => grid.evaluate((element, scrollOffset) => {
     for (const scroller of element.querySelectorAll('.GridScroller')) {
       scroller.scrollTop = scrollOffset;
       scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
@@ -131,40 +119,89 @@ async function gridModel(grid, bookingId) {
   });
 
   const positions = await getAllScrollPositions();
-  const allRowsMap = new Map();
+  const target = normalizeBooking(bookingId);
+  const matchedRows = new Map();
 
   for (const pos of positions) {
     await scrollGridTo(pos);
-    await new Promise(resolve => setTimeout(resolve, 150));
-    const extracted = await extractAllCells();
-    for (const row of extracted.rows) {
-      const key = String(row.top);
-      if (!allRowsMap.has(key)) {
-        allRowsMap.set(key, row);
-      } else {
-        const existing = allRowsMap.get(key);
-        for (const title of columnTitles) {
-          if (!existing.values[title] && row.values[title]) {
-            existing.values[title] = row.values[title];
-          }
-        }
-      }
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const extracted = await extractVisibleRows();
+    for (const row of extracted.rows.filter(item => normalizeBooking(item.bookingRaw) === target)) {
+      const key = `${normalizeBooking(row.bookingRaw)}|${normalized(row.activity)}|${row.top}`;
+      if (!matchedRows.has(key)) matchedRows.set(key, { ...row, scrollOffset: pos });
+    }
+    const rows = [...matchedRows.values()];
+    if (rows.some(row => ACTIVITY_PICKUP.test(row.activity))
+      && rows.some(row => ACTIVITY_DROPOFF.test(row.activity))) {
+      break;
     }
   }
 
-  await scrollGridTo(0);
-  await new Promise(resolve => setTimeout(resolve, 100));
+  return { rows: [...matchedRows.values()] };
+}
 
-  const allRows = [...allRowsMap.values()];
-  return {
-    columns: allRows[0]?.values ? Object.fromEntries(
-      columnTitles.map(title => {
-        const headerCell = allRows.find(r => r.values[title] !== undefined);
-        return [title, 0];
-      })
-    ) : {},
-    rows: matchRows(allRows, bookingId),
-  };
+async function scrollGridTo(grid, offset) {
+  await grid.evaluate((element, scrollOffset) => {
+    for (const scroller of element.querySelectorAll('.GridScroller')) {
+      scroller.scrollTop = scrollOffset;
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+    }
+  }, offset);
+  await new Promise(resolve => setTimeout(resolve, 200));
+}
+
+async function visibleGridRows(grid) {
+  return grid.evaluate((element, columnTitles) => {
+    const cells = [...element.querySelectorAll('.GridCell')];
+    const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
+    const columns = Object.fromEntries(columnTitles.map(title => [
+      title,
+      Number.parseFloat(header(title)?.style.left),
+    ]));
+    const bookingLeft = columns['Booking Id'];
+    const rowMap = new Map();
+    for (const cell of cells) {
+      const top = Number.parseFloat(cell.style.top);
+      const left = Number.parseFloat(cell.style.left);
+      if (top === 0 || !Number.isFinite(top) || left !== bookingLeft) continue;
+      rowMap.set(String(top), {
+        top,
+        bookingRaw: String(cell.title || cell.textContent || '').trim(),
+        values: {},
+      });
+    }
+    for (const cell of cells) {
+      const top = Number.parseFloat(cell.style.top);
+      const row = rowMap.get(String(top));
+      if (!row) continue;
+      const left = Number.parseFloat(cell.style.left);
+      for (const title of columnTitles) {
+        if (left === columns[title]) {
+          row.values[title] = String(cell.title || cell.textContent || '').trim();
+        }
+      }
+    }
+    return [...rowMap.values()].map(row => ({
+      ...row,
+      activity: row.values['Activity'] || '',
+    }));
+  }, GRID_COLUMNS);
+}
+
+async function ensureLiveRow(grid, row) {
+  const targetBooking = normalizeBooking(row.bookingRaw);
+  const targetActivity = normalized(row.activity);
+  const offsets = [row.scrollOffset, Math.max(0, row.scrollOffset - 80), row.scrollOffset + 80]
+    .filter((value, index, list) => Number.isFinite(value) && list.indexOf(value) === index);
+
+  for (const offset of offsets) {
+    await scrollGridTo(grid, offset);
+    const matches = (await visibleGridRows(grid)).filter(candidate =>
+      normalizeBooking(candidate.bookingRaw) === targetBooking
+      && normalized(candidate.activity) === targetActivity);
+    if (matches.length === 1) return { ...matches[0], scrollOffset: offset };
+  }
+  throw new Error(`Booking ${row.bookingRaw} ${row.activity} row is not currently addressable in the virtual grid`);
 }
 
 async function exactCell(grid, top, left) {
@@ -206,6 +243,7 @@ function equalCellValue(column, actual, expected) {
     return Number.isFinite(actualNumber) && Number.isFinite(expectedNumber)
       && Math.abs(actualNumber - expectedNumber) < 0.001;
   }
+  if (column === 'Signature Captured') return Boolean(actual) === Boolean(expected);
   return normalized(actual) === normalized(expected);
 }
 
@@ -315,7 +353,7 @@ async function selectListOption(page, option, column) {
     return;
   }
 
-  if (column === 'Vehicle' || column === 'Driver') {
+  if (column === 'Vehicle' || column === 'Driver' || column === 'Signature Captured?') {
     throw new Error(`${column} option "${optionStr}" was not found in dropdown.`
       + `${availableOptions.length ? ` Available: ${availableOptions.slice(0, 20).join(', ')}` : ' Dropdown may be empty.'}`);
   }
@@ -341,10 +379,11 @@ async function setTextCell(page, grid, row, column, value, required = false) {
   }
   const colLeft = await resolveColumnLeft(grid, column);
   if (colLeft === null) throw new Error(`${column} column not found in grid`);
-  if (equalCellValue(column, row.values?.[column], value)) return true;
+  const liveRow = await ensureLiveRow(grid, row);
+  if (equalCellValue(column, liveRow.values?.[column], value)) return true;
 
-  const cell = await exactCell(grid, row.top, colLeft);
-  if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity} (top=${row.top})`);
+  const cell = await exactCell(grid, liveRow.top, colLeft);
+  if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity} (top=${liveRow.top})`);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await cell.dblclick({ force: true });
@@ -388,12 +427,13 @@ async function setTextCell(page, grid, row, column, value, required = false) {
 
 async function setListCell(page, grid, row, column, option) {
   if (!option) return;
-  if (equalCellValue(column, row.values?.[column], option)) return;
 
   const colLeft = await resolveColumnLeft(grid, column);
   if (colLeft === null) throw new Error(`${column} column not found in grid`);
+  const liveRow = await ensureLiveRow(grid, row);
+  if (equalCellValue(column, liveRow.values?.[column], option)) return;
 
-  const cell = await exactCell(grid, row.top, colLeft);
+  const cell = await exactCell(grid, liveRow.top, colLeft);
   if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity}`);
 
   await cell.dblclick({ force: true });
@@ -405,8 +445,12 @@ async function setListCell(page, grid, row, column, option) {
 
   if (column === 'Signature Captured?') {
     await openListDropdown(page);
-    for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
-    await page.keyboard.press('Enter');
+    try {
+      await selectListOption(page, option, column);
+    } catch {
+      for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
+      await page.keyboard.press('Enter');
+    }
     await page.keyboard.press('Tab');
   } else {
     await openListDropdown(page);
@@ -435,6 +479,28 @@ async function setListCell(page, grid, row, column, option) {
   if (!equalCellValue(column, selected, option)) {
     throw new Error(`${column} selection not confirmed: expected "${option}", found "${selected}"`);
   }
+}
+
+async function readCellValue(grid, row, column) {
+  const left = await resolveColumnLeft(grid, column);
+  if (left === null) throw new Error(`${column} column not found in grid`);
+  const liveRow = await ensureLiveRow(grid, row);
+  const cell = await exactCell(grid, liveRow.top, left);
+  if (!cell) throw new Error(`${column} cell unavailable for ${row.activity}`);
+  if (column === 'Signature Captured') {
+    return cell.evaluate(element => {
+      const checkbox = element.querySelector('input[type="checkbox"]');
+      if (checkbox) return checkbox.checked;
+      if (element.getAttribute('aria-checked') === 'true') return true;
+      if (element.querySelector(
+        '[aria-checked="true"], [checked], .checked, .Checked, .CheckBoxChecked, img[src*="check" i]',
+      )) return true;
+      const text = String(element.title || element.textContent || '').trim().toLowerCase();
+      if (['true', 'yes', 'checked', 'captured', '1', '✓'].includes(text)) return true;
+      return /check|tick/.test(getComputedStyle(element).backgroundImage || '');
+    });
+  }
+  return cell.evaluate(element => String(element.title || element.textContent || '').trim());
 }
 
 export async function validateWellTransTrip(page, payload) {
@@ -487,44 +553,33 @@ export async function syncWellTransTrip(page, payload) {
     await setListCell(page, grid, dropoff, 'Signature Captured?', 'Rider Signature Received');
   }
 
-  const colLefts = {};
-  for (const title of REQUIRED_COLUMNS) {
-    colLefts[title] = await resolveColumnLeft(grid, title);
-  }
-
   const expected = [
-    ...(pickupDriverSet ? [[pickup.top, 'Driver', payload.driver]] : []),
-    ...(pickupVehicleSet ? [[pickup.top, 'Vehicle', payload.vehicle]] : []),
-    [pickup.top, 'Arrival Time', payload.pickup.arrival],
-    [pickup.top, 'Departure Time', payload.pickup.departure],
-    [pickup.top, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
-    ...(dropoffDriverSet ? [[dropoff.top, 'Driver', payload.driver]] : []),
-    ...(dropoffVehicleSet ? [[dropoff.top, 'Vehicle', payload.vehicle]] : []),
-    [dropoff.top, 'Arrival Time', payload.dropoff.arrival],
-    [dropoff.top, 'Departure Time', payload.dropoff.departure],
-    [dropoff.top, 'Mileage/Odometer', payload.dropoff.mileage],
+    ...(pickupDriverSet ? [[pickup, 'Driver', payload.driver]] : []),
+    ...(pickupVehicleSet ? [[pickup, 'Vehicle', payload.vehicle]] : []),
+    [pickup, 'Arrival Time', payload.pickup.arrival],
+    [pickup, 'Departure Time', payload.pickup.departure],
+    [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
+    ...(dropoffDriverSet ? [[dropoff, 'Driver', payload.driver]] : []),
+    ...(dropoffVehicleSet ? [[dropoff, 'Vehicle', payload.vehicle]] : []),
+    [dropoff, 'Arrival Time', payload.dropoff.arrival],
+    [dropoff, 'Departure Time', payload.dropoff.departure],
+    [dropoff, 'Mileage/Odometer', payload.dropoff.mileage],
     ...(payload.dropoff.signatureCaptured
       ? [
-        [pickup.top, 'Signature Captured?', 'Rider Signature Received'],
-        [dropoff.top, 'Signature Captured?', 'Rider Signature Received'],
+        [pickup, 'Signature Captured?', 'Rider Signature Received'],
+        [dropoff, 'Signature Captured?', 'Rider Signature Received'],
+        [pickup, 'Signature Captured', true],
+        [dropoff, 'Signature Captured', true],
       ] : []),
   ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
 
   await page.waitForTimeout(400);
 
   const mismatches = [];
-  for (const [rowTop, column, value] of expected) {
-    const left = colLefts[column];
-    if (left === null) continue;
-    const cell = await exactCell(grid, rowTop, left);
-    if (!cell) {
-      mismatches.push(`${column} at top ${rowTop}: cell not found`);
-      continue;
-    }
-    const actual = await cell.evaluate(element =>
-      String(element.title || element.textContent || '').trim());
+  for (const [row, column, value] of expected) {
+    const actual = await readCellValue(grid, row, column);
     if (!equalCellValue(column, actual, value)) {
-      mismatches.push(`${column} at top ${rowTop}: expected "${value}", found "${actual}"`);
+      mismatches.push(`${row.activity} ${column}: expected "${value}", found "${actual}"`);
     }
   }
 

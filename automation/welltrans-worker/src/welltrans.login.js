@@ -51,22 +51,14 @@ async function detectAndOpenAssignedTask(page) {
 }
 
 export async function performManualLogin({ keepOpen = false, reuseSession = false } = {}) {
-  let settings = {};
-  try {
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const db = getFirestore();
-    const settingsSnap = await db.doc('welltrans_settings/primary').get();
-    if (settingsSnap.exists) settings = settingsSnap.data() || {};
-  } catch {}
-
   const { browser, context, page } = await openWellTransBrowser({ headed: true, withoutSession: !reuseSession });
   await page.goto(process.env.WELLTRANS_PORTAL_URL, { waitUntil: 'domcontentloaded' });
 
-  const username = settings.portalUsername || process.env.WELLTRANS_USERNAME || '';
-  const password = settings.portalPassword || process.env.WELLTRANS_PASSWORD || '';
+  const username = process.env.WELLTRANS_USERNAME || '';
+  const password = process.env.WELLTRANS_PASSWORD || '';
 
   if (username && password) {
-    process.stdout.write('Attempting auto-login with saved credentials...\n');
+    process.stdout.write('Attempting auto-login with credentials stored on this worker computer...\n');
     try {
       const loggedIn = await autoLogin(page, username, password);
       if (loggedIn) {

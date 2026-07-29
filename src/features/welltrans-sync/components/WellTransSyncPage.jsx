@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
-  AlertTriangle, Bot, CheckCircle2, Clock3, Code, Download, ExternalLink, Eye,
-  FileText, Filter, Loader2, Play, RefreshCw, RotateCcw, Save, Search, Settings2,
+  AlertTriangle, Bot, CheckCircle2, Code, Download, Eye,
+  Loader2, Play, RefreshCw, RotateCcw, Save, Search,
   ShieldCheck, Sparkles, X, XCircle, ChevronLeft, ChevronRight, Image, Copy,
-  BarChart3, Zap, Undo2, ListFilter, SkipForward, Activity,
+  BarChart3, Zap, ListFilter, Activity,
 } from 'lucide-react';
 import { auth } from '../../../config/firebase';
 import { useWellTransSync } from '../hooks/useWellTransSync';
@@ -50,7 +50,6 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [autoRetry, setAutoRetry] = useState(() => {
     try { return JSON.parse(localStorage.getItem('agape_wt_autoRetry') || '{}'); } catch { return {}; }
   });
-  const [historyMode, setHistoryMode] = useState(false);
   const bulkMenuRef = useRef(null);
   const pageRef = useRef(null);
 
@@ -66,7 +65,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
 
   const { autoLog } = useWellTransAutoSync({
     settings: effectiveSettings, worker, readyTrips, retryableFailed,
-    syncDate, busy, workerDateMatches,
+    retryCategories: autoRetry, syncDate, busy, workerDateMatches,
   });
 
   const enrichedTrips = useMemo(() => {
@@ -96,19 +95,24 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     });
   }, [enrichedTrips, searchQuery, statusFilter, latestByTrip]);
 
-  const historyDates = useMemo(() => {
-    if (!historyMode) return [];
-    const dates = new Set();
-    logs.forEach(l => { if (l.serviceDate) dates.add(l.serviceDate); });
-    return [...dates].sort().reverse().slice(0, 30);
-  }, [historyMode, logs]);
-
   const workerActivity = useMemo(() => {
     return currentLogs
       .filter(l => l.status === 'processing' || l.status === 'pending')
       .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
       .slice(0, 10);
   }, [currentLogs]);
+
+  const runQueue = useCallback(async (ids, mode) => {
+    if (!ids.length) return setNotice('No eligible trips selected.');
+    setBusy(mode); setNotice(''); setSyncProgress({ done: 0, total: ids.length });
+    try {
+      const result = await queueWellTransSync(ids, mode, syncDate);
+      setNotice(`${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued. ${result.data.rejected || 0} rejected.`);
+      setSelectedIds([]);
+      setTimeout(() => setSyncProgress(null), 5000);
+    } catch (e) { setNotice(e.message || 'Unable to create queue.'); setSyncProgress(null); }
+    finally { setBusy(''); }
+  }, [syncDate]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -132,7 +136,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [filteredTrips, workerDateMatches, retryableFailed, busy]);
+  }, [filteredTrips, workerDateMatches, retryableFailed, busy, runQueue]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -157,18 +161,6 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       </div>
     );
   }
-
-  const runQueue = async (ids, mode) => {
-    if (!ids.length) return setNotice('No eligible trips selected.');
-    setBusy(mode); setNotice(''); setSyncProgress({ done: 0, total: ids.length });
-    try {
-      const result = await queueWellTransSync(ids, mode, syncDate);
-      setNotice(`${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued. ${result.data.rejected || 0} rejected.`);
-      setSelectedIds([]);
-      setTimeout(() => setSyncProgress(null), 5000);
-    } catch (e) { setNotice(e.message || 'Unable to create queue.'); setSyncProgress(null); }
-    finally { setBusy(''); }
-  };
 
   const handleBulkSelect = (type) => {
     setBulkMenuOpen(false);
@@ -609,21 +601,11 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 placeholder="https://tripspark.welltransnemt.com/"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400" />
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600">Portal Username</label>
-                <input value={effectiveSettings.portalUsername || ''}
-                  onChange={e => setDraftSettings(v => ({ ...v, portalUsername: e.target.value }))}
-                  placeholder="e.g. agape.admin"
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600">Portal Password</label>
-                <input type="password" value={effectiveSettings.portalPassword || ''}
-                  onChange={e => setDraftSettings(v => ({ ...v, portalPassword: e.target.value }))}
-                  placeholder="Stored encrypted on worker"
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400" />
-              </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-[11px] font-semibold text-emerald-900">Credentials stay on the worker computer</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-emerald-800">
+                Agape never stores the WellTrans username or password in Firestore. The local worker reuses its encrypted browser session and requests a manual sign-in only when that session expires.
+              </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
               <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5"><Activity size={13} /> Self-Control</p>

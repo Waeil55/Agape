@@ -1,9 +1,10 @@
-import { collection, db, doc, functions, httpsCallable, onSnapshot, query, setDoc, where } from '../../../config/firebase';
+import {
+  collection, db, deleteField, doc, functions, httpsCallable, onSnapshot, query, setDoc, where,
+} from '../../../config/firebase';
 import { DEFAULT_WELLTRANS_FIELD_MAPPING } from '../utils/welltransMapping';
 
 export const DEFAULT_SETTINGS = {
   enabled: false, portalUrl: 'https://tripspark.welltransnemt.com/', automationMethod: 'playwright', lastSync: null,
-  portalUsername: '', portalPassword: '',
   autoStart: false, autoQueue: false, autoRetryEnabled: false,
   autoRetryDelayMs: 30000, maxConcurrent: 1,
   fieldMapping: DEFAULT_WELLTRANS_FIELD_MAPPING,
@@ -36,8 +37,30 @@ export const subscribeWellTransLogs = (serviceDate, callback, onError) => {
 export const subscribeWellTransWorker = (callback, onError) =>
   onSnapshot(doc(db, 'welltrans_worker_status', 'primary'), snapshot => callback(snapshot.exists() ? snapshot.data() : null), onError);
 
-export const saveWellTransSettings = (settings, actorId) =>
-  setDoc(doc(db, 'welltrans_settings', 'primary'), { ...settings, updatedBy: actorId, updatedAt: new Date().toISOString() }, { merge: true });
+export const saveWellTransSettings = (settings, actorId) => {
+  const {
+    portalUsername: _portalUsername,
+    portalPassword: _portalPassword,
+    password: _password,
+    credentials: _credentials,
+    token: _token,
+    accessToken: _accessToken,
+    refreshToken: _refreshToken,
+    ...safeSettings
+  } = settings || {};
+  return setDoc(doc(db, 'welltrans_settings', 'primary'), {
+    ...safeSettings,
+    portalUsername: deleteField(),
+    portalPassword: deleteField(),
+    password: deleteField(),
+    credentials: deleteField(),
+    token: deleteField(),
+    accessToken: deleteField(),
+    refreshToken: deleteField(),
+    updatedBy: actorId,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+};
 
 export const queueWellTransSync = (tripIds, mode, serviceDate) =>
   httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate });
@@ -61,7 +84,7 @@ export const explainWellTransFailure = (log) => {
   const lower = message.toLowerCase();
   if (lower.includes('mileage')) return `Trip ${log.bookingId || log.tripId} failed because a valid mileage value was unavailable or the WellTrans mileage field could not be located. Verify both odometer readings and the configured field mapping, then retry.`;
   if (lower.includes('booking')) return `Trip ${log.bookingId || log.tripId} could not be matched by Booking ID. Passenger names are intentionally not used as a fallback. Confirm the exact WellTrans Booking ID, then retry.`;
-  if (lower.includes('session') || lower.includes('login') || lower.includes('auth')) return `The WellTrans session is unavailable or expired. Check the saved portal credentials under Settings, then retry. If the password was changed, update it in Settings.`;
+  if (lower.includes('session') || lower.includes('login') || lower.includes('auth')) return `The encrypted WellTrans browser session is unavailable or expired. Start the local worker, sign in manually, and reopen TRIPS - ASSIGNED. Agape never stores the broker password.`;
   if (lower.includes('selector') || lower.includes('field')) return `WellTrans did not expose an expected field for trip ${log.bookingId || log.tripId}. Review the captured screenshot and update the selector configuration before retrying.`;
   return `Trip ${log.bookingId || log.tripId} failed during the ${log.stage || 'automation'} stage: ${message} Review the screenshot and retry after correcting the source data or portal configuration.`;
 };
@@ -114,8 +137,7 @@ export const exportTripsQueueCSV = (trips = [], logs = [], serviceDate = '') => 
   });
   const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectObject ? URL.createObjectURL(blob) : '';
-  if (!url) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `WellTrans_Queue_${serviceDate || 'all'}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); return; }
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
   link.setAttribute('download', `WellTrans_Queue_${serviceDate || 'all'}.csv`);
@@ -136,4 +158,3 @@ export const categorizeFailure = (log) => {
   const msg = String(log?.errorMessage || '').toLowerCase();
   return FAILURE_CATEGORIES.find(c => c.match(msg))?.key || 'other';
 };
-

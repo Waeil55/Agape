@@ -14,7 +14,7 @@ initializeApp({
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '1.2.0';
+const workerVersion = '1.3.0';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
@@ -110,8 +110,18 @@ async function migrateLegacyDateJobs(serviceDate) {
       latestByTrip.set(data.tripId, { ref: document.ref, data, updatedAt });
     }
   }
+  const isOlderWorkerVersion = value => {
+    const currentParts = workerVersion.split('.').map(Number);
+    const valueParts = String(value || '0.0.0').split('.').map(part => Number(part) || 0);
+    for (let index = 0; index < Math.max(currentParts.length, valueParts.length); index += 1) {
+      const currentPart = currentParts[index] || 0;
+      const valuePart = valueParts[index] || 0;
+      if (currentPart !== valuePart) return valuePart < currentPart;
+    }
+    return false;
+  };
   const legacy = [...latestByTrip.values()].filter(({ data }) => {
-    if (data.workerVersion) return false;
+    if (!isOlderWorkerVersion(data.workerVersion)) return false;
     if (data.status === 'awaiting_review') return true;
     if (data.status !== 'failed') return false;
     const failure = String(data.errorMessage || '').toLowerCase();
@@ -133,8 +143,10 @@ async function migrateLegacyDateJobs(serviceDate) {
 }
 
 async function processJob(job, existingSession = null) {
-  let browser = existingSession?.browser;
-  let page = existingSession?.page;
+  if (!existingSession?.browser || !existingSession?.page) {
+    throw new Error('WellTrans staging requires a calibrated headed browser session so an operator can review every field before Apply.');
+  }
+  const page = existingSession.page;
   try {
     const tripSnapshot = await db.doc(`trips/${job.tripId}`).get();
     if (!tripSnapshot.exists) throw new Error(`Source trip ${job.tripId} no longer exists`);
@@ -154,10 +166,7 @@ async function processJob(job, existingSession = null) {
       vehicle: settings.vehicleValueMapping?.[validation.payload.vehicle] || validation.payload.vehicle,
     };
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
-    if (!existingSession) {
-      ({ browser, page } = await openWellTransBrowser());
-      await page.goto(portalUrl, { waitUntil: 'domcontentloaded' });
-    } else if (!page.url().startsWith(new URL(portalUrl).origin)) {
+    if (!page.url().startsWith(new URL(portalUrl).origin)) {
       throw new Error('Calibrated WellTrans page is not on the allowed portal host');
     }
     await job.ref.update({ stage: 'matching_booking', updatedAt: FieldValue.serverTimestamp() });
@@ -191,8 +200,6 @@ async function processJob(job, existingSession = null) {
       await page.waitForTimeout(100).catch(() => {});
     }
     return false;
-  } finally {
-    if (!existingSession) await browser?.close().catch(() => {});
   }
 }
 
@@ -383,23 +390,19 @@ async function main() {
     return;
   }
   if (process.argv.includes('--run-job')) {
-    if (process.env.WELLTRANS_ENABLE_WRITES !== 'true') throw new Error('WELLTRANS_ENABLE_WRITES=true is required for --run-job');
-    const logId = process.argv[process.argv.indexOf('--run-job') + 1];
-    if (!logId) throw new Error('Usage: node src/index.js --run-job <welltrans_sync_log_id>');
-    await publishHeartbeat('online');
-    await processJob(await claimJobById(logId));
-    return;
+    throw new Error('--run-job is disabled because it cannot preserve a headed browser for mandatory manual review. Use --calibrate-job or calibrate-run.');
   }
   if (process.argv.includes('--calibrate-job')) {
     if (process.env.WELLTRANS_ENABLE_WRITES !== 'true') throw new Error('WELLTRANS_ENABLE_WRITES=true is required for --calibrate-job');
     const logId = process.argv[process.argv.indexOf('--calibrate-job') + 1];
     if (!logId) throw new Error('Usage: node src/index.js --calibrate-job <welltrans_sync_log_id>');
     const session = await performManualLogin({ keepOpen: true });
-    try {
-      await publishHeartbeat('online');
-      await processJob(await claimJobById(logId), session);
-    } finally {
-      await session.browser.close().catch(() => {});
+    await publishHeartbeat('online');
+    await processJob(await claimJobById(logId), session);
+    process.stdout.write('Trip staged for review. The browser will remain open; review all fields and click Apply yourself when ready.\n');
+    while (session.browser.isConnected()) {
+      await publishHeartbeat('review_ready').catch(() => {});
+      await sleep(10000);
     }
     return;
   }
@@ -422,7 +425,7 @@ async function main() {
     process.stdout.write(`Worker calibrated to WellTrans schedule ${selectedDate}. Only this date will be processed.\n`);
     const migrated = await migrateLegacyDateJobs(selectedDate);
     if (migrated) {
-      process.stdout.write(`Worker upgrade recovery: ${migrated} legacy trip(s) queued for complete field restaging.\n`);
+      process.stdout.write(`Worker upgrade recovery: ${migrated} earlier-worker trip(s) queued for complete field restaging.\n`);
     }
     do {
       await publishHeartbeat('calibrated');

@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { queueWellTransSync } from '../services/welltransService';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { categorizeFailure, queueWellTransSync } from '../services/welltransService';
 
 const WORKER_OFFLINE_THRESHOLD_MS = 60000;
 const AUTO_START_INTERVAL_MS = 30000;
 const AUTO_QUEUE_DELAY_MS = 3000;
-const AUTO_RETRY_DELAY_MS = 10000;
 
 const isWorkerOffline = (worker, now) => {
   if (!worker) return true;
@@ -13,12 +12,7 @@ const isWorkerOffline = (worker, now) => {
   return !heartbeat || (now - heartbeat.getTime() > WORKER_OFFLINE_THRESHOLD_MS) || state === 'error' || state === 'offline';
 };
 
-const isWorkerBusy = (worker) => {
-  const state = worker?.state;
-  return state === 'processing' || state === 'calibrating' || state === 'starting';
-};
-
-const isWorkerReady = (worker, selectedDate, syncDate) => {
+const isWorkerReady = (worker, syncDate) => {
   if (!worker) return false;
   const heartbeat = worker?.lastSeenAt?.toDate?.() || (worker?.lastSeenAt ? new Date(worker.lastSeenAt) : null);
   if (!heartbeat) return false;
@@ -32,6 +26,7 @@ export const useWellTransAutoSync = ({
   worker,
   readyTrips,
   retryableFailed,
+  retryCategories,
   syncDate,
   busy,
   workerDateMatches,
@@ -43,10 +38,11 @@ export const useWellTransAutoSync = ({
   const autoStartAttemptRef = useRef(0);
   const runningRef = useRef(false);
 
-  const logEntry = (msg) => {
+  const logEntry = useCallback((msg) => {
     const ts = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setAutoLog(prev => [...prev.slice(-49), { ts, msg, id: Date.now() + Math.random() }]);
-  };
+    const entry = { ts, msg, id: Date.now() + Math.random() };
+    queueMicrotask(() => setAutoLog(prev => [...prev.slice(-49), entry]));
+  }, []);
 
   // Auto-start worker when offline
   useEffect(() => {
@@ -71,7 +67,7 @@ export const useWellTransAutoSync = ({
     }, AUTO_START_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [settings.autoStart, settings.enabled, worker]);
+  }, [settings.autoStart, settings.enabled, worker, logEntry]);
 
   // Auto-queue ready trips when worker is ready
   useEffect(() => {
@@ -81,7 +77,7 @@ export const useWellTransAutoSync = ({
     const now = Date.now();
     if (now - lastAutoQueueRef.current < AUTO_QUEUE_DELAY_MS) return;
 
-    if (isWorkerReady(worker, null, syncDate) && readyTrips.length > 0) {
+    if (isWorkerReady(worker, syncDate) && readyTrips.length > 0) {
       lastAutoQueueRef.current = now;
       runningRef.current = true;
       logEntry(`Auto-queueing ${readyTrips.length} ready trip(s)...`);
@@ -90,7 +86,7 @@ export const useWellTransAutoSync = ({
         .catch(err => logEntry(`Auto-queue failed: ${err?.message || err}`))
         .finally(() => { runningRef.current = false; });
     }
-  }, [settings.autoQueue, settings.enabled, busy, worker, readyTrips, syncDate, workerDateMatches]);
+  }, [settings.autoQueue, settings.enabled, busy, worker, readyTrips, syncDate, workerDateMatches, logEntry]);
 
   // Auto-retry failed trips
   useEffect(() => {
@@ -98,18 +94,23 @@ export const useWellTransAutoSync = ({
     if (!workerDateMatches || !syncDate) return;
 
     const now = Date.now();
-    if (now - lastAutoRetryRef.current < AUTO_RETRY_DELAY_MS) return;
+    const retryDelay = Math.max(10000, Number(settings.autoRetryDelayMs) || 30000);
+    if (now - lastAutoRetryRef.current < retryDelay) return;
 
-    if (isWorkerReady(worker, null, syncDate) && retryableFailed.length > 0) {
+    const eligibleRetries = retryableFailed.filter(log => retryCategories?.[categorizeFailure(log)] === true);
+    if (isWorkerReady(worker, syncDate) && eligibleRetries.length > 0) {
       lastAutoRetryRef.current = now;
       runningRef.current = true;
-      logEntry(`Auto-retrying ${retryableFailed.length} failed trip(s)...`);
-      queueWellTransSync(retryableFailed.map(l => l.tripId), 'retry', syncDate)
+      logEntry(`Auto-retrying ${eligibleRetries.length} failed trip(s) allowed by the active rules...`);
+      queueWellTransSync(eligibleRetries.map(l => l.tripId), 'retry', syncDate)
         .then(() => logEntry('Auto-retry submitted successfully.'))
         .catch(err => logEntry(`Auto-retry failed: ${err?.message || err}`))
         .finally(() => { runningRef.current = false; });
     }
-  }, [settings.autoRetryEnabled, settings.enabled, busy, worker, retryableFailed, syncDate, workerDateMatches]);
+  }, [
+    settings.autoRetryDelayMs, settings.autoRetryEnabled, settings.enabled, busy, worker,
+    retryableFailed, retryCategories, syncDate, workerDateMatches, logEntry,
+  ]);
 
   // Self-heal: detect dead worker and trigger restart
   useEffect(() => {
@@ -134,7 +135,7 @@ export const useWellTransAutoSync = ({
     }, WORKER_OFFLINE_THRESHOLD_MS);
 
     return () => clearInterval(interval);
-  }, [settings.autoStart, settings.enabled, worker]);
+  }, [settings.autoStart, settings.enabled, worker, logEntry]);
 
   return { autoLog, clearAutoLog: () => setAutoLog([]) };
 };
