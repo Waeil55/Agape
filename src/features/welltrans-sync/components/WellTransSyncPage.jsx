@@ -47,11 +47,25 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [syncProgress, setSyncProgress] = useState(null);
   const [tripDrawer, setTripDrawer] = useState(null);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [agentRelease, setAgentRelease] = useState(null);
   const [autoRetry, setAutoRetry] = useState(() => {
     try { return JSON.parse(localStorage.getItem('agape_wt_autoRetry') || '{}'); } catch { return {}; }
   });
   const bulkMenuRef = useRef(null);
   const pageRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/welltrans-agent/version.json', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error(`Agent manifest returned ${response.status}`);
+        return response.json();
+      })
+      .then(release => { if (active) setAgentRelease(release); })
+      .catch(() => { if (active) setAgentRelease(null); });
+    return () => { active = false; };
+  }, []);
 
   const normalizedRole = String(role || '').toLowerCase().trim();
   const isAuthorized = AUTHORIZED_ROLES.includes(normalizedRole);
@@ -276,18 +290,18 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             <a
               href="/welltrans-agent/agape-welltrans-agent.zip"
               download
+              onClick={() => setShowInstallHelp(true)}
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
             >
-              <Download size={13} /> Download Windows Agent
+              <Download size={13} /> Download Agent ZIP
             </a>
-            <a
-              href="/welltrans-agent/AgapeWellTransAgentSetup.exe"
-              download
+            <button
+              type="button"
+              onClick={() => setShowInstallHelp(true)}
               className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-slate-500 transition hover:border-blue-300 hover:text-blue-700"
-              title="Graphical setup for Windows computers that allow unsigned organization utilities"
             >
-              Setup EXE
-            </a>
+              Windows install help
+            </button>
             <button
               onClick={startAndFillDate}
               disabled={!settings.enabled || Boolean(busy)}
@@ -897,6 +911,67 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 onClick={() => { navigator.clipboard.writeText(JSON.stringify(buildWellTransPayload(inspectPayloadTrip), null, 2)); setNotice('Copied.'); setInspectPayloadTrip(null); }}
                 className="rounded-xl bg-blue-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 transition">
                 Copy JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInstallHelp && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Install the managed Windows agent</h2>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Version {agentRelease?.version || requiredWorkerVersion} · no terminal commands required
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowInstallHelp(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-4 px-5 py-4 text-[11px] text-slate-700">
+              <ol className="space-y-2">
+                {[
+                  'Download the Agent ZIP. Do not open files inside the ZIP yet.',
+                  'In Downloads, right-click the ZIP, choose Properties, select Unblock, then Apply.',
+                  'Choose Extract All and open the extracted agape-welltrans-agent folder.',
+                  'Double-click Install-Agent.cmd. Return to Agape when installation completes.',
+                  'Select the service date and click Start & Fill Date.',
+                ].map((step, index) => (
+                  <li key={step} className="flex gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                      {index + 1}
+                    </span>
+                    <span className="pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                <p className="font-bold">If Windows says “blocked by your organization”</p>
+                <p className="mt-1 leading-relaxed">
+                  This is an enforced App Control policy, not an Agape error. It cannot be safely bypassed by a
+                  website. Your Windows administrator must approve the Agape agent or deploy a trusted
+                  organization-signed build.
+                </p>
+              </div>
+              {agentRelease?.sha256 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="font-semibold text-slate-700">Official ZIP SHA-256</p>
+                  <p className="mt-1 break-all font-mono text-[9px] text-slate-500">{agentRelease.sha256}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+              <a href="/welltrans-agent/agape-welltrans-agent.zip" download
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-blue-700">
+                <Download size={13} /> Download Agent ZIP
+              </a>
+              <button type="button" onClick={() => setShowInstallHelp(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100">
+                Close
               </button>
             </div>
           </div>
