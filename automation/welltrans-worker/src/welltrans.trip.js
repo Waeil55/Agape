@@ -206,16 +206,15 @@ async function ensureLiveRow(grid, row) {
 
 async function exactCell(grid, top, left) {
   const cells = grid.locator('.GridCell');
-  const count = await cells.count();
-  for (let index = 0; index < count; index += 1) {
-    const cell = cells.nth(index);
-    const coordinates = await cell.evaluate(element => ({
-      top: Number.parseFloat(element.style.top),
-      left: Number.parseFloat(element.style.left),
-    }));
-    if (coordinates.top === top && coordinates.left === left) return cell;
-  }
-  return null;
+  // Resolve the coordinate in one browser-context pass. The former
+  // locator-per-cell loop caused hundreds of protocol round-trips for every
+  // field on TripSpark's virtual grid.
+  const index = await cells.evaluateAll((elements, coordinates) =>
+    elements.findIndex(element =>
+      Number.parseFloat(element.style.top) === coordinates.top
+      && Number.parseFloat(element.style.left) === coordinates.left),
+  { top, left });
+  return index >= 0 ? cells.nth(index) : null;
 }
 
 async function resolveColumnLeft(grid, columnTitle) {
@@ -265,8 +264,8 @@ async function openListDropdown(page) {
   return true;
 }
 
-async function getListDropdownOptions(page) {
-  const optionTexts = await page.evaluate(() => {
+async function getListDropdownOptions(page, { strict = false } = {}) {
+  const optionTexts = await page.evaluate(({ strictOnly }) => {
     const results = [];
     const dialogSelectors = [
       '.DropDownDialog',
@@ -278,7 +277,7 @@ async function getListDropdownOptions(page) {
         if (dialog.offsetParent === null && !dialog.classList.contains('visible')) continue;
         const rect = dialog.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) continue;
-        const optionEls = dialog.querySelectorAll('[role="option"], core\\:listitem, .ListBoxItem, [title]');
+        const optionEls = dialog.querySelectorAll('[role="option"], core\\:listitem, .ListBoxItem');
         for (const el of optionEls) {
           const text = String(el.textContent || el.getAttribute('title') || '').trim();
           if (text) results.push(text);
@@ -298,6 +297,8 @@ async function getListDropdownOptions(page) {
         if (text) results.push(text);
       }
     }
+    if (strictOnly) return [...new Set(results)];
+
     // TripSpark releases have used several unlabelled custom elements for
     // dropdown rows. Inspect visible leaf text inside the active editor and
     // dropdown overlays, without ever relying on keyboard position.
@@ -319,12 +320,35 @@ async function getListDropdownOptions(page) {
       }
     }
     return [...new Set(results)];
-  });
+  }, { strictOnly: strict });
   return optionTexts;
 }
 
 async function clickListOption(page, optionText) {
   const optionStr = String(optionText).trim();
+  const textMatches = page.getByText(optionStr, { exact: true });
+  const pointerCandidates = [];
+  const textMatchCount = Math.min(await textMatches.count().catch(() => 0), 100);
+  for (let index = 0; index < textMatchCount; index += 1) {
+    const candidate = textMatches.nth(index);
+    if (!await candidate.isVisible().catch(() => false)) continue;
+    const belongsToActiveDropdown = await candidate.evaluate(element =>
+      Boolean(element.closest(
+        '.EditorWidgets, .DropDownDialog, [class*="DropDown"], [class*="dropdown"]',
+      ))).catch(() => false);
+    if (!belongsToActiveDropdown) continue;
+    const box = await candidate.boundingBox().catch(() => null);
+    if (box) pointerCandidates.push({ candidate, area: box.width * box.height });
+  }
+  pointerCandidates.sort((left, right) => left.area - right.area);
+  if (pointerCandidates.length) {
+    // Use Playwright's trusted pointer sequence. TripSpark's custom list
+    // controller ignores HTMLElement.click() for some listbox releases.
+    await pointerCandidates[0].candidate.click({ force: true });
+    await page.waitForTimeout(200);
+    return true;
+  }
+
   const clicked = await page.evaluate((target) => {
     const normalizedTarget = target.trim().replace(/\s+/g, ' ').toLowerCase();
     const dialogSelectors = [
@@ -444,17 +468,6 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
     const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
     const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
 
-    if (await editor.count()) {
-      await editor.click();
-      await editor.fill('');
-      await page.waitForTimeout(50);
-      await editor.fill(String(value));
-      await page.waitForTimeout(150);
-      await page.keyboard.press('Tab');
-      await page.waitForTimeout(200);
-      return true;
-    }
-
     if (await listbox.count()) {
       await openListDropdown(page);
       try {
@@ -468,6 +481,17 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
         if (column !== 'Vehicle') throw error;
         return false;
       }
+    }
+
+    if (await editor.count()) {
+      await editor.click();
+      await editor.fill('');
+      await page.waitForTimeout(50);
+      await editor.fill(String(value));
+      await page.waitForTimeout(150);
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(200);
+      return true;
     }
 
     await page.keyboard.press('Escape').catch(() => {});
@@ -547,7 +571,9 @@ async function preflightCell(page, grid, row, column, value, {
 
   if (await listbox.count()) {
     await openListDropdown(page);
-    const options = await getListDropdownOptions(page);
+    // Vehicle is deliberately stricter than the other list fields. An input
+    // value or editor container must never be mistaken for a real option.
+    const options = await getListDropdownOptions(page, { strict: optionalExactList });
     const exactMatch = findUniqueExactOption(options, value);
     await page.keyboard.press('Escape').catch(() => {});
     await page.keyboard.press('Escape').catch(() => {});
@@ -567,6 +593,7 @@ async function preflightCell(page, grid, row, column, value, {
     }
     return {
       row, column, original, target: exactMatch, kind: 'list', needsWrite: true,
+      optionalExactList,
     };
   }
 
@@ -591,11 +618,28 @@ async function preflightCell(page, grid, row, column, value, {
 
 async function restorePlanEntry(page, grid, entry) {
   if (!entry.needsWrite) return;
+  const current = await readCellValue(grid, entry.row, entry.column);
+  if (equalCellValue(entry.column, current, entry.original)) return;
   if (entry.kind === 'list') {
-    if (!entry.original) {
-      throw new Error(`${entry.row.activity} ${entry.column} originally had no selectable value`);
+    if (entry.original) {
+      await setListCell(page, grid, entry.row, entry.column, entry.original);
+    } else {
+      const colLeft = await resolveColumnLeft(grid, entry.column);
+      const liveRow = await ensureLiveRow(grid, entry.row);
+      const cell = await exactCell(grid, liveRow.top, colLeft);
+      if (!cell) throw new Error(`${entry.row.activity} ${entry.column} rollback cell was unavailable`);
+      await cell.dblclick({ force: true });
+      await page.waitForTimeout(250);
+      const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
+      if (await editor.count()) {
+        await editor.click();
+        await editor.fill('');
+      } else {
+        await page.keyboard.press('Delete');
+      }
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(250);
     }
-    await setListCell(page, grid, entry.row, entry.column, entry.original);
   } else {
     await setTextCell(page, grid, entry.row, entry.column, entry.original, false, { allowEmpty: true });
   }
@@ -627,15 +671,28 @@ async function readCellValue(grid, row, column) {
   if (!cell) throw new Error(`${column} cell unavailable for ${row.activity}`);
   if (column === 'Signature Captured') {
     return cell.evaluate(element => {
-      const checkbox = element.querySelector('input[type="checkbox"]');
-      if (checkbox) return checkbox.checked;
-      if (element.getAttribute('aria-checked') === 'true') return true;
-      if (element.querySelector(
-        '[aria-checked="true"], [checked], .checked, .Checked, .CheckBoxChecked, img[src*="check" i]',
-      )) return true;
-      const text = String(element.title || element.textContent || '').trim().toLowerCase();
-      if (['true', 'yes', 'checked', 'captured', '1', '✓'].includes(text)) return true;
-      return /check|tick/.test(getComputedStyle(element).backgroundImage || '');
+      const nodes = [element, ...element.querySelectorAll('*')];
+      for (const node of nodes) {
+        if (node instanceof HTMLInputElement && node.type === 'checkbox' && node.checked) return true;
+        if (String(node.getAttribute('aria-checked') || '').toLowerCase() === 'true') return true;
+        const state = [
+          node.getAttribute('checked'),
+          node.getAttribute('data-checked'),
+          node.getAttribute('data-value'),
+          node.getAttribute('value'),
+          node.getAttribute('state'),
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (/^(true|checked|yes|1|on)$/.test(state)) return true;
+        const className = String(node.className || '').toLowerCase();
+        if (/(check|tick)/.test(className) && /(checked|selected|active|true|on)/.test(className)) return true;
+        const text = String(node.title || node.textContent || '').trim().toLowerCase();
+        if (['true', 'yes', 'checked', 'captured', '1', '✓', '✔', '☑'].includes(text)) return true;
+        for (const pseudo of [null, '::before', '::after']) {
+          const content = String(getComputedStyle(node, pseudo).content || '').replace(/^["']|["']$/g, '');
+          if (/[✓✔☑]/.test(content)) return true;
+        }
+      }
+      return false;
     });
   }
   return cell.evaluate(element => String(element.title || element.textContent || '').trim());
@@ -684,16 +741,8 @@ export async function syncWellTransTrip(page, payload) {
     // Complete the entire read-only preflight before the first edit. A missing
     // driver, signature option, row, or editor can therefore never leave a
     // partially staged trip.
-    plan.push(await preflightCell(page, grid, pickup, 'Driver', payload.driver, { required: true }));
-    plan.push(await preflightCell(page, grid, pickup, 'Vehicle', payload.vehicle, { optionalExactList: true }));
-    plan.push(await preflightCell(page, grid, pickup, 'Arrival Time', payload.pickup.arrival, { required: true }));
-    plan.push(await preflightCell(page, grid, pickup, 'Departure Time', payload.pickup.departure, { required: true }));
-    plan.push(await preflightCell(page, grid, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, { required: true }));
-    plan.push(await preflightCell(page, grid, dropoff, 'Driver', payload.driver, { required: true }));
-    plan.push(await preflightCell(page, grid, dropoff, 'Vehicle', payload.vehicle, { optionalExactList: true }));
-    plan.push(await preflightCell(page, grid, dropoff, 'Arrival Time', payload.dropoff.arrival, { required: true }));
-    plan.push(await preflightCell(page, grid, dropoff, 'Departure Time', payload.dropoff.departure));
-    plan.push(await preflightCell(page, grid, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, { required: true }));
+    // Stage the most portal-specific edit first. If TripSpark changes its
+    // signature editor, no driver/time/mileage fields have been touched.
     if (payload.dropoff.signatureCaptured) {
       plan.push(await preflightCell(
         page, grid, pickup, 'Signature Captured?', 'Rider Signature Received', { required: true },
@@ -702,6 +751,18 @@ export async function syncWellTransTrip(page, payload) {
         page, grid, dropoff, 'Signature Captured?', 'Rider Signature Received', { required: true },
       ));
     }
+    plan.push(await preflightCell(page, grid, pickup, 'Driver', payload.driver, { required: true }));
+    plan.push(await preflightCell(page, grid, pickup, 'Arrival Time', payload.pickup.arrival, { required: true }));
+    plan.push(await preflightCell(page, grid, pickup, 'Departure Time', payload.pickup.departure, { required: true }));
+    plan.push(await preflightCell(page, grid, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, { required: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Driver', payload.driver, { required: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Arrival Time', payload.dropoff.arrival, { required: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Departure Time', payload.dropoff.departure));
+    plan.push(await preflightCell(page, grid, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, { required: true }));
+    // Optional vehicle edits are last and require a semantic, unique, exact
+    // option. Otherwise WellTrans keeps both vehicle cells unchanged.
+    plan.push(await preflightCell(page, grid, pickup, 'Vehicle', payload.vehicle, { optionalExactList: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Vehicle', payload.vehicle, { optionalExactList: true }));
   } catch (error) {
     await page.keyboard.press('Escape').catch(() => {});
     throw safePreflightError(error);
@@ -715,7 +776,18 @@ export async function syncWellTransTrip(page, payload) {
       // can occur after the cell value has already changed.
       attempted.push(entry);
       if (entry.kind === 'list') {
-        await setListCell(page, grid, entry.row, entry.column, entry.target);
+        try {
+          await setListCell(page, grid, entry.row, entry.column, entry.target);
+        } catch (error) {
+          if (!entry.optionalExactList) throw error;
+          await page.keyboard.press('Escape').catch(() => {});
+          await restorePlanEntry(page, grid, entry);
+          attempted.pop();
+          entry.skip = true;
+          entry.needsWrite = false;
+          entry.reason = 'portal_rejected_optional_exact_match';
+          continue;
+        }
       } else {
         await setTextCell(page, grid, entry.row, entry.column, entry.target, true);
       }
@@ -730,13 +802,6 @@ export async function syncWellTransTrip(page, payload) {
     const expected = plan
       .filter(entry => !entry.skip)
       .map(entry => [entry.row, entry.column, entry.target]);
-    if (payload.dropoff.signatureCaptured) {
-      expected.push(
-        [pickup, 'Signature Captured', true],
-        [dropoff, 'Signature Captured', true],
-      );
-    }
-
     await page.waitForTimeout(400);
     const mismatches = [];
     for (const [row, column, value] of expected) {
@@ -747,6 +812,27 @@ export async function syncWellTransTrip(page, payload) {
     }
     if (mismatches.length) {
       throw new Error(`Full-trip verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
+    }
+
+    // Signature Captured is a read-only indicator derived from the exact
+    // Signature Captured? reason. TripSpark versions render its green check as
+    // an input, image, pseudo-element, or sprite. Verify the indicator when it
+    // is machine-readable; otherwise re-verify the editable source-of-truth.
+    if (payload.dropoff.signatureCaptured) {
+      const signatureIndicators = await Promise.all([
+        readCellValue(grid, pickup, 'Signature Captured'),
+        readCellValue(grid, dropoff, 'Signature Captured'),
+      ]);
+      for (const [index, captured] of signatureIndicators.entries()) {
+        if (captured) continue;
+        const row = index === 0 ? pickup : dropoff;
+        const reason = await readCellValue(grid, row, 'Signature Captured?');
+        if (!equalCellValue('Signature Captured?', reason, 'Rider Signature Received')) {
+          throw new Error(
+            `${row.activity} signature was not confirmed: expected "Rider Signature Received", found "${reason}"`,
+          );
+        }
+      }
     }
   } catch (error) {
     await page.keyboard.press('Escape').catch(() => {});

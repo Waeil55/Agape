@@ -46,4 +46,63 @@ describe('WellTrans staging safety contract', () => {
     expect(source).not.toContain('queued_for_worker_upgrade');
     expect(source).toContain('failed_review_close_required');
   });
+
+  it('treats TripSpark listboxes as exact-option editors before their internal text inputs', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    const setTextCell = source.slice(
+      source.indexOf('async function setTextCell'),
+      source.indexOf('async function setListCell'),
+    );
+    expect(setTextCell.indexOf('if (await listbox.count())'))
+      .toBeLessThan(setTextCell.indexOf('if (await editor.count())'));
+    expect(source).toContain('if (equalCellValue(entry.column, current, entry.original)) return;');
+  });
+
+  it('uses a trusted pointer click for exact custom-dropdown options', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    const clickListOption = source.slice(
+      source.indexOf('async function clickListOption'),
+      source.indexOf('async function selectListOption'),
+    );
+    expect(clickListOption).toContain('page.getByText(optionStr, { exact: true })');
+    expect(clickListOption).toContain('candidate.click({ force: true })');
+    expect(clickListOption.indexOf('candidate.click({ force: true })'))
+      .toBeLessThan(clickListOption.indexOf('page.evaluate'));
+  });
+
+  it('keeps vehicle matching optional and can restore an originally blank list cell', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    expect(source).toContain("entry.reason = 'portal_rejected_optional_exact_match'");
+    expect(source).toContain('getListDropdownOptions(page, { strict: optionalExactList })');
+    expect(source).toContain('if (strictOnly) return [...new Set(results)]');
+    expect(source).toContain("await editor.fill('')");
+    expect(source).toContain('await restorePlanEntry(page, grid, entry)');
+  });
+
+  it('stages exact signature reasons before required fields and optional vehicles last', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    const syncTrip = source.slice(source.indexOf('export async function syncWellTransTrip'));
+    const signature = syncTrip.indexOf(
+      "page, grid, pickup, 'Signature Captured?', 'Rider Signature Received'",
+    );
+    const driver = syncTrip.indexOf(
+      "preflightCell(page, grid, pickup, 'Driver', payload.driver",
+    );
+    const vehicle = syncTrip.indexOf(
+      "preflightCell(page, grid, pickup, 'Vehicle', payload.vehicle",
+    );
+    expect(signature).toBeGreaterThan(-1);
+    expect(signature).toBeLessThan(driver);
+    expect(driver).toBeLessThan(vehicle);
+  });
+
+  it('resolves a virtual-grid cell in one browser pass', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    const exactCell = source.slice(
+      source.indexOf('async function exactCell'),
+      source.indexOf('async function resolveColumnLeft'),
+    );
+    expect(exactCell).toContain('cells.evaluateAll');
+    expect(exactCell).not.toContain('await cell.evaluate');
+  });
 });
