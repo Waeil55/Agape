@@ -36,21 +36,35 @@ Manual fallback:
 5. Keep the review browser open until the operator has reviewed the staged
    records and clicked Apply.
 
-The Agape dashboard will show `Calibrated` and the exact locked date. Queue
-only trips for that date. To change dates, stop the worker with Ctrl+C, rerun
-`npm run calibrate-run`, and select the new schedule.
+The Agape dashboard shows `Calibrated` and the exact locked date. Queue only
+trips for that date. To change dates, choose another date in Agape and click
+**Start & Fill Selected Date**. The running agent receives the new date,
+opens the schedule selector when possible, and remains safely paused until
+the exact requested WellTrans date is visible.
 
 ## Safety guarantees
 
 - Booking ID is the only trip matching key.
 - Exactly one Pickup and one Dropoff row must be present.
 - A job is rebuilt from the current Agape trip before execution.
-- Driver and vehicle mappings must resolve to values accepted by TripSpark.
+- The driver must resolve to one unique exact TripSpark option before any
+  field is edited.
+- A vehicle is written only when it resolves to one unique exact TripSpark
+  option. Otherwise the WellTrans vehicle cell is left unchanged.
+- The signature reason is selected only by the exact visible
+  `Rider Signature Received` option. Positional keyboard selection is forbidden.
+- Every trip completes a read-only preflight before its first edit.
+- If a later browser error occurs, all attempted fields are restored and
+  verified. If rollback cannot be proven, the batch halts and requires the
+  operator to click **Close**, never **Apply**.
 - Every staged cell is re-located in the virtual grid and verified before the
   trip is marked ready for review.
 - The worker never clicks **Apply** or **Close**. An operator reviews every
   staged field, clicks **Apply**, and confirms the applied record in Agape.
-- One trip failure does not stop later trips.
+- A safe preflight failure or verified rollback does not stop later trips.
+  An unverified rollback stops the batch immediately.
+- Failed or older-version jobs are never requeued automatically; retry is an
+  explicit operator action in Agape.
 - Other service dates stay pending and cannot be written to the selected grid.
 - Credentials and session state remain local and encrypted; they are not
   stored in Firestore.

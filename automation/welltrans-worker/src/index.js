@@ -15,7 +15,7 @@ initializeApp({
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.2.0';
+const workerVersion = '2.3.0';
 let requestedServiceDate = '';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
@@ -168,50 +168,6 @@ async function publishDateReviewSummary(serviceDate) {
   return summary;
 }
 
-async function migrateLegacyDateJobs(serviceDate) {
-  const snapshot = await db.collection('welltrans_sync_logs')
-    .where('serviceDate', '==', serviceDate).limit(500).get();
-  const latestByTrip = new Map();
-  for (const document of snapshot.docs) {
-    const data = document.data();
-    const updatedAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
-    const current = latestByTrip.get(data.tripId);
-    if (!current || updatedAt > current.updatedAt) {
-      latestByTrip.set(data.tripId, { ref: document.ref, data, updatedAt });
-    }
-  }
-  const isOlderWorkerVersion = value => {
-    const currentParts = workerVersion.split('.').map(Number);
-    const valueParts = String(value || '0.0.0').split('.').map(part => Number(part) || 0);
-    for (let index = 0; index < Math.max(currentParts.length, valueParts.length); index += 1) {
-      const currentPart = currentParts[index] || 0;
-      const valuePart = valueParts[index] || 0;
-      if (currentPart !== valuePart) return valuePart < currentPart;
-    }
-    return false;
-  };
-  const legacy = [...latestByTrip.values()].filter(({ data }) => {
-    if (!isOlderWorkerVersion(data.workerVersion)) return false;
-    if (data.status === 'awaiting_review') return true;
-    if (data.status !== 'failed') return false;
-    const failure = String(data.errorMessage || '').toLowerCase();
-    return !failure.includes('expected exactly one of each')
-      && !failure.includes('does not match trip service date')
-      && !failure.includes('source trip is not ready');
-  });
-  if (!legacy.length) return 0;
-  const batch = db.batch();
-  for (const { ref } of legacy) {
-    batch.update(ref, {
-      status: 'pending', stage: 'queued_for_worker_upgrade',
-      workerVersionMigration: workerVersion, errorMessage: '',
-      completedAt: null, updatedAt: FieldValue.serverTimestamp(),
-    });
-  }
-  await batch.commit();
-  return legacy.length;
-}
-
 async function processJob(job, existingSession = null) {
   if (!existingSession?.browser || !existingSession?.page) {
     throw new Error('WellTrans staging requires a calibrated headed browser session so an operator can review every field before Apply.');
@@ -246,7 +202,7 @@ async function processJob(job, existingSession = null) {
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
       warnings: result.warnings || [], workerVersion,
     });
-    return true;
+    return { success: true, safeToContinue: true };
   } catch (error) {
     let screenshot = '';
     let screenshotError = '';
@@ -262,14 +218,30 @@ async function processJob(job, existingSession = null) {
         }
       }
     }
-    await job.ref.update({ status: 'failed', stage: 'failed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: `${String(error?.message || error)}${screenshotError}`.slice(0, 2000), screenshot, workerVersion });
+    const safeToContinue = error?.welltransSafeToContinue !== false;
+    const rollbackVerified = error?.welltransRollbackVerified === true;
+    const rollbackErrors = Array.isArray(error?.welltransRollbackErrors)
+      ? error.welltransRollbackErrors.slice(0, 20) : [];
+    await job.ref.update({
+      status: 'failed',
+      stage: safeToContinue ? 'failed_no_partial_changes' : 'failed_review_close_required',
+      completedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      leaseExpiresAt: FieldValue.delete(),
+      errorMessage: `${String(error?.message || error)}${screenshotError}`.slice(0, 2000),
+      screenshot,
+      workerVersion,
+      mutationStarted: error?.welltransMutationStarted === true,
+      rollbackVerified,
+      rollbackErrors,
+    });
     // Dismiss only a transient cell/dropdown editor so one failed row cannot
     // poison the next job. Keep the itinerary itself open and never Apply.
     if (existingSession && page) {
       await page.keyboard.press('Escape').catch(() => {});
       await page.waitForTimeout(100).catch(() => {});
     }
-    return false;
+    return { success: false, safeToContinue };
   }
 }
 
@@ -508,10 +480,6 @@ async function main() {
       selectedDate, calibratedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     process.stdout.write(`Worker calibrated to WellTrans schedule ${selectedDate}. Only this date will be processed.\n`);
-    const migrated = await migrateLegacyDateJobs(selectedDate);
-    if (migrated) {
-      process.stdout.write(`Worker upgrade recovery: ${migrated} earlier-worker trip(s) queued for complete field restaging.\n`);
-    }
     do {
       const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
       if (activeDate !== selectedDate) {
@@ -533,8 +501,14 @@ async function main() {
           const job = await claimJobById(logId);
           if (job) {
             await publishHeartbeat('processing');
-            await processJob(job, session);
+            const outcome = await processJob(job, session);
             await publishHeartbeat('calibrated');
+            if (!outcome.safeToContinue) {
+              throw new Error(
+                `Booking ${job.bookingId || job.tripId} could not be rolled back completely. `
+                + 'Processing stopped. Review this browser and click Close to discard the unsaved batch; never click Apply.',
+              );
+            }
           }
         }
       } else {

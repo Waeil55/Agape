@@ -227,6 +227,11 @@ async function resolveColumnLeft(grid, columnTitle) {
 }
 
 const normalized = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+export const findUniqueExactOption = (options, target) => {
+  const matches = [...new Set((options || []).map(option => String(option).trim()).filter(Boolean))]
+    .filter(option => normalized(option) === normalized(target));
+  return matches.length === 1 ? matches[0] : null;
+};
 const normalizedTime = value => {
   const match = String(value ?? '').trim().match(/(\d{1,2}):(\d{2})/);
   return match ? `${match[1].padStart(2, '0')}:${match[2]}` : normalized(value);
@@ -293,6 +298,26 @@ async function getListDropdownOptions(page) {
         if (text) results.push(text);
       }
     }
+    // TripSpark releases have used several unlabelled custom elements for
+    // dropdown rows. Inspect visible leaf text inside the active editor and
+    // dropdown overlays, without ever relying on keyboard position.
+    const roots = [
+      ...document.querySelectorAll('.EditorWidgets, .DropDownDialog, [class*="DropDown"], [class*="dropdown"]'),
+    ].filter(root => {
+      const rect = root.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    for (const root of roots) {
+      for (const el of [root, ...root.querySelectorAll('*')]) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const text = String(el.textContent || el.getAttribute('title') || '').trim().replace(/\s+/g, ' ');
+        if (!text || text.length > 120) continue;
+        const childRepeatsText = [...el.children].some(child =>
+          String(child.textContent || child.getAttribute('title') || '').trim().replace(/\s+/g, ' ') === text);
+        if (!childRepeatsText) results.push(text);
+      }
+    }
     return [...new Set(results)];
   });
   return optionTexts;
@@ -301,6 +326,7 @@ async function getListDropdownOptions(page) {
 async function clickListOption(page, optionText) {
   const optionStr = String(optionText).trim();
   const clicked = await page.evaluate((target) => {
+    const normalizedTarget = target.trim().replace(/\s+/g, ' ').toLowerCase();
     const dialogSelectors = [
       '.DropDownDialog',
       '[class*="DropDown"]',
@@ -335,6 +361,32 @@ async function clickListOption(page, optionText) {
           return true;
         }
       }
+    }
+
+    const roots = [
+      ...document.querySelectorAll('.EditorWidgets, .DropDownDialog, [class*="DropDown"], [class*="dropdown"]'),
+    ].filter(root => {
+      const rect = root.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    const candidates = [];
+    for (const root of roots) {
+      for (const el of [root, ...root.querySelectorAll('*')]) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const text = String(el.textContent || el.getAttribute('title') || '')
+          .trim().replace(/\s+/g, ' ').toLowerCase();
+        if (text !== normalizedTarget) continue;
+        const childRepeatsText = [...el.children].some(child =>
+          String(child.textContent || child.getAttribute('title') || '')
+            .trim().replace(/\s+/g, ' ').toLowerCase() === normalizedTarget);
+        if (!childRepeatsText) candidates.push({ el, area: rect.width * rect.height });
+      }
+    }
+    candidates.sort((left, right) => left.area - right.area);
+    if (candidates.length) {
+      candidates[0].el.click();
+      return true;
     }
     return false;
   }, optionStr);
@@ -372,8 +424,8 @@ async function selectListOption(page, option, column) {
     + `${availableOptions.length ? ` Available: ${availableOptions.slice(0, 20).join(', ')}` : ' Dropdown may be empty.'}`);
 }
 
-async function setTextCell(page, grid, row, column, value, required = false) {
-  if (value === undefined || value === null || value === '') {
+async function setTextCell(page, grid, row, column, value, required = false, { allowEmpty = false } = {}) {
+  if (value === undefined || value === null || (value === '' && !allowEmpty)) {
     if (required) throw new Error(`${column} is required for ${row.activity}`);
     return false;
   }
@@ -426,7 +478,7 @@ async function setTextCell(page, grid, row, column, value, required = false) {
 }
 
 async function setListCell(page, grid, row, column, option) {
-  if (!option) return;
+  if (option === undefined || option === null || option === '') return;
 
   const colLeft = await resolveColumnLeft(grid, column);
   if (colLeft === null) throw new Error(`${column} column not found in grid`);
@@ -443,42 +495,128 @@ async function setListCell(page, grid, row, column, option) {
     throw new Error(`${column} listbox did not open for ${row.activity}`);
   }
 
-  if (column === 'Signature Captured?') {
-    await openListDropdown(page);
-    try {
-      await selectListOption(page, option, column);
-    } catch {
-      for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
-      await page.keyboard.press('Enter');
-    }
-    await page.keyboard.press('Tab');
-  } else {
-    await openListDropdown(page);
-    await selectListOption(page, option, column);
-    await page.keyboard.press('Tab');
-  }
+  await openListDropdown(page);
+  await selectListOption(page, option, column);
+  await page.keyboard.press('Tab');
   await page.waitForTimeout(250);
 
-  let selected = await cell.evaluate(element =>
+  const selected = await cell.evaluate(element =>
     String(element.title || element.textContent || '').trim());
-
-  if (column === 'Signature Captured?' && !equalCellValue(column, selected, option)) {
-    await cell.dblclick({ force: true });
-    await page.waitForTimeout(250);
-    if (await page.locator('.EditorWidgets core\\:listbox:visible').count()) {
-      await openListDropdown(page);
-      for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
-      await page.keyboard.press('Enter');
-      await page.keyboard.press('Tab');
-      await page.waitForTimeout(250);
-    }
-    selected = await cell.evaluate(element =>
-      String(element.title || element.textContent || '').trim());
-  }
 
   if (!equalCellValue(column, selected, option)) {
     throw new Error(`${column} selection not confirmed: expected "${option}", found "${selected}"`);
   }
+}
+
+const safePreflightError = error => {
+  error.welltransSafeToContinue = true;
+  error.welltransMutationStarted = false;
+  return error;
+};
+
+async function preflightCell(page, grid, row, column, value, {
+  required = false,
+  optionalExactList = false,
+} = {}) {
+  if (value === undefined || value === null || value === '') {
+    if (required) throw safePreflightError(new Error(`${column} is required for ${row.activity}`));
+    return { skip: true, row, column, reason: 'no_source_value' };
+  }
+
+  const original = await readCellValue(grid, row, column);
+  if (equalCellValue(column, original, value)) {
+    return {
+      row, column, original, target: value, kind: 'unchanged', needsWrite: false,
+    };
+  }
+
+  const colLeft = await resolveColumnLeft(grid, column);
+  if (colLeft === null) {
+    throw safePreflightError(new Error(`${column} column not found in grid`));
+  }
+  const liveRow = await ensureLiveRow(grid, row);
+  const cell = await exactCell(grid, liveRow.top, colLeft);
+  if (!cell) {
+    throw safePreflightError(new Error(`${column} cell unavailable for ${row.activity}`));
+  }
+
+  await cell.dblclick({ force: true });
+  await page.waitForTimeout(250);
+  const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
+  const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+
+  if (await listbox.count()) {
+    await openListDropdown(page);
+    const options = await getListDropdownOptions(page);
+    const exactMatch = findUniqueExactOption(options, value);
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(100);
+
+    if (!exactMatch) {
+      if (optionalExactList) {
+        return {
+          skip: true, row, column, original, reason: 'no_unique_exact_match',
+          availableOptions: options.slice(0, 20),
+        };
+      }
+      throw safePreflightError(new Error(
+        `${column} requires one unique exact WellTrans option for "${value}".`
+        + `${options.length ? ` Available: ${options.slice(0, 20).join(', ')}` : ' Dropdown was empty.'}`,
+      ));
+    }
+    return {
+      row, column, original, target: exactMatch, kind: 'list', needsWrite: true,
+    };
+  }
+
+  if (await editor.count()) {
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(100);
+    if (column === 'Driver' || column === 'Vehicle' || column === 'Signature Captured?') {
+      if (optionalExactList) {
+        return { skip: true, row, column, original, reason: 'exact_list_unavailable' };
+      }
+      throw safePreflightError(new Error(`${column} exact-option editor was unavailable for ${row.activity}`));
+    }
+    return {
+      row, column, original, target: value, kind: 'text', needsWrite: true,
+    };
+  }
+
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForTimeout(100);
+  throw safePreflightError(new Error(`${column} editor did not open for ${row.activity}`));
+}
+
+async function restorePlanEntry(page, grid, entry) {
+  if (!entry.needsWrite) return;
+  if (entry.kind === 'list') {
+    if (!entry.original) {
+      throw new Error(`${entry.row.activity} ${entry.column} originally had no selectable value`);
+    }
+    await setListCell(page, grid, entry.row, entry.column, entry.original);
+  } else {
+    await setTextCell(page, grid, entry.row, entry.column, entry.original, false, { allowEmpty: true });
+  }
+  const restored = await readCellValue(grid, entry.row, entry.column);
+  if (!equalCellValue(entry.column, restored, entry.original)) {
+    throw new Error(
+      `${entry.row.activity} ${entry.column} rollback expected "${entry.original}", found "${restored}"`,
+    );
+  }
+}
+
+async function rollbackAttemptedEntries(page, grid, attempted) {
+  const errors = [];
+  for (const entry of [...attempted].reverse()) {
+    try {
+      await restorePlanEntry(page, grid, entry);
+    } catch (error) {
+      errors.push(String(error?.message || error));
+    }
+  }
+  return { verified: errors.length === 0, errors };
 }
 
 async function readCellValue(grid, row, column) {
@@ -523,7 +661,9 @@ export async function validateWellTransTrip(page, payload) {
 export async function syncWellTransTrip(page, payload) {
   const selectedDate = await getSelectedPortalDate(page);
   if (selectedDate !== payload.serviceDate) {
-    throw new Error(`WellTrans schedule ${selectedDate || 'unknown'} does not match trip service date ${payload.serviceDate}`);
+    throw safePreflightError(
+      new Error(`WellTrans schedule ${selectedDate || 'unknown'} does not match trip service date ${payload.serviceDate}`),
+    );
   }
 
   const grid = await openEditItinerary(page);
@@ -532,66 +672,103 @@ export async function syncWellTransTrip(page, payload) {
   const dropoffRows = model.rows.filter(row => ACTIVITY_DROPOFF.test(row.activity));
   if (pickupRows.length !== 1 || dropoffRows.length !== 1) {
     await page.keyboard.press('Escape').catch(() => {});
-    throw new Error(`Booking ${payload.bookingId} matched ${pickupRows.length} Pickup and ${dropoffRows.length} Dropoff rows; expected exactly one of each`);
+    throw safePreflightError(
+      new Error(`Booking ${payload.bookingId} matched ${pickupRows.length} Pickup and ${dropoffRows.length} Dropoff rows; expected exactly one of each`),
+    );
   }
 
   const pickup = pickupRows[0];
   const dropoff = dropoffRows[0];
-  const pickupDriverSet = await setTextCell(page, grid, pickup, 'Driver', payload.driver, true);
-  const pickupVehicleSet = await setTextCell(page, grid, pickup, 'Vehicle', payload.vehicle);
-  await setTextCell(page, grid, pickup, 'Arrival Time', payload.pickup.arrival, true);
-  await setTextCell(page, grid, pickup, 'Departure Time', payload.pickup.departure, true);
-  await setTextCell(page, grid, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, true);
-
-  const dropoffDriverSet = await setTextCell(page, grid, dropoff, 'Driver', payload.driver, true);
-  const dropoffVehicleSet = await setTextCell(page, grid, dropoff, 'Vehicle', payload.vehicle);
-  await setTextCell(page, grid, dropoff, 'Arrival Time', payload.dropoff.arrival, true);
-  await setTextCell(page, grid, dropoff, 'Departure Time', payload.dropoff.departure);
-  await setTextCell(page, grid, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, true);
-  if (payload.dropoff.signatureCaptured) {
-    await setListCell(page, grid, pickup, 'Signature Captured?', 'Rider Signature Received');
-    await setListCell(page, grid, dropoff, 'Signature Captured?', 'Rider Signature Received');
+  const plan = [];
+  try {
+    // Complete the entire read-only preflight before the first edit. A missing
+    // driver, signature option, row, or editor can therefore never leave a
+    // partially staged trip.
+    plan.push(await preflightCell(page, grid, pickup, 'Driver', payload.driver, { required: true }));
+    plan.push(await preflightCell(page, grid, pickup, 'Vehicle', payload.vehicle, { optionalExactList: true }));
+    plan.push(await preflightCell(page, grid, pickup, 'Arrival Time', payload.pickup.arrival, { required: true }));
+    plan.push(await preflightCell(page, grid, pickup, 'Departure Time', payload.pickup.departure, { required: true }));
+    plan.push(await preflightCell(page, grid, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, { required: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Driver', payload.driver, { required: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Vehicle', payload.vehicle, { optionalExactList: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Arrival Time', payload.dropoff.arrival, { required: true }));
+    plan.push(await preflightCell(page, grid, dropoff, 'Departure Time', payload.dropoff.departure));
+    plan.push(await preflightCell(page, grid, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, { required: true }));
+    if (payload.dropoff.signatureCaptured) {
+      plan.push(await preflightCell(
+        page, grid, pickup, 'Signature Captured?', 'Rider Signature Received', { required: true },
+      ));
+      plan.push(await preflightCell(
+        page, grid, dropoff, 'Signature Captured?', 'Rider Signature Received', { required: true },
+      ));
+    }
+  } catch (error) {
+    await page.keyboard.press('Escape').catch(() => {});
+    throw safePreflightError(error);
   }
 
-  const expected = [
-    ...(pickupDriverSet ? [[pickup, 'Driver', payload.driver]] : []),
-    ...(pickupVehicleSet ? [[pickup, 'Vehicle', payload.vehicle]] : []),
-    [pickup, 'Arrival Time', payload.pickup.arrival],
-    [pickup, 'Departure Time', payload.pickup.departure],
-    [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
-    ...(dropoffDriverSet ? [[dropoff, 'Driver', payload.driver]] : []),
-    ...(dropoffVehicleSet ? [[dropoff, 'Vehicle', payload.vehicle]] : []),
-    [dropoff, 'Arrival Time', payload.dropoff.arrival],
-    [dropoff, 'Departure Time', payload.dropoff.departure],
-    [dropoff, 'Mileage/Odometer', payload.dropoff.mileage],
-    ...(payload.dropoff.signatureCaptured
-      ? [
-        [pickup, 'Signature Captured?', 'Rider Signature Received'],
-        [dropoff, 'Signature Captured?', 'Rider Signature Received'],
+  const actionable = plan.filter(entry => !entry.skip && entry.needsWrite);
+  const attempted = [];
+  try {
+    for (const entry of actionable) {
+      // Record the attempt before editing because a browser/editor exception
+      // can occur after the cell value has already changed.
+      attempted.push(entry);
+      if (entry.kind === 'list') {
+        await setListCell(page, grid, entry.row, entry.column, entry.target);
+      } else {
+        await setTextCell(page, grid, entry.row, entry.column, entry.target, true);
+      }
+      const actual = await readCellValue(grid, entry.row, entry.column);
+      if (!equalCellValue(entry.column, actual, entry.target)) {
+        throw new Error(
+          `${entry.row.activity} ${entry.column}: expected "${entry.target}", found "${actual}"`,
+        );
+      }
+    }
+
+    const expected = plan
+      .filter(entry => !entry.skip)
+      .map(entry => [entry.row, entry.column, entry.target]);
+    if (payload.dropoff.signatureCaptured) {
+      expected.push(
         [pickup, 'Signature Captured', true],
         [dropoff, 'Signature Captured', true],
-      ] : []),
-  ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
-
-  await page.waitForTimeout(400);
-
-  const mismatches = [];
-  for (const [row, column, value] of expected) {
-    const actual = await readCellValue(grid, row, column);
-    if (!equalCellValue(column, actual, value)) {
-      mismatches.push(`${row.activity} ${column}: expected "${value}", found "${actual}"`);
+      );
     }
-  }
 
-  if (mismatches.length) {
-    throw new Error(`Post-save verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
+    await page.waitForTimeout(400);
+    const mismatches = [];
+    for (const [row, column, value] of expected) {
+      const actual = await readCellValue(grid, row, column);
+      if (!equalCellValue(column, actual, value)) {
+        mismatches.push(`${row.activity} ${column}: expected "${value}", found "${actual}"`);
+      }
+    }
+    if (mismatches.length) {
+      throw new Error(`Full-trip verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
+    }
+  } catch (error) {
+    await page.keyboard.press('Escape').catch(() => {});
+    const rollback = await rollbackAttemptedEntries(page, grid, attempted);
+    error.welltransMutationStarted = attempted.length > 0;
+    error.welltransRollbackVerified = rollback.verified;
+    error.welltransRollbackErrors = rollback.errors;
+    error.welltransSafeToContinue = rollback.verified;
+    error.message = `${error.message}. `
+      + (rollback.verified
+        ? 'All attempted fields were restored to their original WellTrans values.'
+        : `Automatic rollback could not be proven (${rollback.errors.join('; ')}). The batch was halted; use Close, not Apply.`);
+    throw error;
   }
 
   return {
     selectedDate, stagedForReview: true, verified: true,
     warnings: [
-      ...(!pickupVehicleSet ? ['Pickup vehicle was left unchanged because no unique WellTrans match was found.'] : []),
-      ...(!dropoffVehicleSet ? ['Dropoff vehicle was left unchanged because no unique WellTrans match was found.'] : []),
+      ...(plan.some(entry => entry.row === pickup && entry.column === 'Vehicle' && entry.skip)
+        ? ['Pickup vehicle was left unchanged because no unique exact WellTrans match was found.'] : []),
+      ...(plan.some(entry => entry.row === dropoff && entry.column === 'Vehicle' && entry.skip)
+        ? ['Dropoff vehicle was left unchanged because no unique exact WellTrans match was found.'] : []),
     ],
   };
 }
