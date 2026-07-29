@@ -22,9 +22,18 @@ export const normalizeServiceDate = (trip = {}) => {
   const value = firstValue(trip, ['dateKey', 'serviceDate', 'tripDate', 'scheduledDate', 'pickupDate', 'date']);
   if (!value) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) return String(value).trim();
-  const date = value?.toDate?.() || new Date(value);
+  if (/^(\d{4})-(\d{1,2})-(\d{1,2})/.test(String(value).trim())) {
+    const m = String(value).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+  }
+  const us = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (us) {
+    const year = us[3].length === 2 ? `20${us[3]}` : us[3];
+    return `${year}-${String(us[1]).padStart(2, '0')}-${String(us[2]).padStart(2, '0')}`;
+  }
+  const date = value?.toDate?.() || (typeof value?.seconds === 'number' ? new Date(value.seconds * 1000) : null) || new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-CA', { timeZone: 'America/Indiana/Indianapolis' });
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
 export const normalizeBookingId = (trip = {}) => {

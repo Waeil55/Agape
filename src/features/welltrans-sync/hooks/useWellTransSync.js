@@ -25,8 +25,10 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const scopedLogs = useMemo(() => logs.filter(log => log.serviceDate === serviceDate), [logs, serviceDate]);
   const dateTrips = useMemo(() => trips.filter(trip =>
     serviceDate && normalizeServiceDate(trip) === serviceDate), [trips, serviceDate]);
-  const completedTrips = useMemo(() => dateTrips.filter(trip =>
-    ['completed', 'complete'].includes(String(trip.status || '').toLowerCase()) || trip.completedAt), [dateTrips]);
+  const completedTrips = useMemo(() => dateTrips.filter(trip => {
+    const s = String(trip.status || '').toLowerCase().trim();
+    return s === 'completed' || s === 'complete' || s === 'done' || s.includes('completed') || s.includes('complete') || trip.completedAt;
+  }), [dateTrips]);
   const latestByTrip = useMemo(() => {
     const map = new Map();
     scopedLogs.forEach(log => {
