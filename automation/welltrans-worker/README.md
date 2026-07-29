@@ -6,6 +6,11 @@ shown in that schedule.
 
 ## Start a production session
 
+Preferred: click **Start Worker** in Agape after the one-click protocol has
+been installed on that Windows computer.
+
+Manual fallback:
+
 1. Open PowerShell in this directory.
 2. Set `WELLTRANS_ENABLE_WRITES=true` for that PowerShell session.
 3. Run `npm run calibrate-run`.
@@ -24,8 +29,10 @@ only trips for that date. To change dates, stop the worker with Ctrl+C, rerun
 - Exactly one Pickup and one Dropoff row must be present.
 - A job is rebuilt from the current Agape trip before execution.
 - Driver and vehicle mappings must resolve to values accepted by TripSpark.
-- The worker reopens the itinerary after Apply and compares every submitted
-  field before marking a log completed.
+- Every staged cell is re-located in the virtual grid and verified before the
+  trip is marked ready for review.
+- The worker never clicks **Apply** or **Close**. An operator reviews every
+  staged field, clicks **Apply**, and confirms the applied record in Agape.
 - One trip failure does not stop later trips.
 - Other service dates stay pending and cannot be written to the selected grid.
 - Credentials and session state remain local and encrypted; they are not

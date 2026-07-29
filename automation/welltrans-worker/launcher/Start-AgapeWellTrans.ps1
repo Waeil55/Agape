@@ -1,17 +1,25 @@
 $ErrorActionPreference = 'Stop'
 $Host.UI.RawUI.WindowTitle = 'Agape WellTrans Worker'
 
-$createdNew = $false
-$workerMutex = [Threading.Mutex]::new($true, 'Local\AgapeWellTransWorker', [ref]$createdNew)
-if (-not $createdNew) {
-  Write-Host 'The Agape WellTrans Worker is already running.' -ForegroundColor Yellow
-  Read-Host 'Press Enter to close this duplicate window'
-  exit 0
+$workerDirectory = Split-Path -Parent $PSScriptRoot
+$secretDirectory = Join-Path $env:USERPROFILE 'AgapeSecrets'
+$credentialPath = Join-Path $secretDirectory 'agape-worker-service-account.json'
+$logPath = Join-Path $secretDirectory 'welltrans-worker.log'
+$lockPath = Join-Path $secretDirectory 'welltrans-worker.pid'
+
+if (Test-Path -LiteralPath $lockPath) {
+  $ownerPid = 0
+  [void][int]::TryParse((Get-Content -LiteralPath $lockPath -Raw).Trim(), [ref]$ownerPid)
+  $ownerProcess = if ($ownerPid -gt 0) { Get-Process -Id $ownerPid -ErrorAction SilentlyContinue } else { $null }
+  if ($ownerProcess) {
+    Write-Host "The Agape WellTrans Worker is already running in process $ownerPid." -ForegroundColor Yellow
+    Read-Host 'Press Enter to close this duplicate window'
+    exit 0
+  }
+  Remove-Item -LiteralPath $lockPath -Force
 }
 
-$workerDirectory = Split-Path -Parent $PSScriptRoot
-$credentialPath = Join-Path $env:USERPROFILE 'AgapeSecrets\agape-worker-service-account.json'
-$logPath = Join-Path $env:USERPROFILE 'AgapeSecrets\welltrans-worker.log'
+Set-Content -LiteralPath $lockPath -Value $PID -NoNewline
 $workerError = $null
 try {
   Start-Transcript -Path $logPath -Append | Out-Null
@@ -39,8 +47,13 @@ try {
   $workerError = $_.Exception.Message
 } finally {
   Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
-  $workerMutex.ReleaseMutex()
-  $workerMutex.Dispose()
+  if (Test-Path -LiteralPath $lockPath) {
+    $lockOwnerPid = 0
+    [void][int]::TryParse((Get-Content -LiteralPath $lockPath -Raw).Trim(), [ref]$lockOwnerPid)
+    if ($lockOwnerPid -eq $PID) {
+      Remove-Item -LiteralPath $lockPath -Force
+    }
+  }
 }
 
 if ($workerError) {
