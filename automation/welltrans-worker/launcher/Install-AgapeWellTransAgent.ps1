@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Security
-$agentVersion = '2.0.0'
+$agentVersion = '2.2.0'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'

@@ -122,6 +122,19 @@
       ],
       "headers": [
         {
+          "source": "/welltrans-agent/*.@(exe|zip)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            },
+            {
+              "key": "Content-Disposition",
+              "value": "attachment"
+            }
+          ]
+        },
+        {
           "source": "**/*.@(js|css|svg|png|jpg)",
           "headers": [
             {

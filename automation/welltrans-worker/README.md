@@ -8,17 +8,23 @@ shown in that schedule.
 
 Preferred:
 
-1. Click **Install / Update Agent** once on each authorized Windows computer.
-2. Run the downloaded installer. It installs the agent in the current Windows
+1. Click **Download Windows Agent** once on each authorized Windows computer.
+2. Extract the ZIP and run `Install-Agent.cmd`. It installs the agent in the current Windows
    profile, registers the private Agape protocol, provisions a private,
    checksum-verified Node.js LTS runtime and Chromium, and creates encrypted
    local session storage. Node.js does not need to be installed separately.
    The Firebase enrollment credential is protected with Windows DPAPI and can
    only be decrypted by the enrolled Windows user.
-3. Click **Start Background Agent** in Agape.
+3. Choose the service date in Agape and click **Start & Fill Selected Date**.
 4. If the saved WellTrans session has expired, complete the legitimate broker
    login in the opened browser. The agent detects login and TRIPS - ASSIGNED
    automatically; there is no terminal window and no Enter-key confirmation.
+5. If the WellTrans portal is displaying another schedule, the agent opens the
+   schedule chooser and pauses until the exact requested date is visible.
+
+The optional **Setup EXE** provides a graphical installer on Windows computers
+whose Application Control policy permits organization utilities. Normal agent
+operation remains hidden.
 
 Manual fallback:
 

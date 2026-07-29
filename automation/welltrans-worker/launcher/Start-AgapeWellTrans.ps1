@@ -11,9 +11,19 @@ $secretDirectory = Join-Path $env:USERPROFILE 'AgapeSecrets'
 $protectedCredentialPath = Join-Path $secretDirectory 'agape-worker-service-account.protected'
 $runtimeDirectory = Join-Path $env:LOCALAPPDATA 'AgapeCare\Runtime'
 $runtimeCredentialPath = Join-Path $runtimeDirectory "welltrans-credential-$PID.json"
+$requestedDatePath = Join-Path $runtimeDirectory 'requested-service-date.txt'
 $logPath = Join-Path $secretDirectory 'welltrans-worker.log'
 $lockPath = Join-Path $secretDirectory 'welltrans-worker.pid'
 $workerProcess = $null
+
+$requestedDateMatch = [Regex]::Match(
+  [Uri]::UnescapeDataString($ProtocolUrl),
+  '(?:[?&])date=(\d{4}-\d{2}-\d{2})(?:&|$)'
+)
+if ($requestedDateMatch.Success) {
+  New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+  Set-Content -LiteralPath $requestedDatePath -Value $requestedDateMatch.Groups[1].Value -NoNewline
+}
 
 if (Test-Path -LiteralPath $lockPath) {
   $ownerPid = 0
@@ -71,6 +81,8 @@ try {
   $env:WELLTRANS_PORTAL_URL = [Environment]::GetEnvironmentVariable('WELLTRANS_PORTAL_URL', 'User')
   $env:WELLTRANS_ALLOWED_HOSTS = [Environment]::GetEnvironmentVariable('WELLTRANS_ALLOWED_HOSTS', 'User')
   $env:WELLTRANS_ENABLE_WRITES = 'true'
+  $env:WELLTRANS_REQUEST_FILE = $requestedDatePath
+  $env:WELLTRANS_POLL_MS = '1500'
 
   if (-not $env:WELLTRANS_SESSION_KEY -or -not $env:WELLTRANS_SESSION_FILE -or -not $env:WELLTRANS_PORTAL_URL) {
     throw 'WellTrans worker configuration is incomplete. Contact an Agape administrator.'

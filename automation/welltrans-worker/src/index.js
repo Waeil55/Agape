@@ -1,6 +1,7 @@
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { readFile } from 'node:fs/promises';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
 import { getSelectedPortalDate, syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
@@ -14,11 +15,12 @@ initializeApp({
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.0.0';
+const workerVersion = '2.2.0';
+let requestedServiceDate = '';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
-  version: workerVersion,
+  version: workerVersion, requestedDate: requestedServiceDate || null,
 }, { merge: true });
 const assertAllowedPortal = value => {
   const url = new URL(value);
@@ -30,7 +32,83 @@ const assertAllowedPortal = value => {
   return url.toString();
 };
 
-async function claimNextJobForDate(serviceDate) {
+const readRequestedServiceDate = async () => {
+  if (!process.env.WELLTRANS_REQUEST_FILE) return '';
+  const value = String(await readFile(process.env.WELLTRANS_REQUEST_FILE, 'utf8').catch(() => '')).trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+};
+
+const readVisiblePortalDate = async (page, fallback = '') => {
+  const runName = await page.locator('.RunName').last().innerText({ timeout: 1500 }).catch(() => '');
+  const match = String(runName).match(/\[(\d{2})-(\d{2})-(\d{4})\]/);
+  return match ? `${match[3]}-${match[1]}-${match[2]}` : fallback;
+};
+
+async function selectExactRequestedSchedule(page, serviceDate) {
+  const [year, month, day] = serviceDate.split('-');
+  const exactLabels = new Set([
+    `${month}/${day}/${year}`,
+    `${month}-${day}-${year}`,
+    `[${month}-${day}-${year}]`,
+  ]);
+  const exactMatches = [];
+  for (const frame of page.frames()) {
+    const candidates = frame.locator(
+      '.GridCell:visible, [role="gridcell"]:visible, option:visible, [role="option"]:visible',
+    );
+    const count = Math.min(await candidates.count().catch(() => 0), 250);
+    for (let index = 0; index < count; index += 1) {
+      const candidate = candidates.nth(index);
+      const value = await candidate.evaluate(element =>
+        String(element.title || element.textContent || '').trim()).catch(() => '');
+      if (exactLabels.has(value)) exactMatches.push(candidate);
+    }
+  }
+  if (exactMatches.length !== 1) return false;
+
+  await exactMatches[0].click({ force: true });
+  for (const frame of page.frames()) {
+    const proceed = frame.getByRole('button', { name: 'Proceed', exact: true }).last();
+    if (await proceed.isVisible().catch(() => false)) {
+      await proceed.click();
+      break;
+    }
+  }
+  await page.waitForTimeout(500);
+  return true;
+}
+
+async function waitForRequestedSchedule(page, selectedDate) {
+  requestedServiceDate = await readRequestedServiceDate();
+  if (!requestedServiceDate || requestedServiceDate === selectedDate) return selectedDate;
+
+  const scheduleControl = page.locator('.ChangeSchedule[title="Select Schedule"]:visible').last();
+  if (await scheduleControl.count()) {
+    await scheduleControl.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(400);
+    await selectExactRequestedSchedule(page, requestedServiceDate).catch(() => false);
+  }
+
+  while (page.context().browser()?.isConnected()) {
+    const currentDate = await readVisiblePortalDate(page, selectedDate);
+    requestedServiceDate = await readRequestedServiceDate() || requestedServiceDate;
+    if (currentDate === requestedServiceDate) {
+      await db.doc('welltrans_worker_status/primary').set({
+        state: 'connecting', selectedDate: currentDate, requestedDate: requestedServiceDate,
+        lastSeenAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return currentDate;
+    }
+    await db.doc('welltrans_worker_status/primary').set({
+      state: 'date_selection_required', selectedDate: currentDate,
+      requestedDate: requestedServiceDate, lastSeenAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await sleep(1000);
+  }
+  throw new Error('The WellTrans browser closed before the requested schedule was selected.');
+}
+
+async function listPendingJobIdsForDate(serviceDate) {
   const datedSnapshot = await db.collection('welltrans_sync_logs')
     .where('serviceDate', '==', serviceDate).limit(500).get();
   const datedPending = datedSnapshot.docs.filter(document => document.data().status === 'pending');
@@ -43,18 +121,10 @@ async function claimNextJobForDate(serviceDate) {
     const rightTime = right.data().createdAt?.toMillis?.() || 0;
     return leftTime - rightTime;
   });
-  const candidate = candidates.find(document => {
+  return candidates.filter(document => {
     const data = document.data();
     return String(data.payload?.serviceDate || data.serviceDate || '').slice(0, 10) === serviceDate;
-  });
-  if (!candidate) return null;
-  const ref = candidate.ref;
-  return db.runTransaction(async transaction => {
-    const fresh = await transaction.get(ref);
-    if (!fresh.exists || fresh.data().status !== 'pending') return null;
-    transaction.update(ref, { status: 'processing', stage: 'claimed', startedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000), attempt: FieldValue.increment(1), workerId });
-    return { id: fresh.id, ref, ...fresh.data() };
-  });
+  }).slice(0, 100).map(document => document.id);
 }
 
 async function claimJobById(logId) {
@@ -204,6 +274,7 @@ async function processJob(job, existingSession = null) {
 }
 
 async function main() {
+  requestedServiceDate = await readRequestedServiceDate();
   if (process.argv.includes('--login')) {
     await publishHeartbeat('waiting_for_login');
     return performManualLogin({
@@ -430,7 +501,8 @@ async function main() {
     onWaiting: () => publishHeartbeat('waiting_for_login').catch(() => {}),
   });
   try {
-    const selectedDate = await getSelectedPortalDate(session.page);
+    let selectedDate = await getSelectedPortalDate(session.page);
+    selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
     await publishHeartbeat('calibrated');
     await db.doc('welltrans_worker_status/primary').set({
       selectedDate, calibratedAt: FieldValue.serverTimestamp(),
@@ -441,13 +513,34 @@ async function main() {
       process.stdout.write(`Worker upgrade recovery: ${migrated} earlier-worker trip(s) queued for complete field restaging.\n`);
     }
     do {
+      const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
+      if (activeDate !== selectedDate) {
+        selectedDate = activeDate;
+        await db.doc('welltrans_worker_status/primary').set({
+          selectedDate, calibratedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
       await publishHeartbeat('calibrated');
-      const job = await claimNextJobForDate(selectedDate);
-      if (job) await processJob(job, session);
-      else {
+      const pendingJobIds = await listPendingJobIdsForDate(selectedDate);
+      if (pendingJobIds.length) {
+        const batchDate = selectedDate;
+        for (const logId of pendingJobIds) {
+          const latestDate = await waitForRequestedSchedule(session.page, selectedDate);
+          if (latestDate !== batchDate) {
+            selectedDate = latestDate;
+            break;
+          }
+          const job = await claimJobById(logId);
+          if (job) {
+            await publishHeartbeat('processing');
+            await processJob(job, session);
+            await publishHeartbeat('calibrated');
+          }
+        }
+      } else {
         const summary = await publishDateReviewSummary(selectedDate);
         process.stdout.write(`Review summary for ${selectedDate}: ${summary.staged} staged, ${summary.failed} failed, ${summary.pending} pending.\n`);
-        if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 10000);
+        if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
       }
     } while (!once);
   } catch (error) {

@@ -59,10 +59,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const workerDateMatches = Boolean(workerCalibrated && worker?.selectedDate === syncDate);
   const workerNeedsLogin = worker?.state === 'waiting_for_login';
   const workerConnecting = worker?.state === 'connecting';
+  const workerNeedsDate = worker?.state === 'date_selection_required';
   const workerStatusLabel = !settings.enabled
     ? 'Disabled'
     : workerNeedsLogin
       ? 'Sign-in required'
+      : workerNeedsDate
+        ? `Select ${worker?.requestedDate || syncDate} in WellTrans`
       : workerConnecting
         ? 'Starting agent'
         : workerOnline
@@ -70,7 +73,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           : workerStandby
             ? 'Standby'
             : 'Offline';
-  const workerHealthy = settings.enabled && workerOnline && !workerNeedsLogin && !workerConnecting;
+  const workerHealthy = settings.enabled && workerOnline
+    && !workerNeedsLogin && !workerNeedsDate && !workerConnecting;
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const stagedCount = currentLogs.filter(l => l.status === 'awaiting_review').length;
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
@@ -122,11 +126,43 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     try {
       const result = await queueWellTransSync(ids, mode, syncDate);
       setNotice(`${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued. ${result.data.rejected || 0} rejected.`);
+      setSyncProgress({ done: result.data.queued + (result.data.rejected || 0), total: ids.length });
       setSelectedIds([]);
       setTimeout(() => setSyncProgress(null), 5000);
     } catch (e) { setNotice(e.message || 'Unable to create queue.'); setSyncProgress(null); }
     finally { setBusy(''); }
   }, [syncDate]);
+
+  const startAndFillDate = useCallback(async () => {
+    if (!settings.enabled || busy) return;
+    setBusy('start-fill');
+    setNotice('');
+    window.location.href = `agape-welltrans://start?date=${encodeURIComponent(syncDate)}`;
+    if (!readyTrips.length) {
+      setNotice(`Agent start requested for ${syncDate}. Existing pending trips will continue automatically.`);
+      setBusy('');
+      return;
+    }
+    setSyncProgress({ done: 0, total: readyTrips.length });
+    try {
+      const result = await queueWellTransSync(readyTrips.map(trip => trip.id), 'start-fill', syncDate);
+      setSyncProgress({
+        done: result.data.queued + (result.data.rejected || 0),
+        total: readyTrips.length,
+      });
+      setNotice(
+        `Agent requested for ${syncDate}. ${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued; `
+        + `${result.data.rejected || 0} rejected by validation.`,
+      );
+      setSelectedIds([]);
+      setTimeout(() => setSyncProgress(null), 5000);
+    } catch (error) {
+      setNotice(error.message || 'The agent was requested, but trips could not be queued.');
+      setSyncProgress(null);
+    } finally {
+      setBusy('');
+    }
+  }, [busy, readyTrips, settings.enabled, syncDate]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -235,17 +271,26 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <a
-              href="/welltrans-agent/Install-AgapeWellTransAgent.cmd"
+              href="/welltrans-agent/agape-welltrans-agent.zip"
               download
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
             >
-              <Download size={13} /> Install / Update Agent
+              <Download size={13} /> Download Windows Agent
+            </a>
+            <a
+              href="/welltrans-agent/AgapeWellTransAgentSetup.exe"
+              download
+              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-slate-500 transition hover:border-blue-300 hover:text-blue-700"
+              title="Graphical setup for Windows computers that allow unsigned organization utilities"
+            >
+              Setup EXE
             </a>
             <button
-              onClick={() => { window.location.href = 'agape-welltrans://start'; }}
+              onClick={startAndFillDate}
+              disabled={!settings.enabled || Boolean(busy)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 transition"
             >
-              <Play size={13} className="fill-current" /> Start Background Agent
+              <Play size={13} className="fill-current" /> Start & Fill {syncDate}
             </button>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="relative flex h-2.5 w-2.5">
@@ -314,11 +359,11 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             </label>
             <button onClick={() => navigateDate(1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronRight size={16} /></button>
           </div>
-          <button disabled={!workerDateMatches || !readyTrips.length || Boolean(busy)}
-            onClick={() => runQueue(readyTrips.map(t => t.id), 'selected-date')}
+          <button disabled={!settings.enabled || Boolean(busy)}
+            onClick={startAndFillDate}
             className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition">
-            {busy === 'selected-date' ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
-            Stage Date ({readyTrips.length})
+            {busy === 'start-fill' ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
+            Start & Fill Date ({readyTrips.length})
           </button>
           <button disabled={!settings.enabled || !selectedIds.length || Boolean(busy)}
             onClick={() => runQueue(selectedIds, 'selected')}
@@ -362,7 +407,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       </div>
 
       {/* Worker warnings */}
-      {(workerUpgradeRequired || (workerCalibrated && !workerDateMatches) || unmatchedCount > 0) && (
+      {(workerUpgradeRequired || workerNeedsDate || (workerCalibrated && !workerDateMatches) || unmatchedCount > 0) && (
         <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2 space-y-1.5">
           {workerUpgradeRequired && (
             <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
@@ -372,6 +417,12 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           {workerCalibrated && !workerDateMatches && (
             <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
               <AlertTriangle size={13} /> Date mismatch: Agape {syncDate} vs Worker {worker.selectedDate}
+            </div>
+          )}
+          {workerNeedsDate && (
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-[11px] font-medium text-blue-800">
+              <AlertTriangle size={13} />
+              In the open WellTrans schedule chooser, select {worker?.requestedDate || syncDate}. The agent is paused and will never write to {worker?.selectedDate || 'the currently open date'}.
             </div>
           )}
           {unmatchedCount > 0 && (

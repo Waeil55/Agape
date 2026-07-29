@@ -12,7 +12,13 @@ try {
   New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $workerRoot 'src') -Destination $packageRoot -Recurse
   Copy-Item -LiteralPath (Join-Path $workerRoot 'launcher') -Destination $packageRoot -Recurse
-  foreach ($file in @('package.json', 'package-lock.json', 'README.md')) {
+  foreach ($file in @(
+    'package.json',
+    'package-lock.json',
+    'README.md',
+    'README-FIRST.txt',
+    'Install-Agent.cmd'
+  )) {
     Copy-Item -LiteralPath (Join-Path $workerRoot $file) -Destination (Join-Path $packageRoot $file)
   }
   if (Test-Path -LiteralPath $archivePath) {
@@ -43,4 +49,5 @@ try {
   }
 }
 
+& (Join-Path $PSScriptRoot 'buildWellTransAgentSetup.ps1') | Out-Null
 Write-Output $archivePath

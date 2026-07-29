@@ -4,6 +4,8 @@ import { categorizeFailure, queueWellTransSync } from '../services/welltransServ
 const WORKER_OFFLINE_THRESHOLD_MS = 60000;
 const AUTO_START_INTERVAL_MS = 30000;
 const AUTO_QUEUE_DELAY_MS = 3000;
+const agentStartUrl = serviceDate =>
+  `agape-welltrans://start?date=${encodeURIComponent(serviceDate || '')}`;
 
 const isWorkerOffline = (worker, now) => {
   if (!worker) return true;
@@ -56,7 +58,7 @@ export const useWellTransAutoSync = ({
         autoStartAttemptRef.current += 1;
         logEntry(`Auto-starting worker (attempt ${autoStartAttemptRef.current})...`);
         try {
-          window.location.href = 'agape-welltrans://start';
+          window.location.href = agentStartUrl(syncDate);
           logEntry('Worker start command sent.');
         } catch {
           logEntry('Failed to send worker start command.');
@@ -67,7 +69,7 @@ export const useWellTransAutoSync = ({
     }, AUTO_START_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [settings.autoStart, settings.enabled, worker, logEntry]);
+  }, [settings.autoStart, settings.enabled, worker, syncDate, logEntry]);
 
   // Auto-queue ready trips when worker is ready
   useEffect(() => {
@@ -126,7 +128,7 @@ export const useWellTransAutoSync = ({
         autoStartAttemptRef.current = 1;
         lastAutoStartRef.current = now;
         try {
-          window.location.href = 'agape-welltrans://start';
+          window.location.href = agentStartUrl(syncDate);
           logEntry('Self-heal restart command sent.');
         } catch {
           logEntry('Self-heal restart failed.');
@@ -135,7 +137,7 @@ export const useWellTransAutoSync = ({
     }, WORKER_OFFLINE_THRESHOLD_MS);
 
     return () => clearInterval(interval);
-  }, [settings.autoStart, settings.enabled, worker, logEntry]);
+  }, [settings.autoStart, settings.enabled, worker, syncDate, logEntry]);
 
   return { autoLog, clearAutoLog: () => setAutoLog([]) };
 };
