@@ -695,7 +695,9 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
               <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5"><Activity size={13} /> Self-Control</p>
-              <p className="text-[10px] text-slate-500">Fully automated sync — no manual intervention needed.</p>
+              <p className="text-[10px] text-slate-500">
+                Automated staging with mandatory operator review before Apply.
+              </p>
               {[
                 { key: 'autoStart', label: 'Auto-Start Worker', desc: 'Automatically launch worker when offline' },
                 { key: 'autoQueue', label: 'Auto-Queue Trips', desc: 'Queue ready trips when worker comes online' },
