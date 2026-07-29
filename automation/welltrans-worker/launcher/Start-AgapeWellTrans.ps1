@@ -30,7 +30,60 @@ if (Test-Path -LiteralPath $lockPath) {
   [void][int]::TryParse((Get-Content -LiteralPath $lockPath -Raw).Trim(), [ref]$ownerPid)
   $ownerProcess = if ($ownerPid -gt 0) { Get-Process -Id $ownerPid -ErrorAction SilentlyContinue } else { $null }
   if ($ownerProcess) {
-    exit 0
+    $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
+    $descendantIds = New-Object 'System.Collections.Generic.HashSet[int]'
+    [void]$descendantIds.Add([int]$ownerPid)
+    $foundDescendant = $true
+    while ($foundDescendant) {
+      $foundDescendant = $false
+      foreach ($process in $processes) {
+        if ($descendantIds.Contains([int]$process.ParentProcessId) -and
+            -not $descendantIds.Contains([int]$process.ProcessId)) {
+          [void]$descendantIds.Add([int]$process.ProcessId)
+          $foundDescendant = $true
+        }
+      }
+    }
+
+    $visibleBrowser = $descendantIds |
+      ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue } |
+      Where-Object {
+        $_.ProcessName -match '^(chrome|chromium)$' -and $_.MainWindowHandle -ne 0
+      } |
+      Select-Object -First 1
+
+    if ($visibleBrowser) {
+      Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class AgapeWindowFocus {
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+'@
+      [AgapeWindowFocus]::ShowWindow($visibleBrowser.MainWindowHandle, 9) | Out-Null
+      [AgapeWindowFocus]::SetForegroundWindow($visibleBrowser.MainWindowHandle) | Out-Null
+      exit 0
+    }
+
+    $workerNode = $descendantIds |
+      ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId=$_" -ErrorAction SilentlyContinue } |
+      Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'src\\index\.js' } |
+      Select-Object -First 1
+    $ownerAgeSeconds = ((Get-Date) - $ownerProcess.StartTime).TotalSeconds
+    if (-not $workerNode -or $ownerAgeSeconds -lt 60) {
+      exit 0
+    }
+
+    # A headed production worker older than one minute must own a visible
+    # browser. If it does not, it is stale and cannot be reviewed. Replace
+    # only this validated Agape process tree.
+    $descendantIds |
+      Where-Object { $_ -ne $ownerPid } |
+      Sort-Object -Descending |
+      ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+    Stop-Process -Id $ownerPid -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
   }
   Remove-Item -LiteralPath $lockPath -Force
 }

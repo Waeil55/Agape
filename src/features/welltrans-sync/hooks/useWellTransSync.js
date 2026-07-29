@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_SETTINGS, isWellTransFailureRetryable, subscribeWellTransLogs, subscribeWellTransSettings, subscribeWellTransWorker } from '../services/welltransService';
 import { calculateSyncHealthScore, normalizeServiceDate, validateTripForWellTrans } from '../utils/welltransMapping';
+import { isWorkerVersionAtLeast } from '../utils/welltransVersion';
 
 const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.createdAt?.toMillis?.()
@@ -48,7 +49,8 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
 
   const workerOnline = Boolean(heartbeat && now - heartbeat.getTime() < 45000
     && ['online', 'connecting', 'waiting_for_login', 'date_selection_required', 'processing', 'calibrated', 'review_ready', 'review_error'].includes(worker?.state));
-  const workerUpgradeRequired = Boolean(workerOnline && worker?.version !== REQUIRED_WORKER_VERSION);
+  const workerUpgradeRequired = Boolean(workerOnline
+    && !isWorkerVersionAtLeast(worker?.version, REQUIRED_WORKER_VERSION));
   const workerCalibrated = Boolean(workerOnline
     && !workerUpgradeRequired
     && ['calibrated', 'review_ready'].includes(worker?.state) && worker?.selectedDate);
