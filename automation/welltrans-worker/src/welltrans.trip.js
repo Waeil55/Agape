@@ -4,6 +4,9 @@ const REQUIRED_COLUMNS = [
   'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
 ];
 
+const ACTIVITY_PICKUP = /^(pickup|pick\s*up|pu)$/i;
+const ACTIVITY_DROPOFF = /^(dropoff|drop\s*off|do|drop)$/i;
+
 const portalDate = value => {
   const match = String(value || '').match(/\[(\d{2})-(\d{2})-(\d{4})\]/);
   return match ? `${match[3]}-${match[1]}-${match[2]}` : '';
@@ -57,95 +60,111 @@ async function openEditItinerary(page) {
 const normalizeBooking = value => String(value ?? '').trim().replace(/\s+/g, '').replace(/^TRIP-/i, '').toLowerCase();
 
 async function gridModel(grid, bookingId) {
-  const normalizedTarget = normalizeBooking(bookingId);
   const columnTitles = [
     'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
     'Departure Time', 'Mileage/Odometer', 'Signature Captured?',
   ];
 
-  const extractRows = (element, booking) => {
+  const extractAllCells = () => grid.evaluate((element) => {
     const cells = [...element.querySelectorAll('.GridCell')];
     const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
     const left = title => Number.parseFloat(header(title)?.style.left);
+    const columns = Object.fromEntries(columnTitles.map(title => [title, left(title)]));
     const bookingLeft = left('Booking Id');
     const activityLeft = left('Activity');
-    const matches = cells.filter(cell => {
-      if (Number.parseFloat(cell.style.left) !== bookingLeft) return false;
+    const rowMap = new Map();
+    for (const cell of cells) {
+      const cellLeft = Number.parseFloat(cell.style.left);
+      const cellTop = Number.parseFloat(cell.style.top);
+      if (cellTop === 0 || !Number.isFinite(cellTop)) continue;
       const raw = String(cell.title || cell.textContent || '').trim();
-      return normalizeBooking(raw) === normalizeBooking(booking);
-    });
-    return {
-      columns: Object.fromEntries(columnTitles.map(title => [title, left(title)])),
-      rows: matches.map(cell => {
-        const top = Number.parseFloat(cell.style.top);
-        const activity = cells.find(candidate =>
-          Number.parseFloat(candidate.style.left) === activityLeft
-          && Number.parseFloat(candidate.style.top) === top)?.title?.trim() || '';
-        const values = Object.fromEntries(columnTitles.map(title => {
-          const valueCell = cells.find(candidate =>
-            Number.parseFloat(candidate.style.left) === left(title)
-            && Number.parseFloat(candidate.style.top) === top);
-          return [title, String(valueCell?.title || valueCell?.textContent || '').trim()];
-        }));
-        return { top, activity, values };
-      }),
-    };
-  };
-
-  const tryExtract = () => grid.evaluate(extractRows, String(bookingId));
-
-  let result = await tryExtract();
-  if (result.rows.length > 0) return result;
-
-  const scrollerInfo = await grid.evaluate(element => {
-    for (const scroller of element.querySelectorAll('.GridScroller')) {
-      if (scroller.scrollHeight > scroller.clientHeight) {
-        return { scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight };
+      if (cellLeft === bookingLeft) {
+        const key = String(cellTop);
+        if (!rowMap.has(key)) rowMap.set(key, { top: cellTop, bookingRaw: raw, values: {} });
+        rowMap.get(key).bookingRaw = raw;
+        rowMap.get(key).values['Booking Id'] = raw;
       }
     }
-    return null;
+    for (const cell of cells) {
+      const cellLeft = Number.parseFloat(cell.style.left);
+      const cellTop = Number.parseFloat(cell.style.top);
+      if (cellTop === 0 || !Number.isFinite(cellTop)) continue;
+      const key = String(cellTop);
+      const row = rowMap.get(key);
+      if (!row) continue;
+      for (const title of columnTitles) {
+        if (Number.parseFloat(cell.style.left) === columns[title]) {
+          row.values[title] = String(cell.title || cell.textContent || '').trim();
+        }
+      }
+    }
+    for (const row of rowMap.values()) {
+      row.activity = row.values['Activity'] || '';
+    }
+    return { columns, rows: [...rowMap.values()] };
   });
 
-  if (scrollerInfo) {
-    const step = Math.max(100, Math.floor(scrollerInfo.clientHeight * 0.7));
-    for (let offset = step; offset < scrollerInfo.scrollHeight; offset += step) {
-      await grid.evaluate((element, scrollOffset) => {
-        for (const scroller of element.querySelectorAll('.GridScroller')) {
-          if (scroller.scrollHeight > scroller.clientHeight) {
-            scroller.scrollTop = scrollOffset;
-            scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+  const matchRows = (allRows, target) => {
+    const normalizedTarget = normalizeBooking(target);
+    return allRows.filter(row => normalizeBooking(row.bookingRaw) === normalizedTarget);
+  };
+
+  const scrollGridTo = async (offset) => grid.evaluate((element, scrollOffset) => {
+    for (const scroller of element.querySelectorAll('.GridScroller')) {
+      scroller.scrollTop = scrollOffset;
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+    }
+  }, offset);
+
+  const getAllScrollPositions = () => grid.evaluate((element) => {
+    for (const scroller of element.querySelectorAll('.GridScroller')) {
+      if (scroller.scrollHeight <= scroller.clientHeight) return [0];
+      const positions = [0];
+      const step = Math.max(50, Math.floor(scroller.clientHeight * 0.6));
+      for (let pos = step; pos < scroller.scrollHeight; pos += step) {
+        positions.push(pos);
+      }
+      positions.push(scroller.scrollHeight);
+      return positions;
+    }
+    return [0];
+  });
+
+  const positions = await getAllScrollPositions();
+  const allRowsMap = new Map();
+
+  for (const pos of positions) {
+    await scrollGridTo(pos);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const extracted = await extractAllCells();
+    for (const row of extracted.rows) {
+      const key = String(row.top);
+      if (!allRowsMap.has(key)) {
+        allRowsMap.set(key, row);
+      } else {
+        const existing = allRowsMap.get(key);
+        for (const title of columnTitles) {
+          if (!existing.values[title] && row.values[title]) {
+            existing.values[title] = row.values[title];
           }
         }
-      }, offset);
-      await new Promise(resolve => setTimeout(resolve, 200));
-      result = await tryExtract();
-      if (result.rows.length > 0) return result;
+      }
     }
-
-    await grid.evaluate(element => {
-      for (const scroller of element.querySelectorAll('.GridScroller')) {
-        if (scroller.scrollHeight > scroller.clientHeight) {
-          scroller.scrollTop = scroller.scrollHeight;
-          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        }
-      }
-    });
-    await new Promise(resolve => setTimeout(resolve, 200));
-    result = await tryExtract();
-    if (result.rows.length > 0) return result;
-
-    await grid.evaluate(element => {
-      for (const scroller of element.querySelectorAll('.GridScroller')) {
-        if (scroller.scrollHeight > scroller.clientHeight) {
-          scroller.scrollTop = 0;
-          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        }
-      }
-    });
-    await new Promise(resolve => setTimeout(resolve, 200));
   }
 
-  return await tryExtract();
+  await scrollGridTo(0);
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  const allRows = [...allRowsMap.values()];
+  return {
+    columns: allRows[0]?.values ? Object.fromEntries(
+      columnTitles.map(title => {
+        const headerCell = allRows.find(r => r.values[title] !== undefined);
+        return [title, 0];
+      })
+    ) : {},
+    rows: matchRows(allRows, bookingId),
+  };
 }
 
 async function exactCell(grid, top, left) {
@@ -160,6 +179,14 @@ async function exactCell(grid, top, left) {
     if (coordinates.top === top && coordinates.left === left) return cell;
   }
   return null;
+}
+
+async function resolveColumnLeft(grid, columnTitle) {
+  return grid.evaluate((element, title) => {
+    const cells = [...element.querySelectorAll('.GridCell')];
+    const header = cells.find(cell => cell.style.top === '0px' && cell.title === title);
+    return header ? Number.parseFloat(header.style.left) : null;
+  }, columnTitle);
 }
 
 const normalized = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -182,128 +209,146 @@ function equalCellValue(column, actual, expected) {
   return normalized(actual) === normalized(expected);
 }
 
-async function waitForDropdownVisible(page, timeoutMs = 3000) {
-  const dropdownSelectors = [
-    '.DropDownDialog:visible',
-    '.EditorWidgets [role="option"]:visible',
-    '.EditorWidgets core\\:listitem:visible',
-    '.EditorWidgets .ListBoxItem:visible',
-    '[class*="DropDown"]:visible [role="option"]',
-    '[class*="dropdown"]:visible [role="option"]',
-    '[class*="listbox"]:visible [role="option"]',
-  ];
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    for (const selector of dropdownSelectors) {
-      if (await page.locator(selector).first().count()) return true;
+async function openListDropdown(page) {
+  const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+  if (!await listbox.count()) return false;
+  const dropBtn = listbox.locator('.dropdlgbutton');
+  if (await dropBtn.count()) {
+    await dropBtn.click({ force: true });
+  } else {
+    await listbox.click({ force: true });
+  }
+  await page.waitForTimeout(400);
+  return true;
+}
+
+async function getListDropdownOptions(page) {
+  const optionTexts = await page.evaluate(() => {
+    const results = [];
+    const dialogSelectors = [
+      '.DropDownDialog',
+      '[class*="DropDown"]',
+      '[class*="dropdown"]',
+    ];
+    for (const sel of dialogSelectors) {
+      for (const dialog of document.querySelectorAll(sel)) {
+        if (dialog.offsetParent === null && !dialog.classList.contains('visible')) continue;
+        const rect = dialog.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const optionEls = dialog.querySelectorAll('[role="option"], core\\:listitem, .ListBoxItem, [title]');
+        for (const el of optionEls) {
+          const text = String(el.textContent || el.getAttribute('title') || '').trim();
+          if (text) results.push(text);
+        }
+      }
     }
-    await page.waitForTimeout(100);
-  }
-  return false;
+    const widgetSelectors = [
+      '.EditorWidgets [role="option"]',
+      '.EditorWidgets core\\:listitem',
+      '.EditorWidgets .ListBoxItem',
+    ];
+    for (const sel of widgetSelectors) {
+      for (const el of document.querySelectorAll(sel)) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const text = String(el.textContent || el.getAttribute('title') || '').trim();
+        if (text) results.push(text);
+      }
+    }
+    return [...new Set(results)];
+  });
+  return optionTexts;
 }
 
-async function getVisibleDropdownOptions(page) {
-  const optionSelectors = [
-    '.DropDownDialog:visible [title]',
-    '.EditorWidgets [role="option"]:visible',
-    '.EditorWidgets core\\:listitem:visible',
-    '.EditorWidgets .ListBoxItem:visible',
-    '[class*="DropDown"]:visible [role="option"]',
-    '[class*="dropdown"]:visible [role="option"]',
-    '[class*="listbox"]:visible [role="option"]',
-  ];
-  for (const selector of optionSelectors) {
-    const options = await page.locator(selector).evaluateAll(elements =>
-      elements.map(element => ({
-        text: String(element.textContent || element.getAttribute('title') || '').trim(),
-        element,
-      })).filter(item => item.text)
-    ).catch(() => []);
-    if (options.length) return options.map(o => o.text);
-  }
-  return [];
+async function clickListOption(page, optionText) {
+  const optionStr = String(optionText).trim();
+  const clicked = await page.evaluate((target) => {
+    const dialogSelectors = [
+      '.DropDownDialog',
+      '[class*="DropDown"]',
+      '[class*="dropdown"]',
+    ];
+    for (const sel of dialogSelectors) {
+      for (const dialog of document.querySelectorAll(sel)) {
+        const rect = dialog.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const optionEls = dialog.querySelectorAll('[role="option"], core\\:listitem, .ListBoxItem, [title]');
+        for (const el of optionEls) {
+          const text = String(el.textContent || el.getAttribute('title') || '').trim();
+          if (text === target) {
+            el.click();
+            return true;
+          }
+        }
+      }
+    }
+    const widgetSelectors = [
+      '.EditorWidgets [role="option"]',
+      '.EditorWidgets core\\:listitem',
+      '.EditorWidgets .ListBoxItem',
+    ];
+    for (const sel of widgetSelectors) {
+      for (const el of document.querySelectorAll(sel)) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const text = String(el.textContent || el.getAttribute('title') || '').trim();
+        if (text === target) {
+          el.click();
+          return true;
+        }
+      }
+    }
+    return false;
+  }, optionStr);
+  return clicked;
 }
 
-async function selectUniqueListOption(page, option, column) {
+async function selectListOption(page, option, column) {
   const optionStr = String(option).trim();
   if (!optionStr) return;
 
-  await waitForDropdownVisible(page, 3000);
+  const availableOptions = await getListDropdownOptions(page);
 
-  const exactMatches = await page.getByText(optionStr, { exact: true }).evaluateAll(elements =>
-    elements.filter(el => {
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    }).length
-  ).catch(() => 0);
-
-  if (exactMatches === 1) {
-    await page.getByText(optionStr, { exact: true }).evaluate(elements => {
-      const visible = elements.filter(el => {
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      });
-      if (visible.length) visible[visible.length - 1].click();
-    });
+  const clicked = await clickListOption(page, optionStr);
+  if (clicked) {
     await page.waitForTimeout(200);
     return;
   }
 
-  if (exactMatches > 1) {
-    const allExact = page.getByText(optionStr, { exact: true });
-    const count = await allExact.count();
-    for (let i = count - 1; i >= 0; i--) {
-      const el = allExact.nth(i);
-      if (await el.isVisible().catch(() => false)) {
-        await el.click();
-        await page.waitForTimeout(200);
-        return;
-      }
-    }
-  }
-
   if (column === 'Vehicle' || column === 'Driver') {
-    const availableOptions = await getVisibleDropdownOptions(page);
-    throw new Error(`${column} option "${optionStr}" was not found exactly.`
-      + `${availableOptions.length ? ` Available: ${[...new Set(availableOptions)].slice(0, 15).join(', ')}` : ''}`);
+    throw new Error(`${column} option "${optionStr}" was not found in dropdown.`
+      + `${availableOptions.length ? ` Available: ${availableOptions.slice(0, 20).join(', ')}` : ' Dropdown may be empty.'}`);
   }
 
-  const containedMatches = await page.getByText(optionStr, { exact: false }).evaluateAll(elements =>
-    elements.filter(el => {
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    })
-  ).catch(() => []);
-
-  if (containedMatches.length === 1) {
-    const el = page.getByText(optionStr, { exact: false });
-    const count = await el.count();
-    for (let i = 0; i < count; i++) {
-      if (await el.nth(i).isVisible().catch(() => false)) {
-        await el.nth(i).click();
-        await page.waitForTimeout(200);
-        return;
-      }
+  const normalizedTarget = normalized(optionStr);
+  const partialMatch = availableOptions.find(opt => normalized(opt).includes(normalizedTarget));
+  if (partialMatch) {
+    const clickedPartial = await clickListOption(page, partialMatch);
+    if (clickedPartial) {
+      await page.waitForTimeout(200);
+      return;
     }
   }
 
-  const availableOptions = await getVisibleDropdownOptions(page);
-  throw new Error(`${column} option "${optionStr}" was ${containedMatches.length > 1 ? 'ambiguous' : 'not found'}`
-    + `${availableOptions.length ? `. Available: ${[...new Set(availableOptions)].slice(0, 15).join(', ')}` : ''}`);
+  throw new Error(`Option "${optionStr}" was not found in dropdown.`
+    + `${availableOptions.length ? ` Available: ${availableOptions.slice(0, 20).join(', ')}` : ' Dropdown may be empty.'}`);
 }
 
-async function setTextCell(page, grid, model, row, column, value, required = false) {
+async function setTextCell(page, grid, row, column, value, required = false) {
   if (value === undefined || value === null || value === '') {
     if (required) throw new Error(`${column} is required for ${row.activity}`);
     return false;
   }
+  const colLeft = await resolveColumnLeft(grid, column);
+  if (colLeft === null) throw new Error(`${column} column not found in grid`);
   if (equalCellValue(column, row.values?.[column], value)) return true;
-  const cell = await exactCell(grid, row.top, model.columns[column]);
-  if (!cell) throw new Error(`${column} cell is unavailable for ${row.activity}`);
+
+  const cell = await exactCell(grid, row.top, colLeft);
+  if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity} (top=${row.top})`);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await cell.dblclick({ force: true });
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(250);
 
     const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
     const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
@@ -313,24 +358,18 @@ async function setTextCell(page, grid, model, row, column, value, required = fal
       await editor.fill('');
       await page.waitForTimeout(50);
       await editor.fill(String(value));
-      await page.waitForTimeout(100);
-      await page.keyboard.press('Tab');
       await page.waitForTimeout(150);
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(200);
       return true;
     }
 
     if (await listbox.count()) {
-      const dropBtn = listbox.locator('.dropdlgbutton');
-      if (await dropBtn.count()) {
-        await dropBtn.click({ force: true });
-      } else {
-        await listbox.click({ force: true });
-      }
-      await page.waitForTimeout(300);
-
+      await openListDropdown(page);
       try {
-        await selectUniqueListOption(page, value, column);
-        await page.waitForTimeout(150);
+        await selectListOption(page, value, column);
+        await page.keyboard.press('Tab');
+        await page.waitForTimeout(200);
         return true;
       } catch (error) {
         await page.keyboard.press('Escape').catch(() => {});
@@ -347,32 +386,32 @@ async function setTextCell(page, grid, model, row, column, value, required = fal
   throw new Error(`${column} editor did not open for ${row.activity}`);
 }
 
-async function setListCell(page, grid, model, row, column, option) {
+async function setListCell(page, grid, row, column, option) {
   if (!option) return;
   if (equalCellValue(column, row.values?.[column], option)) return;
-  const cell = await exactCell(grid, row.top, model.columns[column]);
-  if (!cell) throw new Error(`${column} cell is unavailable for ${row.activity}`);
+
+  const colLeft = await resolveColumnLeft(grid, column);
+  if (colLeft === null) throw new Error(`${column} column not found in grid`);
+
+  const cell = await exactCell(grid, row.top, colLeft);
+  if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity}`);
 
   await cell.dblclick({ force: true });
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(250);
 
-  const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
-  if (!await listbox.count()) throw new Error(`${column} listbox did not open for ${row.activity}`);
-
-  const dropBtn = listbox.locator('.dropdlgbutton');
-  if (await dropBtn.count()) {
-    await dropBtn.click({ force: true });
-  } else {
-    await listbox.click({ force: true });
+  if (!await page.locator('.EditorWidgets core\\:listbox:visible').count()) {
+    throw new Error(`${column} listbox did not open for ${row.activity}`);
   }
-  await page.waitForTimeout(300);
 
   if (column === 'Signature Captured?') {
+    await openListDropdown(page);
     for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
   } else {
-    await selectUniqueListOption(page, option, column);
+    await openListDropdown(page);
+    await selectListOption(page, option, column);
+    await page.keyboard.press('Tab');
   }
   await page.waitForTimeout(250);
 
@@ -381,16 +420,9 @@ async function setListCell(page, grid, model, row, column, option) {
 
   if (column === 'Signature Captured?' && !equalCellValue(column, selected, option)) {
     await cell.dblclick({ force: true });
-    await page.waitForTimeout(200);
-    const retryListbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
-    if (await retryListbox.count()) {
-      const retryDropBtn = retryListbox.locator('.dropdlgbutton');
-      if (await retryDropBtn.count()) {
-        await retryDropBtn.click({ force: true });
-      } else {
-        await retryListbox.click({ force: true });
-      }
-      await page.waitForTimeout(300);
+    await page.waitForTimeout(250);
+    if (await page.locator('.EditorWidgets core\\:listbox:visible').count()) {
+      await openListDropdown(page);
       for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
       await page.keyboard.press('Enter');
       await page.keyboard.press('Tab');
@@ -401,13 +433,8 @@ async function setListCell(page, grid, model, row, column, option) {
   }
 
   if (!equalCellValue(column, selected, option)) {
-    throw new Error(`${column} selection was not confirmed: expected "${option}", found "${selected}"`);
+    throw new Error(`${column} selection not confirmed: expected "${option}", found "${selected}"`);
   }
-}
-
-async function dismissTransientEditor(page) {
-  await page.keyboard.press('Escape').catch(() => {});
-  await page.waitForTimeout(100);
 }
 
 export async function validateWellTransTrip(page, payload) {
@@ -417,9 +444,10 @@ export async function validateWellTransTrip(page, payload) {
   }
   const grid = await openEditItinerary(page);
   const model = await gridModel(grid, payload.bookingId);
-  const pickup = model.rows.filter(row => /^pickup$/i.test(row.activity));
-  const dropoff = model.rows.filter(row => /^dropoff$/i.test(row.activity));
-  await dismissTransientEditor(page);
+  const pickup = model.rows.filter(row => ACTIVITY_PICKUP.test(row.activity));
+  const dropoff = model.rows.filter(row => ACTIVITY_DROPOFF.test(row.activity));
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForTimeout(100);
   if (pickup.length !== 1 || dropoff.length !== 1) {
     throw new Error(`Booking ${payload.bookingId} matched ${pickup.length} Pickup and ${dropoff.length} Dropoff rows; expected exactly one of each`);
   }
@@ -434,65 +462,76 @@ export async function syncWellTransTrip(page, payload) {
 
   const grid = await openEditItinerary(page);
   const model = await gridModel(grid, payload.bookingId);
-  const pickupRows = model.rows.filter(row => /^pickup$/i.test(row.activity));
-  const dropoffRows = model.rows.filter(row => /^dropoff$/i.test(row.activity));
+  const pickupRows = model.rows.filter(row => ACTIVITY_PICKUP.test(row.activity));
+  const dropoffRows = model.rows.filter(row => ACTIVITY_DROPOFF.test(row.activity));
   if (pickupRows.length !== 1 || dropoffRows.length !== 1) {
-    await dismissTransientEditor(page);
+    await page.keyboard.press('Escape').catch(() => {});
     throw new Error(`Booking ${payload.bookingId} matched ${pickupRows.length} Pickup and ${dropoffRows.length} Dropoff rows; expected exactly one of each`);
   }
 
   const pickup = pickupRows[0];
   const dropoff = dropoffRows[0];
-  const pickupDriverSet = await setTextCell(page, grid, model, pickup, 'Driver', payload.driver, true);
-  const pickupVehicleSet = await setTextCell(page, grid, model, pickup, 'Vehicle', payload.vehicle);
-  await setTextCell(page, grid, model, pickup, 'Arrival Time', payload.pickup.arrival, true);
-  await setTextCell(page, grid, model, pickup, 'Departure Time', payload.pickup.departure, true);
-  await setTextCell(page, grid, model, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, true);
+  const pickupDriverSet = await setTextCell(page, grid, pickup, 'Driver', payload.driver, true);
+  const pickupVehicleSet = await setTextCell(page, grid, pickup, 'Vehicle', payload.vehicle);
+  await setTextCell(page, grid, pickup, 'Arrival Time', payload.pickup.arrival, true);
+  await setTextCell(page, grid, pickup, 'Departure Time', payload.pickup.departure, true);
+  await setTextCell(page, grid, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, true);
 
-  const dropoffDriverSet = await setTextCell(page, grid, model, dropoff, 'Driver', payload.driver, true);
-  const dropoffVehicleSet = await setTextCell(page, grid, model, dropoff, 'Vehicle', payload.vehicle);
-  await setTextCell(page, grid, model, dropoff, 'Arrival Time', payload.dropoff.arrival, true);
-  await setTextCell(page, grid, model, dropoff, 'Departure Time', payload.dropoff.departure);
-  await setTextCell(page, grid, model, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, true);
+  const dropoffDriverSet = await setTextCell(page, grid, dropoff, 'Driver', payload.driver, true);
+  const dropoffVehicleSet = await setTextCell(page, grid, dropoff, 'Vehicle', payload.vehicle);
+  await setTextCell(page, grid, dropoff, 'Arrival Time', payload.dropoff.arrival, true);
+  await setTextCell(page, grid, dropoff, 'Departure Time', payload.dropoff.departure);
+  await setTextCell(page, grid, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, true);
   if (payload.dropoff.signatureCaptured) {
-    await setListCell(page, grid, model, pickup, 'Signature Captured?', 'Rider Signature Received');
-    await setListCell(page, grid, model, dropoff, 'Signature Captured?', 'Rider Signature Received');
+    await setListCell(page, grid, pickup, 'Signature Captured?', 'Rider Signature Received');
+    await setListCell(page, grid, dropoff, 'Signature Captured?', 'Rider Signature Received');
+  }
+
+  const colLefts = {};
+  for (const title of REQUIRED_COLUMNS) {
+    colLefts[title] = await resolveColumnLeft(grid, title);
   }
 
   const expected = [
-    ...(pickupDriverSet ? [[pickup, 'Driver', payload.driver]] : []),
-    ...(pickupVehicleSet ? [[pickup, 'Vehicle', payload.vehicle]] : []),
-    [pickup, 'Arrival Time', payload.pickup.arrival],
-    [pickup, 'Departure Time', payload.pickup.departure],
-    [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
-    ...(dropoffDriverSet ? [[dropoff, 'Driver', payload.driver]] : []),
-    ...(dropoffVehicleSet ? [[dropoff, 'Vehicle', payload.vehicle]] : []),
-    [dropoff, 'Arrival Time', payload.dropoff.arrival],
-    [dropoff, 'Departure Time', payload.dropoff.departure],
-    [dropoff, 'Mileage/Odometer', payload.dropoff.mileage],
+    ...(pickupDriverSet ? [[pickup.top, 'Driver', payload.driver]] : []),
+    ...(pickupVehicleSet ? [[pickup.top, 'Vehicle', payload.vehicle]] : []),
+    [pickup.top, 'Arrival Time', payload.pickup.arrival],
+    [pickup.top, 'Departure Time', payload.pickup.departure],
+    [pickup.top, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
+    ...(dropoffDriverSet ? [[dropoff.top, 'Driver', payload.driver]] : []),
+    ...(dropoffVehicleSet ? [[dropoff.top, 'Vehicle', payload.vehicle]] : []),
+    [dropoff.top, 'Arrival Time', payload.dropoff.arrival],
+    [dropoff.top, 'Departure Time', payload.dropoff.departure],
+    [dropoff.top, 'Mileage/Odometer', payload.dropoff.mileage],
     ...(payload.dropoff.signatureCaptured
       ? [
-        [pickup, 'Signature Captured?', 'Rider Signature Received'],
-        [dropoff, 'Signature Captured?', 'Rider Signature Received'],
+        [pickup.top, 'Signature Captured?', 'Rider Signature Received'],
+        [dropoff.top, 'Signature Captured?', 'Rider Signature Received'],
       ] : []),
   ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
 
   await page.waitForTimeout(400);
-  const verified = await gridModel(grid, payload.bookingId);
-  const verifiedPickup = verified.rows.filter(row => /^pickup$/i.test(row.activity));
-  const verifiedDropoff = verified.rows.filter(row => /^dropoff$/i.test(row.activity));
-  if (verifiedPickup.length !== 1 || verifiedDropoff.length !== 1) {
-    throw new Error(`Post-save row verification failed for Booking ${payload.bookingId}`);
+
+  const mismatches = [];
+  for (const [rowTop, column, value] of expected) {
+    const left = colLefts[column];
+    if (left === null) continue;
+    const cell = await exactCell(grid, rowTop, left);
+    if (!cell) {
+      mismatches.push(`${column} at top ${rowTop}: cell not found`);
+      continue;
+    }
+    const actual = await cell.evaluate(element =>
+      String(element.title || element.textContent || '').trim());
+    if (!equalCellValue(column, actual, value)) {
+      mismatches.push(`${column} at top ${rowTop}: expected "${value}", found "${actual}"`);
+    }
   }
-  const verificationExpected = expected.map(([row, column, value]) => [
-    /^pickup$/i.test(row.activity) ? verifiedPickup[0] : verifiedDropoff[0], column, value,
-  ]);
-  const mismatches = verificationExpected
-    .filter(([row, column, value]) => !equalCellValue(column, row.values?.[column], value))
-    .map(([row, column, value]) => `${row.activity} ${column}: expected "${value}", found "${row.values?.[column] || ''}"`);
+
   if (mismatches.length) {
-    throw new Error(`Post-save value verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
+    throw new Error(`Post-save verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
   }
+
   return {
     selectedDate, stagedForReview: true, verified: true,
     warnings: [
