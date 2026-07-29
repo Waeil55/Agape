@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_SETTINGS, isWellTransFailureRetryable, subscribeWellTransLogs, subscribeWellTransSettings, subscribeWellTransWorker } from '../services/welltransService';
-import { normalizeServiceDate, validateTripForWellTrans } from '../utils/welltransMapping';
+import { calculateSyncHealthScore, normalizeServiceDate, validateTripForWellTrans } from '../utils/welltransMapping';
 
 const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.createdAt?.toMillis?.()
@@ -41,7 +41,9 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
       && (latestByTrip.get(trip.id)?.status !== 'failed'
         || isWellTransFailureRetryable(latestByTrip.get(trip.id)))),
   [completedTrips, latestByTrip]);
+
   const heartbeat = worker?.lastSeenAt?.toDate?.() || (worker?.lastSeenAt ? new Date(worker.lastSeenAt) : null);
+
   const workerOnline = Boolean(heartbeat && now - heartbeat.getTime() < 45000
     && ['online', 'calibrated', 'review_ready', 'review_error'].includes(worker?.state));
   const workerUpgradeRequired = Boolean(workerOnline && worker?.version !== REQUIRED_WORKER_VERSION);
@@ -49,9 +51,17 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     && !workerUpgradeRequired
     && ['calibrated', 'review_ready'].includes(worker?.state) && worker?.selectedDate);
   const workerStandby = Boolean(heartbeat && now - heartbeat.getTime() < 45000 && worker?.state === 'standby');
+
+  const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
+  const successfulCount = useMemo(() => currentLogs.filter(log => log.status === 'completed').length, [currentLogs]);
+  const failedCount = useMemo(() => currentLogs.filter(log => log.status === 'failed').length, [currentLogs]);
+  const healthScore = useMemo(() => calculateSyncHealthScore(completedTrips.length, successfulCount, failedCount), [completedTrips.length, successfulCount, failedCount]);
+
   return {
     settings, logs: scopedLogs, worker, workerOnline, workerCalibrated,
     workerUpgradeRequired, requiredWorkerVersion: REQUIRED_WORKER_VERSION,
     workerStandby, loading, dateTrips, completedTrips, readyTrips, latestByTrip,
+    healthScore, successfulCount, failedCount,
   };
 };
+

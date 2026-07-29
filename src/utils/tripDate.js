@@ -104,13 +104,14 @@ export function isCalendarDateKeyWithinLastDays(dateKey, days = 14, from = new D
  */
 export function tripMatchesTodayOrTomorrow(tripDate) {
   const key = tripCalendarDateKey(tripDate);
-  if (key === undefined) return false;
+  if (key === undefined) return true;
   const now = new Date();
   const todayKey = localYmd(now);
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowKey = localYmd(tomorrow);
   return key === todayKey || key === tomorrowKey;
 }
+
 
 /**
  * True if a trip time has passed (late for its scheduled slot).

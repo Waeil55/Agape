@@ -42,6 +42,8 @@ import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES }
 import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { resolveDriverVehicle } from '../utils/vehiclePersistence';
+
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
@@ -555,10 +557,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const phoneNumbers = phoneNumbersProp?.dispatcher || phoneNumbersProp?.routing ? phoneNumbersProp : (phoneNumbersFallback || phoneNumbersProp);
   const me = useMemo(
-    () =>
-      drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
-      (allDrivers || []).find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
-      buildFallbackDriverProfile(currentUser || ''),
+    () => {
+      const rawMe = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
+        (allDrivers || []).find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
+        buildFallbackDriverProfile(currentUser || '');
+      const vehicle = resolveDriverVehicle(rawMe, currentUser);
+      return { ...rawMe, vehicle };
+    },
     [drivers, allDrivers, currentUser]
   );
   const normalizedCurrentUserEmail = useMemo(

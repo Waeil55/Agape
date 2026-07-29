@@ -89,17 +89,25 @@ function normalizeTrip(trip) {
   return trip;
 }
 
+import { resolveDriverVehicle, saveAssignedVehicle } from '../utils/vehiclePersistence';
+
 function cleanTripCollection(trips = []) {
   const list = Array.isArray(trips) ? trips : [];
   return dedupTripsByBookingId(filterValidTripRecords(list.map(normalizeTrip)));
 }
 
 function normalizeData(data = {}) {
+  const rawDrivers = data.drivers || [];
+  const normalizedDrivers = rawDrivers.map(d => {
+    const resolvedVehicle = resolveDriverVehicle(d);
+    return resolvedVehicle && resolvedVehicle !== d.vehicle ? { ...d, vehicle: resolvedVehicle } : d;
+  });
+
   return {
     ...DEFAULT_DATA,
     ...data,
     trips: cleanTripCollection(data.trips || []),
-    drivers: data.drivers || [],
+    drivers: normalizedDrivers,
     dispatchers: data.dispatchers || [],
     vehicles: data.vehicles || [],
     trashedTrips: cleanTripCollection(data.trashedTrips || []),
@@ -107,6 +115,8 @@ function normalizeData(data = {}) {
     phoneNumbers: data.phoneNumbers || DEFAULT_DATA.phoneNumbers,
   };
 }
+
+
 
 function shouldIgnoreRealtimePermissionError(err) {
   return err?.code === 'permission-denied' && !auth.currentUser;
@@ -548,6 +558,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
 
   const upsertDriverProfile = useCallback(async (driverId, updates = {}) => {
     if (!driverId) return false;
+    if (updates?.vehicle) saveAssignedVehicle(driverId, updates.vehicle);
     const currentDrivers = dataRef.current.drivers || [];
     const existing = currentDrivers.find((driver) => driver.id === driverId) || { id: driverId };
     const nextDriver = sanitizeForFirestore({ ...existing, ...updates, id: driverId, updatedAtLocal: updates.updatedAtLocal || new Date().toISOString() });
@@ -565,6 +576,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       return false;
     }
   }, []);
+
 
   const setDispatchers = useCallback((updater) => { const current = dataRef.current.dispatchers || []; return writeField('dispatchers', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
   const setVehicles = useCallback((updater) => { const current = dataRef.current.vehicles || []; return writeField('vehicles', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);

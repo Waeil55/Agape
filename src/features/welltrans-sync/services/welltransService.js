@@ -62,3 +62,28 @@ export const explainWellTransFailure = (log) => {
   if (lower.includes('selector') || lower.includes('field')) return `WellTrans did not expose an expected field for trip ${log.bookingId || log.tripId}. Review the captured screenshot and update the selector configuration before retrying.`;
   return `Trip ${log.bookingId || log.tripId} failed during the ${log.stage || 'automation'} stage: ${message} Review the screenshot and retry after correcting the source data or portal configuration.`;
 };
+
+export const exportWellTransLogsCSV = (logs = [], serviceDate = '') => {
+  if (!logs || !logs.length) return;
+  const headers = ['Booking ID', 'Trip ID', 'Service Date', 'Status', 'Stage', 'Error Message', 'Timestamp', 'Screenshot Link'];
+  const rows = logs.map(log => [
+    `"${log.bookingId || ''}"`,
+    `"${log.tripId || ''}"`,
+    `"${log.serviceDate || serviceDate}"`,
+    `"${log.status || ''}"`,
+    `"${log.stage || ''}"`,
+    `"${(log.errorMessage || '').replace(/"/g, '""')}"`,
+    `"${log.completedAt || log.stagedAt || log.createdAt || ''}"`,
+    `"${log.screenshot || ''}"`,
+  ]);
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `WellTrans_Sync_Report_${serviceDate || 'all'}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+

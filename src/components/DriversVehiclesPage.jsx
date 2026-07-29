@@ -3,9 +3,21 @@ import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, 
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiAnalyzeDriver } from '../config/ai';
+import { getAssignedVehicle, resolveDriverVehicle, saveAssignedVehicle } from '../utils/vehiclePersistence';
 
 const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled }) => {
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
+  const findAssignedDriver = useCallback((v) => {
+    if (!v) return null;
+    const targetName = String(v.name || '').trim().toLowerCase();
+    return drivers.find(d => 
+      (d.id && (d.id === v.driverId || d.id === v.assignedDriver)) ||
+      (d.vehicle && String(d.vehicle).trim().toLowerCase() === targetName) ||
+      (resolveDriverVehicle(d).trim().toLowerCase() === targetName)
+    );
+  }, [drivers]);
+
   const [activeTab, setActiveTab] = useState(mode !== 'all' ? mode : 'drivers');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -327,6 +339,7 @@ const [form, setForm] = useState({
                           const currentOccupant = drivers.find(x => x.vehicle === newV && x.id !== d.id);
                           if (currentOccupant && upsertDriverProfile) await upsertDriverProfile(currentOccupant.id, { vehicle: '' });
                         }
+                        if (newV) saveAssignedVehicle(d.id, newV);
                         if (upsertDriverProfile) {
                           await upsertDriverProfile(d.id, { vehicle: newV });
                         } else {
@@ -485,15 +498,17 @@ const [form, setForm] = useState({
               <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No vehicles yet. Click "Add Vehicle" to create one.</div>
             ) : (
               vehicles.map((v) => {
-                const assignedDriver = drivers.find(d => d.vehicle === v.name);
+                const assignedDriver = findAssignedDriver(v);
                 return (
-                  <div key={v.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div key={v.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-base font-semibold text-slate-900">{v.name}</h3>
-                        <p className="mt-0.5 text-xs font-medium text-slate-500">{v.make || '-'} {v.model || ''} - {v.year || 'No year'} / {v.color || 'No color'}</p>
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900">{v.name}</h3>
+                        <p className="mt-0.5 text-xs text-slate-500">{v.make} {v.model} {v.year ? `(${v.year})` : ''}</p>
                       </div>
-                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{v.plate || 'No plate'}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${assignedDriver ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {assignedDriver ? assignedDriver.name : 'Unassigned'}
+                      </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-xl bg-slate-50 p-3">
@@ -510,7 +525,13 @@ const [form, setForm] = useState({
                       const oldDriverId = assignedDriver?.id;
                       if (driverId === oldDriverId) return;
                       if (oldDriverId && upsertDriverProfile) await upsertDriverProfile(oldDriverId, { vehicle: '' });
-                      if (driverId && upsertDriverProfile) await upsertDriverProfile(driverId, { vehicle: v.name });
+                      if (driverId) {
+                        saveAssignedVehicle(driverId, v.name);
+                        if (upsertDriverProfile) await upsertDriverProfile(driverId, { vehicle: v.name });
+                      }
+                      if (setVehicles) {
+                        setVehicles(prev => prev.map(veh => veh.id === v.id ? { ...veh, driverId, assignedDriver: driverId } : veh));
+                      }
                       addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
                     }} className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                       <option value="">Unassigned driver</option>
@@ -547,7 +568,7 @@ const [form, setForm] = useState({
                   <tr><td colSpan="7" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-xs">No vehicles yet. Click "Add Vehicle" to create one.</td></tr>
                 ) : (
                   vehicles.map((v) => {
-                    const assignedDriver = drivers.find(d => d.vehicle === v.name);
+                    const assignedDriver = findAssignedDriver(v);
                     return (
                       <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs font-semibold text-slate-900">{v.name}</td>
@@ -561,7 +582,13 @@ const [form, setForm] = useState({
                             const oldDriverId = assignedDriver?.id;
                             if (driverId === oldDriverId) return;
                             if (oldDriverId && upsertDriverProfile) await upsertDriverProfile(oldDriverId, { vehicle: '' });
-                            if (driverId && upsertDriverProfile) await upsertDriverProfile(driverId, { vehicle: v.name });
+                            if (driverId) {
+                              saveAssignedVehicle(driverId, v.name);
+                              if (upsertDriverProfile) await upsertDriverProfile(driverId, { vehicle: v.name });
+                            }
+                            if (setVehicles) {
+                              setVehicles(prev => prev.map(veh => veh.id === v.id ? { ...veh, driverId, assignedDriver: driverId } : veh));
+                            }
                             addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- Unassigned -</option>

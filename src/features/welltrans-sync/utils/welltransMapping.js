@@ -90,3 +90,10 @@ export const validateTripForWellTrans = (trip = {}) => {
   if (payload && payload.dropoff.mileage === null) errors.push('Mileage or valid odometer readings are missing');
   return { valid: errors.length === 0, errors, payload };
 };
+
+export const calculateSyncHealthScore = (completedTripsCount = 0, successfulCount = 0, failedCount = 0) => {
+  const totalAttempted = successfulCount + failedCount;
+  if (totalAttempted === 0) return completedTripsCount > 0 ? 100 : 100;
+  return Math.round((successfulCount / totalAttempted) * 100);
+};
+

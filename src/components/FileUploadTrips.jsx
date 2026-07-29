@@ -7,6 +7,8 @@ import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../util
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 import { normalizeDateValue } from '../utils/normalizeDate';
 import { tripCalendarDateKey } from '../utils/tripDate';
+import { resolveDriverVehicle } from '../utils/vehiclePersistence';
+
 
 const timeToMinutes = (t) => {
   if (!t) return 1440;
@@ -951,8 +953,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
         // Extract driver info
         const driverName = extract(row['_agape_driverName'], m.driver, row['Driver'], row['Driver Name'], row['driver']);
-        const completedVehicle = extract(row['_agape_vehicle'], m.completedVehicle, m.vehicle, row['Vehicle'], row['vehicle']);
+        let completedVehicle = extract(row['_agape_vehicle'], m.completedVehicle, m.vehicle, row['Vehicle'], row['vehicle']);
         const driverEmail = extract(m.driverEmail, row['Driver Email'], row['driverEmail'], row['driver_email']);
+        if (!completedVehicle && (driverName || driverEmail)) {
+          const matchedDriver = (drivers || []).find(d => (driverName && d.name && d.name.toLowerCase() === driverName.toLowerCase()) || (driverEmail && d.email && d.email.toLowerCase() === driverEmail.toLowerCase()));
+          completedVehicle = resolveDriverVehicle(matchedDriver, driverEmail || driverName);
+        }
+
 
         // Extract timestamps
         const completedAt = extract(m.completedAt, row['Completed At'], row['completedAt'], row['Completion Time']);
