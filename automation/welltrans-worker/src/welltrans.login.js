@@ -31,26 +31,29 @@ async function autoLogin(page, username, password) {
   return false;
 }
 
-async function detectAndOpenAssignedTask(page) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    for (const frame of page.frames()) {
+async function detectAndOpenAssignedTask(context) {
+  for (const candidatePage of context.pages()) {
+    for (const frame of candidatePage.frames()) {
       const hasGrid = await frame.locator('core\\:grid[gridobject="Pass.UI.Grid.TripBrokerEventsGrid"]').count().catch(() => 0);
       const hasAssignedTask = await frame.locator('.ChangeSchedule, .BulkEdit, [title="Select Schedule"]').count().catch(() => 0);
-      if (hasGrid || hasAssignedTask) return true;
+      if (hasGrid || hasAssignedTask) return candidatePage;
 
       const tripsLink = frame.getByRole('button', { name: /trips.*assigned|assigned.*trips/i }).first()
         .or(frame.locator('[title*="TRIPS - ASSIGNED"], [title*="Trips - Assigned"]').first());
       if (await tripsLink.count() && await tripsLink.isVisible().catch(() => false)) {
         await tripsLink.click().catch(() => {});
-        await page.waitForTimeout(2000);
+        await candidatePage.waitForTimeout(1000);
       }
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
   }
-  return false;
+  return null;
 }
 
-export async function performManualLogin({ keepOpen = false, reuseSession = false } = {}) {
+export async function performManualLogin({
+  keepOpen = false,
+  reuseSession = false,
+  onWaiting = null,
+} = {}) {
   const { browser, context, page } = await openWellTransBrowser({ headed: true, withoutSession: !reuseSession });
   await page.goto(process.env.WELLTRANS_PORTAL_URL, { waitUntil: 'domcontentloaded' });
 
@@ -63,44 +66,34 @@ export async function performManualLogin({ keepOpen = false, reuseSession = fals
       const loggedIn = await autoLogin(page, username, password);
       if (loggedIn) {
         process.stdout.write('Auto-login successful. Searching for TRIPS - ASSIGNED...\n');
-        const found = await detectAndOpenAssignedTask(page);
+        const found = await detectAndOpenAssignedTask(context);
         if (found) {
           await saveEncryptedSession(process.env.WELLTRANS_SESSION_FILE, await context.storageState());
           process.stdout.write('Encrypted WellTrans session saved from auto-login.\n');
-          if (keepOpen) return { browser, context, page };
+          if (keepOpen) return { browser, context, page: found };
           await browser.close();
           return null;
         }
-        process.stdout.write('Auto-login succeeded but TRIPS - ASSIGNED was not found. Falling back to manual login.\n');
+        process.stdout.write('Auto-login succeeded. Waiting for the assigned itinerary workspace.\n');
       }
     } catch (error) {
-      process.stdout.write(`Auto-login failed: ${error.message}. Falling back to manual login.\n`);
+      process.stdout.write(`Auto-login was unavailable: ${error.message}. Waiting for an authorized browser sign-in.\n`);
     }
   }
 
-  process.stdout.write('Complete WellTrans login, open TRIPS - ASSIGNED so the itinerary grid is visible, then press Enter here.\n');
-  await new Promise(resolve => process.stdin.once('data', resolve));
+  process.stdout.write('WellTrans agent is monitoring the browser. Sign in when required; no terminal confirmation is needed.\n');
   let itineraryPage = null;
-  for (let attempt = 0; attempt < 20 && !itineraryPage; attempt += 1) {
-    for (const candidatePage of context.pages()) {
-      for (const frame of candidatePage.frames()) {
-        const hasGrid = await frame.locator('core\\:grid[gridobject="Pass.UI.Grid.TripBrokerEventsGrid"]').count().catch(() => 0);
-        const hasAssignedTask = await frame.locator('.ChangeSchedule, .BulkEdit, [title="Select Schedule"]').count().catch(() => 0);
-        if (hasGrid || hasAssignedTask) {
-          itineraryPage = candidatePage;
-          break;
-        }
-      }
-      if (itineraryPage) break;
-    }
-    if (!itineraryPage) await new Promise(resolve => setTimeout(resolve, 500));
+  while (browser.isConnected() && !itineraryPage) {
+    itineraryPage = await detectAndOpenAssignedTask(context);
+    if (itineraryPage) break;
+    await onWaiting?.();
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
   if (!itineraryPage) {
-    await browser.close();
-    throw new Error('The Trips Assigned task was not detected in any open WellTrans page or frame. Keep the itinerary table visible for two seconds before pressing Enter.');
+    throw new Error('The WellTrans browser was closed before the TRIPS - ASSIGNED itinerary workspace became available.');
   }
   await saveEncryptedSession(process.env.WELLTRANS_SESSION_FILE, await context.storageState());
-  process.stdout.write('Encrypted WellTrans session saved. No password was stored.\n');
+  process.stdout.write('TRIPS - ASSIGNED detected automatically. Encrypted session saved; no password was stored.\n');
   if (keepOpen) return { browser, context, page: itineraryPage };
   await browser.close();
   return null;

@@ -4,7 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
 import { getSelectedPortalDate, syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
-import { validateTripForWellTrans } from '../../../src/features/welltrans-sync/utils/welltransMapping.js';
+import { validateTripForWellTrans } from './welltrans.mapping.js';
 
 initializeApp({
   credential: applicationDefault(),
@@ -14,7 +14,7 @@ initializeApp({
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '1.3.0';
+const workerVersion = '2.0.0';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
@@ -204,7 +204,12 @@ async function processJob(job, existingSession = null) {
 }
 
 async function main() {
-  if (process.argv.includes('--login')) return performManualLogin();
+  if (process.argv.includes('--login')) {
+    await publishHeartbeat('waiting_for_login');
+    return performManualLogin({
+      onWaiting: () => publishHeartbeat('waiting_for_login').catch(() => {}),
+    });
+  }
   if (process.argv.includes('--inspect')) {
     await publishHeartbeat('inspection');
     const settings = (await db.doc('welltrans_settings/primary').get()).data() || {};
@@ -396,7 +401,10 @@ async function main() {
     if (process.env.WELLTRANS_ENABLE_WRITES !== 'true') throw new Error('WELLTRANS_ENABLE_WRITES=true is required for --calibrate-job');
     const logId = process.argv[process.argv.indexOf('--calibrate-job') + 1];
     if (!logId) throw new Error('Usage: node src/index.js --calibrate-job <welltrans_sync_log_id>');
-    const session = await performManualLogin({ keepOpen: true });
+    const session = await performManualLogin({
+      keepOpen: true,
+      onWaiting: () => publishHeartbeat('waiting_for_login').catch(() => {}),
+    });
     await publishHeartbeat('online');
     await processJob(await claimJobById(logId), session);
     process.stdout.write('Trip staged for review. The browser will remain open; review all fields and click Apply yourself when ready.\n');
@@ -415,7 +423,12 @@ async function main() {
   const stale = processing.docs.filter(item => (item.data().leaseExpiresAt?.toMillis?.() || Number.POSITIVE_INFINITY) < now);
   await Promise.all(stale.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete() })));
   const once = process.argv.includes('--once');
-  const session = await performManualLogin({ keepOpen: true, reuseSession: true });
+  await publishHeartbeat('connecting');
+  const session = await performManualLogin({
+    keepOpen: true,
+    reuseSession: true,
+    onWaiting: () => publishHeartbeat('waiting_for_login').catch(() => {}),
+  });
   try {
     const selectedDate = await getSelectedPortalDate(session.page);
     await publishHeartbeat('calibrated');
@@ -440,7 +453,7 @@ async function main() {
   } catch (error) {
     console.error(error);
     process.exitCode = 1;
-    process.stdout.write('\nThe worker encountered an error. The review browser will remain open until you close this PowerShell window.\n');
+    process.stdout.write('\nThe agent encountered an error. The review browser will remain open for inspection until it is closed by the operator.\n');
     let keepReviewOpen = true;
     while (keepReviewOpen) {
       await publishHeartbeat('review_error').catch(() => {});

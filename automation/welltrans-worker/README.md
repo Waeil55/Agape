@@ -1,4 +1,4 @@
-# Agape WellTrans Worker
+# Agape WellTrans Background Agent
 
 The worker intentionally attaches to one live TripSpark `TRIPS - ASSIGNED`
 schedule. It never processes a job whose service date differs from the date
@@ -6,18 +6,29 @@ shown in that schedule.
 
 ## Start a production session
 
-Preferred: click **Start Worker** in Agape after the one-click protocol has
-been installed on that Windows computer.
+Preferred:
+
+1. Click **Install / Update Agent** once on each authorized Windows computer.
+2. Run the downloaded installer. It installs the agent in the current Windows
+   profile, registers the private Agape protocol, provisions a private,
+   checksum-verified Node.js LTS runtime and Chromium, and creates encrypted
+   local session storage. Node.js does not need to be installed separately.
+   The Firebase enrollment credential is protected with Windows DPAPI and can
+   only be decrypted by the enrolled Windows user.
+3. Click **Start Background Agent** in Agape.
+4. If the saved WellTrans session has expired, complete the legitimate broker
+   login in the opened browser. The agent detects login and TRIPS - ASSIGNED
+   automatically; there is no terminal window and no Enter-key confirmation.
 
 Manual fallback:
 
 1. Open PowerShell in this directory.
 2. Set `WELLTRANS_ENABLE_WRITES=true` for that PowerShell session.
 3. Run `npm run calibrate-run`.
-4. In the browser opened by the worker, sign in and open the required
-   `TRIPS - ASSIGNED` date so the itinerary grid is visible.
-5. Press Enter in PowerShell.
-6. Keep that worker browser and PowerShell window open.
+4. In the browser opened by the worker, sign in if required. The agent opens
+   or detects `TRIPS - ASSIGNED` automatically.
+5. Keep the review browser open until the operator has reviewed the staged
+   records and clicked Apply.
 
 The Agape dashboard will show `Calibrated` and the exact locked date. Queue
 only trips for that date. To change dates, stop the worker with Ctrl+C, rerun

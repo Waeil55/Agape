@@ -57,6 +57,20 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const isAuthorized = AUTHORIZED_ROLES.includes(normalizedRole);
   const effectiveSettings = draftSettings || settings;
   const workerDateMatches = Boolean(workerCalibrated && worker?.selectedDate === syncDate);
+  const workerNeedsLogin = worker?.state === 'waiting_for_login';
+  const workerConnecting = worker?.state === 'connecting';
+  const workerStatusLabel = !settings.enabled
+    ? 'Disabled'
+    : workerNeedsLogin
+      ? 'Sign-in required'
+      : workerConnecting
+        ? 'Starting agent'
+        : workerOnline
+          ? 'Online'
+          : workerStandby
+            ? 'Standby'
+            : 'Offline';
+  const workerHealthy = settings.enabled && workerOnline && !workerNeedsLogin && !workerConnecting;
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const stagedCount = currentLogs.filter(l => l.status === 'awaiting_review').length;
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
@@ -220,19 +234,26 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             <p className="text-[11px] text-slate-500 mt-0.5">Broker sync · field mapping · worker telemetry</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href="/welltrans-agent/Install-AgapeWellTransAgent.cmd"
+              download
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
+            >
+              <Download size={13} /> Install / Update Agent
+            </a>
             <button
               onClick={() => { window.location.href = 'agape-welltrans://start'; }}
               className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 transition"
             >
-              <Play size={13} className="fill-current" /> Start Worker
+              <Play size={13} className="fill-current" /> Start Background Agent
             </button>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="relative flex h-2.5 w-2.5">
-                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${settings.enabled && workerOnline ? 'bg-emerald-400 opacity-75' : 'bg-amber-400 opacity-75'}`} />
-                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${settings.enabled && workerOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${workerHealthy ? 'bg-emerald-400 opacity-75' : 'bg-amber-400 opacity-75'}`} />
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${workerHealthy ? 'bg-emerald-500' : 'bg-amber-500'}`} />
               </span>
               <span className="text-[11px] font-semibold text-slate-600">
-                {!settings.enabled ? 'Disabled' : workerOnline ? 'Online' : workerStandby ? 'Standby' : 'Offline'}
+                {workerStatusLabel}
               </span>
             </div>
           </div>

@@ -11,7 +11,7 @@ New-ItemProperty -Path $protocolKey -Name 'URL Protocol' -Value '' -PropertyType
 New-Item -Path "$protocolKey\DefaultIcon" -Force | Out-Null
 Set-Item -Path "$protocolKey\DefaultIcon" -Value 'powershell.exe,0'
 New-Item -Path "$protocolKey\shell\open\command" -Force | Out-Null
-$command = "powershell.exe -NoExit -ExecutionPolicy Bypass -File `"$launcherPath`""
+$command = "powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$launcherPath`" -ProtocolUrl `"%1`""
 Set-Item -Path "$protocolKey\shell\open\command" -Value $command
 
-Write-Host 'Agape WellTrans one-click launcher installed successfully.' -ForegroundColor Green
+Write-Host 'Agape WellTrans background-agent protocol installed successfully.' -ForegroundColor Green
