@@ -9,12 +9,9 @@ const defaults = {
   departure: 'input[aria-label*="Departure" i]',
   mileage: 'input[aria-label*="Mileage" i], input[aria-label*="Odometer" i]',
   signature: 'select[aria-label*="Signature" i], input[aria-label*="Signature" i]',
-  save: 'button:has-text("Apply"), button:has-text("Save")',
-  success: 'text=/saved|updated|success/i',
 };
 
 export const selectors = (() => {
   try { return { ...defaults, ...JSON.parse(process.env.WELLTRANS_SELECTORS_JSON || '{}') }; }
   catch { throw new Error('WELLTRANS_SELECTORS_JSON is not valid JSON'); }
 })();
-

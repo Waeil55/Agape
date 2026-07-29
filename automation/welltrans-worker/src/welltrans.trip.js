@@ -18,8 +18,6 @@ async function waitForAssignedTask(page) {
   const grid = page.locator(`${GRID_SELECTOR}:visible`).first();
   if (await grid.count()) return;
 
-  // TripSpark returns to its schedule calendar after closing an itinerary.
-  // The selected RunName remains present; Proceed restores the same locked task.
   const proceed = page.getByRole('button', { name: 'Proceed', exact: true }).last();
   if (await proceed.isVisible().catch(() => false)) {
     await proceed.click();
@@ -134,37 +132,114 @@ function equalCellValue(column, actual, expected) {
   return normalized(actual) === normalized(expected);
 }
 
-async function selectUniqueListOption(page, option, column) {
-  const visibleMatches = async locator => {
-    const matches = [];
-    for (let index = 0; index < await locator.count(); index += 1) {
-      if (await locator.nth(index).isVisible().catch(() => false)) matches.push(locator.nth(index));
+async function waitForDropdownVisible(page, timeoutMs = 3000) {
+  const dropdownSelectors = [
+    '.DropDownDialog:visible',
+    '.EditorWidgets [role="option"]:visible',
+    '.EditorWidgets core\\:listitem:visible',
+    '.EditorWidgets .ListBoxItem:visible',
+    '[class*="DropDown"]:visible [role="option"]',
+    '[class*="dropdown"]:visible [role="option"]',
+    '[class*="listbox"]:visible [role="option"]',
+  ];
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const selector of dropdownSelectors) {
+      if (await page.locator(selector).first().count()) return true;
     }
-    return matches;
-  };
-  const exact = await visibleMatches(page.getByText(String(option), { exact: true }));
-  if (exact.length) {
-    await exact.at(-1).click();
+    await page.waitForTimeout(100);
+  }
+  return false;
+}
+
+async function getVisibleDropdownOptions(page) {
+  const optionSelectors = [
+    '.DropDownDialog:visible [title]',
+    '.EditorWidgets [role="option"]:visible',
+    '.EditorWidgets core\\:listitem:visible',
+    '.EditorWidgets .ListBoxItem:visible',
+    '[class*="DropDown"]:visible [role="option"]',
+    '[class*="dropdown"]:visible [role="option"]',
+    '[class*="listbox"]:visible [role="option"]',
+  ];
+  for (const selector of optionSelectors) {
+    const options = await page.locator(selector).evaluateAll(elements =>
+      elements.map(element => ({
+        text: String(element.textContent || element.getAttribute('title') || '').trim(),
+        element,
+      })).filter(item => item.text)
+    ).catch(() => []);
+    if (options.length) return options.map(o => o.text);
+  }
+  return [];
+}
+
+async function selectUniqueListOption(page, option, column) {
+  const optionStr = String(option).trim();
+  if (!optionStr) return;
+
+  await waitForDropdownVisible(page, 3000);
+
+  const exactMatches = await page.getByText(optionStr, { exact: true }).evaluateAll(elements =>
+    elements.filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }).length
+  ).catch(() => 0);
+
+  if (exactMatches === 1) {
+    await page.getByText(optionStr, { exact: true }).evaluate(elements => {
+      const visible = elements.filter(el => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      if (visible.length) visible[visible.length - 1].click();
+    });
+    await page.waitForTimeout(200);
     return;
   }
-  // Vehicle identifiers are operational identifiers, not display labels. A
-  // prefix/substring match can select a different vehicle (for example,
-  // "TOYOTA 002" must never select "TOYOTA 0025 3311").
+
+  if (exactMatches > 1) {
+    const allExact = page.getByText(optionStr, { exact: true });
+    const count = await allExact.count();
+    for (let i = count - 1; i >= 0; i--) {
+      const el = allExact.nth(i);
+      if (await el.isVisible().catch(() => false)) {
+        await el.click();
+        await page.waitForTimeout(200);
+        return;
+      }
+    }
+  }
+
   if (column === 'Vehicle' || column === 'Driver') {
-    throw new Error(`${column} option "${option}" was not found exactly`);
+    const availableOptions = await getVisibleDropdownOptions(page);
+    throw new Error(`${column} option "${optionStr}" was not found exactly.`
+      + `${availableOptions.length ? ` Available: ${[...new Set(availableOptions)].slice(0, 15).join(', ')}` : ''}`);
   }
-  const contained = await visibleMatches(page.getByText(String(option), { exact: false }));
-  if (contained.length === 1) {
-    await contained[0].click();
-    return;
+
+  const containedMatches = await page.getByText(optionStr, { exact: false }).evaluateAll(elements =>
+    elements.filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    })
+  ).catch(() => []);
+
+  if (containedMatches.length === 1) {
+    const el = page.getByText(optionStr, { exact: false });
+    const count = await el.count();
+    for (let i = 0; i < count; i++) {
+      if (await el.nth(i).isVisible().catch(() => false)) {
+        await el.nth(i).click();
+        await page.waitForTimeout(200);
+        return;
+      }
+    }
   }
-  const visibleOptions = await page.locator(
-    '.EditorWidgets [role="option"]:visible, .EditorWidgets core\\:listitem:visible, '
-    + '.EditorWidgets .ListBoxItem:visible, .DropDownDialog:visible [title]',
-  ).evaluateAll(elements => elements.map(element =>
-    String(element.textContent || element.getAttribute('title') || '').trim()).filter(Boolean)).catch(() => []);
-  throw new Error(`${column} option "${option}" was ${contained.length > 1 ? 'ambiguous' : 'not found'}`
-    + `${visibleOptions.length ? `. Available values: ${[...new Set(visibleOptions)].slice(0, 20).join(', ')}` : ''}`);
+
+  const availableOptions = await getVisibleDropdownOptions(page);
+  throw new Error(`${column} option "${optionStr}" was ${containedMatches.length > 1 ? 'ambiguous' : 'not found'}`
+    + `${availableOptions.length ? `. Available: ${[...new Set(availableOptions)].slice(0, 15).join(', ')}` : ''}`);
 }
 
 async function setTextCell(page, grid, model, row, column, value, required = false) {
@@ -175,30 +250,48 @@ async function setTextCell(page, grid, model, row, column, value, required = fal
   if (equalCellValue(column, row.values?.[column], value)) return true;
   const cell = await exactCell(grid, row.top, model.columns[column]);
   if (!cell) throw new Error(`${column} cell is unavailable for ${row.activity}`);
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await cell.dblclick({ force: true });
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(200);
+
     const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
     const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+
     if (await editor.count()) {
+      await editor.click();
+      await editor.fill('');
+      await page.waitForTimeout(50);
       await editor.fill(String(value));
+      await page.waitForTimeout(100);
       await page.keyboard.press('Tab');
+      await page.waitForTimeout(150);
       return true;
     }
+
     if (await listbox.count()) {
-      await listbox.locator('.dropdlgbutton').click({ force: true });
-      await page.waitForTimeout(250);
+      const dropBtn = listbox.locator('.dropdlgbutton');
+      if (await dropBtn.count()) {
+        await dropBtn.click({ force: true });
+      } else {
+        await listbox.click({ force: true });
+      }
+      await page.waitForTimeout(300);
+
       try {
         await selectUniqueListOption(page, value, column);
+        await page.waitForTimeout(150);
         return true;
       } catch (error) {
         await page.keyboard.press('Escape').catch(() => {});
+        await page.waitForTimeout(100);
         if (column !== 'Vehicle') throw error;
         return false;
       }
     }
+
     await page.keyboard.press('Escape').catch(() => {});
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(150);
   }
   if (column === 'Vehicle') return false;
   throw new Error(`${column} editor did not open for ${row.activity}`);
@@ -209,15 +302,22 @@ async function setListCell(page, grid, model, row, column, option) {
   if (equalCellValue(column, row.values?.[column], option)) return;
   const cell = await exactCell(grid, row.top, model.columns[column]);
   if (!cell) throw new Error(`${column} cell is unavailable for ${row.activity}`);
+
   await cell.dblclick({ force: true });
-  const listbox = page.locator('.EditorWidgets core\\:listbox').last();
-  await listbox.locator('.dropdlgbutton').click({ force: true });
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(200);
+
+  const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+  if (!await listbox.count()) throw new Error(`${column} listbox did not open for ${row.activity}`);
+
+  const dropBtn = listbox.locator('.dropdlgbutton');
+  if (await dropBtn.count()) {
+    await dropBtn.click({ force: true });
+  } else {
+    await listbox.click({ force: true });
+  }
+  await page.waitForTimeout(300);
+
   if (column === 'Signature Captured?') {
-    // The TripSpark dropdown is keyboard-backed even when its choices are
-    // rendered outside the accessible DOM. "Rider Signature Received" is the
-    // first option; repeated ArrowUp + Enter commits that exact option even
-    // when TripSpark restores a previously selected signature reason.
     for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
@@ -225,30 +325,39 @@ async function setListCell(page, grid, model, row, column, option) {
     await selectUniqueListOption(page, option, column);
   }
   await page.waitForTimeout(250);
+
   let selected = await cell.evaluate(element =>
     String(element.title || element.textContent || '').trim());
+
   if (column === 'Signature Captured?' && !equalCellValue(column, selected, option)) {
-    // TripSpark can highlight a type-ahead result without committing it.
-    // Reopen the list, select its confirmed first value, and leave the editor.
     await cell.dblclick({ force: true });
-    const retryListbox = page.locator('.EditorWidgets core\\:listbox').last();
-    await retryListbox.locator('.dropdlgbutton').click({ force: true });
-    for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
-    await page.keyboard.press('Enter');
-    await page.keyboard.press('Tab');
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(200);
+    const retryListbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+    if (await retryListbox.count()) {
+      const retryDropBtn = retryListbox.locator('.dropdlgbutton');
+      if (await retryDropBtn.count()) {
+        await retryDropBtn.click({ force: true });
+      } else {
+        await retryListbox.click({ force: true });
+      }
+      await page.waitForTimeout(300);
+      for (let index = 0; index < 20; index += 1) await page.keyboard.press('ArrowUp');
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(250);
+    }
     selected = await cell.evaluate(element =>
       String(element.title || element.textContent || '').trim());
   }
+
   if (!equalCellValue(column, selected, option)) {
     throw new Error(`${column} selection was not confirmed: expected "${option}", found "${selected}"`);
   }
 }
 
-async function closeEditorWithoutSaving(page) {
-  const close = page.getByRole('button', { name: 'Close', exact: true }).last();
-  if (await close.count()) await close.click();
-  else await page.keyboard.press('Escape');
+async function dismissTransientEditor(page) {
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForTimeout(100);
 }
 
 export async function validateWellTransTrip(page, payload) {
@@ -260,7 +369,7 @@ export async function validateWellTransTrip(page, payload) {
   const model = await gridModel(grid, payload.bookingId);
   const pickup = model.rows.filter(row => /^pickup$/i.test(row.activity));
   const dropoff = model.rows.filter(row => /^dropoff$/i.test(row.activity));
-  await closeEditorWithoutSaving(page);
+  await dismissTransientEditor(page);
   if (pickup.length !== 1 || dropoff.length !== 1) {
     throw new Error(`Booking ${payload.bookingId} matched ${pickup.length} Pickup and ${dropoff.length} Dropoff rows; expected exactly one of each`);
   }
@@ -278,7 +387,7 @@ export async function syncWellTransTrip(page, payload) {
   const pickupRows = model.rows.filter(row => /^pickup$/i.test(row.activity));
   const dropoffRows = model.rows.filter(row => /^dropoff$/i.test(row.activity));
   if (pickupRows.length !== 1 || dropoffRows.length !== 1) {
-    await closeEditorWithoutSaving(page);
+    await dismissTransientEditor(page);
     throw new Error(`Booking ${payload.bookingId} matched ${pickupRows.length} Pickup and ${dropoffRows.length} Dropoff rows; expected exactly one of each`);
   }
 
@@ -317,9 +426,8 @@ export async function syncWellTransTrip(page, payload) {
         [dropoff, 'Signature Captured?', 'Rider Signature Received'],
       ] : []),
   ].filter(([, , value]) => value !== undefined && value !== null && value !== '');
-  // Human approval is mandatory. Never click Apply or close the staged editor.
-  // Verify only the values currently staged in the visible TripSpark grid.
-  await page.waitForTimeout(300);
+
+  await page.waitForTimeout(400);
   const verified = await gridModel(grid, payload.bookingId);
   const verifiedPickup = verified.rows.filter(row => /^pickup$/i.test(row.activity));
   const verifiedDropoff = verified.rows.filter(row => /^dropoff$/i.test(row.activity));

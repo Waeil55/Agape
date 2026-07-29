@@ -3,6 +3,9 @@ import { DEFAULT_WELLTRANS_FIELD_MAPPING } from '../utils/welltransMapping';
 
 export const DEFAULT_SETTINGS = {
   enabled: false, portalUrl: 'https://tripspark.welltransnemt.com/', automationMethod: 'playwright', lastSync: null,
+  portalUsername: '', portalPassword: '',
+  autoStart: false, autoQueue: false, autoRetryEnabled: false,
+  autoRetryDelayMs: 30000, maxConcurrent: 1,
   fieldMapping: DEFAULT_WELLTRANS_FIELD_MAPPING,
 };
 
@@ -58,7 +61,7 @@ export const explainWellTransFailure = (log) => {
   const lower = message.toLowerCase();
   if (lower.includes('mileage')) return `Trip ${log.bookingId || log.tripId} failed because a valid mileage value was unavailable or the WellTrans mileage field could not be located. Verify both odometer readings and the configured field mapping, then retry.`;
   if (lower.includes('booking')) return `Trip ${log.bookingId || log.tripId} could not be matched by Booking ID. Passenger names are intentionally not used as a fallback. Confirm the exact WellTrans Booking ID, then retry.`;
-  if (lower.includes('session') || lower.includes('login') || lower.includes('auth')) return `The WellTrans session is unavailable or expired. An authorized administrator must refresh the worker's manual-login session; no password is stored in Agape.`;
+  if (lower.includes('session') || lower.includes('login') || lower.includes('auth')) return `The WellTrans session is unavailable or expired. Check the saved portal credentials under Settings, then retry. If the password was changed, update it in Settings.`;
   if (lower.includes('selector') || lower.includes('field')) return `WellTrans did not expose an expected field for trip ${log.bookingId || log.tripId}. Review the captured screenshot and update the selector configuration before retrying.`;
   return `Trip ${log.bookingId || log.tripId} failed during the ${log.stage || 'automation'} stage: ${message} Review the screenshot and retry after correcting the source data or portal configuration.`;
 };

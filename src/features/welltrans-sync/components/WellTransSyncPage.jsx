@@ -3,10 +3,11 @@ import {
   AlertTriangle, Bot, CheckCircle2, Clock3, Code, Download, ExternalLink, Eye,
   FileText, Filter, Loader2, Play, RefreshCw, RotateCcw, Save, Search, Settings2,
   ShieldCheck, Sparkles, X, XCircle, ChevronLeft, ChevronRight, Image, Copy,
-  BarChart3, Zap, Undo2, ListFilter, SkipForward,
+  BarChart3, Zap, Undo2, ListFilter, SkipForward, Activity,
 } from 'lucide-react';
 import { auth } from '../../../config/firebase';
 import { useWellTransSync } from '../hooks/useWellTransSync';
+import { useWellTransAutoSync } from '../hooks/useWellTransAutoSync';
 import {
   confirmWellTransApplied, explainWellTransFailure, exportWellTransLogsCSV,
   isWellTransFailureRetryable, queueWellTransSync, saveWellTransSettings,
@@ -62,6 +63,11 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
   const retryableFailed = failedLogs.filter(isWellTransFailureRetryable);
   const unmatchedCount = failedLogs.length - retryableFailed.length;
+
+  const { autoLog } = useWellTransAutoSync({
+    settings: effectiveSettings, worker, readyTrips, retryableFailed,
+    syncDate, busy, workerDateMatches,
+  });
 
   const enrichedTrips = useMemo(() => {
     return completedTrips.map(trip => {
@@ -407,7 +413,19 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-500" /></div>
         ) : tab === 'queue' ? (
           <div className="flex-1 overflow-auto">
-            <table className="w-full text-left text-[11px] min-w-[800px]">
+            <table className="w-full table-fixed text-left text-[11px]">
+              <colgroup>
+                <col className="w-8" />
+                <col className="w-[12%]" />
+                <col className="w-[16%]" />
+                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[8%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[8%]" />
+              </colgroup>
               <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10">
                 <tr>
                   <th className="px-3 py-2 font-semibold text-slate-500 w-8">
@@ -590,6 +608,53 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 onChange={e => setDraftSettings(v => ({ ...v, portalUrl: e.target.value }))}
                 placeholder="https://tripspark.welltransnemt.com/"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400" />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600">Portal Username</label>
+                <input value={effectiveSettings.portalUsername || ''}
+                  onChange={e => setDraftSettings(v => ({ ...v, portalUsername: e.target.value }))}
+                  placeholder="e.g. agape.admin"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600">Portal Password</label>
+                <input type="password" value={effectiveSettings.portalPassword || ''}
+                  onChange={e => setDraftSettings(v => ({ ...v, portalPassword: e.target.value }))}
+                  placeholder="Stored encrypted on worker"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400" />
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+              <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5"><Activity size={13} /> Self-Control</p>
+              <p className="text-[10px] text-slate-500">Fully automated sync — no manual intervention needed.</p>
+              {[
+                { key: 'autoStart', label: 'Auto-Start Worker', desc: 'Automatically launch worker when offline' },
+                { key: 'autoQueue', label: 'Auto-Queue Trips', desc: 'Queue ready trips when worker comes online' },
+                { key: 'autoRetryEnabled', label: 'Auto-Retry Failures', desc: 'Retry failed trips based on auto-retry rules' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-800">{label}</p>
+                    <p className="text-[10px] text-slate-500">{desc}</p>
+                  </div>
+                  <button type="button" onClick={() => setDraftSettings(v => ({ ...v, [key]: !v[key] }))}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${effectiveSettings[key] ? 'bg-blue-600' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform`}
+                      style={{ left: effectiveSettings[key] ? '22px' : '2px' }} />
+                  </button>
+                </div>
+              ))}
+              {autoLog.length > 0 && (
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-2 max-h-24 overflow-y-auto">
+                  <p className="text-[10px] font-semibold text-slate-500 mb-1">Activity Log</p>
+                  {autoLog.slice(-5).map(entry => (
+                    <p key={entry.id} className="text-[10px] text-slate-600 font-mono">
+                      <span className="text-slate-400">{entry.ts}</span> {entry.msg}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
