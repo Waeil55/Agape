@@ -21,12 +21,18 @@ try {
   Compress-Archive -LiteralPath $packageRoot -DestinationPath $archivePath -CompressionLevel Optimal
   $packageMetadata = Get-Content -LiteralPath (Join-Path $workerRoot 'package.json') -Raw | ConvertFrom-Json
   $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-  @{
+  $manifestJson = @{
     version = $packageMetadata.version
     sha256 = $archiveHash
     file = 'agape-welltrans-agent.zip'
     publishedAt = [DateTime]::UtcNow.ToString('o')
-  } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputRoot 'version.json') -Encoding utf8
+  } | ConvertTo-Json
+  $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
+  [IO.File]::WriteAllText(
+    (Join-Path $outputRoot 'version.json'),
+    $manifestJson,
+    $utf8WithoutBom
+  )
 } finally {
   if (Test-Path -LiteralPath $stagingRoot) {
     $resolvedStaging = (Resolve-Path -LiteralPath $stagingRoot).Path
