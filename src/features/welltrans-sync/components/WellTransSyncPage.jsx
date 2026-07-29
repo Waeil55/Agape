@@ -60,8 +60,11 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const workerNeedsLogin = worker?.state === 'waiting_for_login';
   const workerConnecting = worker?.state === 'connecting';
   const workerNeedsDate = worker?.state === 'date_selection_required';
+  const workerReviewError = worker?.state === 'review_error';
   const workerStatusLabel = !settings.enabled
     ? 'Disabled'
+    : workerReviewError
+      ? 'Safety stop — discard review'
     : workerNeedsLogin
       ? 'Sign-in required'
       : workerNeedsDate
@@ -74,7 +77,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             ? 'Standby'
             : 'Offline';
   const workerHealthy = settings.enabled && workerOnline
-    && !workerNeedsLogin && !workerNeedsDate && !workerConnecting;
+    && !workerNeedsLogin && !workerNeedsDate && !workerConnecting && !workerReviewError;
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const stagedCount = currentLogs.filter(l => l.status === 'awaiting_review').length;
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
@@ -407,8 +410,19 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       </div>
 
       {/* Worker warnings */}
-      {(workerUpgradeRequired || workerNeedsDate || (workerCalibrated && !workerDateMatches) || unmatchedCount > 0) && (
+      {(workerUpgradeRequired || workerReviewError || workerNeedsDate
+        || (workerCalibrated && !workerDateMatches) || unmatchedCount > 0) && (
         <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2 space-y-1.5">
+          {workerReviewError && (
+            <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-300 px-3 py-2 text-[11px] font-semibold text-rose-800">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>
+                Safety stop: this WellTrans review session contains unverified edits. Do not click Apply.
+                Click Close in the Edit Itinerary window, close that agent browser, then click Start &amp; Fill Date
+                to begin a clean verified session.
+              </span>
+            </div>
+          )}
           {workerUpgradeRequired && (
             <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
               <AlertTriangle size={13} /> Worker upgrade required (v{worker?.version || '?'} → v{requiredWorkerVersion})
