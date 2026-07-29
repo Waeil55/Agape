@@ -1276,7 +1276,7 @@ const DesktopEnterpriseDashboard = ({
             ) : (
               <div className={
                 activePanel === 'drive' || activePanel === 'admin' || activePanel === 'welltrans'
-                  ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0'
+                  ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
                   : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>
                 {renderPanelContent()}

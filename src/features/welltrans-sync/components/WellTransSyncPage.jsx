@@ -287,8 +287,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
           </div>
         ) : tab === 'queue' ? (
-          <div className="flex-1 overflow-y-auto">
-            <table className="w-full text-left text-[11px]">
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-left text-[11px] min-w-[800px]">
               <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-3 py-2 font-semibold text-slate-500"><input type="checkbox" className="rounded border-slate-300" onChange={() => {
