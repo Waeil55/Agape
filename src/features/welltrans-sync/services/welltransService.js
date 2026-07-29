@@ -87,3 +87,50 @@ export const exportWellTransLogsCSV = (logs = [], serviceDate = '') => {
   document.body.removeChild(link);
 };
 
+export const exportTripsQueueCSV = (trips = [], logs = [], serviceDate = '') => {
+  const latestByTrip = new Map();
+  logs.forEach(log => {
+    const current = latestByTrip.get(log.tripId);
+    if (!current || timestampMillis(log.updatedAt || log.createdAt) > timestampMillis(current.updatedAt || current.createdAt)) latestByTrip.set(log.tripId, log);
+  });
+  const headers = ['Booking ID', 'Passenger', 'Driver', 'Pickup Time', 'Dropoff Time', 'Mileage', 'Validation', 'Sync Status', 'Error'];
+  const rows = trips.map(trip => {
+    const log = latestByTrip.get(trip.id);
+    const payload = trip._payload || {};
+    return [
+      `"${trip.bookingId || trip.id || ''}"`,
+      `"${(trip.patient || trip.clientName || '').replace(/"/g, '""')}"`,
+      `"${(trip.driverName || '').replace(/"/g, '""')}"`,
+      `"${payload?.pickup?.arrival || ''}"`,
+      `"${payload?.dropoff?.arrival || ''}"`,
+      `"${payload?.dropoff?.mileage ?? ''}"`,
+      `"${trip._valid ? 'Valid' : (trip._errors || []).join('; ')}"`,
+      `"${log?.status || 'Not Queued'}"`,
+      `"${(log?.errorMessage || '').replace(/"/g, '""')}"`,
+    ];
+  });
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectObject ? URL.createObjectURL(blob) : '';
+  if (!url) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `WellTrans_Queue_${serviceDate || 'all'}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); return; }
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `WellTrans_Queue_${serviceDate || 'all'}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const FAILURE_CATEGORIES = [
+  { key: 'mileage', label: 'Mileage', match: m => m.includes('mileage') },
+  { key: 'booking', label: 'Booking ID', match: m => m.includes('booking') },
+  { key: 'session', label: 'Session/Auth', match: m => m.includes('session') || m.includes('login') || m.includes('auth') },
+  { key: 'selector', label: 'Selector/Field', match: m => m.includes('selector') || m.includes('field') },
+  { key: 'other', label: 'Other', match: () => true },
+];
+
+export const categorizeFailure = (log) => {
+  const msg = String(log?.errorMessage || '').toLowerCase();
+  return FAILURE_CATEGORIES.find(c => c.match(msg))?.key || 'other';
+};
+

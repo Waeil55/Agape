@@ -1,14 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   AlertTriangle, Bot, CheckCircle2, Clock3, Code, Download, ExternalLink, Eye,
-  FileText, Loader2, Play, RefreshCw, RotateCcw, Save, Search, Settings2,
-  ShieldCheck, Sparkles, X, XCircle,
+  FileText, Filter, Loader2, Play, RefreshCw, RotateCcw, Save, Search, Settings2,
+  ShieldCheck, Sparkles, X, XCircle, ChevronLeft, ChevronRight, Image, Copy,
+  BarChart3, Zap, Undo2, ListFilter, SkipForward,
 } from 'lucide-react';
 import { auth } from '../../../config/firebase';
 import { useWellTransSync } from '../hooks/useWellTransSync';
 import {
   confirmWellTransApplied, explainWellTransFailure, exportWellTransLogsCSV,
   isWellTransFailureRetryable, queueWellTransSync, saveWellTransSettings,
+  categorizeFailure, FAILURE_CATEGORIES,
 } from '../services/welltransService';
 import {
   buildWellTransPayload, DEFAULT_WELLTRANS_FIELD_MAPPING, validateTripForWellTrans,
@@ -41,6 +43,15 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [inspectPayloadTrip, setInspectPayloadTrip] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [syncProgress, setSyncProgress] = useState(null);
+  const [tripDrawer, setTripDrawer] = useState(null);
+  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const [autoRetry, setAutoRetry] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('agape_wt_autoRetry') || '{}'); } catch { return {}; }
+  });
+  const [historyMode, setHistoryMode] = useState(false);
+  const bulkMenuRef = useRef(null);
+  const pageRef = useRef(null);
 
   const normalizedRole = String(role || '').toLowerCase().trim();
   const isAuthorized = AUTHORIZED_ROLES.includes(normalizedRole);
@@ -52,8 +63,17 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const retryableFailed = failedLogs.filter(isWellTransFailureRetryable);
   const unmatchedCount = failedLogs.length - retryableFailed.length;
 
+  const enrichedTrips = useMemo(() => {
+    return completedTrips.map(trip => {
+      const validation = validateTripForWellTrans(trip);
+      let payload = null;
+      try { payload = buildWellTransPayload(trip); } catch {}
+      return { ...trip, _valid: validation.valid, _errors: validation.errors, _payload: payload };
+    });
+  }, [completedTrips]);
+
   const filteredTrips = useMemo(() => {
-    return completedTrips.filter(trip => {
+    return enrichedTrips.filter(trip => {
       const q = searchQuery.toLowerCase().trim();
       const bid = (trip.bookingId || trip.id || '').toLowerCase();
       const patient = (trip.patient || trip.clientName || '').toLowerCase();
@@ -61,15 +81,64 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       if (q && !bid.includes(q) && !patient.includes(q) && !driver.includes(q)) return false;
       if (statusFilter === 'all') return true;
       const latest = latestByTrip.get(trip.id);
-      const validation = validateTripForWellTrans(trip);
-      if (statusFilter === 'ready') return validation.valid && !latest;
+      if (statusFilter === 'ready') return trip._valid && !latest;
       if (statusFilter === 'staged') return latest?.status === 'awaiting_review';
       if (statusFilter === 'completed') return latest?.status === 'completed';
       if (statusFilter === 'failed') return latest?.status === 'failed';
-      if (statusFilter === 'invalid') return !validation.valid;
+      if (statusFilter === 'invalid') return !trip._valid;
       return true;
     });
-  }, [completedTrips, searchQuery, statusFilter, latestByTrip]);
+  }, [enrichedTrips, searchQuery, statusFilter, latestByTrip]);
+
+  const historyDates = useMemo(() => {
+    if (!historyMode) return [];
+    const dates = new Set();
+    logs.forEach(l => { if (l.serviceDate) dates.add(l.serviceDate); });
+    return [...dates].sort().reverse().slice(0, 30);
+  }, [historyMode, logs]);
+
+  const workerActivity = useMemo(() => {
+    return currentLogs
+      .filter(l => l.status === 'processing' || l.status === 'pending')
+      .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
+      .slice(0, 10);
+  }, [currentLogs]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        setSelectedIds(filteredTrips.map(t => t.id));
+      }
+      if (e.key === 'Escape') {
+        setSelectedIds([]);
+        setTripDrawer(null);
+        setSelectedFailure(null);
+        setInspectPayloadTrip(null);
+        setBulkMenuOpen(false);
+      }
+      if (e.key === 'r' && !e.ctrlKey && !e.metaKey) {
+        if (workerDateMatches && retryableFailed.length && !busy) {
+          runQueue(retryableFailed.map(l => l.tripId), 'retry');
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [filteredTrips, workerDateMatches, retryableFailed, busy]);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target)) setBulkMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('agape_wt_autoRetry', JSON.stringify(autoRetry));
+  }, [autoRetry]);
 
   if (!isAuthorized) {
     return (
@@ -77,7 +146,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
         <div className="text-center bg-white rounded-2xl border border-slate-200 p-8 max-w-sm">
           <ShieldCheck className="h-12 w-12 text-rose-400 mx-auto mb-3" />
           <h2 className="text-base font-semibold text-slate-900 mb-1">Access Restricted</h2>
-          <p className="text-xs text-slate-500">Your role (<span className="font-mono text-rose-500">{role}</span>) does not have permission for WellTrans.</p>
+          <p className="text-xs text-slate-500">Your role (<span className="font-mono text-rose-500">{role}</span>) does not have permission.</p>
         </div>
       </div>
     );
@@ -85,17 +154,63 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
 
   const runQueue = async (ids, mode) => {
     if (!ids.length) return setNotice('No eligible trips selected.');
-    setBusy(mode); setNotice('');
+    setBusy(mode); setNotice(''); setSyncProgress({ done: 0, total: ids.length });
     try {
       const result = await queueWellTransSync(ids, mode, syncDate);
       setNotice(`${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued. ${result.data.rejected || 0} rejected.`);
       setSelectedIds([]);
-    } catch (e) { setNotice(e.message || 'Unable to create queue.'); }
+      setTimeout(() => setSyncProgress(null), 5000);
+    } catch (e) { setNotice(e.message || 'Unable to create queue.'); setSyncProgress(null); }
     finally { setBusy(''); }
   };
 
+  const handleBulkSelect = (type) => {
+    setBulkMenuOpen(false);
+    if (type === 'failed') setSelectedIds(failedLogs.map(l => l.tripId).filter(id => enrichedTrips.some(t => t.id === id)));
+    else if (type === 'invalid') setSelectedIds(enrichedTrips.filter(t => !t._valid).map(t => t.id));
+    else if (type === 'retryable') setSelectedIds(retryableFailed.map(l => l.tripId).filter(id => enrichedTrips.some(t => t.id === id)));
+    else if (type === 'ready') setSelectedIds(readyTrips.map(t => t.id));
+    else if (type === 'invert') setSelectedIds(ids => filteredTrips.map(t => t.id).filter(id => !ids.includes(id)));
+    else if (type === 'none') setSelectedIds([]);
+  };
+
+  const navigateDate = (offset) => {
+    const d = new Date(syncDate + 'T12:00:00');
+    d.setDate(d.getDate() + offset);
+    setSyncDate(d.toISOString().slice(0, 10));
+    setSelectedIds([]);
+  };
+
+  const toggleAutoRetry = (category) => {
+    setAutoRetry(prev => ({ ...prev, [category]: !prev[category] }));
+  };
+
+  const exportAllTripsCSV = () => {
+    const headers = ['Booking ID', 'Passenger', 'Driver', 'Pickup Time', 'Dropoff Time', 'Mileage', 'Validation', 'Sync Status', 'Error'];
+    const rows = enrichedTrips.map(trip => {
+      const log = latestByTrip.get(trip.id);
+      return [
+        `"${trip.bookingId || trip.id || ''}"`,
+        `"${(trip.patient || trip.clientName || '').replace(/"/g, '""')}"`,
+        `"${(trip.driverName || '').replace(/"/g, '""')}"`,
+        `"${trip._payload?.pickup?.arrival || ''}"`,
+        `"${trip._payload?.dropoff?.arrival || ''}"`,
+        `"${trip._payload?.dropoff?.mileage ?? ''}"`,
+        `"${trip._valid ? 'Valid' : (trip._errors || []).join('; ')}"`,
+        `"${log?.status || 'Not Queued'}"`,
+        `"${(log?.errorMessage || '').replace(/"/g, '""')}"`,
+      ];
+    });
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `WellTrans_Queue_${syncDate}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div ref={pageRef} className="flex flex-col h-full min-h-0 overflow-hidden" tabIndex={-1}>
       {/* Header */}
       <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -104,7 +219,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               <Sparkles size={14} className="text-blue-500" />
               <h1 className="text-base font-semibold text-slate-900">WellTrans Automation Center</h1>
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Broker sync staging · field mapping · worker telemetry</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Broker sync · field mapping · worker telemetry</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -125,6 +240,21 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           </div>
         </div>
       </div>
+
+      {/* Sync progress bar */}
+      {syncProgress && (
+        <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-4 py-2">
+          <div className="flex items-center gap-3">
+            <Loader2 size={14} className="animate-spin text-blue-600 shrink-0" />
+            <div className="flex-1">
+              <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (syncProgress.done / syncProgress.total) * 100)}%` }} />
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold text-blue-700 shrink-0">{syncProgress.done}/{syncProgress.total}</span>
+          </div>
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2.5">
@@ -157,54 +287,57 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       {/* Control bar */}
       <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-            <span className="text-[11px] font-semibold text-slate-500">Date:</span>
-            <input
-              type="date"
-              value={syncDate}
-              onChange={e => { setSyncDate(e.target.value); setSelectedIds([]); }}
-              className="bg-transparent text-[11px] font-semibold text-slate-900 outline-none w-[110px]"
-            />
-          </label>
-          <button
-            disabled={!workerDateMatches || !readyTrips.length || Boolean(busy)}
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigateDate(-1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronLeft size={16} /></button>
+            <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+              <input type="date" value={syncDate} onChange={e => { setSyncDate(e.target.value); setSelectedIds([]); }}
+                className="bg-transparent text-[11px] font-semibold text-slate-900 outline-none w-[110px]" />
+            </label>
+            <button onClick={() => navigateDate(1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronRight size={16} /></button>
+          </div>
+          <button disabled={!workerDateMatches || !readyTrips.length || Boolean(busy)}
             onClick={() => runQueue(readyTrips.map(t => t.id), 'selected-date')}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition"
-          >
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition">
             {busy === 'selected-date' ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
             Stage Date ({readyTrips.length})
           </button>
-          <button
-            disabled={!settings.enabled || !selectedIds.length || Boolean(busy)}
+          <button disabled={!settings.enabled || !selectedIds.length || Boolean(busy)}
             onClick={() => runQueue(selectedIds, 'selected')}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition"
-          >
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition">
             Sync Selected ({selectedIds.length})
           </button>
-          <button
-            disabled={!readyTrips.length}
-            onClick={() => setSelectedIds(readyTrips.map(t => t.id))}
-            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition"
-          >
-            Select All Ready
-          </button>
-          {selectedIds.length > 0 && (
-            <button onClick={() => setSelectedIds([])} className="rounded-lg text-[11px] font-semibold text-slate-400 hover:text-slate-600 px-2 py-1.5">
-              Clear
+
+          {/* Bulk select dropdown */}
+          <div className="relative" ref={bulkMenuRef}>
+            <button onClick={() => setBulkMenuOpen(o => !o)}
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition flex items-center gap-1">
+              <ListFilter size={12} /> Bulk <span className="text-[9px]">▾</span>
             </button>
-          )}
-          <button
-            disabled={!workerDateMatches || !retryableFailed.length || Boolean(busy)}
+            {bulkMenuOpen && (
+              <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1">
+                <button onClick={() => handleBulkSelect('ready')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Select All Ready ({readyTrips.length})</button>
+                <button onClick={() => handleBulkSelect('failed')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-rose-600 hover:bg-rose-50">Select All Failed ({failedLogs.length})</button>
+                <button onClick={() => handleBulkSelect('retryable')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-amber-600 hover:bg-amber-50">Select All Retryable ({retryableFailed.length})</button>
+                <button onClick={() => handleBulkSelect('invalid')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-orange-600 hover:bg-orange-50">Select All Invalid</button>
+                <div className="border-t border-slate-100 my-1" />
+                <button onClick={() => handleBulkSelect('invert')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Invert Selection</button>
+                <button onClick={() => handleBulkSelect('none')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Clear Selection</button>
+              </div>
+            )}
+          </div>
+
+          <button disabled={!workerDateMatches || !retryableFailed.length || Boolean(busy)}
             onClick={() => runQueue(retryableFailed.map(l => l.tripId), 'retry')}
-            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition"
-          >
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition">
             <RefreshCw size={12} className="inline mr-1" /> Retry ({retryableFailed.length})
           </button>
-          <button
-            onClick={() => exportWellTransLogsCSV(logs, syncDate)}
-            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition"
-          >
-            <Download size={12} className="inline mr-1" /> CSV
+          <button onClick={exportAllTripsCSV}
+            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition">
+            <Download size={12} className="inline mr-1" /> Export Queue
+          </button>
+          <button onClick={() => exportWellTransLogsCSV(logs, syncDate)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition">
+            <Download size={12} className="inline mr-1" /> Logs
           </button>
         </div>
       </div>
@@ -232,44 +365,33 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
 
       {/* Tabs + content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {/* Tab bar */}
         <div className="shrink-0 flex items-center gap-1 border-b border-slate-200 bg-white px-4 py-1.5">
           {[
             { id: 'queue', label: 'Queue', count: completedTrips.length },
             { id: 'logs', label: 'Logs', count: logs.length },
+            { id: 'activity', label: 'Activity', icon: Zap },
+            { id: 'retry', label: 'Auto-Retry', icon: RotateCcw },
             { id: 'settings', label: 'Settings' },
-          ].map(({ id, label, count }) => (
-            <button
-              key={id}
-              onClick={() => {
-                if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
-                setTab(id);
-              }}
-              className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
-                tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-              }`}
-            >
+          ].map(({ id, label, count, icon: Icon }) => (
+            <button key={id} onClick={() => {
+              if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
+              setTab(id);
+            }} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
+              tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+            }`}>
+              {Icon && <Icon size={12} />}
               {label}{count !== undefined ? ` (${count})` : ''}
             </button>
           ))}
-          {/* Search for queue tab */}
           {tab === 'queue' && (
             <div className="ml-auto flex items-center gap-2">
               <div className="relative">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-40 rounded-lg border border-slate-200 bg-white pl-7 pr-2 py-1.5 text-[11px] text-slate-900 placeholder-slate-400 outline-none focus:border-blue-400"
-                />
+                <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-40 rounded-lg border border-slate-200 bg-white pl-7 pr-2 py-1.5 text-[11px] text-slate-900 placeholder-slate-400 outline-none focus:border-blue-400" />
               </div>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-700 outline-none"
-              >
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-700 outline-none">
                 <option value="all">All</option>
                 <option value="ready">Ready</option>
                 <option value="staged">Review</option>
@@ -281,75 +403,81 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           )}
         </div>
 
-        {/* Content */}
         {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-          </div>
+          <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-500" /></div>
         ) : tab === 'queue' ? (
           <div className="flex-1 overflow-auto">
             <table className="w-full text-left text-[11px] min-w-[800px]">
-              <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
+              <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10">
                 <tr>
-                  <th className="px-3 py-2 font-semibold text-slate-500"><input type="checkbox" className="rounded border-slate-300" onChange={() => {
-                    const allIds = filteredTrips.map(t => t.id);
-                    setSelectedIds(ids => ids.length === allIds.length ? [] : allIds);
-                  }} checked={selectedIds.length === filteredTrips.length && filteredTrips.length > 0} /></th>
+                  <th className="px-3 py-2 font-semibold text-slate-500 w-8">
+                    <input type="checkbox" className="rounded border-slate-300"
+                      onChange={() => setSelectedIds(ids => ids.length === filteredTrips.length ? [] : filteredTrips.map(t => t.id))}
+                      checked={selectedIds.length === filteredTrips.length && filteredTrips.length > 0} />
+                  </th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Booking</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Passenger</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Driver</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Pickup</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Dropoff</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Miles</th>
+                  <th className="px-3 py-2 font-semibold text-slate-500">Validation</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Status</th>
                   <th className="px-3 py-2 font-semibold text-slate-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredTrips.length === 0 ? (
-                  <tr><td colSpan={9} className="px-3 py-8 text-center text-xs text-slate-400">No trips for this date.</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-slate-400">No trips for this date.</td></tr>
                 ) : filteredTrips.map(trip => {
-                  const validation = validateTripForWellTrans(trip);
                   const latest = latestByTrip.get(trip.id);
                   const locked = ['pending', 'processing', 'completed', 'awaiting_review'].includes(latest?.status);
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
-                  const payload = validation.payload;
                   return (
-                    <tr key={trip.id} className="hover:bg-slate-50/50">
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          disabled={!validation.valid || locked || unmatched}
+                    <tr key={trip.id} className="hover:bg-slate-50/50 cursor-pointer group" onClick={() => setTripDrawer(trip)}>
+                      <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" disabled={!trip._valid || locked || unmatched}
                           checked={selectedIds.includes(trip.id)}
                           onChange={() => setSelectedIds(ids => ids.includes(trip.id) ? ids.filter(id => id !== trip.id) : [...ids, trip.id])}
-                          className="rounded border-slate-300"
-                        />
+                          className="rounded border-slate-300" />
                       </td>
                       <td className="px-3 py-2 font-mono font-semibold text-blue-600">{trip.bookingId || trip.id}</td>
                       <td className="px-3 py-2 font-medium text-slate-900">{trip.patient || trip.clientName || '—'}</td>
                       <td className="px-3 py-2 text-slate-600">{trip.driverName || '—'}</td>
-                      <td className="px-3 py-2 text-slate-600 font-mono">{payload?.pickup?.arrival || '—'}</td>
-                      <td className="px-3 py-2 text-slate-600 font-mono">{payload?.dropoff?.arrival || '—'}</td>
-                      <td className="px-3 py-2 font-mono">{payload?.dropoff?.mileage != null ? <span className="text-emerald-600 font-semibold">{payload.dropoff.mileage}</span> : '—'}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-slate-600 font-mono">{trip._payload?.pickup?.arrival || '—'}</td>
+                      <td className="px-3 py-2 text-slate-600 font-mono">{trip._payload?.dropoff?.arrival || '—'}</td>
+                      <td className="px-3 py-2 font-mono">{trip._payload?.dropoff?.mileage != null ? <span className="text-emerald-600 font-semibold">{trip._payload.dropoff.mileage}</span> : '—'}</td>
+                      <td className="px-3 py-2 relative">
                         {unmatched ? (
                           <span className="text-[10px] font-semibold text-amber-600">Not Found</span>
-                        ) : validation.valid ? (
-                          <span className="text-[10px] font-semibold text-emerald-600">Ready</span>
+                        ) : trip._valid ? (
+                          <span className="text-[10px] font-semibold text-emerald-600">Valid</span>
                         ) : (
-                          <span className="text-[10px] font-semibold text-rose-600">{validation.errors[0]}</span>
+                          <span className="text-[10px] font-semibold text-rose-600" title={trip._errors?.join('; ')}>
+                            {trip._errors?.[0] || 'Invalid'}
+                          </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${statusStyle[latest?.status] || 'bg-slate-100 text-slate-500'}`}>
-                            {latest?.status || '—'}
-                          </span>
-                          <button onClick={() => setInspectPayloadTrip(trip)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" title="Inspect payload">
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${statusStyle[latest?.status] || 'bg-slate-100 text-slate-500'}`}>
+                          {latest?.status || '—'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          {latest?.screenshot && (
+                            <a href={latest.screenshot} target="_blank" rel="noopener noreferrer"
+                              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600 transition" title="Screenshot">
+                              <Image size={13} />
+                            </a>
+                          )}
+                          <button onClick={() => setInspectPayloadTrip(trip)}
+                            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" title="Payload">
                             <Code size={13} />
                           </button>
                           {latest?.status === 'failed' && (
-                            <button onClick={() => setSelectedFailure(latest)} className="rounded p-1 text-rose-400 hover:bg-rose-50 transition" title="View failure">
+                            <button onClick={() => setSelectedFailure(latest)}
+                              className="rounded p-1 text-rose-400 hover:bg-rose-50 transition" title="Failure">
                               <Eye size={13} />
                             </button>
                           )}
@@ -368,25 +496,26 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             ) : (
               <div className="divide-y divide-slate-100">
                 {logs.map(log => (
-                  <div key={log.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition">
+                  <div key={log.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer group"
+                    onClick={() => log.screenshot ? window.open(log.screenshot, '_blank') : null}>
                     <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase shrink-0 ${statusStyle[log.status] || 'bg-slate-100 text-slate-500'}`}>
                       {log.status}
                     </span>
                     <span className="font-mono text-[11px] font-semibold text-blue-600 shrink-0">{log.bookingId || log.tripId}</span>
                     <span className="flex-1 text-[11px] text-slate-500 truncate">{log.errorMessage || log.stage || 'Completed'}</span>
+                    {log.screenshot && <Image size={12} className="text-slate-300 group-hover:text-blue-500 shrink-0 transition" />}
                     <span className="text-[10px] text-slate-400 shrink-0">{new Date(log.completedAt || log.stagedAt || log.createdAt).toLocaleString()}</span>
                     {log.status === 'awaiting_review' && (
-                      <button
-                        disabled={busy === log.id}
-                        onClick={async () => {
+                      <button disabled={busy === log.id}
+                        onClick={async (e) => {
+                          e.stopPropagation();
                           if (!window.confirm(`Confirm Booking ${log.bookingId || log.tripId} applied in WellTrans?`)) return;
                           setBusy(log.id);
                           try { await confirmWellTransApplied(log.id); setNotice(`Booking ${log.bookingId || log.tripId} confirmed.`); }
-                          catch (e) { setNotice(e.message || 'Failed.'); }
+                          catch (err) { setNotice(err.message || 'Failed.'); }
                           finally { setBusy(''); }
                         }}
-                        className="rounded-lg bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-700 disabled:opacity-50 transition shrink-0"
-                      >
+                        className="rounded-lg bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-700 disabled:opacity-50 transition shrink-0">
                         Confirm
                       </button>
                     )}
@@ -395,34 +524,78 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               </div>
             )}
           </div>
+        ) : tab === 'activity' ? (
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 size={14} className="text-blue-500" />
+              <span className="text-xs font-semibold text-slate-900">Worker Activity Log</span>
+              <span className="text-[10px] text-slate-400">({workerActivity.length} active)</span>
+            </div>
+            {workerActivity.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-400">No active sync jobs.</div>
+            ) : workerActivity.map(log => (
+              <div key={log.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${log.status === 'processing' ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold text-slate-900">{log.bookingId || log.tripId}</p>
+                  <p className="text-[10px] text-slate-500 truncate">{log.stage || 'Queued'} · {log.status}</p>
+                </div>
+                <span className="text-[10px] text-slate-400 shrink-0">
+                  {new Date(log.updatedAt || log.createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : tab === 'retry' ? (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <RotateCcw size={14} className="text-amber-500" />
+              <span className="text-xs font-semibold text-slate-900">Auto-Retry Rules</span>
+            </div>
+            <p className="text-[11px] text-slate-500">Toggle which failure categories should auto-retry on the next sync cycle.</p>
+            {FAILURE_CATEGORIES.filter(c => c.key !== 'other').map(cat => {
+              const count = failedLogs.filter(l => categorizeFailure(l) === cat.key).length;
+              return (
+                <div key={cat.key} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900">{cat.label}</p>
+                    <p className="text-[10px] text-slate-500">{count} failure(s) in this category</p>
+                  </div>
+                  <button onClick={() => toggleAutoRetry(cat.key)}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${autoRetry[cat.key] ? 'bg-blue-600' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${autoRetry[cat.key] ? 'left-5.5 translate-x-0' : 'left-0.5'}`}
+                      style={{ left: autoRetry[cat.key] ? '22px' : '2px' }} />
+                  </button>
+                </div>
+              );
+            })}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold text-slate-700">Auto-retry enabled for: {Object.entries(autoRetry).filter(([, v]) => v).map(([k]) => FAILURE_CATEGORIES.find(c => c.key === k)?.label || k).join(', ') || 'None'}</p>
+            </div>
+          </div>
         ) : (
-          /* Settings tab */
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
               <div>
                 <p className="text-xs font-semibold text-slate-900">Enable Automation Queue</p>
-                <p className="text-[11px] text-slate-500">Auto-process jobs when worker is online</p>
+                <p className="text-[11px] text-slate-500">Auto-process when worker is online</p>
               </div>
-              <input
-                type="checkbox"
-                checked={effectiveSettings.enabled}
+              <input type="checkbox" checked={effectiveSettings.enabled}
                 onChange={e => setDraftSettings(v => ({ ...v, enabled: e.target.checked }))}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
             </div>
             <div>
               <label className="text-[11px] font-semibold text-slate-600">Portal URL</label>
-              <input
-                value={effectiveSettings.portalUrl || ''}
+              <input value={effectiveSettings.portalUrl || ''}
                 onChange={e => setDraftSettings(v => ({ ...v, portalUrl: e.target.value }))}
                 placeholder="https://tripspark.welltransnemt.com/"
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400"
-              />
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400" />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-[11px] font-semibold text-slate-600">Field Mapping</label>
-                <button onClick={() => setDraftSettings(v => ({ ...v, fieldMapping: { ...DEFAULT_WELLTRANS_FIELD_MAPPING } }))} className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                <button onClick={() => setDraftSettings(v => ({ ...v, fieldMapping: { ...DEFAULT_WELLTRANS_FIELD_MAPPING } }))}
+                  className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1">
                   <RotateCcw size={11} /> Reset
                 </button>
               </div>
@@ -430,30 +603,24 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 {Object.entries(effectiveSettings.fieldMapping || {}).map(([key, value]) => (
                   <div key={key} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
                     <span className="text-[10px] font-semibold uppercase text-slate-500">{key}</span>
-                    <input
-                      value={value}
+                    <input value={value}
                       onChange={e => setDraftSettings(curr => ({ ...curr, fieldMapping: { ...curr.fieldMapping, [key]: e.target.value } }))}
-                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-900 outline-none focus:border-blue-400"
-                    />
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-900 outline-none focus:border-blue-400" />
                   </div>
                 ))}
               </div>
             </div>
-            <button
-              onClick={async () => {
-                await saveWellTransSettings(effectiveSettings, auth.currentUser?.uid || 'unknown');
-                setDraftSettings(null);
-                setNotice('Settings saved.');
-              }}
-              className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 transition flex items-center gap-1.5"
-            >
+            <button onClick={async () => {
+              await saveWellTransSettings(effectiveSettings, auth.currentUser?.uid || 'unknown');
+              setDraftSettings(null); setNotice('Settings saved.');
+            }} className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 transition flex items-center gap-1.5">
               <Save size={14} /> Save Configuration
             </button>
           </div>
         )}
       </div>
 
-      {/* AI Supervisor — only when failure selected */}
+      {/* AI Diagnostic bar */}
       {selectedFailure && (
         <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3">
           <div className="flex items-start gap-3">
@@ -466,6 +633,111 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 <button onClick={() => setSelectedFailure(null)} className="text-slate-400 hover:text-slate-600"><X size={13} /></button>
               </div>
               <p className="text-xs text-slate-700 leading-relaxed">{explainWellTransFailure(selectedFailure)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trip detail drawer */}
+      {tripDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setTripDrawer(null)} />
+          <div className="relative w-full max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-slate-900 truncate">{tripDrawer.patient || tripDrawer.clientName || 'Trip'}</h3>
+                <p className="text-[11px] text-slate-500 font-mono">#{tripDrawer.bookingId || tripDrawer.id}</p>
+              </div>
+              <button onClick={() => setTripDrawer(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Trip info */}
+              <div className="space-y-2">
+                {[
+                  ['Driver', tripDrawer.driverName || '—'],
+                  ['Vehicle', tripDrawer.completedVehicle || tripDrawer.vehicle || '—'],
+                  ['Pickup', tripDrawer.pickup || tripDrawer.pickupAddress || '—'],
+                  ['Dropoff', tripDrawer.dropoff || tripDrawer.dropoffAddress || '—'],
+                  ['Scheduled', tripDrawer.scheduledTime || tripDrawer.time || '—'],
+                  ['Status', tripDrawer.status || '—'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex gap-3">
+                    <span className="text-[11px] font-semibold text-slate-500 w-20 shrink-0">{label}</span>
+                    <span className="text-[11px] text-slate-900 break-words">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* WellTrans payload */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-900">WellTrans Payload</span>
+                  {tripDrawer._valid ? (
+                    <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Valid</span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-rose-600">{tripDrawer._errors?.[0]}</span>
+                  )}
+                </div>
+                {tripDrawer._payload ? (
+                  <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 max-h-[200px] overflow-y-auto">
+                    <pre className="text-[10px] font-mono text-slate-700 whitespace-pre-wrap">{JSON.stringify(tripDrawer._payload, null, 2)}</pre>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 italic">Cannot build payload — missing required fields.</p>
+                )}
+              </div>
+
+              {/* Validation errors */}
+              {tripDrawer._errors?.length > 0 && (
+                <div>
+                  <span className="text-[11px] font-bold text-rose-600 mb-1 block">Validation Errors</span>
+                  <div className="space-y-1">
+                    {tripDrawer._errors.map((err, i) => (
+                      <div key={i} className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5">
+                        <XCircle size={12} className="text-rose-500 mt-0.5 shrink-0" />
+                        <span className="text-[11px] text-rose-700">{err}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sync log */}
+              {latestByTrip.get(tripDrawer.id) && (
+                <div>
+                  <span className="text-[11px] font-bold text-slate-900 mb-1 block">Sync Log</span>
+                  <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                    {(() => { const log = latestByTrip.get(tripDrawer.id); return (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${statusStyle[log.status] || 'bg-slate-100 text-slate-500'}`}>{log.status}</span>
+                          <span className="text-[10px] text-slate-400">{new Date(log.completedAt || log.stagedAt || log.createdAt).toLocaleString()}</span>
+                        </div>
+                        {log.errorMessage && <p className="text-[11px] text-rose-600">{log.errorMessage}</p>}
+                        {log.stage && <p className="text-[10px] text-slate-500">Stage: {log.stage}</p>}
+                        {log.screenshot && (
+                          <a href={log.screenshot} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline">
+                            <Image size={12} /> View Screenshot
+                          </a>
+                        )}
+                      </>
+                    ); })()}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 border-t border-slate-200 px-4 py-2.5 flex gap-2">
+              <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(tripDrawer._payload || {}, null, 2)); setNotice('Payload copied.'); }}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-1">
+                <Copy size={12} /> Copy Payload
+              </button>
+              {latestByTrip.get(tripDrawer.id)?.status === 'failed' && isWellTransFailureRetryable(latestByTrip.get(tripDrawer.id)) && (
+                <button onClick={() => { setTripDrawer(null); runQueue([tripDrawer.id], 'retry'); }}
+                  className="flex-1 rounded-xl bg-amber-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-amber-700 transition flex items-center justify-center gap-1">
+                  <RefreshCw size={12} /> Retry This Trip
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -488,10 +760,28 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             <div className="flex items-center justify-end gap-2 px-4 pb-3">
               <button
                 onClick={() => { navigator.clipboard.writeText(JSON.stringify(buildWellTransPayload(inspectPayloadTrip), null, 2)); setNotice('Copied.'); setInspectPayloadTrip(null); }}
-                className="rounded-xl bg-blue-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 transition"
-              >
+                className="rounded-xl bg-blue-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 transition">
                 Copy JSON
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Screenshot viewer */}
+      {selectedFailure?.screenshot && !tripDrawer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="relative max-w-3xl w-full bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <Image size={16} className="text-blue-500" />
+                <span className="text-sm font-semibold text-slate-900">Failure Screenshot</span>
+                <span className="text-[11px] text-slate-500 font-mono">#{selectedFailure.bookingId || selectedFailure.tripId}</span>
+              </div>
+              <button onClick={() => setSelectedFailure(null)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <div className="p-4 max-h-[70vh] overflow-auto bg-slate-50">
+              <img src={selectedFailure.screenshot} alt="Failure screenshot" className="w-full rounded-lg border border-slate-200" />
             </div>
           </div>
         </div>
