@@ -605,9 +605,11 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-medium leading-relaxed text-slate-700">
-                {explainWellTransFailure(selectedFailure)}
-              </div>
+              {selectedFailure && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-medium leading-relaxed text-slate-700">
+                  {explainWellTransFailure(selectedFailure)}
+                </div>
+              )}
 
               <p className="mt-3 text-[10px] font-semibold text-slate-400 leading-normal">
                 AI diagnostic analyzes snapshot errors and fields. Credentials remain strictly encrypted on worker nodes.
