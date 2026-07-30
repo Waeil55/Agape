@@ -73,7 +73,7 @@ describe('WellTrans staging safety contract', () => {
   it('keeps vehicle matching optional and can restore an originally blank list cell', () => {
     const source = readFileSync(tripSourcePath, 'utf8');
     expect(source).toContain("entry.reason = 'portal_rejected_optional_exact_match'");
-    expect(source).toContain('getListDropdownOptions(page, { strict: optionalExactList })');
+    expect(source).toContain('waitForListDropdownOptions(page, { strict: optionalExactList })');
     expect(source).toContain('if (strictOnly) return [...new Set(results)]');
     expect(source).toContain("await editor.fill('')");
     expect(source).toContain('await restorePlanEntry(page, grid, entry)');
@@ -104,5 +104,29 @@ describe('WellTrans staging safety contract', () => {
     );
     expect(exactCell).toContain('cells.evaluateAll');
     expect(exactCell).not.toContain('await cell.evaluate');
+  });
+
+  it('isolates every TripSpark editor and never commits a typed list filter', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    expect(source).toContain('async function dismissActiveEditor(page)');
+    expect(source).toContain('await dismissActiveEditor(page);');
+    expect(source).toContain('const exactFiltered = findUniqueExactOption(filteredOptions, optionStr)');
+    expect(source).toContain('exactFiltered && await clickListOption(page, exactFiltered)');
+    expect(source).not.toContain("filter.press('Tab')");
+  });
+
+  it('waits for lazy TripSpark options and exact-searches during preflight', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    expect(source).toContain('async function waitForListDropdownOptions');
+    expect(source).toContain('async function filterListDropdown');
+    expect(source).toContain('const filteredOptions = await filterListDropdown(page, value)');
+    expect(source).toContain('exactMatch = findUniqueExactOption(options, value)');
+  });
+
+  it('supports TripSpark direct dropdown dialogs without a listbox wrapper', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    expect(source).toContain("page.locator('.DropDownDialog:visible core\\\\:listitem:visible')");
+    expect(source).toContain('await listbox.count() || await directDialog.count()');
+    expect(source).toContain('if (!await listbox.count() && !await directDialog.count())');
   });
 });

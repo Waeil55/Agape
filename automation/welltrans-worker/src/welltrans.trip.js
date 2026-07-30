@@ -252,6 +252,8 @@ function equalCellValue(column, actual, expected) {
 }
 
 async function openListDropdown(page) {
+  const openDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
+  if (await openDialog.count()) return true;
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
   if (!await listbox.count()) return false;
   const dropBtn = listbox.locator('.dropdlgbutton');
@@ -262,6 +264,18 @@ async function openListDropdown(page) {
   }
   await page.waitForTimeout(400);
   return true;
+}
+
+async function dismissActiveEditor(page) {
+  const activeEditor = page.locator(
+    '.EditorWidgets input:not([style*="z-index: -1"]):visible, '
+    + '.EditorWidgets select:visible, .EditorWidgets textarea:visible, '
+    + '.EditorWidgets core\\:listbox:visible, .DropDownDialog:visible',
+  );
+  for (let attempt = 0; attempt < 3 && await activeEditor.count(); attempt += 1) {
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(100);
+  }
 }
 
 async function getListDropdownOptions(page, { strict = false } = {}) {
@@ -322,6 +336,27 @@ async function getListDropdownOptions(page, { strict = false } = {}) {
     return [...new Set(results)];
   }, { strictOnly: strict });
   return optionTexts;
+}
+
+async function waitForListDropdownOptions(page, options = {}) {
+  let values = [];
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    values = await getListDropdownOptions(page, options);
+    if (values.length) return values;
+    await page.waitForTimeout(250);
+  }
+  return values;
+}
+
+async function filterListDropdown(page, optionText) {
+  const filter = page.locator(
+    '.DropDownDialog input:visible, .EditorWidgets core\\:listbox:visible input:visible',
+  ).last();
+  if (!await filter.count()) return [];
+  await filter.click({ force: true });
+  await filter.fill('');
+  await filter.fill(String(optionText));
+  return waitForListDropdownOptions(page);
 }
 
 async function clickListOption(page, optionText) {
@@ -421,12 +456,26 @@ async function selectListOption(page, option, column) {
   const optionStr = String(option).trim();
   if (!optionStr) return;
 
-  const availableOptions = await getListDropdownOptions(page);
+  let availableOptions = await waitForListDropdownOptions(page);
 
   const clicked = await clickListOption(page, optionStr);
   if (clicked) {
     await page.waitForTimeout(200);
     return;
+  }
+
+  // Some TripSpark listboxes populate only after their internal search input
+  // receives text. Filtering is safe because the worker still requires a
+  // semantic, unique, normalized-exact option and performs a pointer click;
+  // the typed value itself is never committed.
+  const filteredOptions = await filterListDropdown(page, optionStr);
+  if (filteredOptions.length) {
+    const exactFiltered = findUniqueExactOption(filteredOptions, optionStr);
+    if (exactFiltered && await clickListOption(page, exactFiltered)) {
+      await page.waitForTimeout(200);
+      return;
+    }
+    availableOptions = [...new Set([...availableOptions, ...filteredOptions])];
   }
 
   if (column === 'Vehicle' || column === 'Driver' || column === 'Signature Captured?') {
@@ -462,18 +511,21 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
   if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity} (top=${liveRow.top})`);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    await dismissActiveEditor(page);
     await cell.dblclick({ force: true });
     await page.waitForTimeout(250);
 
     const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
     const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
 
-    if (await listbox.count()) {
+    const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
+    if (await listbox.count() || await directDialog.count()) {
       await openListDropdown(page);
       try {
         await selectListOption(page, value, column);
         await page.keyboard.press('Tab');
         await page.waitForTimeout(200);
+        await dismissActiveEditor(page);
         return true;
       } catch (error) {
         await page.keyboard.press('Escape').catch(() => {});
@@ -491,6 +543,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
       await page.waitForTimeout(150);
       await page.keyboard.press('Tab');
       await page.waitForTimeout(200);
+      await dismissActiveEditor(page);
       return true;
     }
 
@@ -512,10 +565,13 @@ async function setListCell(page, grid, row, column, option) {
   const cell = await exactCell(grid, liveRow.top, colLeft);
   if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity}`);
 
+  await dismissActiveEditor(page);
   await cell.dblclick({ force: true });
   await page.waitForTimeout(250);
 
-  if (!await page.locator('.EditorWidgets core\\:listbox:visible').count()) {
+  const listbox = page.locator('.EditorWidgets core\\:listbox:visible');
+  const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
+  if (!await listbox.count() && !await directDialog.count()) {
     throw new Error(`${column} listbox did not open for ${row.activity}`);
   }
 
@@ -530,6 +586,7 @@ async function setListCell(page, grid, row, column, option) {
   if (!equalCellValue(column, selected, option)) {
     throw new Error(`${column} selection not confirmed: expected "${option}", found "${selected}"`);
   }
+  await dismissActiveEditor(page);
 }
 
 const safePreflightError = error => {
@@ -564,20 +621,25 @@ async function preflightCell(page, grid, row, column, value, {
     throw safePreflightError(new Error(`${column} cell unavailable for ${row.activity}`));
   }
 
+  await dismissActiveEditor(page);
   await cell.dblclick({ force: true });
   await page.waitForTimeout(250);
   const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
 
-  if (await listbox.count()) {
+  const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
+  if (await listbox.count() || await directDialog.count()) {
     await openListDropdown(page);
     // Vehicle is deliberately stricter than the other list fields. An input
     // value or editor container must never be mistaken for a real option.
-    const options = await getListDropdownOptions(page, { strict: optionalExactList });
-    const exactMatch = findUniqueExactOption(options, value);
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.waitForTimeout(100);
+    let options = await waitForListDropdownOptions(page, { strict: optionalExactList });
+    let exactMatch = findUniqueExactOption(options, value);
+    if (!exactMatch && !optionalExactList) {
+      const filteredOptions = await filterListDropdown(page, value);
+      options = [...new Set([...options, ...filteredOptions])];
+      exactMatch = findUniqueExactOption(options, value);
+    }
+    await dismissActiveEditor(page);
 
     if (!exactMatch) {
       if (optionalExactList) {
@@ -598,8 +660,7 @@ async function preflightCell(page, grid, row, column, value, {
   }
 
   if (await editor.count()) {
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.waitForTimeout(100);
+    await dismissActiveEditor(page);
     if (column === 'Driver' || column === 'Vehicle' || column === 'Signature Captured?') {
       if (optionalExactList) {
         return { skip: true, row, column, original, reason: 'exact_list_unavailable' };

@@ -15,7 +15,7 @@ initializeApp({
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.3.6';
+const workerVersion = '2.3.9';
 let requestedServiceDate = '';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
