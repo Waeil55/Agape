@@ -5,8 +5,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
-import { getSelectedPortalDate, syncWellTransTrip, validateWellTransTrip } from './welltrans.trip.js';
-import { validateTripForWellTrans } from './welltrans.mapping.js';
+import {
+  auditWellTransTrip,
+  getSelectedPortalDate,
+  syncWellTransTrip,
+  validateWellTransTrip,
+} from './welltrans.trip.js';
+import { normalizeServiceDate, validateTripForWellTrans } from './welltrans.mapping.js';
 
 initializeApp({
   credential: applicationDefault(),
@@ -26,9 +31,10 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   }))
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.5.1';
+const workerVersion = '2.6.1';
 let requestedServiceDate = '';
 let reviewSessionId = '';
+let lastCompletedPortalAuditAt = 0;
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
@@ -170,6 +176,8 @@ async function publishDateReviewSummary(serviceDate) {
       latestByTrip.set(key, {
         status: data.status,
         reviewSessionId: data.reviewSessionId || '',
+        portalReviewSessionId: data.portalVerification?.reviewSessionId || '',
+        portalVerified: data.portalVerification?.verified === true,
         updatedAt,
       });
     }
@@ -199,7 +207,13 @@ async function publishDateReviewSummary(serviceDate) {
     } else if (item.status === 'awaiting_review') {
       summary.missing += 1;
     }
-    else if (Object.hasOwn(summary, item.status)) summary[item.status] += 1;
+    else if (item.status === 'completed'
+      && item.portalVerified
+      && item.portalReviewSessionId === reviewSessionId) {
+      summary.completed += 1;
+    } else if (item.status === 'completed') {
+      summary.missing += 1;
+    } else if (Object.hasOwn(summary, item.status)) summary[item.status] += 1;
   }
   const verified = summary.staged + summary.completed;
   const coverageComplete = summary.total > 0
@@ -291,35 +305,269 @@ async function resolveBookingAlias(sourceBookingId, serviceDate) {
   return { id: snapshot.id, portalBookingId, matchMethod: alias.matchMethod };
 }
 
+async function buildCurrentPortalPayload(tripId) {
+  const tripSnapshot = await db.doc(`trips/${tripId}`).get();
+  if (!tripSnapshot.exists) throw new Error(`Source trip ${tripId} no longer exists`);
+  const trip = tripSnapshot.data() || {};
+  const settings = (await db.doc('welltrans_settings/primary').get()).data() || {};
+  const driverSnapshot = trip.driverId ? await db.doc(`drivers/${trip.driverId}`).get() : null;
+  const hydratedTrip = {
+    id: tripSnapshot.id,
+    ...trip,
+    completedDriverName: driverSnapshot?.exists
+      ? driverSnapshot.data().name
+      : trip.completedDriverName,
+  };
+  const validation = validateTripForWellTrans(hydratedTrip);
+  if (!validation.valid) {
+    throw new Error(`Source trip is not ready: ${validation.errors.join('; ')}`);
+  }
+  const bookingAlias = await resolveBookingAlias(
+    validation.payload.bookingId,
+    validation.payload.serviceDate,
+  );
+  const payload = {
+    ...validation.payload,
+    bookingId: bookingAlias?.portalBookingId || validation.payload.bookingId,
+    driver: settings.driverValueMapping?.[validation.payload.driver] || validation.payload.driver,
+    vehicle: settings.vehicleValueMapping?.[validation.payload.vehicle] || validation.payload.vehicle,
+  };
+  return {
+    tripSnapshot,
+    validation,
+    bookingAlias,
+    payload,
+    settings,
+    sourceFingerprint: wellTransSourceFingerprint(validation.payload),
+  };
+}
+
+const isAuthoritativeCompletedTrip = trip => {
+  const lifecycle = [
+    trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
+  ].map(value => String(value || '').trim().toLowerCase()).join(' ');
+  if (/cancell?ed/.test(lifecycle)) return false;
+  return lifecycle.includes('completed')
+    || lifecycle.includes('complete')
+    || lifecycle.includes('done')
+    || Boolean(trip.completedAt);
+};
+
+async function reconcileAuthoritativeCompletedTrips(serviceDate) {
+  const [tripsSnapshot, logsSnapshot] = await Promise.all([
+    db.collection('trips').get(),
+    db.collection('welltrans_sync_logs').where('serviceDate', '==', serviceDate).limit(1000).get(),
+  ]);
+  const expectedTrips = tripsSnapshot.docs
+    .map(document => ({ id: document.id, ...document.data() }))
+    .filter(trip =>
+      isAuthoritativeCompletedTrip(trip)
+      && normalizeServiceDate(trip) === serviceDate);
+  const latestByTrip = new Map();
+  for (const document of logsSnapshot.docs) {
+    const data = document.data();
+    const key = String(data.tripId);
+    const current = latestByTrip.get(key);
+    const updatedAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
+    if (!current || updatedAt > current.updatedAt) {
+      latestByTrip.set(key, { ref: document.ref, data, updatedAt });
+    }
+  }
+
+  const blockedTrips = [];
+  let queued = 0;
+  let covered = 0;
+  for (const trip of expectedTrips) {
+    let current;
+    try {
+      current = await buildCurrentPortalPayload(trip.id);
+    } catch (error) {
+      blockedTrips.push({
+        tripId: String(trip.id),
+        bookingId: String(trip.bookingId || trip.id),
+        errors: [String(error?.message || error)],
+      });
+      continue;
+    }
+
+    const latest = latestByTrip.get(String(trip.id));
+    if (!latest) {
+      const ref = db.collection('welltrans_sync_logs').doc();
+      await ref.create({
+        tripId: String(trip.id),
+        bookingId: current.validation.payload.bookingId,
+        serviceDate,
+        status: 'pending',
+        stage: 'queued_by_authoritative_worker_reconciliation',
+        startedAt: null,
+        completedAt: null,
+        errorMessage: '',
+        screenshot: '',
+        syncedBy: `agent:${workerId}`,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        attempt: 0,
+        provider: 'welltrans',
+        automationMethod: 'playwright',
+        payload: current.validation.payload,
+        manifestId: serviceDate,
+        queuedSourceFingerprint: current.sourceFingerprint,
+        workerVersion,
+      });
+      queued += 1;
+      continue;
+    }
+
+    if (latest.data.status === 'failed') {
+      const safeRetry = latest.data.stage === 'failed_no_partial_changes'
+        || latest.data.mutationStarted !== true
+        || latest.data.rollbackVerified === true;
+      const retryCount = latest.data.retryWorkerVersion === workerVersion
+        ? Number(latest.data.automaticRetryCount || 0)
+        : 0;
+      if (!safeRetry || retryCount >= 3) {
+        blockedTrips.push({
+          tripId: String(trip.id),
+          bookingId: current.validation.payload.bookingId,
+          errors: [
+            !safeRetry
+              ? (latest.data.errorMessage
+                || 'Prior WellTrans mutation could not be safely rolled back')
+              : `Automatic retry limit reached: ${latest.data.errorMessage || 'unresolved portal failure'}`,
+          ],
+        });
+        continue;
+      }
+      await latest.ref.update({
+        status: 'pending',
+        stage: 'requeued_by_authoritative_worker_reconciliation',
+        errorMessage: '',
+        completedAt: FieldValue.delete(),
+        leaseExpiresAt: FieldValue.delete(),
+        queuedSourceFingerprint: current.sourceFingerprint,
+        retryWorkerVersion: workerVersion,
+        automaticRetryCount: retryCount + 1,
+        updatedAt: FieldValue.serverTimestamp(),
+        workerVersion,
+      });
+      queued += 1;
+      continue;
+    }
+    covered += 1;
+  }
+
+  const manifest = {
+    provider: 'welltrans',
+    serviceDate,
+    state: blockedTrips.length ? 'blocked' : (expectedTrips.length ? 'queued' : 'empty'),
+    expectedTripIds: expectedTrips.map(trip => String(trip.id)),
+    expectedCount: expectedTrips.length,
+    eligibleCount: expectedTrips.length - blockedTrips.length,
+    queuedCount: queued,
+    coveredCount: covered,
+    blockedCount: blockedTrips.length,
+    blockedTrips: blockedTrips.slice(0, 200),
+    source: 'authoritative_worker_completed_trip_scan',
+    workerId,
+    workerVersion,
+    reconciledAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await db.doc(`welltrans_sync_manifests/${serviceDate}`).set(manifest, { merge: true });
+  return { expected: expectedTrips.length, queued, covered, blocked: blockedTrips.length };
+}
+
+async function auditCompletedPortalTrips(page, serviceDate) {
+  const snapshot = await db.collection('welltrans_sync_logs')
+    .where('serviceDate', '==', serviceDate).limit(1000).get();
+  const latestByTrip = new Map();
+  for (const document of snapshot.docs) {
+    const data = document.data();
+    const key = String(data.tripId);
+    const current = latestByTrip.get(key);
+    const updatedAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
+    if (!current || updatedAt > current.updatedAt) {
+      latestByTrip.set(key, { ref: document.ref, data, updatedAt });
+    }
+  }
+
+  const completed = [...latestByTrip.values()]
+    .filter(item => item.data.status === 'completed');
+  const result = { audited: 0, verified: 0, requeued: 0, failed: 0 };
+  for (const item of completed) {
+    result.audited += 1;
+    try {
+      const current = await buildCurrentPortalPayload(item.data.tripId);
+      if (current.validation.payload.serviceDate !== serviceDate) {
+        throw new Error(
+          `Source trip belongs to ${current.validation.payload.serviceDate}, not ${serviceDate}`,
+        );
+      }
+      const warnings = Array.isArray(item.data.warnings) ? item.data.warnings : [];
+      const vehicleWasIntentionallySkipped = warnings.some(warning =>
+        /vehicle was left unchanged because no unique exact WellTrans match/i.test(String(warning)));
+      const portalAudit = await auditWellTransTrip(page, current.payload, {
+        verifyVehicle: !vehicleWasIntentionallySkipped,
+      });
+      const sourceChanged = Boolean(
+        item.data.stagedSourceFingerprint
+        && item.data.stagedSourceFingerprint !== current.sourceFingerprint
+      );
+      if (!portalAudit.verified || sourceChanged) {
+        const reasons = [
+          ...portalAudit.mismatches,
+          ...(sourceChanged ? ['Agape source data changed after the prior staging'] : []),
+        ];
+        await item.ref.update({
+          status: 'pending',
+          stage: 'requeued_after_live_portal_audit',
+          previousCompletedAt: item.data.completedAt || null,
+          completedAt: FieldValue.delete(),
+          reviewSessionId,
+          portalAuditMismatch: reasons.slice(0, 30),
+          portalVerifiedAt: FieldValue.delete(),
+          portalVerification: FieldValue.delete(),
+          queuedSourceFingerprint: current.sourceFingerprint,
+          updatedAt: FieldValue.serverTimestamp(),
+          leaseExpiresAt: FieldValue.delete(),
+          errorMessage: '',
+          workerVersion,
+        });
+        result.requeued += 1;
+      } else {
+        await item.ref.update({
+          portalVerifiedAt: FieldValue.serverTimestamp(),
+          portalVerification: { ...portalAudit, reviewSessionId },
+          workerVersion,
+        });
+        result.verified += 1;
+      }
+    } catch (error) {
+      await item.ref.update({
+        status: 'failed',
+        stage: 'live_portal_reconciliation_failed',
+        errorMessage: String(error?.message || error).slice(0, 2000),
+        completedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        workerVersion,
+      });
+      result.failed += 1;
+    }
+  }
+  return result;
+}
+
 async function processJob(job, existingSession = null) {
   if (!existingSession?.browser || !existingSession?.page) {
     throw new Error('WellTrans staging requires a calibrated headed browser session so an operator can review every field before Apply.');
   }
   const page = existingSession.page;
   try {
-    const tripSnapshot = await db.doc(`trips/${job.tripId}`).get();
-    if (!tripSnapshot.exists) throw new Error(`Source trip ${job.tripId} no longer exists`);
-    const trip = tripSnapshot.data() || {};
-    const settings = (await db.doc('welltrans_settings/primary').get()).data() || {};
-    const driverSnapshot = trip.driverId ? await db.doc(`drivers/${trip.driverId}`).get() : null;
-    const hydratedTrip = {
-      id: tripSnapshot.id,
-      ...trip,
-      completedDriverName: driverSnapshot?.exists ? driverSnapshot.data().name : trip.completedDriverName,
-    };
-    const validation = validateTripForWellTrans(hydratedTrip);
-    if (!validation.valid) throw new Error(`Source trip is not ready: ${validation.errors.join('; ')}`);
-    const bookingAlias = await resolveBookingAlias(
-      validation.payload.bookingId,
-      validation.payload.serviceDate,
-    );
-    const payload = {
-      ...validation.payload,
-      bookingId: bookingAlias?.portalBookingId || validation.payload.bookingId,
-      driver: settings.driverValueMapping?.[validation.payload.driver] || validation.payload.driver,
-      vehicle: settings.vehicleValueMapping?.[validation.payload.vehicle] || validation.payload.vehicle,
-    };
-    const stagedSourceFingerprint = wellTransSourceFingerprint(validation.payload);
+    const current = await buildCurrentPortalPayload(job.tripId);
+    const {
+      validation, bookingAlias, payload, settings,
+      sourceFingerprint: stagedSourceFingerprint,
+    } = current;
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
     if (!page.url().startsWith(new URL(portalUrl).origin)) {
       throw new Error('Calibrated WellTrans page is not on the allowed portal host');
@@ -617,26 +865,39 @@ async function main() {
     let selectedDate = await getSelectedPortalDate(session.page);
     selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
     reviewSessionId = randomUUID();
+    const authoritative = await reconcileAuthoritativeCompletedTrips(selectedDate);
     const recovered = await recoverStaleReviewJobs(selectedDate);
+    const completedAudit = await auditCompletedPortalTrips(session.page, selectedDate);
+    lastCompletedPortalAuditAt = Date.now();
     await publishHeartbeat('calibrated');
     await db.doc('welltrans_worker_status/primary').set({
       selectedDate, calibratedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     process.stdout.write(
       `Worker calibrated to WellTrans schedule ${selectedDate}. `
-      + `${recovered} stale review trip(s) will be rebuilt in this browser session.\n`,
+      + `${recovered} stale review trip(s) and ${completedAudit.requeued} incomplete completed trip(s) `
+      + `will be rebuilt in this browser session. Authoritative coverage: `
+      + `${authoritative.expected} completed, ${authoritative.blocked} blocked.\n`,
     );
     do {
       const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
       if (activeDate !== selectedDate) {
         selectedDate = activeDate;
         reviewSessionId = randomUUID();
+        await reconcileAuthoritativeCompletedTrips(selectedDate);
         await recoverStaleReviewJobs(selectedDate);
+        await auditCompletedPortalTrips(session.page, selectedDate);
+        lastCompletedPortalAuditAt = Date.now();
         await db.doc('welltrans_worker_status/primary').set({
           selectedDate, calibratedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       }
       await publishHeartbeat('calibrated');
+      if (Date.now() - lastCompletedPortalAuditAt >= 60_000) {
+        await reconcileAuthoritativeCompletedTrips(selectedDate);
+        await auditCompletedPortalTrips(session.page, selectedDate);
+        lastCompletedPortalAuditAt = Date.now();
+      }
       const pendingJobIds = await listPendingJobIdsForDate(selectedDate);
       if (pendingJobIds.length) {
         const batchDate = selectedDate;

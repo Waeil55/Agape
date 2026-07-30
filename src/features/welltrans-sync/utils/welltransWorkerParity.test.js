@@ -41,6 +41,14 @@ const representativeTrips = [
     status: 'pending',
     dateKey: '2026-07-25',
   },
+  {
+    id: 'cancelled-with-completed-at',
+    bookingId: '107507545',
+    status: 'Cancelled',
+    operationalStatus: 'cancelled',
+    dateKey: '2026-07-27',
+    completedAt: '2026-07-27T14:49:12.036Z',
+  },
 ];
 
 describe('WellTrans standalone agent mapping parity', () => {

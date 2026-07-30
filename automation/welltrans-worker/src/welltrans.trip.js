@@ -261,8 +261,15 @@ function equalCellValue(column, actual, expected) {
 }
 
 async function openListDropdown(page) {
-  const openDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
-  if (await openDialog.count()) return true;
+  // A direct TripSpark dropdown can be visible before its lazy options have
+  // rendered. Treat the visible dialog itself as open; clicking the listbox
+  // button again at that point toggles it closed and produces a false
+  // "Dropdown was empty" failure.
+  const openDialog = page.locator('.DropDownDialog:visible').last();
+  if (await openDialog.count()) {
+    await waitForListDropdownOptions(page);
+    return true;
+  }
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
   if (!await listbox.count()) return false;
   const dropBtn = listbox.locator('.dropdlgbutton');
@@ -271,7 +278,7 @@ async function openListDropdown(page) {
   } else {
     await listbox.click({ force: true });
   }
-  await page.waitForTimeout(400);
+  await waitForListDropdownOptions(page);
   return true;
 }
 
@@ -783,6 +790,84 @@ export async function validateWellTransTrip(page, payload) {
     throw new Error(`Booking ${payload.bookingId} matched ${pickup.length} Pickup and ${dropoff.length} Dropoff rows; expected exactly one of each`);
   }
   return { selectedDate, pickupRows: pickup.length, dropoffRows: dropoff.length };
+}
+
+export async function auditWellTransTrip(page, payload, { verifyVehicle = true } = {}) {
+  const selectedDate = await getSelectedPortalDate(page);
+  if (selectedDate !== payload.serviceDate) {
+    return {
+      verified: false,
+      selectedDate,
+      mismatches: [
+        `WellTrans schedule ${selectedDate || 'unknown'} does not match trip service date ${payload.serviceDate}`,
+      ],
+    };
+  }
+
+  const grid = await openEditItinerary(page);
+  const model = await gridModel(grid, payload.bookingId);
+  const pickupRows = model.rows.filter(row => ACTIVITY_PICKUP.test(row.activity));
+  const dropoffRows = model.rows.filter(row => ACTIVITY_DROPOFF.test(row.activity));
+  if (pickupRows.length !== 1 || dropoffRows.length !== 1) {
+    await dismissActiveEditor(page);
+    return {
+      verified: false,
+      selectedDate,
+      mismatches: [
+        `Booking ${payload.bookingId} matched ${pickupRows.length} Pickup and ${dropoffRows.length} Dropoff rows; expected exactly one of each`,
+      ],
+    };
+  }
+
+  const pickup = pickupRows[0];
+  const dropoff = dropoffRows[0];
+  const expected = [
+    [pickup, 'Driver', payload.driver],
+    [pickup, 'Arrival Time', payload.pickup.arrival],
+    [pickup, 'Departure Time', payload.pickup.departure],
+    [pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0],
+    [dropoff, 'Driver', payload.driver],
+    [dropoff, 'Arrival Time', payload.dropoff.arrival],
+    [dropoff, 'Departure Time', payload.dropoff.departure],
+    [dropoff, 'Mileage/Odometer', payload.dropoff.mileage],
+  ];
+  if (verifyVehicle && payload.vehicle) {
+    expected.push(
+      [pickup, 'Vehicle', payload.vehicle],
+      [dropoff, 'Vehicle', payload.vehicle],
+    );
+  }
+  if (payload.dropoff.signatureCaptured) {
+    expected.push(
+      [pickup, 'Signature Captured?', 'Rider Signature Received'],
+      [dropoff, 'Signature Captured?', 'Rider Signature Received'],
+      [pickup, 'Signature Captured', true],
+      [dropoff, 'Signature Captured', true],
+    );
+  }
+
+  const mismatches = [];
+  const verifiedFields = [];
+  for (const [row, column, target] of expected) {
+    const actual = await readCellValue(grid, row, column);
+    if (!equalCellValue(column, actual, target)) {
+      mismatches.push(
+        `${row.activity} ${column}: expected "${target}", found "${actual}"`,
+      );
+    } else {
+      verifiedFields.push(`${normalized(row.activity)}.${column}`);
+    }
+  }
+  await dismissActiveEditor(page);
+  return {
+    verified: mismatches.length === 0,
+    selectedDate,
+    bookingId: String(payload.bookingId),
+    pickupRows: 1,
+    dropoffRows: 1,
+    verifiedFields,
+    mismatches,
+  };
 }
 
 export async function syncWellTransTrip(page, payload) {

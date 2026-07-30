@@ -13,7 +13,7 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '2.5.1';
+const REQUIRED_WORKER_VERSION = '2.6.0';
 
 export const useWellTransSync = (trips = [], serviceDate = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -35,6 +35,10 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const dateTrips = useMemo(() => trips.filter(trip =>
     serviceDate && normalizeServiceDate(trip) === serviceDate), [trips, serviceDate]);
   const completedTrips = useMemo(() => dateTrips.filter(trip => {
+    const lifecycle = [
+      trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
+    ].map(value => String(value || '').toLowerCase().trim()).join(' ');
+    if (/cancell?ed/.test(lifecycle)) return false;
     const s = String(trip.status || '').toLowerCase().trim();
     return s === 'completed' || s === 'complete' || s === 'done' || s.includes('completed') || s.includes('complete') || trip.completedAt;
   }), [dateTrips]);

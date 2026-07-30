@@ -147,7 +147,8 @@ describe('WellTrans staging safety contract', () => {
 
   it('supports TripSpark direct dropdown dialogs without a listbox wrapper', () => {
     const source = readFileSync(tripSourcePath, 'utf8');
-    expect(source).toContain("page.locator('.DropDownDialog:visible core\\\\:listitem:visible')");
+    expect(source).toContain("page.locator('.DropDownDialog:visible').last()");
+    expect(source).toContain('Treat the visible dialog itself as open');
     expect(source).toContain('await listbox.count() || await directDialog.count()');
     expect(source).toContain('if (!await listbox.count() && !await directDialog.count())');
   });
@@ -177,5 +178,24 @@ describe('WellTrans staging safety contract', () => {
     expect(source).toContain('async function recoverStaleReviewJobs(serviceDate)');
     expect(source).toContain("stage: 'requeued_for_new_review_session'");
     expect(source).toContain('item.reviewSessionId === reviewSessionId');
+  });
+
+  it('autonomously discovers every completed trip and excludes cancelled records', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    expect(worker).toContain('async function reconcileAuthoritativeCompletedTrips(serviceDate)');
+    expect(worker).toContain("db.collection('trips').get()");
+    expect(worker).toContain("source: 'authoritative_worker_completed_trip_scan'");
+    expect(worker).toContain('if (/cancell?ed/.test(lifecycle)) return false');
+    expect(worker).toContain('await reconcileAuthoritativeCompletedTrips(selectedDate)');
+  });
+
+  it('does not trust a completed log without current live portal verification', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const trip = readFileSync(tripSourcePath, 'utf8');
+    expect(trip).toContain('export async function auditWellTransTrip');
+    expect(worker).toContain('async function auditCompletedPortalTrips(page, serviceDate)');
+    expect(worker).toContain("stage: 'requeued_after_live_portal_audit'");
+    expect(worker).toContain('item.portalReviewSessionId === reviewSessionId');
+    expect(worker).toContain('Date.now() - lastCompletedPortalAuditAt >= 60_000');
   });
 });

@@ -23,6 +23,16 @@ describe('WellTrans mapping', () => {
   it('rejects incomplete records before queueing', () => {
     expect(validateTripForWellTrans({ bookingId: '1', status: 'Assigned' }).valid).toBe(false);
   });
+  it('never treats a cancelled trip as completed merely because it has completedAt', () => {
+    const result = validateTripForWellTrans({
+      bookingId: '107507545',
+      status: 'Cancelled',
+      operationalStatus: 'cancelled',
+      completedAt: '2026-07-27T14:49:12.036Z',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Trip is cancelled');
+  });
   it('allows the server to resolve an authoritative driver ID', () => {
     const result = validateTripForWellTrans({
       bookingId: '107413428', dateKey: '2026-07-25', status: 'Completed',

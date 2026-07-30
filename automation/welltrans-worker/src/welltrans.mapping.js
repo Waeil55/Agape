@@ -98,6 +98,9 @@ export const buildWellTransPayload = (trip = {}) => {
 
 export const validateTripForWellTrans = (trip = {}) => {
   const errors = [];
+  const lifecycle = [
+    trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
+  ].map(value => String(value || '').trim().toLowerCase()).join(' ');
   const payload = (() => {
     try {
       return buildWellTransPayload(trip);
@@ -106,7 +109,9 @@ export const validateTripForWellTrans = (trip = {}) => {
       return null;
     }
   })();
-  if (!['completed', 'complete'].includes(String(trip.status || '').trim().toLowerCase()) && !trip.completedAt) {
+  if (/cancell?ed/.test(lifecycle)) {
+    errors.push('Trip is cancelled');
+  } else if (!['completed', 'complete'].includes(String(trip.status || '').trim().toLowerCase()) && !trip.completedAt) {
     errors.push('Trip is not completed');
   }
   if (payload && !payload.pickup.arrival) errors.push('Pickup arrival is missing');
