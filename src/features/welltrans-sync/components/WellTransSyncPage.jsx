@@ -492,6 +492,15 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition">
             <Download size={12} className="inline mr-1" /> Logs
           </button>
+          {Number(worker?.throughputPerMinute) > 0 && (
+            <div className="ml-auto flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] font-semibold text-cyan-800">
+              <Zap size={12} />
+              Turbo {worker.throughputPerMinute} trips/min
+              {worker.estimatedMinutesRemaining != null && (
+                <span className="text-cyan-600">ETA {worker.estimatedMinutesRemaining} min</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

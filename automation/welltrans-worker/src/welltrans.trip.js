@@ -144,14 +144,83 @@ async function gridModel(grid, bookingId) {
   return { rows: [...matchedRows.values()] };
 }
 
-async function scrollGridTo(grid, offset) {
-  await grid.evaluate((element, scrollOffset) => {
+export async function buildWellTransGridIndex(page, expectedServiceDate) {
+  const selectedDate = await getSelectedPortalDate(page);
+  if (expectedServiceDate && selectedDate !== expectedServiceDate) {
+    throw new Error(
+      `Cannot index WellTrans schedule ${selectedDate || 'unknown'} for requested date ${expectedServiceDate}`,
+    );
+  }
+  const grid = await openEditItinerary(page);
+  const positions = await grid.evaluate((element) => {
     for (const scroller of element.querySelectorAll('.GridScroller')) {
+      if (scroller.scrollHeight <= scroller.clientHeight) return [0];
+      const result = [0];
+      const step = Math.max(50, Math.floor(scroller.clientHeight * 0.8));
+      for (let position = step; position < scroller.scrollHeight; position += step) {
+        result.push(position);
+      }
+      result.push(scroller.scrollHeight);
+      return result;
+    }
+    return [0];
+  });
+  const rowsByBooking = new Map();
+  for (const scrollOffset of positions) {
+    await scrollGridTo(grid, scrollOffset);
+    const visible = await visibleGridRows(grid);
+    const visibleByBooking = new Map();
+    for (const row of visible) {
+      const booking = normalizeBooking(row.bookingRaw);
+      if (!booking) continue;
+      if (!visibleByBooking.has(booking)) visibleByBooking.set(booking, []);
+      visibleByBooking.get(booking).push({ ...row, scrollOffset });
+    }
+    for (const [booking, rows] of visibleByBooking) {
+      const current = rowsByBooking.get(booking) || [];
+      // Overlapping virtual-grid windows show the same booking more than once.
+      // Keep the observation with the most rows so genuine duplicate
+      // Pickup/Dropoff rows remain visible to fail-closed validation.
+      if (rows.length > current.length) {
+        rowsByBooking.set(booking, rows);
+      } else {
+        const merged = [...current];
+        for (const row of rows) {
+          if (!merged.some(item => normalized(item.activity) === normalized(row.activity))) {
+            merged.push(row);
+          }
+        }
+        rowsByBooking.set(booking, merged);
+      }
+    }
+  }
+  return {
+    selectedDate,
+    rowsByBooking,
+    bookingCount: rowsByBooking.size,
+    rowCount: [...rowsByBooking.values()].reduce((total, rows) => total + rows.length, 0),
+    builtAt: Date.now(),
+  };
+}
+
+const indexedGridModel = (gridIndex, bookingId) => {
+  if (!gridIndex?.rowsByBooking) return null;
+  return {
+    rows: gridIndex.rowsByBooking.get(normalizeBooking(bookingId)) || [],
+  };
+};
+
+async function scrollGridTo(grid, offset) {
+  const changed = await grid.evaluate((element, scrollOffset) => {
+    let didChange = false;
+    for (const scroller of element.querySelectorAll('.GridScroller')) {
+      if (Math.abs(scroller.scrollTop - scrollOffset) > 1) didChange = true;
       scroller.scrollTop = scrollOffset;
       scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
     }
+    return didChange;
   }, offset);
-  await new Promise(resolve => setTimeout(resolve, 200));
+  if (changed) await new Promise(resolve => setTimeout(resolve, 120));
 }
 
 async function visibleGridRows(grid) {
@@ -792,7 +861,11 @@ export async function validateWellTransTrip(page, payload) {
   return { selectedDate, pickupRows: pickup.length, dropoffRows: dropoff.length };
 }
 
-export async function auditWellTransTrip(page, payload, { verifyVehicle = true } = {}) {
+export async function auditWellTransTrip(
+  page,
+  payload,
+  { verifyVehicle = true, gridIndex = null } = {},
+) {
   const selectedDate = await getSelectedPortalDate(page);
   if (selectedDate !== payload.serviceDate) {
     return {
@@ -805,7 +878,8 @@ export async function auditWellTransTrip(page, payload, { verifyVehicle = true }
   }
 
   const grid = await openEditItinerary(page);
-  const model = await gridModel(grid, payload.bookingId);
+  const model = indexedGridModel(gridIndex, payload.bookingId)
+    || await gridModel(grid, payload.bookingId);
   const pickupRows = model.rows.filter(row => ACTIVITY_PICKUP.test(row.activity));
   const dropoffRows = model.rows.filter(row => ACTIVITY_DROPOFF.test(row.activity));
   if (pickupRows.length !== 1 || dropoffRows.length !== 1) {
@@ -870,7 +944,7 @@ export async function auditWellTransTrip(page, payload, { verifyVehicle = true }
   };
 }
 
-export async function syncWellTransTrip(page, payload) {
+export async function syncWellTransTrip(page, payload, _fieldMapping = {}, gridIndex = null) {
   const selectedDate = await getSelectedPortalDate(page);
   if (selectedDate !== payload.serviceDate) {
     throw safePreflightError(
@@ -879,7 +953,8 @@ export async function syncWellTransTrip(page, payload) {
   }
 
   const grid = await openEditItinerary(page);
-  const model = await gridModel(grid, payload.bookingId);
+  const model = indexedGridModel(gridIndex, payload.bookingId)
+    || await gridModel(grid, payload.bookingId);
   const pickupRows = model.rows.filter(row => ACTIVITY_PICKUP.test(row.activity));
   const dropoffRows = model.rows.filter(row => ACTIVITY_DROPOFF.test(row.activity));
   if (pickupRows.length !== 1 || dropoffRows.length !== 1) {

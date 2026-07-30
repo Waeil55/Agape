@@ -12,6 +12,7 @@ import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
 import {
   auditWellTransTrip,
+  buildWellTransGridIndex,
   getSelectedPortalDate,
   syncWellTransTrip,
   validateWellTransTrip,
@@ -37,10 +38,12 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.0.0';
+const workerVersion = '3.1.0';
 let requestedServiceDate = '';
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
+let portalGridIndex = null;
+const stagingDurations = [];
 const firestorePageSize = Math.min(
   1000,
   Math.max(100, Number(process.env.WELLTRANS_FIRESTORE_PAGE_SIZE) || 500),
@@ -55,6 +58,11 @@ const heartbeatPayload = state => ({
   version: workerVersion, requestedDate: requestedServiceDate || null,
   reviewSessionId: reviewSessionId || null,
   workerInstanceId,
+  indexedBookings: portalGridIndex?.bookingCount || 0,
+  indexedRows: portalGridIndex?.rowCount || 0,
+  throughputPerMinute: stagingDurations.length
+    ? Number((60_000 / (stagingDurations.reduce((sum, value) => sum + value, 0) / stagingDurations.length)).toFixed(1))
+    : 0,
 });
 const publishHeartbeat = (state = 'online') => Promise.all([
   db.doc('welltrans_worker_status/primary').set(heartbeatPayload(state), { merge: true }),
@@ -299,6 +307,17 @@ async function publishDateReviewSummary(serviceDate) {
     selectedDate: serviceDate,
     reviewSummary: { ...summary, verified, coverageComplete },
     reviewSummaryAt: FieldValue.serverTimestamp(),
+    indexedBookings: portalGridIndex?.bookingCount || 0,
+    indexedRows: portalGridIndex?.rowCount || 0,
+    averageTripMs: stagingDurations.length
+      ? Math.round(stagingDurations.reduce((sum, value) => sum + value, 0) / stagingDurations.length)
+      : 0,
+    throughputPerMinute: stagingDurations.length
+      ? Number((60_000 / (stagingDurations.reduce((sum, value) => sum + value, 0) / stagingDurations.length)).toFixed(1))
+      : 0,
+    estimatedMinutesRemaining: stagingDurations.length
+      ? Number(((summary.pending * (stagingDurations.reduce((sum, value) => sum + value, 0) / stagingDurations.length)) / 60_000).toFixed(1))
+      : null,
   };
   const writes = [db.doc('welltrans_worker_status/primary').set(update, { merge: true })];
   if (manifestSnapshot.exists) {
@@ -624,6 +643,7 @@ async function auditCompletedPortalTrips(page, serviceDate) {
         /vehicle was left unchanged because no unique exact WellTrans match/i.test(String(warning)));
       const portalAudit = await auditWellTransTrip(page, current.payload, {
         verifyVehicle: !vehicleWasIntentionallySkipped,
+        gridIndex: portalGridIndex,
       });
       const sourceChanged = Boolean(
         item.data.stagedSourceFingerprint
@@ -678,6 +698,7 @@ async function processJob(job, existingSession = null) {
     throw new Error('WellTrans staging requires a calibrated headed browser session so an operator can review every field before Apply.');
   }
   const page = existingSession.page;
+  const stagingStartedAt = Date.now();
   try {
     const current = await buildCurrentPortalPayload(job.tripId);
     const {
@@ -696,7 +717,12 @@ async function processJob(job, existingSession = null) {
       bookingAliasId: bookingAlias?.id || FieldValue.delete(),
       bookingMatchMethod: bookingAlias?.matchMethod || 'exact_booking_id',
     });
-    const result = await syncWellTransTrip(page, payload, settings.fieldMapping || {});
+    const result = await syncWellTransTrip(
+      page,
+      payload,
+      settings.fieldMapping || {},
+      portalGridIndex,
+    );
     await job.ref.update({
       status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
@@ -707,6 +733,8 @@ async function processJob(job, existingSession = null) {
       ),
       workerVersion, reviewSessionId,
     });
+    stagingDurations.push(Date.now() - stagingStartedAt);
+    if (stagingDurations.length > 50) stagingDurations.shift();
     return { success: true, safeToContinue: true };
   } catch (error) {
     let screenshot = '';
@@ -984,6 +1012,7 @@ async function main() {
     selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
     await waitForDateLease(selectedDate);
     reviewSessionId = randomUUID();
+    portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
     const authoritative = await reconcileAuthoritativeCompletedTrips(selectedDate);
     const recovered = await recoverStaleReviewJobs(selectedDate);
     const completedAudit = await auditCompletedPortalTrips(session.page, selectedDate);
@@ -1004,6 +1033,7 @@ async function main() {
         selectedDate = activeDate;
         await waitForDateLease(selectedDate);
         reviewSessionId = randomUUID();
+        portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
         await reconcileAuthoritativeCompletedTrips(selectedDate);
         await recoverStaleReviewJobs(selectedDate);
         await auditCompletedPortalTrips(session.page, selectedDate);
