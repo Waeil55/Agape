@@ -15,7 +15,7 @@ initializeApp({
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.3.9';
+const workerVersion = '2.4.0';
 let requestedServiceDate = '';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
@@ -168,6 +168,23 @@ async function publishDateReviewSummary(serviceDate) {
   return summary;
 }
 
+async function resolveBookingAlias(sourceBookingId, serviceDate) {
+  const snapshot = await db.doc(`welltrans_booking_aliases/${sourceBookingId}`).get();
+  if (!snapshot.exists) return null;
+  const alias = snapshot.data() || {};
+  const portalBookingId = String(alias.portalBookingId || '').trim();
+  const valid = alias.status === 'active'
+    && alias.provider === 'welltrans'
+    && String(alias.sourceBookingId || '') === String(sourceBookingId)
+    && String(alias.serviceDate || '').slice(0, 10) === serviceDate
+    && /^\d+$/.test(portalBookingId)
+    && alias.matchMethod === 'supervised_unique_composite';
+  if (!valid) {
+    throw new Error(`WellTrans booking alias for ${sourceBookingId} failed integrity validation`);
+  }
+  return { id: snapshot.id, portalBookingId, matchMethod: alias.matchMethod };
+}
+
 async function processJob(job, existingSession = null) {
   if (!existingSession?.browser || !existingSession?.page) {
     throw new Error('WellTrans staging requires a calibrated headed browser session so an operator can review every field before Apply.');
@@ -186,8 +203,13 @@ async function processJob(job, existingSession = null) {
     };
     const validation = validateTripForWellTrans(hydratedTrip);
     if (!validation.valid) throw new Error(`Source trip is not ready: ${validation.errors.join('; ')}`);
+    const bookingAlias = await resolveBookingAlias(
+      validation.payload.bookingId,
+      validation.payload.serviceDate,
+    );
     const payload = {
       ...validation.payload,
+      bookingId: bookingAlias?.portalBookingId || validation.payload.bookingId,
       driver: settings.driverValueMapping?.[validation.payload.driver] || validation.payload.driver,
       vehicle: settings.vehicleValueMapping?.[validation.payload.vehicle] || validation.payload.vehicle,
     };
@@ -195,7 +217,14 @@ async function processJob(job, existingSession = null) {
     if (!page.url().startsWith(new URL(portalUrl).origin)) {
       throw new Error('Calibrated WellTrans page is not on the allowed portal host');
     }
-    await job.ref.update({ stage: 'matching_booking', updatedAt: FieldValue.serverTimestamp() });
+    await job.ref.update({
+      stage: 'matching_booking',
+      updatedAt: FieldValue.serverTimestamp(),
+      sourceBookingId: validation.payload.bookingId,
+      portalBookingId: payload.bookingId,
+      bookingAliasId: bookingAlias?.id || FieldValue.delete(),
+      bookingMatchMethod: bookingAlias?.matchMethod || 'exact_booking_id',
+    });
     const result = await syncWellTransTrip(page, payload, settings.fieldMapping || {});
     await job.ref.update({
       status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),

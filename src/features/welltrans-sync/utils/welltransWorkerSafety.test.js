@@ -47,6 +47,15 @@ describe('WellTrans staging safety contract', () => {
     expect(source).toContain('failed_review_close_required');
   });
 
+  it('accepts only integrity-checked supervised booking aliases', () => {
+    const source = readFileSync(workerSourcePath, 'utf8');
+    expect(source).toContain('async function resolveBookingAlias(sourceBookingId, serviceDate)');
+    expect(source).toContain("alias.matchMethod === 'supervised_unique_composite'");
+    expect(source).toContain("alias.provider === 'welltrans'");
+    expect(source).toContain('bookingId: bookingAlias?.portalBookingId || validation.payload.bookingId');
+    expect(source).toContain("bookingMatchMethod: bookingAlias?.matchMethod || 'exact_booking_id'");
+  });
+
   it('treats TripSpark listboxes as exact-option editors before their internal text inputs', () => {
     const source = readFileSync(tripSourcePath, 'utf8');
     const setTextCell = source.slice(
