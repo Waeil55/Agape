@@ -21,6 +21,10 @@ Preferred:
    automatically; there is no terminal window and no Enter-key confirmation.
 5. If the WellTrans portal is displaying another schedule, the agent opens the
    schedule chooser and pauses until the exact requested date is visible.
+6. Use the **Agape WellTrans Console** inside the Playwright window to
+   reconcile and fill the opened date, switch to an exact manual date, refresh
+   the virtual-grid index, pause/resume automatic filling, or verify every
+   staged field. The opened date is detected automatically.
 
 The optional **Setup EXE** provides a graphical installer on Windows computers
 whose Application Control policy permits organization utilities. Normal agent
@@ -59,9 +63,12 @@ the exact requested WellTrans date is visible.
   operator to click **Close**, never **Apply**.
 - Every staged cell is re-located in the virtual grid and verified before the
   trip is marked ready for review.
+- Before showing the green review-ready state, Agent 3.4 performs an exhaustive
+  second pass across every staged trip. Mismatches and changed Agape source
+  records are requeued and repaired automatically before review.
 - The worker never clicks **Apply** or **Close**. An operator reviews every
   staged field and clicks **Apply**. When the itinerary dialog closes, Agent
-  3.3 reads every affected portal row back, marks only persisted values
+  3.4 reads every affected portal row back, marks only persisted values
   complete, and requeues anything that was closed without being saved.
 - A safe preflight failure or verified rollback does not stop later trips.
   An unverified rollback stops the batch immediately.
@@ -76,6 +83,10 @@ the exact requested WellTrans date is visible.
 - Each Agent publishes an independent heartbeat. The selected service date is
   protected by a renewable fencing lease, so a standby computer can take over
   only after the active owner stops renewing.
+- Turbo mode is enabled by default. It caches portal editor capabilities only
+  after they have been proven in the current schedule, uses adaptive editor
+  readiness checks, and still verifies the exact row after every write.
+  Set `WELLTRANS_TURBO_MODE=false` only for portal diagnostics.
 
 ## Enterprise verification
 

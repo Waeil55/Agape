@@ -11,6 +11,10 @@ const workerSourcePath = fileURLToPath(new URL(
   '../../../../automation/welltrans-worker/src/index.js',
   import.meta.url,
 ));
+const operatorConsolePath = fileURLToPath(new URL(
+  '../../../../automation/welltrans-worker/src/welltrans.operator-console.js',
+  import.meta.url,
+));
 const functionsSourcePath = fileURLToPath(new URL(
   '../../../../functions/index.js',
   import.meta.url,
@@ -237,5 +241,46 @@ describe('WellTrans staging safety contract', () => {
     expect(backend).toContain('blockedDateCount');
     expect(backend).toContain('welltrans.operations.health_changed');
     expect(rules).toContain('match /welltrans_operations/{document}');
+  });
+
+  it('provides an in-browser operator console with automatic and manual date controls', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
+    expect(operatorConsole).toContain('Reconcile & Fill Opened Date');
+    expect(operatorConsole).toContain('Verify Every Field');
+    expect(operatorConsole).toContain('Use Opened Date');
+    expect(operatorConsole).toContain('Switch & Fill');
+    expect(worker).toContain('await installWellTransOperatorConsole(session.page, handleOperatorCommand)');
+    expect(worker).toContain('operatorControl.dateOverride');
+    expect(worker).toContain('return currentDate;');
+  });
+
+  it('runs an exhaustive pre-Apply audit and automatically repairs mismatched trips', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    expect(worker).toContain('async function auditStagedReviewBatch(page, serviceDate)');
+    expect(worker).toContain("stage: 'requeued_by_pre_apply_exhaustive_audit'");
+    expect(worker).toContain("state: 'verifying_every_field'");
+    expect(worker).toContain('finalReviewAuditValid');
+    expect(worker).toContain('verifiedFields');
+  });
+
+  it('keeps Apply and Close as explicit human-only actions', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
+    expect(operatorConsole).toContain('HUMAN APPLY ONLY');
+    expect(operatorConsole).toContain('never clicks Apply or Close');
+    expect(operatorConsole).not.toContain("data-action=\"apply\"");
+    expect(operatorConsole).not.toContain("data-action=\"close\"");
+    expect(worker).not.toMatch(/getByRole\(['"]button['"],\s*\{\s*name:\s*['"]Apply/);
+    expect(worker).not.toMatch(/locator\(['"][^'"]*Apply[^'"]*['"]\)\.click/);
+  });
+
+  it('uses session-proven editor capabilities and adaptive turbo waits', () => {
+    const trip = readFileSync(tripSourcePath, 'utf8');
+    expect(trip).toContain("const TURBO_MODE = process.env.WELLTRANS_TURBO_MODE !== 'false'");
+    expect(trip).toContain('provenEditorCapabilities');
+    expect(trip).toContain('capabilityCacheHit: true');
+    expect(trip).toContain('async function waitForEditorSurface');
+    expect(trip).toContain('export function resetWellTransSessionCaches()');
   });
 });

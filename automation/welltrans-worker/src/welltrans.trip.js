@@ -3,7 +3,20 @@ const REQUIRED_COLUMNS = [
   'Booking Id', 'Activity', 'Driver', 'Vehicle', 'Arrival Time',
   'Departure Time', 'Mileage/Odometer', 'Signature Captured?', 'Signature Captured',
 ];
-const GRID_COLUMNS = [...REQUIRED_COLUMNS];
+const GRID_COLUMNS = [...REQUIRED_COLUMNS, 'Is Read Only'];
+const TURBO_MODE = process.env.WELLTRANS_TURBO_MODE !== 'false';
+const TURBO_SETTLE_MS = Math.max(
+  15,
+  Math.min(150, Number(process.env.WELLTRANS_TURBO_SETTLE_MS) || 35),
+);
+const provenEditorCapabilities = new Map();
+
+const settleUi = (page, normalMs, turboMs = TURBO_SETTLE_MS) =>
+  page.waitForTimeout(TURBO_MODE ? turboMs : normalMs);
+
+export function resetWellTransSessionCaches() {
+  provenEditorCapabilities.clear();
+}
 
 const ACTIVITY_PICKUP = /^(pickup|pick\s*up|pu)$/i;
 const ACTIVITY_DROPOFF = /^(dropoff|drop\s*off|do|drop)$/i;
@@ -364,8 +377,21 @@ async function dismissActiveEditor(page) {
   );
   for (let attempt = 0; attempt < 3 && await activeEditor.count(); attempt += 1) {
     await page.keyboard.press('Escape').catch(() => {});
-    await page.waitForTimeout(100);
+    await settleUi(page, 100, 20);
   }
+}
+
+async function waitForEditorSurface(page, timeoutMs = 1500) {
+  const selector = [
+    '.EditorWidgets input:not([style*="z-index: -1"]):visible',
+    '.EditorWidgets select:visible',
+    '.EditorWidgets textarea:visible',
+    '.EditorWidgets core\\:listbox:visible',
+    '.DropDownDialog:visible',
+  ].join(', ');
+  const surface = page.locator(selector).last();
+  await surface.waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => {});
+  return surface.count();
 }
 
 async function getListDropdownOptions(page, { strict = false } = {}) {
@@ -430,10 +456,11 @@ async function getListDropdownOptions(page, { strict = false } = {}) {
 
 async function waitForListDropdownOptions(page, options = {}) {
   let values = [];
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  const attempts = TURBO_MODE ? 30 : 8;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     values = await getListDropdownOptions(page, options);
     if (values.length) return values;
-    await page.waitForTimeout(250);
+    await settleUi(page, 250, 40);
   }
   return values;
 }
@@ -470,7 +497,7 @@ async function clickListOption(page, optionText) {
     // Use Playwright's trusted pointer sequence. TripSpark's custom list
     // controller ignores HTMLElement.click() for some listbox releases.
     await pointerCandidates[0].candidate.click({ force: true });
-    await page.waitForTimeout(200);
+    await settleUi(page, 200);
     return true;
   }
 
@@ -550,7 +577,7 @@ async function selectListOption(page, option, column) {
 
   const clicked = await clickListOption(page, optionStr);
   if (clicked) {
-    await page.waitForTimeout(200);
+    await settleUi(page, 200);
     return;
   }
 
@@ -562,7 +589,7 @@ async function selectListOption(page, option, column) {
   if (filteredOptions.length) {
     const exactFiltered = findUniqueExactOption(filteredOptions, optionStr);
     if (exactFiltered && await clickListOption(page, exactFiltered)) {
-      await page.waitForTimeout(200);
+      await settleUi(page, 200);
       return;
     }
     availableOptions = [...new Set([...availableOptions, ...filteredOptions])];
@@ -578,7 +605,7 @@ async function selectListOption(page, option, column) {
   if (partialMatch) {
     const clickedPartial = await clickListOption(page, partialMatch);
     if (clickedPartial) {
-      await page.waitForTimeout(200);
+      await settleUi(page, 200);
       return;
     }
   }
@@ -603,7 +630,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await dismissActiveEditor(page);
     await cell.dblclick({ force: true });
-    await page.waitForTimeout(250);
+    await waitForEditorSurface(page);
 
     const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
     const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
@@ -614,12 +641,12 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
       try {
         await selectListOption(page, value, column);
         await page.keyboard.press('Tab');
-        await page.waitForTimeout(200);
+        await settleUi(page, 200);
         await dismissActiveEditor(page);
         return true;
       } catch (error) {
         await page.keyboard.press('Escape').catch(() => {});
-        await page.waitForTimeout(100);
+        await settleUi(page, 100, 20);
         if (column !== 'Vehicle') throw error;
         return false;
       }
@@ -628,17 +655,17 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
     if (await editor.count()) {
       await editor.click();
       await editor.fill('');
-      await page.waitForTimeout(50);
+      await settleUi(page, 50, 15);
       await editor.fill(String(value));
-      await page.waitForTimeout(150);
+      await settleUi(page, 150);
       await page.keyboard.press('Tab');
-      await page.waitForTimeout(200);
+      await settleUi(page, 200);
       await dismissActiveEditor(page);
       return true;
     }
 
     await page.keyboard.press('Escape').catch(() => {});
-    await page.waitForTimeout(150);
+    await settleUi(page, 150);
   }
   if (column === 'Vehicle') return false;
   throw new Error(`${column} editor did not open for ${row.activity}`);
@@ -657,7 +684,7 @@ async function setListCell(page, grid, row, column, option) {
 
   await dismissActiveEditor(page);
   await cell.dblclick({ force: true });
-  await page.waitForTimeout(250);
+  await waitForEditorSurface(page);
 
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible');
   const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
@@ -668,7 +695,7 @@ async function setListCell(page, grid, row, column, option) {
   await openListDropdown(page);
   await selectListOption(page, option, column);
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(250);
+  await settleUi(page, 250);
 
   const selected = await cell.evaluate(element =>
     String(element.title || element.textContent || '').trim());
@@ -685,6 +712,9 @@ const safePreflightError = error => {
   return error;
 };
 
+const capabilityKey = (column, value, kind) =>
+  `${kind}|${normalized(column)}|${kind === 'list' ? normalized(value) : '*'}`;
+
 async function preflightCell(page, grid, row, column, value, {
   required = false,
   optionalExactList = false,
@@ -700,6 +730,40 @@ async function preflightCell(page, grid, row, column, value, {
       row, column, original, target: value, kind: 'unchanged', needsWrite: false,
     };
   }
+  const readOnlyState = normalized(row.values?.['Is Read Only']);
+  if (['true', 'yes', 'checked', '1', 'on'].includes(readOnlyState)) {
+    throw safePreflightError(new Error(
+      `Booking ${row.bookingRaw} ${row.activity} is read-only in WellTrans`,
+    ));
+  }
+
+  const expectedKind = ['Driver', 'Vehicle', 'Signature Captured?'].includes(column)
+    ? 'list'
+    : 'text';
+  const cached = provenEditorCapabilities.get(capabilityKey(column, value, expectedKind));
+  if (cached) {
+    if (cached.skip) {
+      return {
+        skip: true,
+        row,
+        column,
+        original,
+        reason: cached.reason,
+        availableOptions: cached.availableOptions || [],
+        capabilityCacheHit: true,
+      };
+    }
+    return {
+      row,
+      column,
+      original,
+      target: cached.target ?? value,
+      kind: expectedKind,
+      needsWrite: true,
+      optionalExactList,
+      capabilityCacheHit: true,
+    };
+  }
 
   const colLeft = await resolveColumnLeft(grid, column);
   if (colLeft === null) {
@@ -713,7 +777,7 @@ async function preflightCell(page, grid, row, column, value, {
 
   await dismissActiveEditor(page);
   await cell.dblclick({ force: true });
-  await page.waitForTimeout(250);
+  await waitForEditorSurface(page);
   const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
 
@@ -733,6 +797,12 @@ async function preflightCell(page, grid, row, column, value, {
 
     if (!exactMatch) {
       if (optionalExactList) {
+        provenEditorCapabilities.set(capabilityKey(column, value, 'list'), {
+          skip: true,
+          reason: 'no_unique_exact_match',
+          availableOptions: options.slice(0, 20),
+          provenAt: Date.now(),
+        });
         return {
           skip: true, row, column, original, reason: 'no_unique_exact_match',
           availableOptions: options.slice(0, 20),
@@ -743,6 +813,10 @@ async function preflightCell(page, grid, row, column, value, {
         + `${options.length ? ` Available: ${options.slice(0, 20).join(', ')}` : ' Dropdown was empty.'}`,
       ));
     }
+    provenEditorCapabilities.set(capabilityKey(column, value, 'list'), {
+      target: exactMatch,
+      provenAt: Date.now(),
+    });
     return {
       row, column, original, target: exactMatch, kind: 'list', needsWrite: true,
       optionalExactList,
@@ -757,13 +831,17 @@ async function preflightCell(page, grid, row, column, value, {
       }
       throw safePreflightError(new Error(`${column} exact-option editor was unavailable for ${row.activity}`));
     }
+    provenEditorCapabilities.set(capabilityKey(column, value, 'text'), {
+      target: value,
+      provenAt: Date.now(),
+    });
     return {
       row, column, original, target: value, kind: 'text', needsWrite: true,
     };
   }
 
   await page.keyboard.press('Escape').catch(() => {});
-  await page.waitForTimeout(100);
+  await settleUi(page, 100, 20);
   throw safePreflightError(new Error(`${column} editor did not open for ${row.activity}`));
 }
 

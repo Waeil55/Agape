@@ -7,14 +7,19 @@ import {
 } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
+import {
+  installWellTransOperatorConsole,
+  updateWellTransOperatorConsole,
+} from './welltrans.operator-console.js';
 import {
   auditWellTransTrip,
   buildWellTransGridIndex,
   getSelectedPortalDate,
   isEditItineraryOpen,
+  resetWellTransSessionCaches,
   syncWellTransTrip,
   validateWellTransTrip,
 } from './welltrans.trip.js';
@@ -39,13 +44,22 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.3.0';
+const workerVersion = '3.4.0';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
 let lastAuthoritativeReconcileAt = 0;
 let portalGridIndex = null;
+let finalReviewAuditValid = false;
+const operatorControl = {
+  autoRun: true,
+  dateOverride: null,
+  forceReconcile: false,
+  forceVerify: false,
+  forceReindex: false,
+  message: 'Automatically detecting the opened WellTrans date.',
+};
 const stagingDurations = [];
 const firestorePageSize = Math.min(
   1000,
@@ -132,6 +146,76 @@ const readRequestedServiceDate = async () => {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
 };
 
+const readEffectiveRequestedServiceDate = async () => (
+  operatorControl.dateOverride === null
+    ? readRequestedServiceDate()
+    : operatorControl.dateOverride
+);
+
+async function persistRequestedServiceDate(value) {
+  if (!process.env.WELLTRANS_REQUEST_FILE) return;
+  await writeFile(process.env.WELLTRANS_REQUEST_FILE, value ? `${value}\n` : '', 'utf8');
+}
+
+async function handleOperatorCommand(action, payload = {}) {
+  if (action === 'pause') {
+    operatorControl.autoRun = !operatorControl.autoRun;
+    operatorControl.message = operatorControl.autoRun
+      ? 'Automatic reconciliation resumed.'
+      : 'Paused safely. The current field will finish; no new trip will start.';
+  } else if (action === 'reconcile') {
+    operatorControl.autoRun = true;
+    operatorControl.forceReconcile = true;
+    operatorControl.forceReindex = true;
+    operatorControl.message = 'Reconciliation and complete-date fill queued.';
+  } else if (action === 'verify') {
+    operatorControl.forceVerify = true;
+    operatorControl.message = 'Exhaustive field verification queued.';
+  } else if (action === 'reindex') {
+    operatorControl.forceReindex = true;
+    operatorControl.message = 'Portal grid re-index queued.';
+  } else if (action === 'detect-date') {
+    operatorControl.dateOverride = '';
+    requestedServiceDate = '';
+    await persistRequestedServiceDate('');
+    operatorControl.forceReconcile = true;
+    operatorControl.forceReindex = true;
+    operatorControl.autoRun = true;
+    operatorControl.message = 'Following the date currently opened in WellTrans.';
+  } else if (action === 'switch-date') {
+    const serviceDate = String(payload.serviceDate || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
+      throw new Error('Choose a valid service date first.');
+    }
+    operatorControl.dateOverride = serviceDate;
+    requestedServiceDate = serviceDate;
+    await persistRequestedServiceDate(serviceDate);
+    operatorControl.forceReconcile = true;
+    operatorControl.forceReindex = true;
+    operatorControl.autoRun = true;
+    operatorControl.message = `Switching to ${serviceDate}; if a review dialog is open, review and close it manually first.`;
+  } else {
+    throw new Error(`Unsupported operator command: ${action}`);
+  }
+  return { accepted: true, message: operatorControl.message };
+}
+
+async function updateOperatorConsole(page, summary = {}, extra = {}) {
+  await updateWellTransOperatorConsole(page, {
+    selectedDate: activeServiceDate || requestedServiceDate || '',
+    state: extra.state || (operatorControl.autoRun ? 'online' : 'paused'),
+    message: extra.message || operatorControl.message,
+    autoRun: operatorControl.autoRun,
+    expected: summary.expected ?? summary.authoritativeCompleted ?? 0,
+    completed: summary.completed ?? 0,
+    staged: summary.staged ?? 0,
+    pending: summary.pending ?? 0,
+    failed: summary.failed ?? 0,
+    blocked: summary.blocked ?? 0,
+    missing: summary.missing ?? 0,
+  });
+}
+
 const readVisiblePortalDate = async (page, fallback = '') => {
   const runName = await page.locator('.RunName').last().innerText({ timeout: 1500 }).catch(() => '');
   const match = String(runName).match(/\[(\d{2})-(\d{2})-(\d{4})\]/);
@@ -173,19 +257,14 @@ async function selectExactRequestedSchedule(page, serviceDate) {
 }
 
 async function waitForRequestedSchedule(page, selectedDate) {
-  requestedServiceDate = await readRequestedServiceDate();
-  if (!requestedServiceDate || requestedServiceDate === selectedDate) return selectedDate;
-
-  const scheduleControl = page.locator('.ChangeSchedule[title="Select Schedule"]:visible').last();
-  if (await scheduleControl.count()) {
-    await scheduleControl.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(400);
-    await selectExactRequestedSchedule(page, requestedServiceDate).catch(() => false);
-  }
-
+  let lastAutomaticSelectionAttempt = 0;
   while (page.context().browser()?.isConnected()) {
-    const currentDate = await readVisiblePortalDate(page, selectedDate);
-    requestedServiceDate = await readRequestedServiceDate() || requestedServiceDate;
+    const currentDate = await readVisiblePortalDate(page, selectedDate)
+      || await getSelectedPortalDate(page).catch(() => selectedDate);
+    requestedServiceDate = await readEffectiveRequestedServiceDate();
+    if (!requestedServiceDate) {
+      return currentDate;
+    }
     if (currentDate === requestedServiceDate) {
       await db.doc('welltrans_worker_status/primary').set({
         state: 'connecting', selectedDate: currentDate, requestedDate: requestedServiceDate,
@@ -193,11 +272,30 @@ async function waitForRequestedSchedule(page, selectedDate) {
       }, { merge: true });
       return currentDate;
     }
+    const editOpen = await isEditItineraryOpen(page);
+    if (!editOpen && Date.now() - lastAutomaticSelectionAttempt >= 3000) {
+      lastAutomaticSelectionAttempt = Date.now();
+      const scheduleControl = page.locator('.ChangeSchedule[title="Select Schedule"]:visible').last();
+      if (await scheduleControl.count()) {
+        await scheduleControl.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(100);
+        await selectExactRequestedSchedule(page, requestedServiceDate).catch(() => false);
+      }
+    }
+    operatorControl.message = editOpen
+      ? `Opened date is ${currentDate}. Review and manually Apply or Close the current itinerary before switching to ${requestedServiceDate}.`
+      : `Selecting ${requestedServiceDate}; opened date is ${currentDate}.`;
     await db.doc('welltrans_worker_status/primary').set({
-      state: 'date_selection_required', selectedDate: currentDate,
+      state: editOpen ? 'date_change_waiting_for_manual_review' : 'date_selection_required',
+      selectedDate: currentDate,
       requestedDate: requestedServiceDate, lastSeenAt: FieldValue.serverTimestamp(),
     }, { merge: true });
-    await sleep(1000);
+    activeServiceDate = currentDate;
+    await updateOperatorConsole(page, {}, {
+      state: editOpen ? 'manual_review_required' : 'switching_date',
+      message: operatorControl.message,
+    });
+    await sleep(500);
   }
   throw new Error('The WellTrans browser closed before the requested schedule was selected.');
 }
@@ -720,6 +818,98 @@ async function auditCompletedPortalTrips(page, serviceDate) {
   return result;
 }
 
+async function auditStagedReviewBatch(page, serviceDate) {
+  const documents = await loadAllLogsForDate(serviceDate);
+  const staged = documents.filter(document => {
+    const data = document.data();
+    return data.status === 'awaiting_review' && data.reviewSessionId === reviewSessionId;
+  });
+  const result = {
+    checked: 0,
+    verified: 0,
+    requeued: 0,
+    failed: 0,
+    verifiedFields: 0,
+  };
+  for (const document of staged) {
+    const data = document.data();
+    result.checked += 1;
+    try {
+      const current = await buildCurrentPortalPayload(data.tripId);
+      if (current.validation.payload.serviceDate !== serviceDate) {
+        throw new Error(
+          `Source trip belongs to ${current.validation.payload.serviceDate}, not ${serviceDate}`,
+        );
+      }
+      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const vehicleWasIntentionallySkipped = warnings.some(warning =>
+        /vehicle was left unchanged because no unique exact WellTrans match/i.test(String(warning)));
+      const portalAudit = await auditWellTransTrip(page, current.payload, {
+        verifyVehicle: !vehicleWasIntentionallySkipped,
+        gridIndex: portalGridIndex,
+      });
+      const sourceChanged = Boolean(
+        data.stagedSourceFingerprint
+        && data.stagedSourceFingerprint !== current.sourceFingerprint
+      );
+      if (!portalAudit.verified || sourceChanged) {
+        const reasons = [
+          ...(portalAudit.mismatches || []),
+          ...(sourceChanged ? ['Agape source data changed after staging'] : []),
+        ];
+        await commitSyncTransition(document.ref, {
+          status: 'pending',
+          stage: 'requeued_by_pre_apply_exhaustive_audit',
+          errorMessage: '',
+          completedAt: FieldValue.delete(),
+          portalVerification: FieldValue.delete(),
+          preApplyMismatch: reasons.slice(0, 30),
+          queuedSourceFingerprint: current.sourceFingerprint,
+          updatedAt: FieldValue.serverTimestamp(),
+          workerVersion,
+        }, {
+          tripId: data.tripId,
+          bookingId: data.bookingId,
+          serviceDate,
+          type: 'pre_apply_exhaustive_audit_requeued',
+          status: 'pending',
+          stage: 'requeued_by_pre_apply_exhaustive_audit',
+          sourceFingerprint: current.sourceFingerprint,
+        });
+        result.requeued += 1;
+      } else {
+        await document.ref.update({
+          preApplyVerifiedAt: FieldValue.serverTimestamp(),
+          preApplyVerification: { ...portalAudit, reviewSessionId },
+          updatedAt: FieldValue.serverTimestamp(),
+          workerVersion,
+        });
+        result.verified += 1;
+        result.verifiedFields += portalAudit.verifiedFields?.length || 0;
+      }
+    } catch (error) {
+      await commitSyncTransition(document.ref, {
+        status: 'pending',
+        stage: 'requeued_after_pre_apply_audit_error',
+        errorMessage: String(error?.message || error).slice(0, 2000),
+        completedAt: FieldValue.delete(),
+        portalVerification: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+        workerVersion,
+      }, {
+        tripId: data.tripId,
+        bookingId: data.bookingId,
+        serviceDate,
+        type: 'pre_apply_exhaustive_audit_error',
+        status: 'pending',
+        stage: 'requeued_after_pre_apply_audit_error',
+      });
+      result.failed += 1;
+    }
+  }
+  return result;
+}
+
 async function verifyClosedReviewBatch(page, serviceDate) {
   const documents = await loadAllLogsForDate(serviceDate);
   const staged = documents.filter(document => {
@@ -906,7 +1096,7 @@ async function processJob(job, existingSession = null) {
 }
 
 async function main() {
-  requestedServiceDate = await readRequestedServiceDate();
+  requestedServiceDate = await readEffectiveRequestedServiceDate();
   if (process.argv.includes('--login')) {
     await publishHeartbeat('waiting_for_login');
     return performManualLogin({
@@ -1108,6 +1298,7 @@ async function main() {
       keepOpen: true,
       onWaiting: () => publishHeartbeat('waiting_for_login').catch(() => {}),
     });
+    await installWellTransOperatorConsole(session.page, handleOperatorCommand);
     await publishHeartbeat('online');
     await processJob(await claimJobById(logId), session);
     process.stdout.write('Trip staged for review. The browser will remain open; review all fields and click Apply yourself when ready.\n');
@@ -1135,17 +1326,27 @@ async function main() {
     onWaiting: () => publishHeartbeat('waiting_for_login').catch(() => {}),
   });
   try {
+    await installWellTransOperatorConsole(session.page, handleOperatorCommand);
+    await updateOperatorConsole(session.page, {}, {
+      state: 'detecting_date',
+      message: 'Detecting the opened WellTrans service date automatically.',
+    });
     let selectedDate = await getSelectedPortalDate(session.page);
     selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
     activeServiceDate = selectedDate;
     await waitForDateLease(selectedDate);
     reviewSessionId = randomUUID();
+    resetWellTransSessionCaches();
     await publishHeartbeat('indexing_schedule');
     portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
     const authoritative = await reconcileAuthoritativeCompletedTrips(selectedDate);
     lastAuthoritativeReconcileAt = Date.now();
     const recovered = await recoverStaleReviewJobs(selectedDate);
     const initialSummary = await publishDateReviewSummary(selectedDate);
+    await updateOperatorConsole(session.page, initialSummary, {
+      state: 'calibrated',
+      message: `Opened date ${selectedDate} detected and indexed exactly.`,
+    });
     const completedAudit = initialSummary.pending === 0
       ? await auditCompletedPortalTrips(session.page, selectedDate)
       : { requeued: 0, verified: 0, failed: 0, deferred: initialSummary.unverifiedCompleted };
@@ -1165,8 +1366,10 @@ async function main() {
       if (activeDate !== selectedDate) {
         selectedDate = activeDate;
         activeServiceDate = selectedDate;
+        finalReviewAuditValid = false;
         await waitForDateLease(selectedDate);
         reviewSessionId = randomUUID();
+        resetWellTransSessionCaches();
         await publishHeartbeat('indexing_schedule');
         portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
         await reconcileAuthoritativeCompletedTrips(selectedDate);
@@ -1184,11 +1387,57 @@ async function main() {
       }
       await waitForDateLease(selectedDate);
       await publishHeartbeat('calibrated');
+      if (operatorControl.forceReindex) {
+        operatorControl.forceReindex = false;
+        finalReviewAuditValid = false;
+        resetWellTransSessionCaches();
+        operatorControl.message = `Re-indexing every visible and virtual row for ${selectedDate}.`;
+        await updateOperatorConsole(session.page, {}, {
+          state: 'indexing_schedule',
+          message: operatorControl.message,
+        });
+        await publishHeartbeat('indexing_schedule');
+        portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
+      }
+      if (operatorControl.forceReconcile) {
+        operatorControl.forceReconcile = false;
+        finalReviewAuditValid = false;
+        operatorControl.message = `Reconciling all authoritative completed trips for ${selectedDate}.`;
+        await updateOperatorConsole(session.page, {}, {
+          state: 'reconciling',
+          message: operatorControl.message,
+        });
+        await publishHeartbeat('reconciling_authoritative_trips');
+        await reconcileAuthoritativeCompletedTrips(selectedDate);
+        await recoverStaleReviewJobs(selectedDate);
+        lastAuthoritativeReconcileAt = Date.now();
+      }
       if (Date.now() - lastAuthoritativeReconcileAt >= 60_000) {
         await reconcileAuthoritativeCompletedTrips(selectedDate);
         lastAuthoritativeReconcileAt = Date.now();
       }
       let summary = await publishDateReviewSummary(selectedDate);
+      await updateOperatorConsole(session.page, summary, {
+        state: operatorControl.autoRun ? 'calibrated' : 'paused',
+        message: operatorControl.message,
+      });
+      if (operatorControl.forceVerify && summary.staged > 0 && await isEditItineraryOpen(session.page)) {
+        operatorControl.forceVerify = false;
+        operatorControl.message = `Verifying every staged field for ${selectedDate}.`;
+        await publishHeartbeat('verifying_staged_records');
+        await updateOperatorConsole(session.page, summary, {
+          state: 'verifying_every_field',
+          message: operatorControl.message,
+        });
+        const forcedAudit = await auditStagedReviewBatch(session.page, selectedDate);
+        finalReviewAuditValid = forcedAudit.requeued === 0 && forcedAudit.failed === 0;
+        summary = await publishDateReviewSummary(selectedDate);
+        operatorControl.message = `${forcedAudit.verified}/${forcedAudit.checked} trips and ${forcedAudit.verifiedFields} fields verified before Apply.`;
+        await updateOperatorConsole(session.page, summary, {
+          state: finalReviewAuditValid ? 'verified' : 'repairing_mismatches',
+          message: operatorControl.message,
+        });
+      }
       if (summary.staged > 0
         && (summary.staged >= reviewBatchSize || summary.pending === 0)) {
         if (!await isEditItineraryOpen(session.page)) {
@@ -1199,13 +1448,39 @@ async function main() {
             `Manual dialog completion detected: ${verification.verified} applied and verified, `
             + `${verification.requeued} not persisted and requeued, ${verification.failed} failed.\n`,
           );
+          finalReviewAuditValid = false;
           if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
           continue;
         }
-        const state = summary.pending === 0 && summary.failed === 0
-          && summary.blocked === 0 && summary.missing === 0
-          ? 'review_ready'
-          : 'review_batch_ready';
+        if (!finalReviewAuditValid) {
+          operatorControl.message = `Running mandatory pre-Apply audit across every staged trip for ${selectedDate}.`;
+          await publishHeartbeat('verifying_staged_records');
+          await updateOperatorConsole(session.page, summary, {
+            state: 'verifying_every_field',
+            message: operatorControl.message,
+          });
+          const audit = await auditStagedReviewBatch(session.page, selectedDate);
+          summary = await publishDateReviewSummary(selectedDate);
+          finalReviewAuditValid = audit.requeued === 0 && audit.failed === 0;
+          if (!finalReviewAuditValid) {
+            operatorControl.message = `${audit.requeued + audit.failed} trip(s) failed the pre-Apply audit and were queued for automatic repair.`;
+            await updateOperatorConsole(session.page, summary, {
+              state: 'repairing_mismatches',
+              message: operatorControl.message,
+            });
+            continue;
+          }
+          operatorControl.message = `${audit.verified} trips and ${audit.verifiedFields} fields verified. Review and click Apply yourself.`;
+        }
+        const hasCoverageBlockers = summary.failed > 0
+          || summary.blocked > 0
+          || summary.missing > 0;
+        const state = hasCoverageBlockers
+          ? 'reconciliation_blocked_do_not_apply'
+          : (summary.pending === 0 ? 'review_ready_verified' : 'review_batch_verified');
+        operatorControl.message = hasCoverageBlockers
+          ? `${summary.failed + summary.blocked + summary.missing} completed trip(s) remain blocked or missing. Do not Apply yet; correct them and run Reconcile & Fill Date.`
+          : operatorControl.message;
         await db.doc('welltrans_worker_status/primary').set({
           state,
           selectedDate,
@@ -1215,10 +1490,15 @@ async function main() {
           reviewBatchRemaining: summary.pending,
           lastSeenAt: FieldValue.serverTimestamp(),
         }, { merge: true });
-        process.stdout.write(
-          `Review batch ready for ${selectedDate}: ${summary.staged} staged, `
-          + `${summary.pending} remaining. Review the browser and click Apply yourself.\n`,
-        );
+        process.stdout.write(hasCoverageBlockers
+          ? `Reconciliation blocked for ${selectedDate}: ${summary.failed} failed, `
+            + `${summary.blocked} blocked and ${summary.missing} missing. Do not Apply yet.\n`
+          : `Verified review batch ready for ${selectedDate}: ${summary.staged} staged, `
+            + `${summary.pending} remaining. The Agent never clicks Apply; review and click it yourself.\n`);
+        await updateOperatorConsole(session.page, summary, {
+          state,
+          message: operatorControl.message,
+        });
         if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
         continue;
       }
@@ -1232,6 +1512,15 @@ async function main() {
           + `${audit.failed} blocked.\n`,
         );
       }
+      if (!operatorControl.autoRun) {
+        operatorControl.message = `Paused safely on ${selectedDate}. No new trip will be edited.`;
+        await updateOperatorConsole(session.page, summary, {
+          state: 'paused',
+          message: operatorControl.message,
+        });
+        if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 500);
+        continue;
+      }
       const batchCapacity = Math.max(0, reviewBatchSize - summary.staged);
       const pendingJobIds = batchCapacity
         ? await listPendingJobIdsForDate(selectedDate, batchCapacity)
@@ -1241,13 +1530,14 @@ async function main() {
         for (const logId of pendingJobIds) {
           const latestDate = await waitForRequestedSchedule(session.page, selectedDate);
           if (latestDate !== batchDate) {
-            selectedDate = latestDate;
+            activeServiceDate = latestDate;
             break;
           }
           const job = await claimJobById(logId);
           if (job) {
             await publishHeartbeat('staging');
             const outcome = await processJob(job, session);
+            if (outcome.success) finalReviewAuditValid = false;
             await publishHeartbeat('calibrated');
             if (!outcome.safeToContinue) {
               throw new Error(
@@ -1255,6 +1545,12 @@ async function main() {
                 + 'Processing stopped. Review this browser and click Close to discard the unsaved batch; never click Apply.',
               );
             }
+            const currentSummary = await publishDateReviewSummary(selectedDate);
+            await updateOperatorConsole(session.page, currentSummary, {
+              state: 'staging',
+              message: `Filled and verified Booking ${job.bookingId || job.tripId}. Continuing automatically.`,
+            });
+            if (!operatorControl.autoRun) break;
           }
         }
       } else {
