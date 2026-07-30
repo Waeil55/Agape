@@ -64,13 +64,17 @@ async function gridModel(grid, bookingId) {
   const extractVisibleRows = () => grid.evaluate((element, columnTitles) => {
     const cells = [...element.querySelectorAll('.GridCell')];
     const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
+    const headerCells = new Set(columnTitles.map(header).filter(Boolean));
     const left = title => Number.parseFloat(header(title)?.style.left);
     const columns = Object.fromEntries(columnTitles.map(title => [title, left(title)]));
     const bookingLeft = left('Booking Id');
     const rowMap = new Map();
     for (const cell of cells) {
       const cellTop = Number.parseFloat(cell.style.top);
-      if (cellTop === 0 || !Number.isFinite(cellTop)) continue;
+      // TripSpark renders the first itinerary row at top:0 in its data layer,
+      // the same coordinate used by the separate header layer. Exclude the
+      // actual header elements, not every cell at top:0.
+      if (headerCells.has(cell) || !Number.isFinite(cellTop)) continue;
       const raw = String(cell.title || cell.textContent || '').trim();
       if (Number.parseFloat(cell.style.left) === bookingLeft) {
         const key = String(cellTop);
@@ -81,7 +85,7 @@ async function gridModel(grid, bookingId) {
     }
     for (const cell of cells) {
       const cellTop = Number.parseFloat(cell.style.top);
-      if (cellTop === 0 || !Number.isFinite(cellTop)) continue;
+      if (headerCells.has(cell) || !Number.isFinite(cellTop)) continue;
       const key = String(cellTop);
       const row = rowMap.get(key);
       if (!row) continue;
@@ -154,6 +158,7 @@ async function visibleGridRows(grid) {
   return grid.evaluate((element, columnTitles) => {
     const cells = [...element.querySelectorAll('.GridCell')];
     const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
+    const headerCells = new Set(columnTitles.map(header).filter(Boolean));
     const columns = Object.fromEntries(columnTitles.map(title => [
       title,
       Number.parseFloat(header(title)?.style.left),
@@ -163,7 +168,7 @@ async function visibleGridRows(grid) {
     for (const cell of cells) {
       const top = Number.parseFloat(cell.style.top);
       const left = Number.parseFloat(cell.style.left);
-      if (top === 0 || !Number.isFinite(top) || left !== bookingLeft) continue;
+      if (headerCells.has(cell) || !Number.isFinite(top) || left !== bookingLeft) continue;
       rowMap.set(String(top), {
         top,
         bookingRaw: String(cell.title || cell.textContent || '').trim(),
@@ -171,6 +176,7 @@ async function visibleGridRows(grid) {
       });
     }
     for (const cell of cells) {
+      if (headerCells.has(cell)) continue;
       const top = Number.parseFloat(cell.style.top);
       const row = rowMap.get(String(top));
       if (!row) continue;
@@ -204,7 +210,7 @@ async function ensureLiveRow(grid, row) {
   throw new Error(`Booking ${row.bookingRaw} ${row.activity} row is not currently addressable in the virtual grid`);
 }
 
-async function exactCell(grid, top, left) {
+async function exactCell(grid, top, left, columnTitle) {
   const cells = grid.locator('.GridCell');
   // Resolve the coordinate in one browser-context pass. The former
   // locator-per-cell loop caused hundreds of protocol round-trips for every
@@ -212,8 +218,11 @@ async function exactCell(grid, top, left) {
   const index = await cells.evaluateAll((elements, coordinates) =>
     elements.findIndex(element =>
       Number.parseFloat(element.style.top) === coordinates.top
-      && Number.parseFloat(element.style.left) === coordinates.left),
-  { top, left });
+      && Number.parseFloat(element.style.left) === coordinates.left
+      // At top:0, prefer the data-layer cell over the identically positioned
+      // header-layer cell for this column.
+      && !(coordinates.top === 0 && element.title === coordinates.columnTitle)),
+  { top, left, columnTitle });
   return index >= 0 ? cells.nth(index) : null;
 }
 
@@ -507,7 +516,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
   const liveRow = await ensureLiveRow(grid, row);
   if (equalCellValue(column, liveRow.values?.[column], value)) return true;
 
-  const cell = await exactCell(grid, liveRow.top, colLeft);
+  const cell = await exactCell(grid, liveRow.top, colLeft, column);
   if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity} (top=${liveRow.top})`);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -562,7 +571,7 @@ async function setListCell(page, grid, row, column, option) {
   const liveRow = await ensureLiveRow(grid, row);
   if (equalCellValue(column, liveRow.values?.[column], option)) return;
 
-  const cell = await exactCell(grid, liveRow.top, colLeft);
+  const cell = await exactCell(grid, liveRow.top, colLeft, column);
   if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity}`);
 
   await dismissActiveEditor(page);
@@ -616,7 +625,7 @@ async function preflightCell(page, grid, row, column, value, {
     throw safePreflightError(new Error(`${column} column not found in grid`));
   }
   const liveRow = await ensureLiveRow(grid, row);
-  const cell = await exactCell(grid, liveRow.top, colLeft);
+  const cell = await exactCell(grid, liveRow.top, colLeft, column);
   if (!cell) {
     throw safePreflightError(new Error(`${column} cell unavailable for ${row.activity}`));
   }
@@ -687,7 +696,7 @@ async function restorePlanEntry(page, grid, entry) {
     } else {
       const colLeft = await resolveColumnLeft(grid, entry.column);
       const liveRow = await ensureLiveRow(grid, entry.row);
-      const cell = await exactCell(grid, liveRow.top, colLeft);
+      const cell = await exactCell(grid, liveRow.top, colLeft, entry.column);
       if (!cell) throw new Error(`${entry.row.activity} ${entry.column} rollback cell was unavailable`);
       await cell.dblclick({ force: true });
       await page.waitForTimeout(250);
@@ -728,7 +737,7 @@ async function readCellValue(grid, row, column) {
   const left = await resolveColumnLeft(grid, column);
   if (left === null) throw new Error(`${column} column not found in grid`);
   const liveRow = await ensureLiveRow(grid, row);
-  const cell = await exactCell(grid, liveRow.top, left);
+  const cell = await exactCell(grid, liveRow.top, left, column);
   if (!cell) throw new Error(`${column} cell unavailable for ${row.activity}`);
   if (column === 'Signature Captured') {
     return cell.evaluate(element => {

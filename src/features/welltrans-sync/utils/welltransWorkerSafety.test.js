@@ -113,6 +113,15 @@ describe('WellTrans staging safety contract', () => {
     );
     expect(exactCell).toContain('cells.evaluateAll');
     expect(exactCell).not.toContain('await cell.evaluate');
+    expect(exactCell).toContain('element.title === coordinates.columnTitle');
+  });
+
+  it('does not discard TripSpark first-row cells that share top:0 with the header layer', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    expect(source).not.toContain('if (cellTop === 0 || !Number.isFinite(cellTop)) continue;');
+    expect(source).not.toContain('if (top === 0 || !Number.isFinite(top)');
+    expect(source).toContain('const headerCells = new Set(columnTitles.map(header).filter(Boolean));');
+    expect(source).toContain('if (headerCells.has(cell) || !Number.isFinite(cellTop)) continue;');
   });
 
   it('isolates every TripSpark editor and never commits a typed list filter', () => {
