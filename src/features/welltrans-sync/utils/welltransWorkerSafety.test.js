@@ -117,15 +117,16 @@ describe('WellTrans staging safety contract', () => {
     expect(driver).toBeLessThan(vehicle);
   });
 
-  it('resolves a virtual-grid cell in one browser pass', () => {
+  it('re-resolves a virtual-grid cell by stable coordinates before every action', () => {
     const source = readFileSync(tripSourcePath, 'utf8');
     const exactCell = source.slice(
       source.indexOf('async function exactCell'),
       source.indexOf('async function resolveColumnLeft'),
     );
-    expect(exactCell).toContain('cells.evaluateAll');
-    expect(exactCell).not.toContain('await cell.evaluate');
-    expect(exactCell).toContain('element.title === coordinates.columnTitle');
+    expect(exactCell).toContain('[style*="top: ${top}px"]');
+    expect(exactCell).toContain('[style*="left: ${left}px"]');
+    expect(exactCell).toContain(':not([title="${escapedTitle}"])');
+    expect(exactCell).not.toContain('.nth(');
   });
 
   it('does not discard TripSpark first-row cells that share top:0 with the header layer', () => {
@@ -250,6 +251,8 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).toContain('Verify Every Field');
     expect(operatorConsole).toContain('Use Opened Date');
     expect(operatorConsole).toContain('Switch & Fill');
+    expect(operatorConsole).toContain('<section class="panel collapsed">');
+    expect(operatorConsole).toContain("'bottom:12px'");
     expect(worker).toContain('await installWellTransOperatorConsole(session.page, handleOperatorCommand)');
     expect(worker).toContain('operatorControl.dateOverride');
     expect(worker).toContain('return currentDate;');
@@ -282,6 +285,8 @@ describe('WellTrans staging safety contract', () => {
     expect(trip).toContain('capabilityCacheHit: true');
     expect(trip).toContain('async function waitForEditorSurface');
     expect(trip).toContain('export function resetWellTransSessionCaches()');
+    expect(trip).toContain('Re-resolve by coordinates immediately before each action');
+    expect(trip).not.toContain('return index >= 0 ? cells.nth(index) : null');
   });
 
   it('runs and monitors a read-only production portal contract canary', () => {
@@ -294,6 +299,14 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain("db.doc('welltrans_canary/latest')");
     expect(backend).toContain('canaryContractFingerprint');
     expect(rules).toContain('match /welltrans_canary/{document}');
+  });
+
+  it('requeues an unsafe old-version review only in a fresh upgraded browser session', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    expect(worker).toContain("latest.data.stage === 'failed_review_close_required'");
+    expect(worker).toContain('latest.data.reviewSessionId !== reviewSessionId');
+    expect(worker).toContain('latest.data.workerVersion !== workerVersion');
+    expect(worker).toContain('recoveredAfterAgentUpgrade: upgradedFreshSessionRecovery');
   });
 
   it('uses durable date shards and Cloud Tasks for large reconciliations', () => {

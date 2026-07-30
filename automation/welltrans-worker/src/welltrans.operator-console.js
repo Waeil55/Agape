@@ -8,10 +8,10 @@ const consoleBootstrap = ({ consoleId, commandBinding }) => {
   host.id = consoleId;
   host.style.cssText = [
     'position:fixed',
-    'top:12px',
-    'right:14px',
+    'bottom:12px',
+    'right:12px',
     'z-index:2147483647',
-    'width:354px',
+    'width:286px',
     'font-family:Inter,Segoe UI,Arial,sans-serif',
   ].join(';');
   const shadow = host.attachShadow({ mode: 'open' });
@@ -20,12 +20,12 @@ const consoleBootstrap = ({ consoleId, commandBinding }) => {
       *{box-sizing:border-box}
       .panel{color:#e8eefc;background:rgba(8,15,31,.97);border:1px solid #2b3f66;
         border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.38);overflow:hidden}
-      .head{padding:13px 14px 10px;background:linear-gradient(135deg,#12264b,#0a1429)}
+      .head{padding:9px 10px;background:linear-gradient(135deg,#12264b,#0a1429)}
       .brand{display:flex;align-items:center;justify-content:space-between;gap:10px}
-      .title{font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
-      .badge{padding:4px 7px;border-radius:999px;background:#123c2c;color:#6ee7b7;font-size:10px;font-weight:800}
-      .sub{margin-top:5px;color:#91a4c8;font-size:10px;line-height:1.35}
-      .body{padding:12px 14px 14px}
+      .title{font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase}
+      .badge{padding:3px 6px;border-radius:999px;background:#123c2c;color:#6ee7b7;font-size:9px;font-weight:800}
+      .sub{margin-top:4px;color:#91a4c8;font-size:9px;line-height:1.3}
+      .body{padding:9px 10px 10px}
       .dateRow{display:grid;grid-template-columns:1fr auto;gap:7px;margin-bottom:8px}
       input{width:100%;height:34px;border:1px solid #38517e;border-radius:8px;background:#0d1930;
         color:#fff;padding:0 9px;font:600 12px inherit}
@@ -46,16 +46,17 @@ const consoleBootstrap = ({ consoleId, commandBinding }) => {
         border:1px solid #713232;font-size:9px;font-weight:800;line-height:1.35}
       .progress{height:4px;margin-top:8px;background:#172743;border-radius:99px;overflow:hidden}
       .bar{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#60a5fa);transition:width .2s}
-      .collapsed .body,.collapsed .sub{display:none}
+      .collapsed{width:210px}
+      .collapsed .body,.collapsed .sub,.collapsed .badge{display:none}
       .collapse{min-height:25px;padding:2px 7px;background:#1b2b49}
     </style>
-    <section class="panel">
+    <section class="panel collapsed">
       <header class="head">
         <div class="brand">
           <div class="title">Agape WellTrans Console</div>
           <div>
             <span class="badge" data-role="mode">AUTO</span>
-            <button class="collapse" data-action="collapse" title="Collapse">−</button>
+            <button class="collapse" data-action="collapse" title="Open controls">+</button>
           </div>
         </div>
         <div class="sub">Exact Booking ID • selected-date fencing • field-by-field verification</div>

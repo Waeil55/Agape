@@ -348,19 +348,16 @@ async function ensureLiveRow(grid, row) {
 }
 
 async function exactCell(grid, top, left, columnTitle) {
-  const cells = grid.locator('.GridCell');
-  // Resolve the coordinate in one browser-context pass. The former
-  // locator-per-cell loop caused hundreds of protocol round-trips for every
-  // field on TripSpark's virtual grid.
-  const index = await cells.evaluateAll((elements, coordinates) =>
-    elements.findIndex(element =>
-      Number.parseFloat(element.style.top) === coordinates.top
-      && Number.parseFloat(element.style.left) === coordinates.left
-      // At top:0, prefer the data-layer cell over the identically positioned
-      // header-layer cell for this column.
-      && !(coordinates.top === 0 && element.title === coordinates.columnTitle)),
-  { top, left, columnTitle });
-  return index >= 0 ? cells.nth(index) : null;
+  // Re-resolve by coordinates immediately before each action. TripSpark
+  // recycles virtual-grid nodes after editor dismissal, so nth(index) can
+  // silently drift into another column between lookup and double-click.
+  const escapedTitle = String(columnTitle).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+  const spaced = `.GridCell[style*="top: ${top}px"][style*="left: ${left}px"]`;
+  const compact = `.GridCell[style*="top:${top}px"][style*="left:${left}px"]`;
+  const cell = grid.locator(
+    `${spaced}:not([title="${escapedTitle}"]), ${compact}:not([title="${escapedTitle}"])`,
+  ).first();
+  return await cell.count() ? cell : null;
 }
 
 async function resolveColumnLeft(grid, columnTitle) {
@@ -506,7 +503,7 @@ async function getListDropdownOptions(page, { strict = false } = {}) {
 
 async function waitForListDropdownOptions(page, options = {}) {
   let values = [];
-  const attempts = TURBO_MODE ? 30 : 8;
+  const attempts = TURBO_MODE ? 60 : 20;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     values = await getListDropdownOptions(page, options);
     if (values.length) return values;
@@ -539,8 +536,15 @@ async function clickListOption(page, optionText) {
         '.EditorWidgets, .DropDownDialog, [class*="DropDown"], [class*="dropdown"]',
       ))).catch(() => false);
     if (!belongsToActiveDropdown) continue;
-    const box = await candidate.boundingBox().catch(() => null);
-    if (box) pointerCandidates.push({ candidate, area: box.width * box.height });
+    // Click the semantic option container. Clicking only its nested text span
+    // can highlight a row without notifying TripSpark's list controller.
+    const optionContainer = candidate.locator(
+      'xpath=ancestor-or-self::*[@role="option" or local-name()="listitem" '
+      + 'or contains(concat(" ", normalize-space(@class), " "), " ListBoxItem ")]',
+    ).first();
+    const clickTarget = await optionContainer.count() ? optionContainer : candidate;
+    const box = await clickTarget.boundingBox().catch(() => null);
+    if (box) pointerCandidates.push({ candidate: clickTarget, area: box.width * box.height });
   }
   pointerCandidates.sort((left, right) => left.area - right.area);
   if (pointerCandidates.length) {
@@ -729,31 +733,53 @@ async function setListCell(page, grid, row, column, option) {
   const liveRow = await ensureLiveRow(grid, row);
   if (equalCellValue(column, liveRow.values?.[column], option)) return;
 
-  const cell = await exactCell(grid, liveRow.top, colLeft, column);
-  if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity}`);
+  let selected = '';
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await dismissActiveEditor(page);
+    const currentRow = await ensureLiveRow(grid, row);
+    const cell = await exactCell(grid, currentRow.top, colLeft, column);
+    if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity}`);
+    await cell.dblclick({ force: true });
+    await waitForEditorSurface(page, 2500);
 
-  await dismissActiveEditor(page);
-  await cell.dblclick({ force: true });
-  await waitForEditorSurface(page);
+    const listbox = page.locator('.EditorWidgets core\\:listbox:visible');
+    const directDialog = page.locator(
+      '.DropDownDialog:visible core\\:listitem:visible, '
+      + '.DropDownDialog:visible [role="option"]:visible, '
+      + '.DropDownDialog:visible .ListBoxItem:visible',
+    );
+    if (!await listbox.count() && !await directDialog.count()) {
+      await page.keyboard.press('Escape').catch(() => {});
+      if (attempt < 2) {
+        await settleUi(page, 250, 80);
+        continue;
+      }
+      throw new Error(`${column} listbox did not open for ${row.activity}`);
+    }
 
-  const listbox = page.locator('.EditorWidgets core\\:listbox:visible');
-  const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
-  if (!await listbox.count() && !await directDialog.count()) {
-    throw new Error(`${column} listbox did not open for ${row.activity}`);
+    await openListDropdown(page);
+    await selectListOption(page, option, column);
+    await settleUi(page, 250, 80);
+    selected = await readCellValue(grid, row, column);
+    if (equalCellValue(column, selected, option)) {
+      await dismissActiveEditor(page);
+      return;
+    }
+    // Some portal releases commit only when focus leaves the list editor.
+    await page.keyboard.press('Tab').catch(() => {});
+    await settleUi(page, 300, 100);
+    selected = await readCellValue(grid, row, column);
+    if (equalCellValue(column, selected, option)) {
+      await dismissActiveEditor(page);
+      return;
+    }
+    await page.keyboard.press('Escape').catch(() => {});
+    await settleUi(page, 180, 60);
   }
-
-  await openListDropdown(page);
-  await selectListOption(page, option, column);
-  await page.keyboard.press('Tab');
-  await settleUi(page, 250);
-
-  const selected = await cell.evaluate(element =>
-    String(element.title || element.textContent || '').trim());
-
-  if (!equalCellValue(column, selected, option)) {
-    throw new Error(`${column} selection not confirmed: expected "${option}", found "${selected}"`);
-  }
-  await dismissActiveEditor(page);
+  throw new Error(
+    `${column} selection not confirmed after 3 exact-option attempts: `
+    + `expected "${option}", found "${selected}"`,
+  );
 }
 
 const safePreflightError = error => {

@@ -45,7 +45,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.5.0';
+const workerVersion = '3.5.1';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -725,7 +725,13 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
     }
 
     if (latest.data.status === 'failed') {
-      const safeRetry = latest.data.stage === 'failed_no_partial_changes'
+      const upgradedFreshSessionRecovery =
+        latest.data.stage === 'failed_review_close_required'
+        && Boolean(latest.data.reviewSessionId)
+        && latest.data.reviewSessionId !== reviewSessionId
+        && latest.data.workerVersion !== workerVersion;
+      const safeRetry = upgradedFreshSessionRecovery
+        || latest.data.stage === 'failed_no_partial_changes'
         || latest.data.mutationStarted !== true
         || latest.data.rollbackVerified === true;
       const retryCount = latest.data.retryWorkerVersion === workerVersion
@@ -753,6 +759,11 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
         queuedSourceFingerprint: current.sourceFingerprint,
         retryWorkerVersion: workerVersion,
         automaticRetryCount: retryCount + 1,
+        recoveredAfterAgentUpgrade: upgradedFreshSessionRecovery,
+        previousReviewSessionId: upgradedFreshSessionRecovery
+          ? latest.data.reviewSessionId
+          : latest.data.previousReviewSessionId || null,
+        reviewSessionId,
         updatedAt: FieldValue.serverTimestamp(),
         workerVersion,
       });
