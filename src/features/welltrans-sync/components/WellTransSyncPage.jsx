@@ -9,13 +9,15 @@ import { auth } from '../../../config/firebase';
 import { useWellTransSync } from '../hooks/useWellTransSync';
 import { useWellTransAutoSync } from '../hooks/useWellTransAutoSync';
 import {
-  confirmWellTransApplied, confirmWellTransDateApplied, explainWellTransFailure, exportWellTransLogsCSV,
+  confirmWellTransReviewBatchApplied,
+  explainWellTransFailure, exportWellTransLogsCSV,
   isWellTransFailureRetryable, queueWellTransSync, saveWellTransSettings,
   categorizeFailure, FAILURE_CATEGORIES,
 } from '../services/welltransService';
 import {
   buildWellTransPayload, DEFAULT_WELLTRANS_FIELD_MAPPING, validateTripForWellTrans,
 } from '../utils/welltransMapping';
+import { pageWellTransRows, WELLTRANS_TABLE_PAGE_SIZE } from '../utils/welltransScale';
 
 const statusStyle = {
   pending: 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -26,6 +28,7 @@ const statusStyle = {
 };
 
 const AUTHORIZED_ROLES = ['admin', 'superadmin', 'dispatcher', 'manager', 'biller', 'owner'];
+const TABLE_PAGE_SIZE = WELLTRANS_TABLE_PAGE_SIZE;
 
 const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
@@ -47,6 +50,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [syncProgress, setSyncProgress] = useState(null);
   const [tripDrawer, setTripDrawer] = useState(null);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const [queuePage, setQueuePage] = useState(0);
+  const [logsPage, setLogsPage] = useState(0);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [agentRelease, setAgentRelease] = useState(null);
   const [autoRetry, setAutoRetry] = useState(() => {
@@ -76,12 +81,15 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const workerNeedsDate = worker?.state === 'date_selection_required';
   const workerReviewError = worker?.state === 'review_error';
   const workerReconciliationBlocked = worker?.state === 'reconciliation_blocked';
+  const workerBatchReady = ['review_batch_ready', 'review_ready'].includes(worker?.state);
   const workerStatusLabel = !settings.enabled
     ? 'Disabled'
     : workerReviewError
       ? 'Safety stop — discard review'
     : workerReconciliationBlocked
       ? 'Incomplete date — action required'
+    : workerBatchReady
+      ? `${worker?.reviewBatchStaged || 0} ready for Apply`
     : workerNeedsLogin
       ? 'Sign-in required'
       : workerNeedsDate
@@ -97,7 +105,9 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     && !workerNeedsLogin && !workerNeedsDate && !workerConnecting
     && !workerReviewError && !workerReconciliationBlocked;
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
-  const stagedCount = currentLogs.filter(l => l.status === 'awaiting_review').length;
+  const stagedCount = currentLogs.filter(l =>
+    l.status === 'awaiting_review'
+    && (!worker?.reviewSessionId || l.reviewSessionId === worker.reviewSessionId)).length;
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
   const retryableFailed = failedLogs.filter(isWellTransFailureRetryable);
   const unmatchedCount = failedLogs.length - retryableFailed.length;
@@ -133,6 +143,23 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       return true;
     });
   }, [enrichedTrips, searchQuery, statusFilter, latestByTrip]);
+  const queuePageCount = Math.max(1, Math.ceil(filteredTrips.length / TABLE_PAGE_SIZE));
+  const displayedTrips = useMemo(
+    () => pageWellTransRows(filteredTrips, queuePage),
+    [filteredTrips, queuePage],
+  );
+  const logsPageCount = Math.max(1, Math.ceil(logs.length / TABLE_PAGE_SIZE));
+  const displayedLogs = useMemo(
+    () => pageWellTransRows(logs, logsPage),
+    [logs, logsPage],
+  );
+  useEffect(() => { setQueuePage(0); }, [searchQuery, statusFilter, syncDate]);
+  useEffect(() => {
+    if (queuePage >= queuePageCount) setQueuePage(queuePageCount - 1);
+  }, [queuePage, queuePageCount]);
+  useEffect(() => {
+    if (logsPage >= logsPageCount) setLogsPage(logsPageCount - 1);
+  }, [logsPage, logsPageCount]);
 
   const workerActivity = useMemo(() => {
     return currentLogs
@@ -193,27 +220,30 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     }
   }, [busy, completedTrips, settings.enabled, syncDate]);
 
-  const confirmDateApplied = useCallback(async () => {
-    if (!coverage.reviewReady) {
-      setNotice(
-        `Cannot confirm ${syncDate}: ${coverage.missingCount} missing, ${coverage.blockedCount} blocked, `
-        + `${coverage.pending + coverage.processing} still active.`,
-      );
+  const confirmReviewBatchApplied = useCallback(async () => {
+    if (!workerBatchReady || !worker?.reviewSessionId || !stagedCount) {
+      setNotice('No live WellTrans review batch is ready for Apply confirmation.');
       return;
     }
     if (!window.confirm(
-      `Confirm that you reviewed all ${coverage.staged} staged trips and clicked Apply in WellTrans for ${syncDate}?`,
+      `Confirm that you reviewed all ${stagedCount} staged trips and clicked Apply in WellTrans for ${syncDate}? `
+      + 'The agent will read every field back before starting the next batch.',
     )) return;
-    setBusy('confirm-date');
+    setBusy('confirm-batch');
     try {
-      const result = await confirmWellTransDateApplied(syncDate);
-      setNotice(`${result.data.confirmed} verified trips confirmed for ${syncDate}.`);
+      const result = await confirmWellTransReviewBatchApplied(
+        syncDate,
+        worker.reviewSessionId,
+      );
+      setNotice(
+        `${result.data.confirmed} trips marked Applied. Live WellTrans verification is running before the next batch.`,
+      );
     } catch (error) {
-      setNotice(error.message || 'The date could not be confirmed.');
+      setNotice(error.message || 'The review batch could not be confirmed.');
     } finally {
       setBusy('');
     }
-  }, [coverage, syncDate]);
+  }, [stagedCount, syncDate, worker, workerBatchReady]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -418,11 +448,11 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             {busy === 'start-fill' ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
             Reconcile & Fill Date ({completedTrips.length})
           </button>
-          <button disabled={!coverage.reviewReady || Boolean(busy)}
-            onClick={confirmDateApplied}
+          <button disabled={!workerBatchReady || !stagedCount || Boolean(busy)}
+            onClick={confirmReviewBatchApplied}
             className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-40 transition">
             <CheckCircle2 size={12} className="inline mr-1" />
-            I Applied This Date ({coverage.staged})
+            I Applied Current Batch ({stagedCount})
           </button>
           <button disabled={!settings.enabled || !selectedIds.length || Boolean(busy)}
             onClick={() => runQueue(selectedIds, 'selected')}
@@ -598,7 +628,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               <tbody className="divide-y divide-slate-100">
                 {filteredTrips.length === 0 ? (
                   <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-slate-400">No trips for this date.</td></tr>
-                ) : filteredTrips.map(trip => {
+                ) : displayedTrips.map(trip => {
                   const latest = latestByTrip.get(trip.id);
                   const locked = ['pending', 'processing', 'completed', 'awaiting_review'].includes(latest?.status);
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
@@ -657,6 +687,17 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 })}
               </tbody>
             </table>
+            {filteredTrips.length > TABLE_PAGE_SIZE && (
+              <div className="sticky bottom-0 flex items-center justify-between border-t border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500">
+                <span>Showing {queuePage * TABLE_PAGE_SIZE + 1}–{Math.min((queuePage + 1) * TABLE_PAGE_SIZE, filteredTrips.length)} of {filteredTrips.length}</span>
+                <div className="flex gap-2">
+                  <button type="button" disabled={queuePage === 0} onClick={() => setQueuePage(page => Math.max(0, page - 1))}
+                    className="rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:opacity-40">Previous</button>
+                  <button type="button" disabled={queuePage + 1 >= queuePageCount} onClick={() => setQueuePage(page => Math.min(queuePageCount - 1, page + 1))}
+                    className="rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
           </div>
         ) : tab === 'logs' ? (
           <div className="flex-1 overflow-y-auto">
@@ -664,7 +705,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               <div className="px-4 py-8 text-center text-xs text-slate-400">No logs for {syncDate}.</div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {logs.map(log => (
+                {displayedLogs.map(log => (
                   <div key={log.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer group"
                     onClick={() => log.screenshot ? window.open(log.screenshot, '_blank') : null}>
                     <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase shrink-0 ${statusStyle[log.status] || 'bg-slate-100 text-slate-500'}`}>
@@ -674,22 +715,19 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                     <span className="flex-1 text-[11px] text-slate-500 truncate">{log.errorMessage || log.stage || 'Completed'}</span>
                     {log.screenshot && <Image size={12} className="text-slate-300 group-hover:text-blue-500 shrink-0 transition" />}
                     <span className="text-[10px] text-slate-400 shrink-0">{new Date(log.completedAt || log.stagedAt || log.createdAt).toLocaleString()}</span>
-                    {log.status === 'awaiting_review' && (
-                      <button disabled={busy === log.id}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (!window.confirm(`Confirm Booking ${log.bookingId || log.tripId} applied in WellTrans?`)) return;
-                          setBusy(log.id);
-                          try { await confirmWellTransApplied(log.id); setNotice(`Booking ${log.bookingId || log.tripId} confirmed.`); }
-                          catch (err) { setNotice(err.message || 'Failed.'); }
-                          finally { setBusy(''); }
-                        }}
-                        className="rounded-lg bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-700 disabled:opacity-50 transition shrink-0">
-                        Confirm
-                      </button>
-                    )}
                   </div>
                 ))}
+                {logs.length > TABLE_PAGE_SIZE && (
+                  <div className="sticky bottom-0 flex items-center justify-between bg-white px-4 py-2 text-[11px] text-slate-500">
+                    <span>Showing {logsPage * TABLE_PAGE_SIZE + 1}–{Math.min((logsPage + 1) * TABLE_PAGE_SIZE, logs.length)} of {logs.length}</span>
+                    <div className="flex gap-2">
+                      <button type="button" disabled={logsPage === 0} onClick={() => setLogsPage(page => Math.max(0, page - 1))}
+                        className="rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:opacity-40">Previous</button>
+                      <button type="button" disabled={logsPage + 1 >= logsPageCount} onClick={() => setLogsPage(page => Math.min(logsPageCount - 1, page + 1))}
+                        className="rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:opacity-40">Next</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

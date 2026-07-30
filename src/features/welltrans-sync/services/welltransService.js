@@ -28,8 +28,7 @@ export const subscribeWellTransLogs = (serviceDate, callback, onError) => {
     snapshot => callback(snapshot.docs
       .map(item => ({ id: item.id, ...item.data() }))
       .sort((left, right) =>
-        timestampMillis(right.updatedAt || right.createdAt) - timestampMillis(left.updatedAt || left.createdAt))
-      .slice(0, 500)),
+        timestampMillis(right.updatedAt || right.createdAt) - timestampMillis(left.updatedAt || left.createdAt))),
     onError,
   );
 };
@@ -82,6 +81,12 @@ export const confirmWellTransApplied = logId =>
 
 export const confirmWellTransDateApplied = serviceDate =>
   httpsCallable(functions, 'confirmWellTransDateApplied')({ serviceDate });
+
+export const confirmWellTransReviewBatchApplied = (serviceDate, reviewSessionId) =>
+  httpsCallable(functions, 'confirmWellTransReviewBatchApplied')({
+    serviceDate,
+    reviewSessionId,
+  });
 
 export const isWellTransFailureRetryable = log => {
   if (!log || log.status !== 'failed') return false;

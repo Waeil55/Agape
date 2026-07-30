@@ -1,5 +1,10 @@
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
-import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
+import {
+  FieldPath,
+  FieldValue,
+  Timestamp,
+  getFirestore,
+} from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -31,16 +36,30 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   }))
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.6.1';
+const workerInstanceId = `${workerId}-${randomUUID()}`;
+const workerVersion = '3.0.0';
 let requestedServiceDate = '';
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
-const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
+const firestorePageSize = Math.min(
+  1000,
+  Math.max(100, Number(process.env.WELLTRANS_FIRESTORE_PAGE_SIZE) || 500),
+);
+const reviewBatchSize = Math.min(
+  500,
+  Math.max(25, Number(process.env.WELLTRANS_REVIEW_BATCH_SIZE) || 250),
+);
+const heartbeatPayload = state => ({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
   version: workerVersion, requestedDate: requestedServiceDate || null,
   reviewSessionId: reviewSessionId || null,
-}, { merge: true });
+  workerInstanceId,
+});
+const publishHeartbeat = (state = 'online') => Promise.all([
+  db.doc('welltrans_worker_status/primary').set(heartbeatPayload(state), { merge: true }),
+  db.doc(`welltrans_workers/${workerInstanceId}`).set(heartbeatPayload(state), { merge: true }),
+]);
 const assertAllowedPortal = value => {
   const url = new URL(value);
   const configured = (process.env.WELLTRANS_ALLOWED_HOSTS || new URL(process.env.WELLTRANS_PORTAL_URL).hostname)
@@ -50,6 +69,27 @@ const assertAllowedPortal = value => {
   }
   return url.toString();
 };
+
+async function loadAllQueryDocuments(baseQuery, pageSize = firestorePageSize) {
+  const documents = [];
+  let cursor = null;
+  do {
+    let pageQuery = baseQuery
+      .orderBy(FieldPath.documentId())
+      .limit(pageSize);
+    if (cursor) pageQuery = pageQuery.startAfter(cursor);
+    const snapshot = await pageQuery.get();
+    documents.push(...snapshot.docs);
+    cursor = snapshot.docs.at(-1) || null;
+    if (snapshot.size < pageSize) break;
+  } while (cursor);
+  return documents;
+}
+
+const loadAllLogsForDate = serviceDate =>
+  loadAllQueryDocuments(
+    db.collection('welltrans_sync_logs').where('serviceDate', '==', serviceDate),
+  );
 
 const readRequestedServiceDate = async () => {
   if (!process.env.WELLTRANS_REQUEST_FILE) return '';
@@ -127,23 +167,18 @@ async function waitForRequestedSchedule(page, selectedDate) {
   throw new Error('The WellTrans browser closed before the requested schedule was selected.');
 }
 
-async function listPendingJobIdsForDate(serviceDate) {
-  const datedSnapshot = await db.collection('welltrans_sync_logs')
-    .where('serviceDate', '==', serviceDate).limit(500).get();
-  const datedPending = datedSnapshot.docs.filter(document => document.data().status === 'pending');
-  const legacySnapshot = datedPending.length === 0
-    ? await db.collection('welltrans_sync_logs').where('status', '==', 'pending').limit(1000).get()
-    : null;
-  const sourceDocuments = datedPending.length === 0 ? legacySnapshot.docs : datedPending;
-  const candidates = [...sourceDocuments].sort((left, right) => {
+async function listPendingJobIdsForDate(serviceDate, limit = reviewBatchSize) {
+  const snapshot = await db.collection('welltrans_sync_logs')
+    .where('serviceDate', '==', serviceDate)
+    .where('status', '==', 'pending')
+    .limit(Math.max(1, Math.min(reviewBatchSize, limit)))
+    .get();
+  const candidates = [...snapshot.docs].sort((left, right) => {
     const leftTime = left.data().createdAt?.toMillis?.() || 0;
     const rightTime = right.data().createdAt?.toMillis?.() || 0;
     return leftTime - rightTime;
   });
-  return candidates.filter(document => {
-    const data = document.data();
-    return String(data.payload?.serviceDate || data.serviceDate || '').slice(0, 10) === serviceDate;
-  }).slice(0, 100).map(document => document.id);
+  return candidates.map(document => document.id);
 }
 
 async function claimJobById(logId) {
@@ -155,19 +190,50 @@ async function claimJobById(logId) {
     transaction.update(ref, {
       status: 'processing', stage: 'claimed', startedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
-      attempt: FieldValue.increment(1), workerId,
+      attempt: FieldValue.increment(1), workerId, workerInstanceId,
     });
     return { id: fresh.id, ref, ...fresh.data() };
   });
 }
 
+async function acquireDateLease(serviceDate) {
+  const ref = db.doc(`welltrans_sync_leases/${serviceDate}`);
+  return db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(ref);
+    const lease = snapshot.exists ? snapshot.data() || {} : {};
+    const expiresAt = lease.expiresAt?.toMillis?.() || 0;
+    if (expiresAt > Date.now() && lease.ownerInstanceId !== workerInstanceId) {
+      return false;
+    }
+    transaction.set(ref, {
+      provider: 'welltrans',
+      serviceDate,
+      ownerInstanceId: workerInstanceId,
+      workerId,
+      fencingToken: lease.ownerInstanceId === workerInstanceId
+        ? Number(lease.fencingToken || 1)
+        : Number(lease.fencingToken || 0) + 1,
+      expiresAt: Timestamp.fromMillis(Date.now() + 45_000),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return true;
+  });
+}
+
+async function waitForDateLease(serviceDate) {
+  while (!await acquireDateLease(serviceDate)) {
+    await publishHeartbeat('lease_standby');
+    await sleep(5000);
+  }
+}
+
 async function publishDateReviewSummary(serviceDate) {
-  const [snapshot, manifestSnapshot] = await Promise.all([
-    db.collection('welltrans_sync_logs').where('serviceDate', '==', serviceDate).limit(1000).get(),
+  const [documents, manifestSnapshot] = await Promise.all([
+    loadAllLogsForDate(serviceDate),
     db.doc(`welltrans_sync_manifests/${serviceDate}`).get(),
   ]);
   const latestByTrip = new Map();
-  for (const document of snapshot.docs) {
+  for (const document of documents) {
     const data = document.data();
     const key = String(data.tripId);
     const current = latestByTrip.get(key);
@@ -194,6 +260,7 @@ async function publishDateReviewSummary(serviceDate) {
     pending: 0,
     processing: 0,
     missing: 0,
+    unverifiedCompleted: 0,
     blocked: Number(manifest.blockedCount || 0),
   };
   for (const tripId of expectedTripIds) {
@@ -213,6 +280,7 @@ async function publishDateReviewSummary(serviceDate) {
       summary.completed += 1;
     } else if (item.status === 'completed') {
       summary.missing += 1;
+      summary.unverifiedCompleted += 1;
     } else if (Object.hasOwn(summary, item.status)) summary[item.status] += 1;
   }
   const verified = summary.staged + summary.completed;
@@ -254,10 +322,9 @@ async function publishDateReviewSummary(serviceDate) {
 }
 
 async function recoverStaleReviewJobs(serviceDate) {
-  const snapshot = await db.collection('welltrans_sync_logs')
-    .where('serviceDate', '==', serviceDate).limit(1000).get();
+  const documents = await loadAllLogsForDate(serviceDate);
   const latestByTrip = new Map();
-  for (const document of snapshot.docs) {
+  for (const document of documents) {
     const data = document.data();
     const key = String(data.tripId);
     const current = latestByTrip.get(key);
@@ -353,18 +420,62 @@ const isAuthoritativeCompletedTrip = trip => {
     || Boolean(trip.completedAt);
 };
 
-async function reconcileAuthoritativeCompletedTrips(serviceDate) {
-  const [tripsSnapshot, logsSnapshot] = await Promise.all([
-    db.collection('trips').get(),
-    db.collection('welltrans_sync_logs').where('serviceDate', '==', serviceDate).limit(1000).get(),
-  ]);
-  const expectedTrips = tripsSnapshot.docs
+async function loadAuthoritativeTripsForDate(serviceDate) {
+  const outboxSnapshot = await db.collection('welltrans_sync_outbox')
+    .where('serviceDate', '==', serviceDate)
+    .where('eligibility', '==', 'eligible')
+    .get();
+  if (outboxSnapshot.size) {
+    const outboxByTrip = new Map(outboxSnapshot.docs.map(document => [
+      String(document.data().tripId),
+      document.data(),
+    ]));
+    const tripIds = [...outboxByTrip.keys()];
+    const documents = [];
+    for (let offset = 0; offset < tripIds.length; offset += 300) {
+      const refs = tripIds.slice(offset, offset + 300).map(id => db.doc(`trips/${id}`));
+      documents.push(...await db.getAll(...refs));
+    }
+    return documents
+      .filter(document => document.exists)
+      .map(document => ({
+        id: document.id,
+        ...document.data(),
+        _outboxUpdatedAt: outboxByTrip.get(document.id)?.updatedAt || null,
+      }))
+      .filter(trip => isAuthoritativeCompletedTrip(trip) && normalizeServiceDate(trip) === serviceDate);
+  }
+
+  // One-time legacy bootstrap. Future trip writes are maintained by the
+  // captureWellTransTripCompletion trigger.
+  const tripsSnapshot = await db.collection('trips').get();
+  const trips = tripsSnapshot.docs
     .map(document => ({ id: document.id, ...document.data() }))
-    .filter(trip =>
-      isAuthoritativeCompletedTrip(trip)
-      && normalizeServiceDate(trip) === serviceDate);
+    .filter(trip => isAuthoritativeCompletedTrip(trip) && normalizeServiceDate(trip) === serviceDate);
+  for (let offset = 0; offset < trips.length; offset += 400) {
+    const batch = db.batch();
+    for (const trip of trips.slice(offset, offset + 400)) {
+      const id = createHash('sha256').update(`welltrans:${serviceDate}:${trip.id}`).digest('hex');
+      batch.set(db.doc(`welltrans_sync_outbox/${id}`), {
+        provider: 'welltrans',
+        tripId: String(trip.id),
+        serviceDate,
+        eligibility: 'eligible',
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    await batch.commit();
+  }
+  return trips;
+}
+
+async function reconcileAuthoritativeCompletedTrips(serviceDate) {
+  const [expectedTrips, logDocuments] = await Promise.all([
+    loadAuthoritativeTripsForDate(serviceDate),
+    loadAllLogsForDate(serviceDate),
+  ]);
   const latestByTrip = new Map();
-  for (const document of logsSnapshot.docs) {
+  for (const document of logDocuments) {
     const data = document.data();
     const key = String(data.tripId);
     const current = latestByTrip.get(key);
@@ -378,6 +489,13 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
   let queued = 0;
   let covered = 0;
   for (const trip of expectedTrips) {
+    const latest = latestByTrip.get(String(trip.id));
+    const outboxUpdatedAt = trip._outboxUpdatedAt?.toMillis?.() || 0;
+    const logUpdatedAt = latest?.updatedAt || 0;
+    if (latest && latest.data.status !== 'failed' && outboxUpdatedAt <= logUpdatedAt) {
+      covered += 1;
+      continue;
+    }
     let current;
     try {
       current = await buildCurrentPortalPayload(trip.id);
@@ -390,7 +508,6 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
       continue;
     }
 
-    const latest = latestByTrip.get(String(trip.id));
     if (!latest) {
       const ref = db.collection('welltrans_sync_logs').doc();
       await ref.create({
@@ -478,10 +595,9 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
 }
 
 async function auditCompletedPortalTrips(page, serviceDate) {
-  const snapshot = await db.collection('welltrans_sync_logs')
-    .where('serviceDate', '==', serviceDate).limit(1000).get();
+  const documents = await loadAllLogsForDate(serviceDate);
   const latestByTrip = new Map();
-  for (const document of snapshot.docs) {
+  for (const document of documents) {
     const data = document.data();
     const key = String(data.tripId);
     const current = latestByTrip.get(key);
@@ -850,9 +966,11 @@ async function main() {
     await publishHeartbeat('standby');
     throw new Error('WellTrans writes are locked. Set WELLTRANS_ENABLE_WRITES=true only after the TripSpark adapter passes a supervised test.');
   }
-  const processing = await db.collection('welltrans_sync_logs').where('status', '==', 'processing').limit(500).get();
+  const processing = await loadAllQueryDocuments(
+    db.collection('welltrans_sync_logs').where('status', '==', 'processing'),
+  );
   const now = Date.now();
-  const stale = processing.docs.filter(item => (item.data().leaseExpiresAt?.toMillis?.() || Number.POSITIVE_INFINITY) < now);
+  const stale = processing.filter(item => (item.data().leaseExpiresAt?.toMillis?.() || Number.POSITIVE_INFINITY) < now);
   await Promise.all(stale.map(item => item.ref.update({ status: 'failed', stage: 'worker_lease_expired', errorMessage: 'Worker stopped before completing this trip. Retry is safe.', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete() })));
   const once = process.argv.includes('--once');
   await publishHeartbeat('connecting');
@@ -864,6 +982,7 @@ async function main() {
   try {
     let selectedDate = await getSelectedPortalDate(session.page);
     selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
+    await waitForDateLease(selectedDate);
     reviewSessionId = randomUUID();
     const authoritative = await reconcileAuthoritativeCompletedTrips(selectedDate);
     const recovered = await recoverStaleReviewJobs(selectedDate);
@@ -883,6 +1002,7 @@ async function main() {
       const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
       if (activeDate !== selectedDate) {
         selectedDate = activeDate;
+        await waitForDateLease(selectedDate);
         reviewSessionId = randomUUID();
         await reconcileAuthoritativeCompletedTrips(selectedDate);
         await recoverStaleReviewJobs(selectedDate);
@@ -892,13 +1012,49 @@ async function main() {
           selectedDate, calibratedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       }
+      await waitForDateLease(selectedDate);
       await publishHeartbeat('calibrated');
       if (Date.now() - lastCompletedPortalAuditAt >= 60_000) {
         await reconcileAuthoritativeCompletedTrips(selectedDate);
         await auditCompletedPortalTrips(session.page, selectedDate);
         lastCompletedPortalAuditAt = Date.now();
       }
-      const pendingJobIds = await listPendingJobIdsForDate(selectedDate);
+      let summary = await publishDateReviewSummary(selectedDate);
+      if (summary.unverifiedCompleted > 0) {
+        const audit = await auditCompletedPortalTrips(session.page, selectedDate);
+        lastCompletedPortalAuditAt = Date.now();
+        summary = await publishDateReviewSummary(selectedDate);
+        process.stdout.write(
+          `Post-Apply verification: ${audit.verified} verified, ${audit.requeued} rebuilt, `
+          + `${audit.failed} blocked.\n`,
+        );
+      }
+      if (summary.staged > 0
+        && (summary.staged >= reviewBatchSize || summary.pending === 0)) {
+        const state = summary.pending === 0 && summary.failed === 0
+          && summary.blocked === 0 && summary.missing === 0
+          ? 'review_ready'
+          : 'review_batch_ready';
+        await db.doc('welltrans_worker_status/primary').set({
+          state,
+          selectedDate,
+          reviewSessionId,
+          reviewBatchSize,
+          reviewBatchStaged: summary.staged,
+          reviewBatchRemaining: summary.pending,
+          lastSeenAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        process.stdout.write(
+          `Review batch ready for ${selectedDate}: ${summary.staged} staged, `
+          + `${summary.pending} remaining. Review the browser and click Apply yourself.\n`,
+        );
+        if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
+        continue;
+      }
+      const batchCapacity = Math.max(0, reviewBatchSize - summary.staged);
+      const pendingJobIds = batchCapacity
+        ? await listPendingJobIdsForDate(selectedDate, batchCapacity)
+        : [];
       if (pendingJobIds.length) {
         const batchDate = selectedDate;
         for (const logId of pendingJobIds) {
@@ -921,7 +1077,6 @@ async function main() {
           }
         }
       } else {
-        const summary = await publishDateReviewSummary(selectedDate);
         process.stdout.write(`Review summary for ${selectedDate}: ${summary.staged} staged, ${summary.failed} failed, ${summary.pending} pending.\n`);
         if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
       }

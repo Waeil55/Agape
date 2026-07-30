@@ -708,6 +708,43 @@ const wellTransSourceFingerprint = (payload) => crypto
   }))
   .digest("hex");
 
+const wellTransOutboxId = (serviceDate, tripId) => crypto
+  .createHash("sha256")
+  .update(`welltrans:${serviceDate}:${tripId}`)
+  .digest("hex");
+
+// Durable completion outbox. The worker can discover changed trips for one
+// service date without repeatedly downloading the entire trips collection.
+exports.captureWellTransTripCompletion = functions.firestore
+  .document("trips/{tripId}")
+  .onWrite(async (change, context) => {
+    const before = change.before.exists ? { id: context.params.tripId, ...change.before.data() } : null;
+    const after = change.after.exists ? { id: context.params.tripId, ...change.after.data() } : null;
+    const dates = [...new Set([before && wellTransServiceDate(before), after && wellTransServiceDate(after)].filter(Boolean))];
+    if (!dates.length) return null;
+    const batch = admin.firestore().batch();
+    for (const serviceDate of dates) {
+      const eligible = Boolean(
+        after
+        && wellTransServiceDate(after) === serviceDate
+        && isWellTransCompletedTrip(after)
+      );
+      const ref = admin.firestore().doc(
+        `welltrans_sync_outbox/${wellTransOutboxId(serviceDate, context.params.tripId)}`,
+      );
+      batch.set(ref, {
+        provider: "welltrans",
+        tripId: context.params.tripId,
+        serviceDate,
+        eligibility: eligible ? "eligible" : "ineligible",
+        sourceDocumentUpdatedAt: after?.updatedAt || after?.completedAt || null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    await batch.commit();
+    return null;
+  });
+
 const unsafeWellTransRetry = (log = {}) => {
   const failure = String(log.errorMessage || "").toLowerCase();
   return failure.includes("expected exactly one of each")
@@ -736,29 +773,83 @@ exports.queueWellTransSync = functions
   const authoritativeById = new Map(authoritativeTrips.map((trip) => [String(trip.id), trip]));
   const clientIds = [...new Set((Array.isArray(data?.tripIds) ? data.tripIds : []).map(String))];
   const requestedIds = fullDateMode ? [...authoritativeById.keys()] : clientIds;
+  const wellTransShardSize = 250;
+  const shardByTrip = new Map(requestedIds.map((tripId, index) => [
+    tripId,
+    `${requestedServiceDate}_${String(Math.floor(index / wellTransShardSize)).padStart(4, "0")}`,
+  ]));
   if (!requestedIds.length && !fullDateMode) {
     throw new functions.https.HttpsError("invalid-argument", "Select at least one trip.");
   }
-  if (requestedIds.length > 1000) {
+  if (requestedIds.length > 10000) {
     throw new functions.https.HttpsError(
       "resource-exhausted",
-      `The selected date contains ${requestedIds.length} completed trips; split the date before synchronization.`,
+      `The selected date contains ${requestedIds.length} completed trips; the current guarded run limit is 10,000.`,
     );
   }
   const manifestRef = admin.firestore().doc(`welltrans_sync_manifests/${requestedServiceDate}`);
   if (fullDateMode) {
+    const shardSize = wellTransShardSize;
+    const shardCount = Math.ceil(requestedIds.length / shardSize);
+    for (let offset = 0; offset < requestedIds.length; offset += shardSize * 400) {
+      const batch = admin.firestore().batch();
+      const firstShard = Math.floor(offset / shardSize);
+      const finalShard = Math.min(shardCount, firstShard + 400);
+      for (let shardIndex = firstShard; shardIndex < finalShard; shardIndex++) {
+        const tripIds = requestedIds.slice(shardIndex * shardSize, (shardIndex + 1) * shardSize);
+        const shardRef = admin.firestore().doc(
+          `welltrans_sync_shards/${requestedServiceDate}_${String(shardIndex).padStart(4, "0")}`,
+        );
+        batch.set(shardRef, {
+          provider: "welltrans",
+          runId: requestedServiceDate,
+          serviceDate: requestedServiceDate,
+          shardIndex,
+          shardCount,
+          tripIds,
+          tripCount: tripIds.length,
+          state: "queued",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      await batch.commit();
+    }
     await manifestRef.set({
       provider: "welltrans",
       serviceDate: requestedServiceDate,
       state: "reconciling",
       expectedTripIds: requestedIds,
       expectedCount: requestedIds.length,
+      shardSize,
+      shardCount,
       clientTripCount: clientIds.length,
       source: "authoritative_firestore_completed_trip_scan",
       requestedBy: context.auth.uid,
       requestedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+  }
+  const [driversSnapshot, datedLogsSnapshot] = fullDateMode
+    ? await Promise.all([
+      admin.firestore().collection("drivers").get(),
+      admin.firestore().collection("welltrans_sync_logs")
+        .where("serviceDate", "==", requestedServiceDate)
+        .get(),
+    ])
+    : [null, null];
+  const driverNames = new Map((driversSnapshot?.docs || []).map(document => [
+    document.id,
+    document.data().name || "",
+  ]));
+  const latestLogByTrip = new Map();
+  for (const document of datedLogsSnapshot?.docs || []) {
+    const data = document.data();
+    const key = String(data.tripId);
+    const timestamp = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
+    const previous = latestLogByTrip.get(key);
+    if (!previous || timestamp > previous.timestamp) {
+      latestLogByTrip.set(key, { ref: document.ref, data, timestamp });
+    }
   }
   let queued = 0;
   let covered = 0;
@@ -773,8 +864,12 @@ exports.queueWellTransSync = functions
     }
     const trip = authoritativeById.get(tripId) || { id: tripSnap.id, ...tripSnap.data() };
     if (trip.driverId && (!trip.driverName || /medical transportation inc/i.test(trip.driverName))) {
-      const driverSnap = await admin.firestore().doc(`drivers/${trip.driverId}`).get();
-      if (driverSnap.exists && driverSnap.data().name) trip.completedDriverName = driverSnap.data().name;
+      if (fullDateMode) {
+        if (driverNames.get(trip.driverId)) trip.completedDriverName = driverNames.get(trip.driverId);
+      } else {
+        const driverSnap = await admin.firestore().doc(`drivers/${trip.driverId}`).get();
+        if (driverSnap.exists && driverSnap.data().name) trip.completedDriverName = driverSnap.data().name;
+      }
     }
     const { payload, errors } = buildWellTransJobPayload(trip);
     if (payload.serviceDate !== requestedServiceDate) {
@@ -782,6 +877,44 @@ exports.queueWellTransSync = functions
     }
     if (errors.length) {
       return { tripId, bookingId: payload.bookingId, rejected: true, errors };
+    }
+    if (fullDateMode) {
+      const latest = latestLogByTrip.get(tripId);
+      if (latest && ["pending", "processing", "awaiting_review", "completed"].includes(latest.data.status)) {
+        return { tripId, bookingId: payload.bookingId, covered: true, existingStatus: latest.data.status };
+      }
+      if (latest?.data.status === "failed" && unsafeWellTransRetry(latest.data)) {
+        return {
+          tripId,
+          bookingId: payload.bookingId,
+          rejected: true,
+          errors: ["Unsafe failed attempt requires supervised correction before this date can be complete"],
+        };
+      }
+      const ref = latest?.ref || admin.firestore().doc(
+        `welltrans_sync_logs/${crypto.createHash("sha256").update(`welltrans:${requestedServiceDate}:${tripId}`).digest("hex")}`,
+      );
+      return {
+        tripId,
+        bookingId: payload.bookingId,
+        queued: true,
+        writeRef: ref,
+        writeData: {
+          tripId, bookingId: payload.bookingId, serviceDate: requestedServiceDate,
+          status: "pending", stage: latest ? "requeued_by_authoritative_run" : "queued",
+          startedAt: null, completedAt: admin.firestore.FieldValue.delete(),
+          errorMessage: "", screenshot: "",
+          syncedBy: context.auth.uid,
+          createdAt: latest?.data.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          attempt: Number(latest?.data.attempt || 0) + 1,
+          provider: "welltrans", automationMethod: "playwright", payload,
+          manifestId: requestedServiceDate,
+          runId: requestedServiceDate,
+          shardId: shardByTrip.get(tripId),
+          queuedSourceFingerprint: wellTransSourceFingerprint(payload),
+        },
+      };
     }
     const logsQuery = admin.firestore().collection("welltrans_sync_logs").where("tripId", "==", tripId);
     const newLogRef = admin.firestore().collection("welltrans_sync_logs").doc();
@@ -831,8 +964,17 @@ exports.queueWellTransSync = functions
     }
     return { tripId, bookingId: payload.bookingId, rejected: true, errors: [decision.error] };
   };
-  for (let offset = 0; offset < requestedIds.length; offset += 20) {
-    const results = await Promise.all(requestedIds.slice(offset, offset + 20).map(processTrip));
+  const processingChunkSize = fullDateMode ? 250 : 20;
+  for (let offset = 0; offset < requestedIds.length; offset += processingChunkSize) {
+    const results = await Promise.all(requestedIds.slice(offset, offset + processingChunkSize).map(processTrip));
+    const writes = results.filter(result => result.writeRef);
+    for (let writeOffset = 0; writeOffset < writes.length; writeOffset += 400) {
+      const batch = admin.firestore().batch();
+      for (const write of writes.slice(writeOffset, writeOffset + 400)) {
+        batch.set(write.writeRef, write.writeData, { merge: true });
+      }
+      await batch.commit();
+    }
     for (const result of results) {
       if (result.queued) queued++;
       else if (result.covered) covered++;
@@ -901,6 +1043,90 @@ exports.confirmWellTransApplied = functions.https.onCall(async (data, context) =
   });
   return { confirmed: true };
 });
+
+exports.confirmWellTransReviewBatchApplied = functions
+  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .https.onCall(async (data, context) => {
+    await requireAdmin(context);
+    const serviceDate = String(data?.serviceDate || "").trim();
+    const reviewSessionId = String(data?.reviewSessionId || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate) || !reviewSessionId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "A valid service date and live review-session ID are required.",
+      );
+    }
+
+    const workerSnapshot = await admin.firestore().doc("welltrans_worker_status/primary").get();
+    const worker = workerSnapshot.exists ? workerSnapshot.data() || {} : {};
+    if (worker.selectedDate !== serviceDate
+      || worker.reviewSessionId !== reviewSessionId
+      || !["review_batch_ready", "review_ready"].includes(worker.state)) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "The worker is not holding a review-ready batch for this date and browser session.",
+      );
+    }
+
+    const snapshot = await admin.firestore().collection("welltrans_sync_logs")
+      .where("serviceDate", "==", serviceDate)
+      .where("status", "==", "awaiting_review")
+      .get();
+    const reviewDocuments = snapshot.docs.filter((document) =>
+      document.data().reviewSessionId === reviewSessionId);
+    if (!reviewDocuments.length) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "No staged trips belong to the current live review batch.",
+      );
+    }
+    if (reviewDocuments.length > 500) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "The live review batch exceeds the 500-trip safety boundary.",
+      );
+    }
+
+    for (let offset = 0; offset < reviewDocuments.length; offset += 400) {
+      const batch = admin.firestore().batch();
+      for (const document of reviewDocuments.slice(offset, offset + 400)) {
+        batch.update(document.ref, {
+          status: "completed",
+          stage: "manual_batch_apply_pending_live_verification",
+          appliedBy: context.auth.uid,
+          appliedReviewSessionId: reviewSessionId,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          portalVerifiedAt: admin.firestore.FieldValue.delete(),
+          portalVerification: admin.firestore.FieldValue.delete(),
+        });
+      }
+      await batch.commit();
+    }
+
+    await admin.firestore().doc("welltrans_worker_status/primary").set({
+      state: "batch_apply_confirmed",
+      selectedDate: serviceDate,
+      reviewSessionId,
+      lastAppliedBatchCount: reviewDocuments.length,
+      lastAppliedBatchConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await admin.firestore().collection("audit_logs").add({
+      action: "welltrans.review_batch.applied",
+      entityType: "broker_sync_batch",
+      actorId: context.auth.uid,
+      serviceDate,
+      reviewSessionId,
+      confirmed: reviewDocuments.length,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      confirmed: reviewDocuments.length,
+      serviceDate,
+      reviewSessionId,
+      verificationPending: true,
+    };
+  });
 
 exports.confirmWellTransDateApplied = functions
   .runWith({ timeoutSeconds: 120, memory: "256MB" })

@@ -12,6 +12,22 @@
       "collectionGroup": "welltrans_sync_logs",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "serviceDate", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "welltrans_sync_outbox",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "serviceDate", "order": "ASCENDING" },
+        { "fieldPath": "eligibility", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "welltrans_sync_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "leaseExpiresAt", "order": "ASCENDING" }
       ]

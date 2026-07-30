@@ -138,7 +138,23 @@ service cloud.firestore {
       allow read: if request.auth != null && isAdmin();
       allow write: if false;
     }
+    match /welltrans_sync_shards/{shardId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+    match /welltrans_sync_outbox/{outboxId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+    match /welltrans_sync_leases/{serviceDate} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
     match /welltrans_worker_status/{workerId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+    match /welltrans_workers/{workerInstanceId} {
       allow read: if request.auth != null && isAdmin();
       allow write: if false;
     }
