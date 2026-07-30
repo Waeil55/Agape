@@ -58,6 +58,11 @@ async function openEditItinerary(page) {
   return grid;
 }
 
+export const isEditItineraryOpen = async page =>
+  Boolean(await page.locator(
+    `${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`,
+  ).count().catch(() => 0));
+
 const normalizeBooking = value => String(value ?? '').trim().replace(/\s+/g, '').replace(/^TRIP-/i, '').toLowerCase();
 
 async function gridModel(grid, bookingId) {

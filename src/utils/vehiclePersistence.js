@@ -5,7 +5,6 @@
 
 const STORAGE_PREFIX_ID = 'agape_assigned_veh_id_';
 const STORAGE_PREFIX_EMAIL = 'agape_assigned_veh_email_';
-const STORAGE_GLOBAL_LAST = 'agape_assigned_veh_global_last';
 
 // In-memory fallback for environments where window.localStorage is unavailable (Node/testing)
 const memoryStore = new Map();
@@ -52,7 +51,6 @@ export function saveAssignedVehicle(driverIdOrEmail, vehicleName) {
         store.setItem(`${STORAGE_PREFIX_ID}${key}`, cleanedVehicle);
       }
     }
-    store.setItem(STORAGE_GLOBAL_LAST, cleanedVehicle);
   } catch (err) {
     console.warn('[vehiclePersistence] Failed to write to storage:', err);
   }
@@ -67,7 +65,7 @@ export function getAssignedVehicle(driverIdOrEmail) {
   try {
     const store = getStorage();
     const key = normalizeKey(driverIdOrEmail);
-    if (!key) return store.getItem(STORAGE_GLOBAL_LAST) || '';
+    if (!key) return '';
 
     if (key.includes('@')) {
       const byEmail = store.getItem(`${STORAGE_PREFIX_EMAIL}${key}`);
@@ -77,10 +75,51 @@ export function getAssignedVehicle(driverIdOrEmail) {
       if (byId) return byId;
     }
 
-    return store.getItem(STORAGE_GLOBAL_LAST) || '';
+    return '';
   } catch (err) {
     return '';
   }
+}
+
+export function clearAssignedVehicle(driverIdOrEmail) {
+  try {
+    const store = getStorage();
+    const key = normalizeKey(driverIdOrEmail);
+    if (!key) return;
+    store.removeItem(`${key.includes('@') ? STORAGE_PREFIX_EMAIL : STORAGE_PREFIX_ID}${key}`);
+  } catch (err) {
+    console.warn('[vehiclePersistence] Failed to clear stored assignment:', err);
+  }
+}
+
+export function planVehicleAssignment(drivers = [], vehicles = [], driverId, vehicleName = '') {
+  const driver = drivers.find(item => item.id === driverId);
+  if (!driver) throw new Error('The selected driver no longer exists.');
+  const normalizedName = String(vehicleName || '').trim();
+  const vehicle = normalizedName
+    ? vehicles.find(item => String(item.name || '').trim().toLowerCase() === normalizedName.toLowerCase())
+    : null;
+  if (normalizedName && !vehicle) throw new Error('The selected vehicle no longer exists.');
+
+  const nextDrivers = drivers.map(item => {
+    const occupiesSelected = normalizedName
+      && String(item.vehicle || '').trim().toLowerCase() === normalizedName.toLowerCase();
+    if (item.id === driverId) {
+      return { ...item, vehicle: normalizedName, vehicleId: vehicle?.id || '' };
+    }
+    return occupiesSelected ? { ...item, vehicle: '', vehicleId: '' } : item;
+  });
+  const nextVehicles = vehicles.map(item => {
+    const isSelected = vehicle && item.id === vehicle.id;
+    const wasOwnedByDriver = item.driverId === driverId || item.assignedDriver === driverId;
+    const occupantWasCleared = Boolean(
+      item.driverId && nextDrivers.some(candidate => candidate.id === item.driverId && !candidate.vehicle),
+    );
+    if (isSelected) return { ...item, driverId, assignedDriver: driverId };
+    if (wasOwnedByDriver || occupantWasCleared) return { ...item, driverId: '', assignedDriver: '' };
+    return item;
+  });
+  return { nextDrivers, nextVehicles, vehicle };
 }
 
 /**
@@ -160,4 +199,3 @@ export function clearVehiclePersistence() {
     memoryStore.clear();
   }
 }
-

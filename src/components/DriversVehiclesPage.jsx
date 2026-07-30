@@ -3,9 +3,9 @@ import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, 
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiAnalyzeDriver } from '../config/ai';
-import { getAssignedVehicle, resolveDriverVehicle, saveAssignedVehicle } from '../utils/vehiclePersistence';
+import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 
-const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled }) => {
+const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled }) => {
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
   const findAssignedDriver = useCallback((v) => {
@@ -41,6 +41,36 @@ const [form, setForm] = useState({
   const [showFleetSummary, setShowFleetSummary] = useState(false);
   const [fleetSummary, setFleetSummary] = useState(null);
   const [fleetSummaryLoading, setFleetSummaryLoading] = useState(false);
+  const [assignmentError, setAssignmentError] = useState('');
+  const [savingAssignment, setSavingAssignment] = useState('');
+
+  const persistVehicleAssignment = useCallback(async (driverId, vehicleName) => {
+    if (!driverId || savingAssignment) return false;
+    setAssignmentError('');
+    setSavingAssignment(driverId);
+    try {
+      if (assignVehicleToDriver) {
+        await assignVehicleToDriver(driverId, vehicleName);
+      } else if (upsertDriverProfile) {
+        const occupant = drivers.find(item => item.id !== driverId && item.vehicle === vehicleName);
+        if (occupant) await upsertDriverProfile(occupant.id, { vehicle: '', vehicleId: '' });
+        const vehicle = vehicles.find(item => item.name === vehicleName);
+        const saved = await upsertDriverProfile(driverId, {
+          vehicle: vehicleName,
+          vehicleId: vehicle?.id || '',
+        });
+        if (!saved) throw new Error('Firestore did not confirm the vehicle assignment.');
+      } else {
+        throw new Error('Vehicle persistence is unavailable.');
+      }
+      return true;
+    } catch (error) {
+      setAssignmentError(error.message || 'Vehicle assignment could not be saved.');
+      return false;
+    } finally {
+      setSavingAssignment('');
+    }
+  }, [assignVehicleToDriver, drivers, savingAssignment, upsertDriverProfile, vehicles]);
   
   const resetVForm = () => setVForm({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '' });
   
@@ -59,24 +89,46 @@ const [form, setForm] = useState({
     onCreateIntentHandled?.();
   }, [createIntent?.nonce]);
   
-  const saveVehicle = () => {
+  const saveVehicle = async () => {
     if (!vForm.name.trim()) return;
-    if (editVehicleId) {
-      setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm } : v));
-      addAuditLog('Vehicle Updated', `${currentUser} updated vehicle ${vForm.name}.`, 'blue');
-    } else {
-      const id = `VHC-${Date.now()}`;
-      setVehicles(prev => [...prev, { ...vForm, id, status: 'Available' }]);
-      addAuditLog('Vehicle Added', `${currentUser} added vehicle ${vForm.name}.`, 'emerald');
+    setAssignmentError('');
+    try {
+      const saved = editVehicleId
+        ? await setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm } : v))
+        : await setVehicles(prev => [...prev, { ...vForm, id: `VHC-${Date.now()}`, status: 'Available' }]);
+      if (saved === false) throw new Error('Firestore did not confirm the vehicle save.');
+      addAuditLog(
+        editVehicleId ? 'Vehicle Updated' : 'Vehicle Added',
+        `${currentUser} ${editVehicleId ? 'updated' : 'added'} vehicle ${vForm.name}.`,
+        editVehicleId ? 'blue' : 'emerald',
+      );
+      setVehicleForm(false);
+      resetVForm();
+    } catch (error) {
+      setAssignmentError(error.message || 'Vehicle could not be saved.');
     }
-    setVehicleForm(false);
-    resetVForm();
   };
   
-  const deleteVehicle = (v) => {
+  const deleteVehicle = async (v) => {
     if (!window.confirm(`Delete vehicle ${v.name}?`)) return;
-    setVehicles(prev => prev.filter(x => x.id !== v.id));
-    addAuditLog('Vehicle Deleted', `${currentUser} deleted vehicle ${v.name}.`, 'rose');
+    setAssignmentError('');
+    try {
+      const assignedDrivers = drivers.filter((driver) =>
+        driver.vehicle === v.name || driver.vehicleId === v.id);
+      for (const driver of assignedDrivers) {
+        if (assignVehicleToDriver) {
+          await assignVehicleToDriver(driver.id, '');
+        } else if (upsertDriverProfile) {
+          const savedDriver = await upsertDriverProfile(driver.id, { vehicle: '', vehicleId: '' });
+          if (!savedDriver) throw new Error(`Could not clear ${driver.name}'s vehicle assignment.`);
+        }
+      }
+      const saved = await setVehicles(prev => prev.filter(x => x.id !== v.id));
+      if (saved === false) throw new Error('Firestore did not confirm the vehicle deletion.');
+      addAuditLog('Vehicle Deleted', `${currentUser} deleted vehicle ${v.name}.`, 'rose');
+    } catch (error) {
+      setAssignmentError(error.message || 'Vehicle could not be deleted.');
+    }
   };
 
   
@@ -138,36 +190,66 @@ const [form, setForm] = useState({
     setShowForm(true);
   };
 
-  const saveDriver = () => {
+  const saveDriver = async () => {
     if (!form.name.trim()) return;
-    if (editing) {
-      setDrivers(prev => prev.map(d => d.id === editing ? { ...d, ...form } : d));
-      addAuditLog('Driver Updated', `${currentUser} updated driver ${form.name}.`, 'blue');
-    } else {
-      const id = `DRV-${Date.now()}`;
-      const currentDispatcher = role === 'dispatcher'
-        ? dispatchers.find((dispatcher) => normalizeEmail(dispatcher.email) === normalizeEmail(currentUser))
-        : null;
-       setDrivers(prev => [...prev, {
-          id, name: form.name, status: form.status, vehicle: form.vehicle, dist: '--',
+    setAssignmentError('');
+    try {
+      const selectedVehicle = form.vehicle || '';
+      const profileFields = { ...form };
+      delete profileFields.vehicle;
+      if (editing) {
+        const saved = upsertDriverProfile
+          ? await upsertDriverProfile(editing, profileFields)
+          : await setDrivers(prev => prev.map(d => d.id === editing ? { ...d, ...profileFields } : d));
+        if (saved === false) throw new Error('Firestore did not confirm the driver update.');
+        const currentVehicle = drivers.find((driver) => driver.id === editing)?.vehicle || '';
+        if (selectedVehicle !== currentVehicle) {
+          if (!assignVehicleToDriver) throw new Error('Vehicle assignment persistence is unavailable.');
+          await assignVehicleToDriver(editing, selectedVehicle);
+        }
+        addAuditLog('Driver Updated', `${currentUser} updated driver ${form.name}.`, 'blue');
+      } else {
+        const id = `DRV-${Date.now()}`;
+        const currentDispatcher = role === 'dispatcher'
+          ? dispatchers.find((dispatcher) => normalizeEmail(dispatcher.email) === normalizeEmail(currentUser))
+          : null;
+        const saved = await setDrivers(prev => [...prev, {
+          id, name: form.name, status: form.status, vehicle: '', vehicleId: '', dist: '--',
           currentZone: form.currentZone, odometer: 0, nextOilChange: 5000,
           assignedTo: currentDispatcher?.id || form.assignedTo || '', schedule: [],
           email: form.email, phone: form.phone,
           vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
           capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
           cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: currentDispatcher?.id || form.assignedDispatcher || '',
-          hourlyRate: form.hourlyRate || ''
+          hourlyRate: form.hourlyRate || '',
         }]);
-      addAuditLog('Driver Added', `${currentUser} added driver ${form.name}.`, 'emerald');
+        if (saved === false) throw new Error('Firestore did not confirm the new driver.');
+        if (selectedVehicle) {
+          if (!assignVehicleToDriver) throw new Error('Vehicle assignment persistence is unavailable.');
+          await assignVehicleToDriver(id, selectedVehicle);
+        }
+        addAuditLog('Driver Added', `${currentUser} added driver ${form.name}.`, 'emerald');
+      }
+      setShowForm(false);
+      resetForm();
+    } catch (error) {
+      setAssignmentError(error.message || 'Driver could not be saved.');
     }
-    setShowForm(false);
-    resetForm();
   };
 
   const deleteDriver = (driver) => {
-    const doDelete = () => {
-      setDrivers(prev => prev.filter(d => d.id !== driver.id));
-      addAuditLog('Driver Deleted', `${currentUser} deleted driver ${driver.name}.`, 'rose');
+    const doDelete = async () => {
+      setAssignmentError('');
+      try {
+        if (driver.vehicle && assignVehicleToDriver) {
+          await assignVehicleToDriver(driver.id, '');
+        }
+        const saved = await setDrivers(prev => prev.filter(d => d.id !== driver.id));
+        if (saved === false) throw new Error('Firestore did not confirm the driver deletion.');
+        addAuditLog('Driver Deleted', `${currentUser} deleted driver ${driver.name}.`, 'rose');
+      } catch (error) {
+        setAssignmentError(error.message || 'Driver could not be deleted.');
+      }
     };
     if (requestAuthAction) {
       requestAuthAction('Delete Driver', doDelete);
@@ -204,20 +286,26 @@ const [form, setForm] = useState({
     setEditingScheduleIdx(null);
   };
 
-  const saveScheduleBlock = () => {
+  const saveScheduleBlock = async () => {
     if (!editScheduleDriver || !scheduleForm.start || !scheduleForm.end) return;
-    setDrivers(prev => prev.map(d => {
-      if (d.id !== editScheduleDriver.id) return d;
-      const schedule = [...(d.schedule || [])];
-      if (editingScheduleIdx !== null) {
-        schedule[editingScheduleIdx] = { start: scheduleForm.start, end: scheduleForm.end, status: scheduleForm.status };
-      } else {
-        schedule.push({ start: scheduleForm.start, end: scheduleForm.end, status: scheduleForm.status });
-      }
-      return { ...d, schedule };
-    }));
-    setScheduleForm({ start: '09:00 AM', end: '10:00 AM', status: 'free' });
-    setEditingScheduleIdx(null);
+    setAssignmentError('');
+    const schedule = [...(editScheduleDriver.schedule || [])];
+    if (editingScheduleIdx !== null) {
+      schedule[editingScheduleIdx] = { start: scheduleForm.start, end: scheduleForm.end, status: scheduleForm.status };
+    } else {
+      schedule.push({ start: scheduleForm.start, end: scheduleForm.end, status: scheduleForm.status });
+    }
+    try {
+      const saved = upsertDriverProfile
+        ? await upsertDriverProfile(editScheduleDriver.id, { schedule })
+        : await setDrivers(prev => prev.map(d => d.id === editScheduleDriver.id ? { ...d, schedule } : d));
+      if (saved === false) throw new Error('Firestore did not confirm the schedule update.');
+      setEditScheduleDriver(prev => ({ ...prev, schedule }));
+      setScheduleForm({ start: '09:00 AM', end: '10:00 AM', status: 'free' });
+      setEditingScheduleIdx(null);
+    } catch (error) {
+      setAssignmentError(error.message || 'Schedule could not be saved.');
+    }
   };
 
   const editScheduleBlock = (idx) => {
@@ -228,16 +316,22 @@ const [form, setForm] = useState({
     }
   };
 
-  const deleteScheduleBlock = (idx) => {
+  const deleteScheduleBlock = async (idx) => {
     if (!editScheduleDriver) return;
-    setDrivers(prev => prev.map(d => {
-      if (d.id !== editScheduleDriver.id) return d;
-      const schedule = (d.schedule || []).filter((_, i) => i !== idx);
-      return { ...d, schedule };
-    }));
-    if (editingScheduleIdx === idx) {
-      setScheduleForm({ start: '09:00 AM', end: '10:00 AM', status: 'free' });
-      setEditingScheduleIdx(null);
+    setAssignmentError('');
+    const schedule = (editScheduleDriver.schedule || []).filter((_, i) => i !== idx);
+    try {
+      const saved = upsertDriverProfile
+        ? await upsertDriverProfile(editScheduleDriver.id, { schedule })
+        : await setDrivers(prev => prev.map(d => d.id === editScheduleDriver.id ? { ...d, schedule } : d));
+      if (saved === false) throw new Error('Firestore did not confirm the schedule deletion.');
+      setEditScheduleDriver(prev => ({ ...prev, schedule }));
+      if (editingScheduleIdx === idx) {
+        setScheduleForm({ start: '09:00 AM', end: '10:00 AM', status: 'free' });
+        setEditingScheduleIdx(null);
+      }
+    } catch (error) {
+      setAssignmentError(error.message || 'Schedule block could not be deleted.');
     }
   };
 
@@ -260,6 +354,11 @@ const [form, setForm] = useState({
 
   return (
     <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${mode === 'all' ? 'space-y-5' : ''}`}>
+      {assignmentError && (
+        <div role="alert" className="mx-3 mt-3 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+          <AlertCircle size={14} /> {assignmentError}
+        </div>
+      )}
       {mode === 'all' && (
         <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-slate-100/95 py-1 backdrop-blur">
           {[
@@ -331,31 +430,25 @@ const [form, setForm] = useState({
                     <div className="mt-3 grid grid-cols-1 gap-2">
                       <select value={d.vehicle || ''} onChange={async (e) => {
                         const newV = e.target.value;
-                        if (d.vehicle) {
-                          const prevDriver = drivers.find(x => x.vehicle === d.vehicle && x.id !== d.id);
-                          if (prevDriver && upsertDriverProfile) await upsertDriverProfile(prevDriver.id, { vehicle: '' });
+                        if (await persistVehicleAssignment(d.id, newV)) {
+                          addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
                         }
-                        if (newV) {
-                          const currentOccupant = drivers.find(x => x.vehicle === newV && x.id !== d.id);
-                          if (currentOccupant && upsertDriverProfile) await upsertDriverProfile(currentOccupant.id, { vehicle: '' });
-                        }
-                        if (newV) saveAssignedVehicle(d.id, newV);
-                        if (upsertDriverProfile) {
-                          await upsertDriverProfile(d.id, { vehicle: newV });
-                        } else {
-                          setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, vehicle: newV } : x));
-                        }
-                        addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
                       }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                         <option value="">No vehicle</option>
                         {vehicles.filter(v => !drivers.find(x => x.vehicle === v.name && x.id !== d.id) || v.name === d.vehicle).map(v => (
                           <option key={v.id} value={v.name}>{v.name} {v.plate ? `(${v.plate})` : ''}</option>
                         ))}
                       </select>
-                      <select value={d.assignedDispatcher || d.assignedTo || ''} onChange={(e) => {
+                      <select value={d.assignedDispatcher || d.assignedTo || ''} onChange={async (e) => {
                         const newDisp = e.target.value;
-                        setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, assignedDispatcher: newDisp, assignedTo: newDisp } : x));
-                        addAuditLog('Driver Reassigned', `${currentUser} assigned driver ${d.name} to dispatcher ${dispatchers.find(ds => ds.id === newDisp)?.name || 'None'}.`, 'blue');
+                        const saved = upsertDriverProfile
+                          ? await upsertDriverProfile(d.id, { assignedDispatcher: newDisp, assignedTo: newDisp })
+                          : await setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, assignedDispatcher: newDisp, assignedTo: newDisp } : x));
+                        if (saved === false) {
+                          setAssignmentError('Dispatcher assignment could not be saved.');
+                        } else {
+                          addAuditLog('Driver Reassigned', `${currentUser} assigned driver ${d.name} to dispatcher ${dispatchers.find(ds => ds.id === newDisp)?.name || 'None'}.`, 'blue');
+                        }
                       }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                         <option value="">Unassigned dispatcher</option>
                         {dispatchers.map(ds => (
@@ -415,20 +508,9 @@ const [form, setForm] = useState({
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">
                            <select value={d.vehicle || ''} onChange={async (e) => {
                             const newV = e.target.value;
-                            if (upsertDriverProfile) {
-                              if (newV) {
-                                const currentOccupant = drivers.find(x => x.vehicle === newV && x.id !== d.id);
-                                if (currentOccupant) await upsertDriverProfile(currentOccupant.id, { vehicle: '' });
-                              }
-                              await upsertDriverProfile(d.id, { vehicle: newV });
-                            } else {
-                              setDrivers(prev => prev.map(x => {
-                                if (x.id === d.id) return { ...x, vehicle: newV };
-                                if (newV && x.vehicle === newV) return { ...x, vehicle: '' };
-                                return x;
-                              }));
+                            if (await persistVehicleAssignment(d.id, newV)) {
+                              addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
                             }
-                            addAuditLog('Vehicle Assigned', `${currentUser} assigned ${newV || 'no vehicle'} to ${d.name}.`, 'indigo');
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- None -</option>
                             {vehicles.filter(v => !drivers.find(x => x.vehicle === v.name && x.id !== d.id) || v.name === d.vehicle).map(v => (
@@ -438,10 +520,16 @@ const [form, setForm] = useState({
                         </td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden md:table-cell">{d.currentZone || '-'}</td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden lg:table-cell">
-                          <select value={d.assignedDispatcher || d.assignedTo || ''} onChange={(e) => {
+                          <select value={d.assignedDispatcher || d.assignedTo || ''} onChange={async (e) => {
                             const newDisp = e.target.value;
-                            setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, assignedDispatcher: newDisp, assignedTo: newDisp } : x));
-                            addAuditLog('Driver Reassigned', `${currentUser} assigned driver ${d.name} to dispatcher ${dispatchers.find(ds => ds.id === newDisp)?.name || 'None'}.`, 'blue');
+                            const saved = upsertDriverProfile
+                              ? await upsertDriverProfile(d.id, { assignedDispatcher: newDisp, assignedTo: newDisp })
+                              : await setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, assignedDispatcher: newDisp, assignedTo: newDisp } : x));
+                            if (saved === false) {
+                              setAssignmentError('Dispatcher assignment could not be saved.');
+                            } else {
+                              addAuditLog('Driver Reassigned', `${currentUser} assigned driver ${d.name} to dispatcher ${dispatchers.find(ds => ds.id === newDisp)?.name || 'None'}.`, 'blue');
+                            }
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- Unassigned -</option>
                             {dispatchers.map(ds => (
@@ -524,15 +612,10 @@ const [form, setForm] = useState({
                       const driverId = e.target.value;
                       const oldDriverId = assignedDriver?.id;
                       if (driverId === oldDriverId) return;
-                      if (oldDriverId && upsertDriverProfile) await upsertDriverProfile(oldDriverId, { vehicle: '' });
-                      if (driverId) {
-                        saveAssignedVehicle(driverId, v.name);
-                        if (upsertDriverProfile) await upsertDriverProfile(driverId, { vehicle: v.name });
+                      const targetDriverId = driverId || oldDriverId;
+                      if (targetDriverId && await persistVehicleAssignment(targetDriverId, driverId ? v.name : '')) {
+                        addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
                       }
-                      if (setVehicles) {
-                        setVehicles(prev => prev.map(veh => veh.id === v.id ? { ...veh, driverId, assignedDriver: driverId } : veh));
-                      }
-                      addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
                     }} className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                       <option value="">Unassigned driver</option>
                       {drivers.map(d => (
@@ -581,15 +664,10 @@ const [form, setForm] = useState({
                             const driverId = e.target.value;
                             const oldDriverId = assignedDriver?.id;
                             if (driverId === oldDriverId) return;
-                            if (oldDriverId && upsertDriverProfile) await upsertDriverProfile(oldDriverId, { vehicle: '' });
-                            if (driverId) {
-                              saveAssignedVehicle(driverId, v.name);
-                              if (upsertDriverProfile) await upsertDriverProfile(driverId, { vehicle: v.name });
+                            const targetDriverId = driverId || oldDriverId;
+                            if (targetDriverId && await persistVehicleAssignment(targetDriverId, driverId ? v.name : '')) {
+                              addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
                             }
-                            if (setVehicles) {
-                              setVehicles(prev => prev.map(veh => veh.id === v.id ? { ...veh, driverId, assignedDriver: driverId } : veh));
-                            }
-                            addAuditLog('Driver Assigned', `${currentUser} assigned ${drivers.find(d => d.id === driverId)?.name || 'no driver'} to vehicle ${v.name}.`, 'indigo');
                           }} className="px-2 py-1 border border-slate-200 rounded-xl text-xs font-semibold bg-white w-full max-w-[140px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                             <option value="">- Unassigned -</option>
                             {drivers.map(d => (

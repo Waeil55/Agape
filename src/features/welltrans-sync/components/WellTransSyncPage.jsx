@@ -90,6 +90,12 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       ? 'Incomplete date — action required'
     : workerBatchReady
       ? `${worker?.reviewBatchStaged || 0} ready for Apply`
+    : worker?.state === 'indexing_schedule'
+      ? 'Indexing schedule for turbo fill'
+    : worker?.state === 'verifying_applied_records'
+      ? 'Verifying applied records'
+    : worker?.state === 'staging'
+      ? 'Filling WellTrans'
     : workerNeedsLogin
       ? 'Sign-in required'
       : workerNeedsDate

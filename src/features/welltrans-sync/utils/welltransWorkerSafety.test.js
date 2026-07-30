@@ -196,6 +196,23 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain('async function auditCompletedPortalTrips(page, serviceDate)');
     expect(worker).toContain("stage: 'requeued_after_live_portal_audit'");
     expect(worker).toContain('item.portalReviewSessionId === reviewSessionId');
-    expect(worker).toContain('Date.now() - lastCompletedPortalAuditAt >= 60_000');
+    expect(worker).toContain('Date.now() - lastAuthoritativeReconcileAt >= 60_000');
+  });
+
+  it('fills pending rows before running broad live verification', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    expect(worker).toContain('initialSummary.pending === 0');
+    expect(worker).toContain('if (summary.pending === 0 && summary.staged === 0 && summary.unverifiedCompleted > 0)');
+    expect(worker).toContain("await publishHeartbeat('staging')");
+  });
+
+  it('verifies a manually closed review batch and safely rebuilds unsaved rows', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const trip = readFileSync(tripSourcePath, 'utf8');
+    expect(trip).toContain('export const isEditItineraryOpen');
+    expect(worker).toContain('async function verifyClosedReviewBatch(page, serviceDate)');
+    expect(worker).toContain("stage: 'manual_apply_live_verified'");
+    expect(worker).toContain("stage: 'requeued_after_manual_dialog_close'");
+    expect(worker).toContain('if (!await isEditItineraryOpen(session.page))');
   });
 });

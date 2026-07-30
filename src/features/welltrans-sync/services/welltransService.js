@@ -76,9 +76,6 @@ export const saveWellTransSettings = (settings, actorId) => {
 export const queueWellTransSync = (tripIds, mode, serviceDate) =>
   httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate });
 
-export const confirmWellTransApplied = logId =>
-  httpsCallable(functions, 'confirmWellTransApplied')({ logId });
-
 export const confirmWellTransDateApplied = serviceDate =>
   httpsCallable(functions, 'confirmWellTransDateApplied')({ serviceDate });
 

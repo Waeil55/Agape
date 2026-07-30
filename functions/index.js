@@ -1016,34 +1016,6 @@ exports.queueWellTransSync = functions
   };
 });
 
-exports.confirmWellTransApplied = functions.https.onCall(async (data, context) => {
-  await requireAdmin(context);
-  const logId = String(data?.logId || "");
-  if (!logId) throw new functions.https.HttpsError("invalid-argument", "A synchronization log ID is required.");
-  const ref = admin.firestore().doc(`welltrans_sync_logs/${logId}`);
-  await admin.firestore().runTransaction(async transaction => {
-    const snapshot = await transaction.get(ref);
-    if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Synchronization log not found.");
-    if (snapshot.data().status !== "awaiting_review") {
-      throw new functions.https.HttpsError("failed-precondition", "Only records awaiting manual review can be confirmed.");
-    }
-    transaction.update(ref, {
-      status: "completed", stage: "manually_applied", appliedBy: context.auth.uid,
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  });
-  await admin.firestore().doc("welltrans_settings/primary").set({
-    lastSync: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
-  await admin.firestore().collection("audit_logs").add({
-    action: "welltrans.sync.manually_applied", entityType: "broker_sync",
-    entityId: logId, actorId: context.auth.uid,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  return { confirmed: true };
-});
-
 exports.confirmWellTransReviewBatchApplied = functions
   .runWith({ timeoutSeconds: 120, memory: "256MB" })
   .https.onCall(async (data, context) => {

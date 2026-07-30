@@ -27,6 +27,7 @@ import {
   filterValidTripRecords,
   isCorruptedTripRecord,
 } from '../utils/tripIntegrity';
+import { findRemovedDocumentIds } from '../utils/firestorePersistence';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -89,7 +90,12 @@ function normalizeTrip(trip) {
   return trip;
 }
 
-import { resolveDriverVehicle, saveAssignedVehicle } from '../utils/vehiclePersistence';
+import {
+  clearAssignedVehicle,
+  planVehicleAssignment,
+  resolveDriverVehicle,
+  saveAssignedVehicle,
+} from '../utils/vehiclePersistence';
 
 function cleanTripCollection(trips = []) {
   const list = Array.isArray(trips) ? trips : [];
@@ -266,8 +272,9 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       if (cancelled) return;
       const nextList = [];
       snap.forEach((itemDoc) => nextList.push({ ...itemDoc.data(), id: itemDoc.id }));
-      dataRef.current = { ...normalizeData(dataRef.current), [field]: nextList };
-      setState(prev => ({ ...prev, [field]: nextList, loading: false, initialized: true, error: null }));
+      const normalized = normalizeData({ ...dataRef.current, [field]: nextList });
+      dataRef.current = normalized;
+      setState(prev => ({ ...prev, [field]: normalized[field], loading: false, initialized: true, error: null }));
     };
 
     const applyTripsSnapshot = (snap) => {
@@ -476,6 +483,8 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
         });
       } else if (field === 'drivers') {
         await writeDriversToCollection(dataRef.current.drivers || []);
+        const removedIds = findRemovedDocumentIds(previousData.drivers, dataRef.current.drivers);
+        await deleteDocsById(DRIVER_PROFILE_COLLECTION, removedIds);
       } else if (field === 'dispatchers') {
         const now = new Date().toISOString();
         const docs = (dataRef.current.dispatchers || []).filter((d) => d?.id).map((d) => ({
@@ -488,6 +497,8 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
           });
           await batch.commit();
         }
+        const removedIds = findRemovedDocumentIds(previousData.dispatchers, dataRef.current.dispatchers);
+        await deleteDocsById(DISPATCHER_PROFILE_COLLECTION, removedIds);
       } else if (field === 'vehicles') {
         const now = new Date().toISOString();
         const docs = (dataRef.current.vehicles || []).filter((v) => v?.id).map((v) => ({
@@ -500,6 +511,8 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
           });
           await batch.commit();
         }
+        const removedIds = findRemovedDocumentIds(previousData.vehicles, dataRef.current.vehicles);
+        await deleteDocsById(VEHICLE_COLLECTION, removedIds);
       } else if (field === 'phoneNumbers') {
         await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
       } else if (field === 'logs') {
@@ -558,7 +571,6 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
 
   const upsertDriverProfile = useCallback(async (driverId, updates = {}) => {
     if (!driverId) return false;
-    if (updates?.vehicle) saveAssignedVehicle(driverId, updates.vehicle);
     const currentDrivers = dataRef.current.drivers || [];
     const existing = currentDrivers.find((driver) => driver.id === driverId) || { id: driverId };
     const nextDriver = sanitizeForFirestore({ ...existing, ...updates, id: driverId, updatedAtLocal: updates.updatedAtLocal || new Date().toISOString() });
@@ -569,11 +581,76 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
     setState(prev => ({ ...prev, drivers: nextDrivers, error: null }));
     try {
       await setDoc(doc(db, DRIVER_PROFILE_COLLECTION, driverId), nextDriver, { merge: true });
+      if (Object.prototype.hasOwnProperty.call(updates, 'vehicle')) {
+        if (nextDriver.vehicle) {
+          saveAssignedVehicle(driverId, nextDriver.vehicle);
+          if (nextDriver.email) saveAssignedVehicle(nextDriver.email, nextDriver.vehicle);
+        } else {
+          clearAssignedVehicle(driverId);
+          if (nextDriver.email) clearAssignedVehicle(nextDriver.email);
+        }
+      }
       emitSystemEvents(buildDriverEvents([existing], [nextDriver], getCurrentEventActor())).catch((err) => console.error('Driver event failed:', err));
       return true;
     } catch (err) {
       console.error('Failed to upsert driver profile:', err);
+      dataRef.current = { ...normalizeData(dataRef.current), drivers: currentDrivers };
+      setState(prev => ({
+        ...prev,
+        drivers: currentDrivers,
+        error: err.message || 'Driver profile could not be saved',
+      }));
       return false;
+    }
+  }, []);
+
+  const assignVehicleToDriver = useCallback(async (driverId, vehicleName = '') => {
+    if (!driverId) throw new Error('A driver is required for vehicle assignment.');
+    const currentDrivers = dataRef.current.drivers || [];
+    const currentVehicles = dataRef.current.vehicles || [];
+    const planned = planVehicleAssignment(currentDrivers, currentVehicles, driverId, vehicleName);
+    const timestamp = new Date().toISOString();
+    const nextDrivers = planned.nextDrivers.map((item, index) =>
+      item.vehicle !== currentDrivers[index]?.vehicle || item.vehicleId !== currentDrivers[index]?.vehicleId
+        ? { ...item, updatedAtLocal: timestamp }
+        : item);
+    const nextVehicles = planned.nextVehicles;
+
+    dataRef.current = { ...normalizeData(dataRef.current), drivers: nextDrivers, vehicles: nextVehicles };
+    setState(prev => ({ ...prev, drivers: nextDrivers, vehicles: nextVehicles, saving: true, error: null }));
+    try {
+      const batch = writeBatch(db);
+      for (const changedDriver of nextDrivers.filter((item, index) =>
+        item.vehicle !== currentDrivers[index]?.vehicle || item.vehicleId !== currentDrivers[index]?.vehicleId)) {
+        batch.set(doc(db, DRIVER_PROFILE_COLLECTION, changedDriver.id), sanitizeForFirestore(changedDriver), { merge: true });
+      }
+      for (const changedVehicle of nextVehicles.filter((item, index) =>
+        item.driverId !== currentVehicles[index]?.driverId
+        || item.assignedDriver !== currentVehicles[index]?.assignedDriver)) {
+        batch.set(doc(db, VEHICLE_COLLECTION, changedVehicle.id), sanitizeForFirestore(changedVehicle), { merge: true });
+      }
+      await batch.commit();
+      for (const item of nextDrivers) {
+        if (item.vehicle) {
+          saveAssignedVehicle(item.id, item.vehicle);
+          if (item.email) saveAssignedVehicle(item.email, item.vehicle);
+        } else {
+          clearAssignedVehicle(item.id);
+          if (item.email) clearAssignedVehicle(item.email);
+        }
+      }
+      setState(prev => ({ ...prev, saving: false, lastSavedAt: new Date().toISOString() }));
+      return true;
+    } catch (error) {
+      dataRef.current = { ...normalizeData(dataRef.current), drivers: currentDrivers, vehicles: currentVehicles };
+      setState(prev => ({
+        ...prev,
+        drivers: currentDrivers,
+        vehicles: currentVehicles,
+        saving: false,
+        error: error.message || 'Vehicle assignment could not be saved',
+      }));
+      throw error;
     }
   }, []);
 
@@ -597,7 +674,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
     trashedTrips: state.trashedTrips, logs: state.logs, phoneNumbers: state.phoneNumbers,
     loading: state.loading, saving: state.saving, error: state.error,
     initialized: state.initialized, docExists: state.docExists, lastSavedAt: state.lastSavedAt,
-    setTrips, setDrivers, upsertDriverProfile, upsertDriverTrip, setDispatchers, setVehicles, setTrashedTrips, setLogs, setPhoneNumbers, addLog, initializeAppData,
+    setTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles, setTrashedTrips, setLogs, setPhoneNumbers, addLog, initializeAppData,
   };
 }
 

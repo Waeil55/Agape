@@ -14,6 +14,7 @@ import {
   auditWellTransTrip,
   buildWellTransGridIndex,
   getSelectedPortalDate,
+  isEditItineraryOpen,
   syncWellTransTrip,
   validateWellTransTrip,
 } from './welltrans.trip.js';
@@ -38,10 +39,11 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.1.0';
+const workerVersion = '3.2.0';
 let requestedServiceDate = '';
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
+let lastAuthoritativeReconcileAt = 0;
 let portalGridIndex = null;
 const stagingDurations = [];
 const firestorePageSize = Math.min(
@@ -693,6 +695,66 @@ async function auditCompletedPortalTrips(page, serviceDate) {
   return result;
 }
 
+async function verifyClosedReviewBatch(page, serviceDate) {
+  const documents = await loadAllLogsForDate(serviceDate);
+  const staged = documents.filter(document => {
+    const data = document.data();
+    return data.status === 'awaiting_review' && data.reviewSessionId === reviewSessionId;
+  });
+  const result = { verified: 0, requeued: 0, failed: 0 };
+  for (const document of staged) {
+    const data = document.data();
+    try {
+      const current = await buildCurrentPortalPayload(data.tripId);
+      const sourceChanged = Boolean(
+        data.stagedSourceFingerprint
+        && data.stagedSourceFingerprint !== current.sourceFingerprint
+      );
+      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const vehicleWasIntentionallySkipped = warnings.some(warning =>
+        /vehicle was left unchanged because no unique exact WellTrans match/i.test(String(warning)));
+      const portalAudit = await auditWellTransTrip(page, current.payload, {
+        verifyVehicle: !vehicleWasIntentionallySkipped,
+        gridIndex: portalGridIndex,
+      });
+      if (!portalAudit.verified || sourceChanged) {
+        await document.ref.update({
+          status: 'pending',
+          stage: 'requeued_after_manual_dialog_close',
+          errorMessage: '',
+          completedAt: FieldValue.delete(),
+          portalVerification: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+          workerVersion,
+        });
+        result.requeued += 1;
+      } else {
+        await document.ref.update({
+          status: 'completed',
+          stage: 'manual_apply_live_verified',
+          completedAt: FieldValue.serverTimestamp(),
+          portalVerifiedAt: FieldValue.serverTimestamp(),
+          portalVerification: { ...portalAudit, reviewSessionId },
+          updatedAt: FieldValue.serverTimestamp(),
+          workerVersion,
+        });
+        result.verified += 1;
+      }
+    } catch (error) {
+      await document.ref.update({
+        status: 'failed',
+        stage: 'manual_apply_verification_failed',
+        errorMessage: String(error?.message || error).slice(0, 2000),
+        completedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        workerVersion,
+      });
+      result.failed += 1;
+    }
+  }
+  return result;
+}
+
 async function processJob(job, existingSession = null) {
   if (!existingSession?.browser || !existingSession?.page) {
     throw new Error('WellTrans staging requires a calibrated headed browser session so an operator can review every field before Apply.');
@@ -1012,10 +1074,15 @@ async function main() {
     selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
     await waitForDateLease(selectedDate);
     reviewSessionId = randomUUID();
+    await publishHeartbeat('indexing_schedule');
     portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
     const authoritative = await reconcileAuthoritativeCompletedTrips(selectedDate);
+    lastAuthoritativeReconcileAt = Date.now();
     const recovered = await recoverStaleReviewJobs(selectedDate);
-    const completedAudit = await auditCompletedPortalTrips(session.page, selectedDate);
+    const initialSummary = await publishDateReviewSummary(selectedDate);
+    const completedAudit = initialSummary.pending === 0
+      ? await auditCompletedPortalTrips(session.page, selectedDate)
+      : { requeued: 0, verified: 0, failed: 0, deferred: initialSummary.unverifiedCompleted };
     lastCompletedPortalAuditAt = Date.now();
     await publishHeartbeat('calibrated');
     await db.doc('welltrans_worker_status/primary').set({
@@ -1033,10 +1100,16 @@ async function main() {
         selectedDate = activeDate;
         await waitForDateLease(selectedDate);
         reviewSessionId = randomUUID();
+        await publishHeartbeat('indexing_schedule');
         portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
         await reconcileAuthoritativeCompletedTrips(selectedDate);
+        lastAuthoritativeReconcileAt = Date.now();
         await recoverStaleReviewJobs(selectedDate);
-        await auditCompletedPortalTrips(session.page, selectedDate);
+        const changedDateSummary = await publishDateReviewSummary(selectedDate);
+        if (changedDateSummary.pending === 0) {
+          await publishHeartbeat('verifying_applied_records');
+          await auditCompletedPortalTrips(session.page, selectedDate);
+        }
         lastCompletedPortalAuditAt = Date.now();
         await db.doc('welltrans_worker_status/primary').set({
           selectedDate, calibratedAt: FieldValue.serverTimestamp(),
@@ -1044,23 +1117,24 @@ async function main() {
       }
       await waitForDateLease(selectedDate);
       await publishHeartbeat('calibrated');
-      if (Date.now() - lastCompletedPortalAuditAt >= 60_000) {
+      if (Date.now() - lastAuthoritativeReconcileAt >= 60_000) {
         await reconcileAuthoritativeCompletedTrips(selectedDate);
-        await auditCompletedPortalTrips(session.page, selectedDate);
-        lastCompletedPortalAuditAt = Date.now();
+        lastAuthoritativeReconcileAt = Date.now();
       }
       let summary = await publishDateReviewSummary(selectedDate);
-      if (summary.unverifiedCompleted > 0) {
-        const audit = await auditCompletedPortalTrips(session.page, selectedDate);
-        lastCompletedPortalAuditAt = Date.now();
-        summary = await publishDateReviewSummary(selectedDate);
-        process.stdout.write(
-          `Post-Apply verification: ${audit.verified} verified, ${audit.requeued} rebuilt, `
-          + `${audit.failed} blocked.\n`,
-        );
-      }
       if (summary.staged > 0
         && (summary.staged >= reviewBatchSize || summary.pending === 0)) {
+        if (!await isEditItineraryOpen(session.page)) {
+          await publishHeartbeat('verifying_applied_records');
+          const verification = await verifyClosedReviewBatch(session.page, selectedDate);
+          lastCompletedPortalAuditAt = Date.now();
+          process.stdout.write(
+            `Manual dialog completion detected: ${verification.verified} applied and verified, `
+            + `${verification.requeued} not persisted and requeued, ${verification.failed} failed.\n`,
+          );
+          if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
+          continue;
+        }
         const state = summary.pending === 0 && summary.failed === 0
           && summary.blocked === 0 && summary.missing === 0
           ? 'review_ready'
@@ -1081,6 +1155,16 @@ async function main() {
         if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
         continue;
       }
+      if (summary.pending === 0 && summary.staged === 0 && summary.unverifiedCompleted > 0) {
+        await publishHeartbeat('verifying_applied_records');
+        const audit = await auditCompletedPortalTrips(session.page, selectedDate);
+        lastCompletedPortalAuditAt = Date.now();
+        summary = await publishDateReviewSummary(selectedDate);
+        process.stdout.write(
+          `Post-Apply verification: ${audit.verified} verified, ${audit.requeued} rebuilt, `
+          + `${audit.failed} blocked.\n`,
+        );
+      }
       const batchCapacity = Math.max(0, reviewBatchSize - summary.staged);
       const pendingJobIds = batchCapacity
         ? await listPendingJobIdsForDate(selectedDate, batchCapacity)
@@ -1095,7 +1179,7 @@ async function main() {
           }
           const job = await claimJobById(logId);
           if (job) {
-            await publishHeartbeat('processing');
+            await publishHeartbeat('staging');
             const outcome = await processJob(job, session);
             await publishHeartbeat('calibrated');
             if (!outcome.safeToContinue) {

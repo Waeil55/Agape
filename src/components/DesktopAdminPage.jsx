@@ -496,7 +496,7 @@ const exportFullJson = (trips, drivers, dispatchers, vehicles, logs) => {
 };
 
 const DesktopAdminPage = ({
-  role, currentUser, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], setDispatchers,
+  role, currentUser, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers,
   addAuditLog, logs = [], trips = [], vehicles = [], setVehicles,
   assignTripToDriver, requestAuthAction, onViewTrip
 }) => {
@@ -868,6 +868,7 @@ const DesktopAdminPage = ({
           <DriversVehiclesPage
             mode="all"
             role={role} drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
+            assignVehicleToDriver={assignVehicleToDriver}
             dispatchers={dispatchers}
             addAuditLog={addAuditLog} currentUser={currentUser}
             trips={trips} onAssignTrip={assignTripToDriver}

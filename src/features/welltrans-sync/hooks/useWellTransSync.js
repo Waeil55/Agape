@@ -13,7 +13,7 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '3.1.0';
+const REQUIRED_WORKER_VERSION = '3.2.0';
 
 export const useWellTransSync = (trips = [], serviceDate = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -62,7 +62,8 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const workerOnline = Boolean(heartbeat && now - heartbeat.getTime() < 45000
     && [
       'online', 'connecting', 'waiting_for_login', 'date_selection_required',
-      'processing', 'calibrated', 'review_ready', 'review_batch_ready',
+      'processing', 'staging', 'indexing_schedule', 'verifying_applied_records',
+      'calibrated', 'review_ready', 'review_batch_ready',
       'batch_apply_confirmed', 'reconciliation_blocked', 'review_error',
     ].includes(worker?.state));
   const workerUpgradeRequired = Boolean(workerOnline
@@ -70,7 +71,8 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const workerCalibrated = Boolean(workerOnline
     && !workerUpgradeRequired
     && [
-      'calibrated', 'review_ready', 'review_batch_ready',
+      'calibrated', 'staging', 'verifying_applied_records',
+      'review_ready', 'review_batch_ready',
       'batch_apply_confirmed', 'reconciliation_blocked',
     ].includes(worker?.state)
     && worker?.selectedDate);

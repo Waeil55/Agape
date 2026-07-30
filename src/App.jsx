@@ -490,7 +490,7 @@ const App = () => {
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, error: dataError,
-    setTrips, setDrivers, upsertDriverProfile, upsertDriverTrip, setDispatchers, setVehicles,
+    setTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
   } = useFirestoreAppData({ resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
@@ -2916,6 +2916,7 @@ const App = () => {
               drivers={scopedDrivers}
               setDrivers={setDrivers}
               upsertDriverProfile={upsertDriverProfile}
+              assignVehicleToDriver={assignVehicleToDriver}
               dispatchers={dispatchers}
               setDispatchers={setDispatchers}
               vehicles={vehicles}

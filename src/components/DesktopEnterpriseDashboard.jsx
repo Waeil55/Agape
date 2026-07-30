@@ -138,7 +138,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
 };
 
 const DesktopEnterpriseDashboard = ({
-  role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, dispatchers = [], setDispatchers, vehicles = [], setVehicles,
+  role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers, vehicles = [], setVehicles,
   trashedTrips = [], setTrashedTrips, restoreTrip, deleteTrashedTrip, logs = [], setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
   selectedTasks = [], setSelectedTasks, searchQuery, setSearchQuery,
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
@@ -1166,7 +1166,7 @@ const DesktopEnterpriseDashboard = ({
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
         <AdminPage
           role={role} currentUser={currentUser}
-          drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile}
+          drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile} assignVehicleToDriver={assignVehicleToDriver}
           dispatchers={dispatchers} setDispatchers={setDispatchers}
           vehicles={vehicles} setVehicles={setVehicles}
           addAuditLog={addAuditLog}
