@@ -221,6 +221,56 @@ export async function buildWellTransGridIndex(page, expectedServiceDate) {
   };
 }
 
+export async function inspectWellTransPortalContract(page, expectedServiceDate, gridIndex = null) {
+  const selectedDate = await getSelectedPortalDate(page);
+  if (selectedDate !== expectedServiceDate) {
+    return {
+      passed: false,
+      selectedDate,
+      expectedServiceDate,
+      errors: [`Opened date ${selectedDate || 'unknown'} does not match ${expectedServiceDate}`],
+    };
+  }
+  const grid = await openEditItinerary(page);
+  const headers = await grid.evaluate(element => [...new Set(
+    [...element.querySelectorAll('.GridCell')]
+      .filter(cell => cell.style.top === '0px')
+      .map(cell => String(cell.title || '').trim())
+      .filter(Boolean),
+  )]);
+  const missingColumns = REQUIRED_COLUMNS.filter(column => !headers.includes(column));
+  const index = gridIndex || await buildWellTransGridIndex(page, expectedServiceDate);
+  const ambiguousBookings = [];
+  for (const [bookingId, rows] of index.rowsByBooking || []) {
+    const pickupCount = rows.filter(row => ACTIVITY_PICKUP.test(row.activity)).length;
+    const dropoffCount = rows.filter(row => ACTIVITY_DROPOFF.test(row.activity)).length;
+    if (pickupCount !== 1 || dropoffCount !== 1) {
+      ambiguousBookings.push({ bookingId, pickupCount, dropoffCount });
+    }
+  }
+  const errors = [
+    ...(missingColumns.length ? [`Missing required columns: ${missingColumns.join(', ')}`] : []),
+    ...(!index.bookingCount ? ['No Booking IDs were indexed from the opened itinerary'] : []),
+  ];
+  return {
+    passed: errors.length === 0,
+    provider: 'welltrans',
+    adapter: 'tripspark-novusmed',
+    selectedDate,
+    requiredColumns: [...REQUIRED_COLUMNS],
+    headers,
+    missingColumns,
+    bookingCount: index.bookingCount,
+    rowCount: index.rowCount,
+    ambiguousBookingCount: ambiguousBookings.length,
+    ambiguousBookings: ambiguousBookings.slice(0, 50),
+    warnings: ambiguousBookings.length
+      ? [`${ambiguousBookings.length} Booking ID(s) require trip-level fail-closed validation`]
+      : [],
+    errors,
+  };
+}
+
 const indexedGridModel = (gridIndex, bookingId) => {
   if (!gridIndex?.rowsByBooking) return null;
   return {

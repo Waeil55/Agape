@@ -10,7 +10,7 @@ import { useWellTransSync } from '../hooks/useWellTransSync';
 import { useWellTransAutoSync } from '../hooks/useWellTransAutoSync';
 import {
   confirmWellTransReviewBatchApplied,
-  explainWellTransFailure, exportWellTransLogsCSV,
+  explainWellTransFailure, explainWellTransFailureAI, exportWellTransLogsCSV,
   isWellTransFailureRetryable, queueWellTransSync, saveWellTransSettings,
   categorizeFailure, FAILURE_CATEGORIES,
 } from '../services/welltransService';
@@ -33,7 +33,7 @@ const TABLE_PAGE_SIZE = WELLTRANS_TABLE_PAGE_SIZE;
 const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const {
-    settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, manifest, coverage,
+    settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, canary, manifest, coverage,
     workerOnline, workerCalibrated, workerUpgradeRequired,
     requiredWorkerVersion, workerStandby, loading, completedTrips, readyTrips,
     latestByTrip, healthScore, successfulCount,
@@ -45,6 +45,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [selectedFailure, setSelectedFailure] = useState(null);
+  const [aiDiagnostic, setAiDiagnostic] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
   const [inspectPayloadTrip, setInspectPayloadTrip] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -81,8 +83,16 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const workerConnecting = worker?.state === 'connecting';
   const workerNeedsDate = worker?.state === 'date_selection_required';
   const workerReviewError = worker?.state === 'review_error';
-  const workerReconciliationBlocked = worker?.state === 'reconciliation_blocked';
-  const workerBatchReady = ['review_batch_ready', 'review_ready'].includes(worker?.state);
+  const workerReconciliationBlocked = [
+    'reconciliation_blocked',
+    'reconciliation_blocked_do_not_apply',
+  ].includes(worker?.state);
+  const workerBatchReady = [
+    'review_batch_ready',
+    'review_ready',
+    'review_batch_verified',
+    'review_ready_verified',
+  ].includes(worker?.state);
   const workerStatusLabel = !settings.enabled
     ? 'Disabled'
     : workerReviewError
@@ -93,6 +103,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       ? `${worker?.reviewBatchStaged || 0} ready for Apply`
     : worker?.state === 'indexing_schedule'
       ? 'Indexing schedule for turbo fill'
+    : worker?.state === 'running_portal_canary'
+      ? 'Verifying portal contract'
     : worker?.state === 'verifying_applied_records'
       ? 'Verifying applied records'
     : worker?.state === 'staging'
@@ -111,6 +123,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const workerHealthy = settings.enabled && workerOnline
     && !workerNeedsLogin && !workerNeedsDate && !workerConnecting
     && !workerReviewError && !workerReconciliationBlocked;
+  const canaryHealthy = canary?.passed === true
+    && (!canary?.serviceDate || canary.serviceDate === syncDate);
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const stagedCount = currentLogs.filter(l =>
     l.status === 'awaiting_review'
@@ -209,14 +223,15 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
         syncDate,
       );
       setSyncProgress({
-        done: result.data.queued + (result.data.rejected || 0),
+        done: result.data.orchestrated
+          || result.data.queued + (result.data.rejected || 0),
         total: result.data.expected || completedTrips.length,
       });
-      setNotice(
-        `Full-date reconciliation requested for ${syncDate}: ${result.data.expected || completedTrips.length} completed, `
-        + `${result.data.queued} queued, ${result.data.covered || 0} already covered, `
-        + `${result.data.rejected || 0} blocked for correction.`,
-      );
+      setNotice(result.data.orchestrated != null
+        ? `Durable reconciliation dispatched for ${syncDate}: ${result.data.orchestrated} completed trips across ${result.data.shardCount || 0} recoverable task shard(s).`
+        : `Full-date reconciliation requested for ${syncDate}: ${result.data.expected || completedTrips.length} completed, `
+          + `${result.data.queued} queued, ${result.data.covered || 0} already covered, `
+          + `${result.data.rejected || 0} blocked for correction.`);
       setSelectedIds([]);
       setTimeout(() => setSyncProgress(null), 5000);
     } catch (error) {
@@ -450,6 +465,11 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 Failover ready
               </span>
             )}
+            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+              canaryHealthy ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+            }`}>
+              Portal contract {canaryHealthy ? 'verified' : 'not verified'}
+            </span>
           </div>
           {workers.length ? workers.slice(0, 6).map(item => {
             const ageLabel = Number.isFinite(item.ageMs)
@@ -491,8 +511,15 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           <span>
             Operations {operations.state}: {operations.activeWorkerCount || 0} active agents,
             {' '}{operations.staleProcessingCount || 0} stuck jobs,
-            {' '}{operations.blockedDateCount || 0} blocked dates.
+            {' '}{operations.blockedDateCount || 0} blocked dates
+            {operations.canaryPassed === false ? ', portal contract failed.' : '.'}
           </span>
+        </div>
+      )}
+      {agentRelease?.signed === false && (
+        <div className="shrink-0 flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-[11px] font-semibold text-amber-800">
+          <ShieldCheck size={13} className="shrink-0" />
+          The current Agent package is integrity-checked but not Authenticode-signed. Organization-managed Windows computers may require a trusted publisher certificate.
         </div>
       )}
       {notice && (
@@ -957,9 +984,40 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-[11px] font-bold text-purple-600 uppercase">AI Diagnostic</p>
-                <button onClick={() => setSelectedFailure(null)} className="text-slate-400 hover:text-slate-600"><X size={13} /></button>
+                <button onClick={() => { setSelectedFailure(null); setAiDiagnostic(null); }} className="text-slate-400 hover:text-slate-600"><X size={13} /></button>
               </div>
               <p className="text-xs text-slate-700 leading-relaxed">{explainWellTransFailure(selectedFailure)}</p>
+              {aiDiagnostic?.explanation && (
+                <div className="mt-2 rounded-lg border border-purple-100 bg-purple-50/60 p-2 text-[11px] text-slate-700">
+                  <p className="font-semibold text-purple-700">{aiDiagnostic.category || 'Supervised analysis'}</p>
+                  <p className="mt-0.5">{aiDiagnostic.explanation}</p>
+                  {aiDiagnostic.recommendedAction && <p className="mt-1"><span className="font-semibold">Next:</span> {aiDiagnostic.recommendedAction}</p>}
+                  <p className="mt-1 text-[9px] uppercase tracking-wide text-slate-400">
+                    {aiDiagnostic.aiEnhanced ? 'Gemini-enhanced explanation' : 'Deterministic safety explanation'} · read-only
+                  </p>
+                </div>
+              )}
+              <button
+                disabled={aiBusy}
+                onClick={async () => {
+                  setAiBusy(true);
+                  try {
+                    const result = await explainWellTransFailureAI(selectedFailure.id);
+                    setAiDiagnostic(result.data);
+                  } catch (error) {
+                    setAiDiagnostic({
+                      explanation: error.message || 'The supervised explanation is unavailable.',
+                      recommendedAction: 'Use the deterministic diagnosis above and inspect the captured portal evidence.',
+                      aiEnhanced: false,
+                    });
+                  } finally {
+                    setAiBusy(false);
+                  }
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-purple-700 hover:bg-purple-50 disabled:opacity-50">
+                {aiBusy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                Explain securely
+              </button>
             </div>
           </div>
         </div>

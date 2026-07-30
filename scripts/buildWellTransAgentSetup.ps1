@@ -21,6 +21,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $signingThumbprint = [Environment]::GetEnvironmentVariable('AGAPE_CODE_SIGN_CERT_THUMBPRINT', 'Process')
+$requireSignedRelease = [Environment]::GetEnvironmentVariable('AGAPE_REQUIRE_SIGNED_AGENT', 'Process') -eq 'true'
+$signatureStatus = 'Unsigned'
 if ($signingThumbprint) {
   $certificate = Get-ChildItem -LiteralPath "Cert:\CurrentUser\My\$signingThumbprint" -ErrorAction SilentlyContinue
   if (-not $certificate) {
@@ -31,6 +33,10 @@ if ($signingThumbprint) {
   if ($signature.Status -ne 'Valid') {
     throw "Windows setup signing failed: $($signature.StatusMessage)"
   }
+  $signatureStatus = 'Valid'
+}
+if ($requireSignedRelease -and $signatureStatus -ne 'Valid') {
+  throw 'A signed Agent release is required, but AGAPE_CODE_SIGN_CERT_THUMBPRINT was not configured.'
 }
 
 $manifestPath = Join-Path $outputRoot 'version.json'
@@ -38,6 +44,8 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $manifest | Add-Member -NotePropertyName setupFile -NotePropertyValue 'AgapeWellTransAgentSetup.exe' -Force
 $manifest | Add-Member -NotePropertyName setupSha256 `
   -NotePropertyValue (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash.ToLowerInvariant() -Force
+$manifest | Add-Member -NotePropertyName setupSignatureStatus -NotePropertyValue $signatureStatus -Force
+$manifest | Add-Member -NotePropertyName signed -NotePropertyValue ($signatureStatus -eq 'Valid') -Force
 $manifestJson = $manifest | ConvertTo-Json
 $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($manifestPath, $manifestJson, $utf8WithoutBom)

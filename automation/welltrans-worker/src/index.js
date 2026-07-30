@@ -18,6 +18,7 @@ import {
   auditWellTransTrip,
   buildWellTransGridIndex,
   getSelectedPortalDate,
+  inspectWellTransPortalContract,
   isEditItineraryOpen,
   resetWellTransSessionCaches,
   syncWellTransTrip,
@@ -44,13 +45,14 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.4.0';
+const workerVersion = '3.5.0';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
 let lastAuthoritativeReconcileAt = 0;
 let portalGridIndex = null;
+let latestPortalCanary = null;
 let finalReviewAuditValid = false;
 const operatorControl = {
   autoRun: true,
@@ -78,6 +80,10 @@ const heartbeatPayload = state => ({
   workerInstanceId,
   indexedBookings: portalGridIndex?.bookingCount || 0,
   indexedRows: portalGridIndex?.rowCount || 0,
+  canaryPassed: latestPortalCanary?.passed === true,
+  canaryFingerprint: latestPortalCanary?.contractFingerprint || null,
+  canaryCheckedAtMs: latestPortalCanary?.checkedAtMs || null,
+  credentialMode: process.env.AGAPE_WORKER_CREDENTIAL_MODE || 'application_default',
   throughputPerMinute: stagingDurations.length
     ? Number((60_000 / (stagingDurations.reduce((sum, value) => sum + value, 0) / stagingDurations.length)).toFixed(1))
     : 0,
@@ -214,6 +220,45 @@ async function updateOperatorConsole(page, summary = {}, extra = {}) {
     blocked: summary.blocked ?? 0,
     missing: summary.missing ?? 0,
   });
+}
+
+async function runPortalContractCanary(page, serviceDate) {
+  await publishHeartbeat('running_portal_canary');
+  const contract = await inspectWellTransPortalContract(page, serviceDate, portalGridIndex);
+  const contractFingerprint = createHash('sha256')
+    .update(JSON.stringify({
+      adapter: contract.adapter,
+      requiredColumns: contract.requiredColumns,
+      headers: contract.headers,
+      selectedDate: contract.selectedDate,
+    }))
+    .digest('hex');
+  latestPortalCanary = {
+    ...contract,
+    contractFingerprint,
+    workerId,
+    workerInstanceId,
+    workerVersion,
+    checkedAtMs: Date.now(),
+  };
+  const canaryRef = db.doc('welltrans_canary/latest');
+  const historyRef = db.collection('welltrans_canary_history').doc();
+  const canaryRecord = {
+    ...latestPortalCanary,
+    checkedAt: FieldValue.serverTimestamp(),
+  };
+  const batch = db.batch();
+  batch.set(canaryRef, canaryRecord, { merge: true });
+  batch.set(historyRef, canaryRecord);
+  await batch.commit();
+  if (!contract.passed) {
+    throw new Error(
+      `TripSpark production canary failed: ${(contract.errors || []).join('; ')}. `
+      + 'Staging remains locked until the portal contract is restored.',
+    );
+  }
+  operatorControl.message = `Portal canary passed for ${serviceDate}: ${contract.bookingCount} bookings and ${contract.rowCount} rows indexed.`;
+  return latestPortalCanary;
 }
 
 const readVisiblePortalDate = async (page, fallback = '') => {
@@ -1339,6 +1384,7 @@ async function main() {
     resetWellTransSessionCaches();
     await publishHeartbeat('indexing_schedule');
     portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
+    await runPortalContractCanary(session.page, selectedDate);
     const authoritative = await reconcileAuthoritativeCompletedTrips(selectedDate);
     lastAuthoritativeReconcileAt = Date.now();
     const recovered = await recoverStaleReviewJobs(selectedDate);
@@ -1372,6 +1418,7 @@ async function main() {
         resetWellTransSessionCaches();
         await publishHeartbeat('indexing_schedule');
         portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
+        await runPortalContractCanary(session.page, selectedDate);
         await reconcileAuthoritativeCompletedTrips(selectedDate);
         lastAuthoritativeReconcileAt = Date.now();
         await recoverStaleReviewJobs(selectedDate);
@@ -1398,6 +1445,7 @@ async function main() {
         });
         await publishHeartbeat('indexing_schedule');
         portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
+        await runPortalContractCanary(session.page, selectedDate);
       }
       if (operatorControl.forceReconcile) {
         operatorControl.forceReconcile = false;

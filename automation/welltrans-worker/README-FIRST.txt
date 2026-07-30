@@ -8,8 +8,10 @@ AGAPE CARE WELLTRANS AGENT - MANAGED WINDOWS INSTALL
 6. Return to Agape, select a date, and click Start & Fill Selected Date.
 
 The installer is per-user and does not request Windows administrator access.
-It verifies the official Node.js runtime before installing it and protects the
-Agape enrollment credential with Windows DPAPI.
+It verifies the official Node.js runtime before installing it. Preferred
+enterprise enrollment uses an administrator-issued agape-worker-wif.json
+external-account configuration with short-lived Google credentials. Existing
+DPAPI-protected service-account enrollment is a migration-only fallback.
 
 If Windows Application Control blocks Install-Agent.cmd, your organization
 must allowlist this Agape package or provide an organization code-signing

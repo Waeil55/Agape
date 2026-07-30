@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_SETTINGS, isWellTransFailureRetryable, subscribeWellTransLogs,
   subscribeWellTransManifest, subscribeWellTransSettings, subscribeWellTransWorker,
-  subscribeWellTransOperations, subscribeWellTransWorkers,
+  subscribeWellTransCanary, subscribeWellTransOperations, subscribeWellTransWorkers,
 } from '../services/welltransService';
 import {
   buildWellTransCoverage, normalizeServiceDate, validateTripForWellTrans,
@@ -14,7 +14,7 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '3.4.0';
+const REQUIRED_WORKER_VERSION = '3.5.0';
 
 export const useWellTransSync = (trips = [], serviceDate = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -22,6 +22,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const [worker, setWorker] = useState(null);
   const [workers, setWorkers] = useState([]);
   const [operations, setOperations] = useState(null);
+  const [canary, setCanary] = useState(null);
   const [manifest, setManifest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -30,6 +31,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   useEffect(() => subscribeWellTransWorker(setWorker, () => setWorker(null)), []);
   useEffect(() => subscribeWellTransWorkers(setWorkers, () => setWorkers([])), []);
   useEffect(() => subscribeWellTransOperations(setOperations, () => setOperations(null)), []);
+  useEffect(() => subscribeWellTransCanary(setCanary, () => setCanary(null)), []);
   useEffect(() =>
     subscribeWellTransManifest(serviceDate, setManifest, () => setManifest(null)), [serviceDate]);
   useEffect(() => {
@@ -68,6 +70,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     && [
       'online', 'connecting', 'waiting_for_login', 'date_selection_required',
       'processing', 'staging', 'indexing_schedule', 'verifying_applied_records',
+      'running_portal_canary',
       'calibrated', 'review_ready', 'review_batch_ready',
       'batch_apply_confirmed', 'reconciliation_blocked', 'review_error',
     ].includes(worker?.state));
@@ -77,6 +80,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     && !workerUpgradeRequired
     && [
       'calibrated', 'staging', 'verifying_applied_records',
+      'running_portal_canary',
       'review_ready', 'review_batch_ready',
       'batch_apply_confirmed', 'reconciliation_blocked',
     ].includes(worker?.state)
@@ -108,7 +112,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const standbyWorkers = activeWorkers.filter(item => item.standby);
 
   return {
-    settings, logs: scopedLogs, worker, workers: workerFleet, activeWorkers, standbyWorkers, operations,
+    settings, logs: scopedLogs, worker, workers: workerFleet, activeWorkers, standbyWorkers, operations, canary,
     manifest, coverage, workerOnline, workerCalibrated,
     workerUpgradeRequired, requiredWorkerVersion: REQUIRED_WORKER_VERSION,
     workerStandby, loading, dateTrips, completedTrips, readyTrips, latestByTrip,

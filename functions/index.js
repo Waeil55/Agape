@@ -1,6 +1,8 @@
 const functions = require("firebase-functions/v1");
+const { onTaskDispatched } = require("firebase-functions/tasks");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const { getFunctions } = require("firebase-admin/functions");
 const axios = require("axios");
 const crypto = require("crypto");
 
@@ -782,6 +784,178 @@ const unsafeWellTransRetry = (log = {}) => {
     || failure.includes("rollback could not be proven");
 };
 
+const WELLTRANS_SHARD_SIZE = 250;
+
+const refreshWellTransManifestFromShards = async (serviceDate, orchestrationId) => {
+  const snapshot = await admin.firestore().collection("welltrans_sync_shards")
+    .where("serviceDate", "==", serviceDate)
+    .get();
+  const shards = snapshot.docs
+    .map((document) => document.data())
+    .filter((shard) => shard.orchestrationId === orchestrationId);
+  if (!shards.length) return;
+  const finished = shards.filter((shard) => ["ready", "blocked"].includes(shard.state)).length;
+  const blocked = shards.reduce((total, shard) => total + Number(shard.blockedCount || 0), 0);
+  const queued = shards.reduce((total, shard) => total + Number(shard.queuedCount || 0), 0);
+  const covered = shards.reduce((total, shard) => total + Number(shard.coveredCount || 0), 0);
+  await admin.firestore().doc(`welltrans_sync_manifests/${serviceDate}`).set({
+    orchestrationId,
+    orchestrationState: finished === shards.length
+      ? (blocked ? "blocked" : "ready")
+      : "processing",
+    state: finished === shards.length
+      ? (blocked ? "blocked" : "queued")
+      : "reconciling",
+    processedShardCount: finished,
+    shardCount: shards.length,
+    queuedCount: queued,
+    coveredCount: covered,
+    blockedCount: blocked,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+};
+
+const reconcileWellTransShard = async ({ serviceDate, shardId, orchestrationId, actorId }) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(serviceDate || ""))) {
+    throw new Error("WellTrans task received an invalid service date");
+  }
+  const shardRef = admin.firestore().doc(`welltrans_sync_shards/${shardId}`);
+  const shardSnapshot = await shardRef.get();
+  if (!shardSnapshot.exists) return { stale: true, reason: "shard_missing" };
+  const shard = shardSnapshot.data() || {};
+  if (shard.serviceDate !== serviceDate || shard.orchestrationId !== orchestrationId) {
+    return { stale: true, reason: "superseded_orchestration" };
+  }
+  if (["ready", "blocked"].includes(shard.state)) {
+    return { idempotent: true, state: shard.state };
+  }
+
+  await shardRef.set({
+    state: "processing",
+    processingStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+    taskAttempt: admin.firestore.FieldValue.increment(1),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  const tripIds = [...new Set((shard.tripIds || []).map(String))].slice(0, WELLTRANS_SHARD_SIZE);
+  const tripRefs = tripIds.map((tripId) => admin.firestore().doc(`trips/${tripId}`));
+  const tripSnapshots = tripRefs.length ? await admin.firestore().getAll(...tripRefs) : [];
+  const driversSnapshot = await admin.firestore().collection("drivers").get();
+  const driverNames = new Map(driversSnapshot.docs.map((document) => [
+    document.id,
+    document.data().name || "",
+  ]));
+  const logRefs = tripIds.map((tripId) => admin.firestore().doc(
+    `welltrans_sync_logs/${wellTransOutboxId(serviceDate, tripId)}`,
+  ));
+  const logSnapshots = logRefs.length ? await admin.firestore().getAll(...logRefs) : [];
+
+  let queued = 0;
+  let covered = 0;
+  let blocked = 0;
+  const blockedTrips = [];
+  const writes = [];
+  for (let index = 0; index < tripIds.length; index++) {
+    const tripId = tripIds[index];
+    const tripSnapshot = tripSnapshots[index];
+    const existingSnapshot = logSnapshots[index];
+    if (!tripSnapshot?.exists) {
+      blocked++;
+      blockedTrips.push({ tripId, errors: ["Trip not found"] });
+      continue;
+    }
+    const trip = { id: tripSnapshot.id, ...tripSnapshot.data() };
+    if (trip.driverId && (!trip.driverName || /medical transportation inc/i.test(trip.driverName))) {
+      if (driverNames.get(trip.driverId)) trip.completedDriverName = driverNames.get(trip.driverId);
+    }
+    const { payload, errors } = buildWellTransJobPayload(trip);
+    if (payload.serviceDate !== serviceDate) {
+      errors.push(`Trip belongs to ${payload.serviceDate || "an unknown date"}, not selected date ${serviceDate}`);
+    }
+    const existing = existingSnapshot?.exists ? existingSnapshot.data() : null;
+    if (errors.length) {
+      blocked++;
+      blockedTrips.push({ tripId, bookingId: payload.bookingId, errors });
+      continue;
+    }
+    if (existing && ["pending", "processing", "awaiting_review", "completed"].includes(existing.status)) {
+      covered++;
+      continue;
+    }
+    if (existing?.status === "failed" && unsafeWellTransRetry(existing)) {
+      blocked++;
+      blockedTrips.push({
+        tripId,
+        bookingId: payload.bookingId,
+        errors: ["Unsafe failed attempt requires supervised correction before this date can be complete"],
+      });
+      continue;
+    }
+    queued++;
+    writes.push({
+      ref: logRefs[index],
+      data: {
+        tripId,
+        bookingId: payload.bookingId,
+        serviceDate,
+        status: "pending",
+        stage: existing ? "requeued_by_cloud_task_reconciliation" : "queued_by_cloud_task_reconciliation",
+        startedAt: null,
+        completedAt: admin.firestore.FieldValue.delete(),
+        errorMessage: "",
+        screenshot: "",
+        syncedBy: actorId || "cloud-task",
+        createdAt: existing?.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        attempt: Number(existing?.attempt || 0) + 1,
+        provider: "welltrans",
+        automationMethod: "playwright",
+        payload,
+        manifestId: serviceDate,
+        runId: serviceDate,
+        shardId,
+        orchestrationId,
+        queuedSourceFingerprint: wellTransSourceFingerprint(payload),
+      },
+    });
+  }
+
+  for (let offset = 0; offset < writes.length; offset += 400) {
+    const batch = admin.firestore().batch();
+    for (const write of writes.slice(offset, offset + 400)) {
+      batch.set(write.ref, write.data, { merge: true });
+    }
+    await batch.commit();
+  }
+  await shardRef.set({
+    state: blocked ? "blocked" : "ready",
+    queuedCount: queued,
+    coveredCount: covered,
+    blockedCount: blocked,
+    blockedTrips: blockedTrips.slice(0, WELLTRANS_SHARD_SIZE),
+    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await refreshWellTransManifestFromShards(serviceDate, orchestrationId);
+  return { queued, covered, blocked };
+};
+
+exports.wellTransReconcileShard = onTaskDispatched({
+  region: "us-central1",
+  retryConfig: {
+    maxAttempts: 5,
+    minBackoffSeconds: 15,
+    maxBackoffSeconds: 300,
+    maxDoublings: 4,
+  },
+  rateLimits: {
+    maxConcurrentDispatches: 4,
+    maxDispatchesPerSecond: 4,
+  },
+  timeoutSeconds: 540,
+  memory: "512MiB",
+}, async (request) => reconcileWellTransShard(request.data || {}));
+
 exports.queueWellTransSync = functions
   .runWith({ timeoutSeconds: 540, memory: "512MB" })
   .https.onCall(async (data, context) => {
@@ -802,7 +976,8 @@ exports.queueWellTransSync = functions
   const authoritativeById = new Map(authoritativeTrips.map((trip) => [String(trip.id), trip]));
   const clientIds = [...new Set((Array.isArray(data?.tripIds) ? data.tripIds : []).map(String))];
   const requestedIds = fullDateMode ? [...authoritativeById.keys()] : clientIds;
-  const wellTransShardSize = 250;
+  const wellTransShardSize = WELLTRANS_SHARD_SIZE;
+  const orchestrationId = fullDateMode ? crypto.randomUUID() : "";
   const shardByTrip = new Map(requestedIds.map((tripId, index) => [
     tripId,
     `${requestedServiceDate}_${String(Math.floor(index / wellTransShardSize)).padStart(4, "0")}`,
@@ -838,6 +1013,7 @@ exports.queueWellTransSync = functions
           tripIds,
           tripCount: tripIds.length,
           state: "queued",
+          orchestrationId,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }
@@ -853,10 +1029,63 @@ exports.queueWellTransSync = functions
       shardCount,
       clientTripCount: clientIds.length,
       source: "authoritative_firestore_completed_trip_scan",
+      orchestrationId,
+      orchestrationState: "dispatching",
       requestedBy: context.auth.uid,
       requestedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+    const taskQueue = getFunctions().taskQueue("wellTransReconcileShard");
+    for (let shardOffset = 0; shardOffset < shardCount; shardOffset += 50) {
+      const enqueues = [];
+      for (
+        let shardIndex = shardOffset;
+        shardIndex < Math.min(shardCount, shardOffset + 50);
+        shardIndex++
+      ) {
+        const shardId = `${requestedServiceDate}_${String(shardIndex).padStart(4, "0")}`;
+        const taskId = crypto.createHash("sha256")
+          .update(`${orchestrationId}:${shardId}`)
+          .digest("hex");
+        enqueues.push(taskQueue.enqueue({
+          serviceDate: requestedServiceDate,
+          shardId,
+          orchestrationId,
+          actorId: context.auth.uid,
+        }, {
+          id: taskId,
+          dispatchDeadlineSeconds: 540,
+        }));
+      }
+      await Promise.all(enqueues);
+    }
+    await manifestRef.set({
+      orchestrationState: requestedIds.length ? "dispatched" : "empty",
+      state: requestedIds.length ? "reconciling" : "empty",
+      dispatchedShardCount: shardCount,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await admin.firestore().collection("audit_logs").add({
+      action: "welltrans.sync.orchestrated",
+      entityType: "broker_sync",
+      actorId: context.auth.uid,
+      mode,
+      serviceDate: requestedServiceDate,
+      orchestrationId,
+      requested: requestedIds.length,
+      shardCount,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      expected: requestedIds.length,
+      queued: 0,
+      covered: 0,
+      rejected: 0,
+      orchestrated: requestedIds.length,
+      shardCount,
+      orchestrationId,
+      reconciliationState: requestedIds.length ? "dispatching" : "empty",
+    };
   }
   const [driversSnapshot, datedLogsSnapshot] = fullDateMode
     ? await Promise.all([
@@ -1297,13 +1526,14 @@ exports.monitorWellTransOperations = functions.pubsub
     const db = admin.firestore();
     const now = Date.now();
     const activeCutoff = admin.firestore.Timestamp.fromMillis(now - 90_000);
-    const [settingsSnapshot, workersSnapshot, processingSnapshot, blockedSnapshot, previousSnapshot] =
+    const [settingsSnapshot, workersSnapshot, processingSnapshot, blockedSnapshot, previousSnapshot, canarySnapshot] =
       await Promise.all([
         db.doc("welltrans_settings/primary").get(),
         db.collection("welltrans_workers").where("lastSeenAt", ">=", activeCutoff).get(),
         db.collection("welltrans_sync_logs").where("status", "==", "processing").limit(500).get(),
         db.collection("welltrans_sync_manifests").where("state", "==", "blocked").limit(50).get(),
         db.doc("welltrans_operations/health").get(),
+        db.doc("welltrans_canary/latest").get(),
       ]);
 
     const enabled = settingsSnapshot.exists && settingsSnapshot.data().enabled === true;
@@ -1323,9 +1553,16 @@ exports.monitorWellTransOperations = functions.pubsub
       return expiresAt > 0 && expiresAt < now;
     });
     const blockedDates = blockedSnapshot.docs.map(document => document.id);
+    const canary = canarySnapshot.exists ? canarySnapshot.data() : null;
+    const canaryCheckedAt = canary?.checkedAt?.toMillis?.()
+      || Number(canary?.checkedAtMs || 0);
+    const canaryStale = enabled && activeWorkers.length > 0
+      && (!canaryCheckedAt || now - canaryCheckedAt > 15 * 60_000);
+    const canaryFailed = enabled && activeWorkers.length > 0
+      && (canary?.passed === false || canaryStale);
     const state = !enabled
       ? "disabled"
-      : activeWorkers.length === 0 || staleProcessing.length > 0
+      : activeWorkers.length === 0 || staleProcessing.length > 0 || canaryFailed
         ? "critical"
         : blockedDates.length > 0
           ? "degraded"
@@ -1343,6 +1580,13 @@ exports.monitorWellTransOperations = functions.pubsub
       staleProcessingIds: staleProcessing.slice(0, 100).map(document => document.id),
       blockedDateCount: blockedDates.length,
       blockedDates,
+      canaryPassed: canary?.passed === true && !canaryStale,
+      canaryStale,
+      canaryServiceDate: canary?.serviceDate || null,
+      canaryContractFingerprint: canary?.contractFingerprint || null,
+      canaryError: canaryFailed
+        ? String(canary?.errorMessage || (canaryStale ? "Portal contract canary is stale." : "Portal contract canary failed.")).slice(0, 500)
+        : null,
       checkedAt: admin.firestore.FieldValue.serverTimestamp(),
       stateChangedAt: stateChanged
         ? admin.firestore.FieldValue.serverTimestamp()
@@ -1360,6 +1604,8 @@ exports.monitorWellTransOperations = functions.pubsub
         activeWorkerCount: activeWorkers.length,
         staleProcessingCount: staleProcessing.length,
         blockedDates,
+        canaryPassed: health.canaryPassed,
+        canaryStale,
         actorId: "system",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -1374,7 +1620,7 @@ exports.monitorWellTransOperations = functions.pubsub
         .filter(Boolean))];
       if (tokens.length) {
         const body = state === "critical"
-          ? `WellTrans needs attention: ${activeWorkers.length} active agents, ${staleProcessing.length} stuck jobs.`
+          ? `WellTrans needs attention: ${activeWorkers.length} active agents, ${staleProcessing.length} stuck jobs${canaryFailed ? ", portal contract not verified" : ""}.`
           : `WellTrans has ${blockedDates.length} blocked service date(s).`;
         await admin.messaging().sendEachForMulticast({
           tokens: tokens.slice(0, 500),
@@ -1396,4 +1642,119 @@ exports.monitorWellTransOperations = functions.pubsub
       }
     }
     return health;
+  });
+
+function classifyWellTransFailure(message) {
+  const value = String(message || "").toLowerCase();
+  if (value.includes("mileage") || value.includes("odometer")) {
+    return {
+      category: "Mileage or odometer",
+      explanation: "The source mileage was incomplete or the portal mileage field could not be verified.",
+      recommendedAction: "Verify both source odometer readings and the portal mileage column, then retry the trip.",
+    };
+  }
+  if (value.includes("booking") || value.includes("pickup") || value.includes("dropoff")) {
+    return {
+      category: "Booking-row match",
+      explanation: "The exact Booking ID did not resolve to one unambiguous Pickup row and one unambiguous Dropoff row.",
+      recommendedAction: "Confirm the selected service date and exact Booking ID in WellTrans. Never match using a passenger name.",
+    };
+  }
+  if (value.includes("session") || value.includes("login") || value.includes("auth")) {
+    return {
+      category: "Portal session",
+      explanation: "The local WellTrans session was unavailable or expired.",
+      recommendedAction: "Open the enrolled Agent, sign in to WellTrans, and reopen TRIPS - ASSIGNED for the requested date.",
+    };
+  }
+  if (value.includes("selector") || value.includes("field") || value.includes("contract")) {
+    return {
+      category: "Portal contract",
+      explanation: "The WellTrans page did not expose the verified fields expected by the production adapter.",
+      recommendedAction: "Do not Apply. Reindex the date and review the portal canary before retrying.",
+    };
+  }
+  return {
+    category: "Automation safety stop",
+    explanation: "The Agent stopped this trip because it could not prove that every required value would be written to the correct portal rows.",
+    recommendedAction: "Review the source validation, screenshot, and selected service date before retrying.",
+  };
+}
+
+exports.explainWellTransFailureAI = functions
+  .runWith({ secrets: [runtimeConfigSecret], timeoutSeconds: 30, memory: "256MB" })
+  .https.onCall(async (data, context) => {
+    await requireAdmin(context);
+    const logId = String(data?.logId || "").trim();
+    if (!/^[A-Za-z0-9_-]{1,160}$/.test(logId)) {
+      throw new functions.https.HttpsError("invalid-argument", "A valid synchronization log ID is required.");
+    }
+    const snapshot = await admin.firestore().doc(`welltrans_sync_logs/${logId}`).get();
+    if (!snapshot.exists) {
+      throw new functions.https.HttpsError("not-found", "The synchronization log no longer exists.");
+    }
+    const log = snapshot.data();
+    const safeFailure = String(log.errorMessage || "No detailed worker error was recorded.")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .slice(0, 600);
+    const deterministic = classifyWellTransFailure(safeFailure);
+    const gemini = getRuntimeConfig().gemini || {};
+    if (!gemini.api_key || gemini.enabled !== true) {
+      return { ...deterministic, aiEnhanced: false, readOnly: true };
+    }
+
+    try {
+      const model = String(gemini.model || "gemini-2.5-flash").replace(/[^A-Za-z0-9._-]/g, "");
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          contents: [{
+            role: "user",
+            parts: [{
+              text: [
+                "Explain this broker-portal automation failure to an operations administrator.",
+                "Do not infer or invent trip facts. Do not suggest changing transportation records.",
+                `Deterministic category: ${deterministic.category}`,
+                `Sanitized technical failure: ${safeFailure}`,
+              ].join("\n"),
+            }],
+          }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 300,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                explanation: { type: "STRING" },
+                recommendedAction: { type: "STRING" },
+              },
+              required: ["explanation", "recommendedAction"],
+            },
+          },
+        },
+        {
+          params: { key: gemini.api_key },
+          timeout: 15_000,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parsed = JSON.parse(raw || "{}");
+      if (!parsed.explanation || !parsed.recommendedAction) throw new Error("Gemini returned an incomplete explanation.");
+      return {
+        category: deterministic.category,
+        explanation: String(parsed.explanation).slice(0, 800),
+        recommendedAction: String(parsed.recommendedAction).slice(0, 500),
+        aiEnhanced: true,
+        readOnly: true,
+      };
+    } catch (error) {
+      functions.logger.warn("Gemini WellTrans explanation fell back to deterministic output.", {
+        logId,
+        error: error.message,
+      });
+      return { ...deterministic, aiEnhanced: false, readOnly: true };
+    }
   });

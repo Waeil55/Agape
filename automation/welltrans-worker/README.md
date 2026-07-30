@@ -13,8 +13,10 @@ Preferred:
    profile, registers the private Agape protocol, provisions a private,
    checksum-verified Node.js LTS runtime and Chromium, and creates encrypted
    local session storage. Node.js does not need to be installed separately.
-   The Firebase enrollment credential is protected with Windows DPAPI and can
-   only be decrypted by the enrolled Windows user.
+   Preferred enrollment uses an administrator-issued
+   `agape-worker-wif.json` external-account configuration so Google issues
+   short-lived credentials. Existing DPAPI-protected service-account
+   enrollment remains a clearly reported legacy fallback during migration.
 3. Choose the service date in Agape and click **Start & Fill Selected Date**.
 4. If the saved WellTrans session has expired, complete the legitimate broker
    login in the opened browser. The agent detects login and TRIPS - ASSIGNED
@@ -63,12 +65,12 @@ the exact requested WellTrans date is visible.
   operator to click **Close**, never **Apply**.
 - Every staged cell is re-located in the virtual grid and verified before the
   trip is marked ready for review.
-- Before showing the green review-ready state, Agent 3.4 performs an exhaustive
+- Before showing the green review-ready state, Agent 3.5 performs an exhaustive
   second pass across every staged trip. Mismatches and changed Agape source
   records are requeued and repaired automatically before review.
 - The worker never clicks **Apply** or **Close**. An operator reviews every
   staged field and clicks **Apply**. When the itinerary dialog closes, Agent
-  3.4 reads every affected portal row back, marks only persisted values
+  3.5 reads every affected portal row back, marks only persisted values
   complete, and requeues anything that was closed without being saved.
 - A safe preflight failure or verified rollback does not stop later trips.
   An unverified rollback stops the batch immediately.
@@ -77,6 +79,8 @@ the exact requested WellTrans date is visible.
 - Other service dates stay pending and cannot be written to the selected grid.
 - Credentials and session state remain local and encrypted; they are not
   stored in Firestore.
+- The Agent runs a read-only portal contract canary before staging any date.
+  Missing or renamed WellTrans fields stop the run before a record is edited.
 - Every staged, failed, requeued, and live-verified transition writes an
   append-only `welltrans_sync_events` record with the source fingerprint,
   worker instance, review session, and timestamp.

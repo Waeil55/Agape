@@ -9,6 +9,7 @@ try { $Host.UI.RawUI.WindowTitle = 'Agape WellTrans Agent' } catch {}
 $workerDirectory = Split-Path -Parent $PSScriptRoot
 $secretDirectory = Join-Path $env:USERPROFILE 'AgapeSecrets'
 $protectedCredentialPath = Join-Path $secretDirectory 'agape-worker-service-account.protected'
+$federatedCredentialPath = Join-Path $secretDirectory 'agape-worker-wif.json'
 $runtimeDirectory = Join-Path $env:LOCALAPPDATA 'AgapeCare\Runtime'
 $runtimeCredentialPath = Join-Path $runtimeDirectory "welltrans-credential-$PID.json"
 $requestedDatePath = Join-Path $runtimeDirectory 'requested-service-date.txt'
@@ -118,19 +119,33 @@ $workerError = $null
 try {
   Start-Transcript -Path $logPath -Append | Out-Null
 
-  if (-not (Test-Path -LiteralPath $protectedCredentialPath)) {
-    throw "This computer is not enrolled with an encrypted Agape agent credential."
-  }
   New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
-  $protectedBytes = [IO.File]::ReadAllBytes($protectedCredentialPath)
-  $credentialBytes = [System.Security.Cryptography.ProtectedData]::Unprotect(
-    $protectedBytes,
-    $null,
-    [System.Security.Cryptography.DataProtectionScope]::CurrentUser
-  )
-  [IO.File]::WriteAllBytes($runtimeCredentialPath, $credentialBytes)
-
-  $env:GOOGLE_APPLICATION_CREDENTIALS = $runtimeCredentialPath
+  if (Test-Path -LiteralPath $federatedCredentialPath) {
+    $federatedConfig = Get-Content -LiteralPath $federatedCredentialPath -Raw | ConvertFrom-Json
+    if ($federatedConfig.type -ne 'external_account') {
+      throw 'The enrolled Workload Identity configuration is not an external_account credential.'
+    }
+    if ($federatedConfig.credential_source.executable) {
+      throw 'Executable-sourced Workload Identity configurations are not permitted by the Agape Agent.'
+    }
+    if ($federatedConfig.audience -notmatch 'workloadIdentityPools') {
+      throw 'The enrolled Workload Identity audience is invalid.'
+    }
+    $env:GOOGLE_APPLICATION_CREDENTIALS = $federatedCredentialPath
+    $env:AGAPE_WORKER_CREDENTIAL_MODE = 'workload_identity_federation'
+  } elseif (Test-Path -LiteralPath $protectedCredentialPath) {
+    $protectedBytes = [IO.File]::ReadAllBytes($protectedCredentialPath)
+    $credentialBytes = [System.Security.Cryptography.ProtectedData]::Unprotect(
+      $protectedBytes,
+      $null,
+      [System.Security.Cryptography.DataProtectionScope]::CurrentUser
+    )
+    [IO.File]::WriteAllBytes($runtimeCredentialPath, $credentialBytes)
+    $env:GOOGLE_APPLICATION_CREDENTIALS = $runtimeCredentialPath
+    $env:AGAPE_WORKER_CREDENTIAL_MODE = 'legacy_dpapi_service_account'
+  } else {
+    throw 'This computer is not enrolled. Install a Workload Identity external-account configuration or contact an Agape administrator.'
+  }
   $env:GOOGLE_CLOUD_PROJECT = 'agape-95c9f'
   $env:WELLTRANS_SESSION_KEY = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_KEY', 'User')
   $env:WELLTRANS_SESSION_FILE = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_FILE', 'User')

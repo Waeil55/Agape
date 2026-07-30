@@ -283,4 +283,33 @@ describe('WellTrans staging safety contract', () => {
     expect(trip).toContain('async function waitForEditorSurface');
     expect(trip).toContain('export function resetWellTransSessionCaches()');
   });
+
+  it('runs and monitors a read-only production portal contract canary', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const trip = readFileSync(tripSourcePath, 'utf8');
+    const backend = readFileSync(functionsSourcePath, 'utf8');
+    const rules = readFileSync(firestoreRulesPath, 'utf8');
+    expect(trip).toContain('export async function inspectWellTransPortalContract');
+    expect(worker).toContain('async function runPortalContractCanary');
+    expect(worker).toContain("db.doc('welltrans_canary/latest')");
+    expect(backend).toContain('canaryContractFingerprint');
+    expect(rules).toContain('match /welltrans_canary/{document}');
+  });
+
+  it('uses durable date shards and Cloud Tasks for large reconciliations', () => {
+    const backend = readFileSync(functionsSourcePath, 'utf8');
+    expect(backend).toContain('exports.wellTransReconcileShard');
+    expect(backend).toContain('onTaskDispatched');
+    expect(backend).toContain('WELLTRANS_SHARD_SIZE = 250');
+    expect(backend).toContain('taskQueue.enqueue');
+    expect(backend).toContain('orchestrationId');
+  });
+
+  it('keeps AI supervision read-only and deterministic when Gemini is unavailable', () => {
+    const backend = readFileSync(functionsSourcePath, 'utf8');
+    expect(backend).toContain('exports.explainWellTransFailureAI');
+    expect(backend).toContain('classifyWellTransFailure');
+    expect(backend).toContain('readOnly: true');
+    expect(backend).not.toMatch(/explainWellTransFailureAI[\s\S]*?collection\("trips"\)[\s\S]*?\.update\(/);
+  });
 });

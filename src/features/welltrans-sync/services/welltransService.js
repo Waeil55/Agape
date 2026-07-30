@@ -51,6 +51,13 @@ export const subscribeWellTransOperations = (callback, onError) =>
     onError,
   );
 
+export const subscribeWellTransCanary = (callback, onError) =>
+  onSnapshot(
+    doc(db, 'welltrans_canary', 'latest'),
+    snapshot => callback(snapshot.exists() ? snapshot.data() : null),
+    onError,
+  );
+
 export const subscribeWellTransManifest = (serviceDate, callback, onError) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(serviceDate || ''))) {
     callback(null);
@@ -90,6 +97,9 @@ export const saveWellTransSettings = (settings, actorId) => {
 
 export const queueWellTransSync = (tripIds, mode, serviceDate) =>
   httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate });
+
+export const explainWellTransFailureAI = logId =>
+  httpsCallable(functions, 'explainWellTransFailureAI')({ logId });
 
 export const confirmWellTransDateApplied = serviceDate =>
   httpsCallable(functions, 'confirmWellTransDateApplied')({ serviceDate });

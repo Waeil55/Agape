@@ -4,12 +4,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Security
-$agentVersion = '3.4.0'
+$agentVersion = '3.5.0'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'
 $credentialPath = Join-Path $secretRoot 'agape-worker-service-account.json'
 $protectedCredentialPath = Join-Path $secretRoot 'agape-worker-service-account.protected'
+$federatedCredentialPath = Join-Path $secretRoot 'agape-worker-wif.json'
 $sessionPath = Join-Path $secretRoot 'welltrans-session.enc'
 $installLog = Join-Path $secretRoot 'welltrans-agent-install.log'
 $runtimeRoot = Join-Path $installRoot 'runtime'
@@ -33,7 +34,28 @@ try {
     Copy-Item -LiteralPath (Join-Path $sourceRoot $file) -Destination (Join-Path $installRoot $file) -Force
   }
 
-  if (-not (Test-Path -LiteralPath $protectedCredentialPath) -and -not (Test-Path -LiteralPath $credentialPath)) {
+  if (-not (Test-Path -LiteralPath $federatedCredentialPath)) {
+    $downloads = Join-Path $env:USERPROFILE 'Downloads'
+    $federatedCandidate = Get-ChildItem -LiteralPath $downloads -Filter 'agape-worker-wif.json' -File -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending |
+      Select-Object -First 1
+    if ($federatedCandidate) {
+      $federatedConfig = Get-Content -LiteralPath $federatedCandidate.FullName -Raw | ConvertFrom-Json
+      if ($federatedConfig.type -ne 'external_account') {
+        throw 'agape-worker-wif.json is not a valid external-account credential configuration.'
+      }
+      if ($federatedConfig.credential_source.executable) {
+        throw 'Executable-sourced Workload Identity configurations are not permitted by the Agape Agent.'
+      }
+      if ($federatedConfig.audience -notmatch 'workloadIdentityPools') {
+        throw 'agape-worker-wif.json does not contain a valid Workload Identity Pool audience.'
+      }
+      Copy-Item -LiteralPath $federatedCandidate.FullName -Destination $federatedCredentialPath -Force
+    }
+  }
+  if (-not (Test-Path -LiteralPath $federatedCredentialPath) -and
+      -not (Test-Path -LiteralPath $protectedCredentialPath) -and
+      -not (Test-Path -LiteralPath $credentialPath)) {
     $downloads = Join-Path $env:USERPROFILE 'Downloads'
     $candidate = Get-ChildItem -LiteralPath $downloads -Filter 'agape-95c9f-firebase-adminsdk-*.json' -File -ErrorAction SilentlyContinue |
       Sort-Object LastWriteTime -Descending |
@@ -42,8 +64,10 @@ try {
       Copy-Item -LiteralPath $candidate.FullName -Destination $credentialPath -Force
     }
   }
-  if (-not (Test-Path -LiteralPath $protectedCredentialPath) -and -not (Test-Path -LiteralPath $credentialPath)) {
-    throw "This computer is not enrolled. Place the Agape worker service-account file at $credentialPath and run the installer again."
+  if (-not (Test-Path -LiteralPath $federatedCredentialPath) -and
+      -not (Test-Path -LiteralPath $protectedCredentialPath) -and
+      -not (Test-Path -LiteralPath $credentialPath)) {
+    throw "This computer is not enrolled. Preferred: place agape-worker-wif.json in Downloads. Legacy fallback: place the service-account file at $credentialPath."
   }
   if (Test-Path -LiteralPath $credentialPath) {
     $credentialBytes = [IO.File]::ReadAllBytes($credentialPath)
