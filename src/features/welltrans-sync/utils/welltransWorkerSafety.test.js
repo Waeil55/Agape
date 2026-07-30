@@ -15,6 +15,10 @@ const functionsSourcePath = fileURLToPath(new URL(
   '../../../../functions/index.js',
   import.meta.url,
 ));
+const firestoreRulesPath = fileURLToPath(new URL(
+  '../../../../firestore.rules',
+  import.meta.url,
+));
 
 describe('WellTrans staging safety contract', () => {
   it('accepts only a unique normalized-exact broker option', () => {
@@ -214,5 +218,24 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain("stage: 'manual_apply_live_verified'");
     expect(worker).toContain("stage: 'requeued_after_manual_dialog_close'");
     expect(worker).toContain('if (!await isEditItineraryOpen(session.page))');
+  });
+
+  it('records append-only synchronization transitions and per-agent schedule heartbeats', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const rules = readFileSync(firestoreRulesPath, 'utf8');
+    expect(worker).toContain("db.collection('welltrans_sync_events').doc()");
+    expect(worker).toContain('selectedDate: activeServiceDate || null');
+    expect(rules).toContain('match /welltrans_sync_events/{eventId}');
+    expect(rules).toContain('allow write: if false;');
+  });
+
+  it('monitors active agents, stuck jobs, and blocked dates without client write access', () => {
+    const backend = readFileSync(functionsSourcePath, 'utf8');
+    const rules = readFileSync(firestoreRulesPath, 'utf8');
+    expect(backend).toContain('exports.monitorWellTransOperations');
+    expect(backend).toContain('staleProcessingCount');
+    expect(backend).toContain('blockedDateCount');
+    expect(backend).toContain('welltrans.operations.health_changed');
+    expect(rules).toContain('match /welltrans_operations/{document}');
   });
 });

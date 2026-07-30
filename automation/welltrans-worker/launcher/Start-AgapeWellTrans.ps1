@@ -14,6 +14,9 @@ $runtimeCredentialPath = Join-Path $runtimeDirectory "welltrans-credential-$PID.
 $requestedDatePath = Join-Path $runtimeDirectory 'requested-service-date.txt'
 $logPath = Join-Path $secretDirectory 'welltrans-worker.log'
 $lockPath = Join-Path $secretDirectory 'welltrans-worker.pid'
+$agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'
+$rollbackRoot = Join-Path $agentDataRoot 'WellTransAgentRollback'
+$pendingUpdatePath = Join-Path $agentDataRoot 'welltrans-update-pending.json'
 $workerProcess = $null
 
 $requestedDateMatch = [Regex]::Match(
@@ -147,10 +150,59 @@ try {
     $nodeExecutable = (Get-Command node.exe -ErrorAction Stop).Source
   }
   $workerEntry = Join-Path $workerDirectory 'src\index.js'
+  $workerStartedAt = Get-Date
   $workerProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$workerEntry`"" -NoNewWindow -PassThru
   $workerProcess.WaitForExit()
   if ($workerProcess.ExitCode -ne 0) {
     $workerError = "Agent exited with code $($workerProcess.ExitCode)."
+    $workerRuntimeSeconds = ((Get-Date) - $workerStartedAt).TotalSeconds
+    if ($workerRuntimeSeconds -lt 180 -and (Test-Path -LiteralPath $pendingUpdatePath)) {
+      try {
+        $pendingUpdate = Get-Content -LiteralPath $pendingUpdatePath -Raw | ConvertFrom-Json
+        if (-not $pendingUpdate.backupPath -or -not (Test-Path -LiteralPath $pendingUpdate.backupPath)) {
+          throw 'The last-known-good Agent backup is unavailable.'
+        }
+        $resolvedBackup = (Resolve-Path -LiteralPath $pendingUpdate.backupPath).Path
+        $resolvedRollbackRoot = (Resolve-Path -LiteralPath $rollbackRoot).Path
+        if (-not $resolvedBackup.StartsWith($resolvedRollbackRoot, [StringComparison]::OrdinalIgnoreCase)) {
+          throw 'The Agent rollback backup was outside the authorized directory.'
+        }
+        foreach ($directory in @('src', 'launcher')) {
+          $targetDirectory = Join-Path $workerDirectory $directory
+          $backupDirectory = Join-Path $resolvedBackup $directory
+          if (Test-Path -LiteralPath $targetDirectory) {
+            $resolvedTarget = (Resolve-Path -LiteralPath $targetDirectory).Path
+            $resolvedWorkerRoot = (Resolve-Path -LiteralPath $workerDirectory).Path
+            if (-not $resolvedTarget.StartsWith($resolvedWorkerRoot, [StringComparison]::OrdinalIgnoreCase)) {
+              throw 'The Agent rollback target was outside the installation directory.'
+            }
+            Remove-Item -LiteralPath $resolvedTarget -Recurse -Force
+          }
+          Copy-Item -LiteralPath $backupDirectory -Destination $targetDirectory -Recurse -Force
+        }
+        foreach ($file in @('package.json', 'package-lock.json', 'README.md', 'VERSION')) {
+          $backupFile = Join-Path $resolvedBackup $file
+          if (Test-Path -LiteralPath $backupFile) {
+            Copy-Item -LiteralPath $backupFile -Destination (Join-Path $workerDirectory $file) -Force
+          }
+        }
+        $npmExecutable = Join-Path $workerDirectory 'runtime\node\npm.cmd'
+        Push-Location $workerDirectory
+        try {
+          & $npmExecutable ci --omit=dev --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) {
+            throw "Dependency rollback failed with code $LASTEXITCODE."
+          }
+        } finally {
+          Pop-Location
+        }
+        Remove-Item -LiteralPath $pendingUpdatePath -Force
+        Remove-Item -LiteralPath $resolvedBackup -Recurse -Force
+        $workerError = "Agent $($pendingUpdate.newVersion) failed its startup health window and was rolled back to $($pendingUpdate.previousVersion). Start it again."
+      } catch {
+        $workerError = "$workerError Automatic rollback failed: $($_.Exception.Message)"
+      }
+    }
   }
 } catch {
   $workerError = $_.Exception.Message

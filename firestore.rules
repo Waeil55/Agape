@@ -134,6 +134,10 @@ service cloud.firestore {
       allow read: if request.auth != null && isAdmin();
       allow write: if false;
     }
+    match /welltrans_sync_events/{eventId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
     match /welltrans_sync_manifests/{serviceDate} {
       allow read: if request.auth != null && isAdmin();
       allow write: if false;
@@ -155,6 +159,10 @@ service cloud.firestore {
       allow write: if false;
     }
     match /welltrans_workers/{workerInstanceId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+    match /welltrans_operations/{document} {
       allow read: if request.auth != null && isAdmin();
       allow write: if false;
     }

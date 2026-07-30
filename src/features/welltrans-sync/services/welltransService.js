@@ -1,5 +1,6 @@
 import {
-  collection, db, deleteField, doc, functions, httpsCallable, onSnapshot, query, setDoc, where,
+  collection, db, deleteField, doc, functions, httpsCallable, limit, onSnapshot,
+  orderBy, query, setDoc, where,
 } from '../../../config/firebase';
 import { DEFAULT_WELLTRANS_FIELD_MAPPING } from '../utils/welltransMapping';
 
@@ -35,6 +36,20 @@ export const subscribeWellTransLogs = (serviceDate, callback, onError) => {
 
 export const subscribeWellTransWorker = (callback, onError) =>
   onSnapshot(doc(db, 'welltrans_worker_status', 'primary'), snapshot => callback(snapshot.exists() ? snapshot.data() : null), onError);
+
+export const subscribeWellTransWorkers = (callback, onError) =>
+  onSnapshot(
+    query(collection(db, 'welltrans_workers'), orderBy('lastSeenAt', 'desc'), limit(20)),
+    snapshot => callback(snapshot.docs.map(item => ({ id: item.id, ...item.data() }))),
+    onError,
+  );
+
+export const subscribeWellTransOperations = (callback, onError) =>
+  onSnapshot(
+    doc(db, 'welltrans_operations', 'health'),
+    snapshot => callback(snapshot.exists() ? snapshot.data() : null),
+    onError,
+  );
 
 export const subscribeWellTransManifest = (serviceDate, callback, onError) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(serviceDate || ''))) {

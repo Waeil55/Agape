@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_SETTINGS, isWellTransFailureRetryable, subscribeWellTransLogs,
   subscribeWellTransManifest, subscribeWellTransSettings, subscribeWellTransWorker,
+  subscribeWellTransOperations, subscribeWellTransWorkers,
 } from '../services/welltransService';
 import {
   buildWellTransCoverage, normalizeServiceDate, validateTripForWellTrans,
@@ -13,18 +14,22 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '3.2.0';
+const REQUIRED_WORKER_VERSION = '3.3.0';
 
 export const useWellTransSync = (trips = [], serviceDate = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [logs, setLogs] = useState([]);
   const [worker, setWorker] = useState(null);
+  const [workers, setWorkers] = useState([]);
+  const [operations, setOperations] = useState(null);
   const [manifest, setManifest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => subscribeWellTransSettings(value => { setSettings(value); setLoading(false); }, () => setLoading(false)), []);
   useEffect(() => subscribeWellTransLogs(serviceDate, setLogs, () => setLogs([])), [serviceDate]);
   useEffect(() => subscribeWellTransWorker(setWorker, () => setWorker(null)), []);
+  useEffect(() => subscribeWellTransWorkers(setWorkers, () => setWorkers([])), []);
+  useEffect(() => subscribeWellTransOperations(setOperations, () => setOperations(null)), []);
   useEffect(() =>
     subscribeWellTransManifest(serviceDate, setManifest, () => setManifest(null)), [serviceDate]);
   useEffect(() => {
@@ -86,9 +91,25 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     [completedTrips, latestByTrip],
   );
   const healthScore = coverage.coveragePercent;
+  const workerFleet = useMemo(() => workers.map(item => {
+    const lastSeenMs = item.lastSeenAt?.toMillis?.()
+      || item.lastSeenAt?.toDate?.()?.getTime?.()
+      || 0;
+    const ageMs = lastSeenMs ? Math.max(0, now - lastSeenMs) : Number.POSITIVE_INFINITY;
+    return {
+      ...item,
+      lastSeenMs,
+      ageMs,
+      online: ageMs < 45_000,
+      standby: item.state === 'lease_standby',
+    };
+  }), [now, workers]);
+  const activeWorkers = workerFleet.filter(item => item.online);
+  const standbyWorkers = activeWorkers.filter(item => item.standby);
 
   return {
-    settings, logs: scopedLogs, worker, manifest, coverage, workerOnline, workerCalibrated,
+    settings, logs: scopedLogs, worker, workers: workerFleet, activeWorkers, standbyWorkers, operations,
+    manifest, coverage, workerOnline, workerCalibrated,
     workerUpgradeRequired, requiredWorkerVersion: REQUIRED_WORKER_VERSION,
     workerStandby, loading, dateTrips, completedTrips, readyTrips, latestByTrip,
     healthScore, successfulCount, failedCount,

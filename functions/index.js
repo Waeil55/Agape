@@ -1,4 +1,5 @@
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
+const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const axios = require("axios");
 const crypto = require("crypto");
@@ -6,6 +7,27 @@ const crypto = require("crypto");
 admin.initializeApp();
 
 const TELNYX_API_BASE = "https://api.telnyx.com/v2";
+const runtimeConfigSecret = defineSecret("AGAPE_RUNTIME_CONFIG");
+
+function getRuntimeConfig() {
+  const raw = runtimeConfigSecret.value();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    functions.logger.error("AGAPE_RUNTIME_CONFIG is not valid JSON.", {
+      error: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Secure runtime configuration is unavailable.",
+    );
+  }
+}
+
+function getTelnyxConfig() {
+  return getRuntimeConfig().telnyx || {};
+}
 
 // Deliver Messenger-style push alerts for every newly created team-chat message.
 // Tokens are registered by the web client in users/{uid}.fcmToken.
@@ -129,7 +151,9 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
   }
 });
 
-exports.sendSms = functions.https.onCall(async (data, context) => {
+exports.sendSms = functions
+  .runWith({ secrets: [runtimeConfigSecret] })
+  .https.onCall(async (data, context) => {
   await requireAdminOrDispatcher(context);
   const { to: rawTo, text, tripId } = data;
   const to = normalizePhone(rawTo);
@@ -137,10 +161,10 @@ exports.sendSms = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Both 'to' and 'text' are required.");
   }
   try {
-    const cfg = functions.config();
-    const apiKey = cfg.telnyx?.api_key;
-    const fromNumber = cfg.telnyx?.from || "+18552223330";
-    const messagingProfileId = cfg.telnyx?.messaging_profile_id || null;
+    const telnyx = getTelnyxConfig();
+    const apiKey = telnyx.api_key;
+    const fromNumber = telnyx.from || "+18552223330";
+    const messagingProfileId = telnyx.messaging_profile_id || null;
     if (!apiKey) {
       throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
     }
@@ -178,16 +202,18 @@ exports.sendSms = functions.https.onCall(async (data, context) => {
   }
 });
 
-exports.sendBulkSms = functions.https.onCall(async (data, context) => {
+exports.sendBulkSms = functions
+  .runWith({ secrets: [runtimeConfigSecret] })
+  .https.onCall(async (data, context) => {
   await requireAdminOrDispatcher(context);
   const { messages } = data;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     throw new functions.https.HttpsError("invalid-argument", "'messages' must be a non-empty array.");
   }
-  const cfg = functions.config();
-  const apiKey = cfg.telnyx?.api_key;
-  const fromNumber = cfg.telnyx?.from || "+18552223330";
-  const messagingProfileId = cfg.telnyx?.messaging_profile_id || null;
+  const telnyx = getTelnyxConfig();
+  const apiKey = telnyx.api_key;
+  const fromNumber = telnyx.from || "+18552223330";
+  const messagingProfileId = telnyx.messaging_profile_id || null;
   if (!apiKey) {
     throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
   }
@@ -252,8 +278,7 @@ function parseConfirmation(text) {
 }
 
 function verifyTelnyxSignature(req) {
-  const cfg = functions.config();
-  const publicKey = cfg.telnyx?.webhook_public_key;
+  const publicKey = getTelnyxConfig().webhook_public_key;
   if (!publicKey) {
     functions.logger.warn("Telnyx webhook public key not configured — skipping signature verification");
     return true;
@@ -299,7 +324,9 @@ function verifyTelnyxSignature(req) {
   }
 }
 
-exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
+exports.handleInboundSms = functions
+  .runWith({ secrets: [runtimeConfigSecret] })
+  .https.onRequest(async (req, res) => {
   try {
     if (!verifyTelnyxSignature(req)) {
       res.status(403).json({ error: "Invalid Telnyx signature" });
@@ -409,7 +436,9 @@ exports.handleInboundSms = functions.https.onRequest(async (req, res) => {
   }
 });
 
-exports.diagnoseTelnyx = functions.https.onCall(async (data, context) => {
+exports.diagnoseTelnyx = functions
+  .runWith({ secrets: [runtimeConfigSecret] })
+  .https.onCall(async (data, context) => {
   await requireAdminOrDispatcher(context);
   const results = { checks: [], passed: 0, failed: 0, warnings: 0 };
 
@@ -421,20 +450,20 @@ exports.diagnoseTelnyx = functions.https.onCall(async (data, context) => {
   };
 
   try {
-    const cfg = functions.config();
-    const apiKey = cfg.telnyx?.api_key;
-    const fromNumber = cfg.telnyx?.from;
-    const messagingProfileId = cfg.telnyx?.messaging_profile_id;
+    const telnyx = getTelnyxConfig();
+    const apiKey = telnyx.api_key;
+    const fromNumber = telnyx.from;
+    const messagingProfileId = telnyx.messaging_profile_id;
 
     // 1. Check config
     if (!apiKey) {
-      addCheck("Telnyx API key configured", "fail", "No telnyx.api_key found in Firebase config. Run: firebase functions:config:set telnyx.api_key=\"YOUR_KEY\"");
+      addCheck("Telnyx API key configured", "fail", "The secure AGAPE_RUNTIME_CONFIG secret does not contain a Telnyx API key.");
     } else {
       addCheck("Telnyx API key configured", "pass", "API key is set");
     }
 
     if (!fromNumber) {
-      addCheck("Telnyx from number configured", "warn", "No telnyx.from found in Firebase config. Using default +18552223330");
+      addCheck("Telnyx from number configured", "warn", "No Telnyx sender number is configured. Using default +18552223330.");
     } else {
       addCheck("Telnyx from number configured", "pass", `From number: ${fromNumber}`);
     }
@@ -442,7 +471,7 @@ exports.diagnoseTelnyx = functions.https.onCall(async (data, context) => {
     if (messagingProfileId) {
       addCheck("Messaging profile ID configured", "pass", `Profile ID: ${messagingProfileId}`);
     } else {
-      addCheck("Messaging profile ID configured", "warn", "Not set — Telnyx will auto-detect. Set via: firebase functions:config:set telnyx.messaging_profile_id=\"UUID\"");
+      addCheck("Messaging profile ID configured", "warn", "Not set — Telnyx will auto-detect.");
     }
 
     if (!apiKey) {
@@ -1260,3 +1289,111 @@ exports.systemHealthCheck = functions.https.onRequest(async (req, res) => {
   const healthy = checks.firestore && checks.auth;
   res.status(healthy ? 200 : 503).json({ status: healthy ? "healthy" : "degraded", checks });
 });
+
+exports.monitorWellTransOperations = functions.pubsub
+  .schedule("every 5 minutes")
+  .timeZone("America/Indiana/Indianapolis")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = Date.now();
+    const activeCutoff = admin.firestore.Timestamp.fromMillis(now - 90_000);
+    const [settingsSnapshot, workersSnapshot, processingSnapshot, blockedSnapshot, previousSnapshot] =
+      await Promise.all([
+        db.doc("welltrans_settings/primary").get(),
+        db.collection("welltrans_workers").where("lastSeenAt", ">=", activeCutoff).get(),
+        db.collection("welltrans_sync_logs").where("status", "==", "processing").limit(500).get(),
+        db.collection("welltrans_sync_manifests").where("state", "==", "blocked").limit(50).get(),
+        db.doc("welltrans_operations/health").get(),
+      ]);
+
+    const enabled = settingsSnapshot.exists && settingsSnapshot.data().enabled === true;
+    const activeWorkers = workersSnapshot.docs.map(document => {
+      const data = document.data();
+      return {
+        id: document.id,
+        workerId: data.workerId || "",
+        version: data.version || "",
+        state: data.state || "unknown",
+        selectedDate: data.selectedDate || null,
+        lastSeenAt: data.lastSeenAt || null,
+      };
+    });
+    const staleProcessing = processingSnapshot.docs.filter(document => {
+      const expiresAt = document.data().leaseExpiresAt?.toMillis?.() || 0;
+      return expiresAt > 0 && expiresAt < now;
+    });
+    const blockedDates = blockedSnapshot.docs.map(document => document.id);
+    const state = !enabled
+      ? "disabled"
+      : activeWorkers.length === 0 || staleProcessing.length > 0
+        ? "critical"
+        : blockedDates.length > 0
+          ? "degraded"
+          : "healthy";
+    const previous = previousSnapshot.exists ? previousSnapshot.data() : {};
+    const stateChanged = previous.state !== state;
+    const health = {
+      provider: "welltrans",
+      enabled,
+      state,
+      activeWorkerCount: activeWorkers.length,
+      standbyWorkerCount: activeWorkers.filter(worker => worker.state === "lease_standby").length,
+      activeWorkers,
+      staleProcessingCount: staleProcessing.length,
+      staleProcessingIds: staleProcessing.slice(0, 100).map(document => document.id),
+      blockedDateCount: blockedDates.length,
+      blockedDates,
+      checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+      stateChangedAt: stateChanged
+        ? admin.firestore.FieldValue.serverTimestamp()
+        : previous.stateChangedAt || admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await db.doc("welltrans_operations/health").set(health, { merge: true });
+
+    if (stateChanged) {
+      await db.collection("audit_logs").add({
+        action: "welltrans.operations.health_changed",
+        entityType: "broker_sync",
+        entityId: "welltrans",
+        previousState: previous.state || null,
+        state,
+        activeWorkerCount: activeWorkers.length,
+        staleProcessingCount: staleProcessing.length,
+        blockedDates,
+        actorId: "system",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    if (enabled && stateChanged && (state === "critical" || state === "degraded")) {
+      const administrators = await db.collection("users")
+        .where("role", "in", ["admin", "superadmin", "owner"])
+        .get();
+      const tokens = [...new Set(administrators.docs
+        .map(document => document.data().fcmToken)
+        .filter(Boolean))];
+      if (tokens.length) {
+        const body = state === "critical"
+          ? `WellTrans needs attention: ${activeWorkers.length} active agents, ${staleProcessing.length} stuck jobs.`
+          : `WellTrans has ${blockedDates.length} blocked service date(s).`;
+        await admin.messaging().sendEachForMulticast({
+          tokens: tokens.slice(0, 500),
+          notification: { title: "WellTrans Operations Alert", body },
+          data: { type: "welltrans_operations", state },
+          webpush: {
+            headers: { Urgency: "high" },
+            notification: {
+              title: "WellTrans Operations Alert",
+              body,
+              icon: "/agape.png",
+              badge: "/agape.png",
+              tag: "welltrans-operations",
+              renotify: true,
+            },
+            fcmOptions: { link: "/?view=welltrans" },
+          },
+        });
+      }
+    }
+    return health;
+  });

@@ -60,7 +60,9 @@ the exact requested WellTrans date is visible.
 - Every staged cell is re-located in the virtual grid and verified before the
   trip is marked ready for review.
 - The worker never clicks **Apply** or **Close**. An operator reviews every
-  staged field, clicks **Apply**, and confirms the applied record in Agape.
+  staged field and clicks **Apply**. When the itinerary dialog closes, Agent
+  3.3 reads every affected portal row back, marks only persisted values
+  complete, and requeues anything that was closed without being saved.
 - A safe preflight failure or verified rollback does not stop later trips.
   An unverified rollback stops the batch immediately.
 - Failed or older-version jobs are never requeued automatically; retry is an
@@ -68,6 +70,19 @@ the exact requested WellTrans date is visible.
 - Other service dates stay pending and cannot be written to the selected grid.
 - Credentials and session state remain local and encrypted; they are not
   stored in Firestore.
+- Every staged, failed, requeued, and live-verified transition writes an
+  append-only `welltrans_sync_events` record with the source fingerprint,
+  worker instance, review session, and timestamp.
+- Each Agent publishes an independent heartbeat. The selected service date is
+  protected by a renewable fencing lease, so a standby computer can take over
+  only after the active owner stops renewing.
+
+## Enterprise verification
+
+Run `npm test` to execute the deterministic TripSpark digital twin. It indexes
+5,000 bookings / 10,000 Pickup and Dropoff rows, stages every exact Booking ID,
+proves that staging never performs Apply, and exercises whole-trip rollback
+without touching production WellTrans records.
 
 Use `npm run standby` when writes must remain disabled. `npm run login` only
 refreshes the encrypted session; it does not process queued jobs.

@@ -14,10 +14,11 @@
   "main": "index.js",
   "dependencies": {
     "axios": "^1.16.1",
-    "firebase-admin": "^12.1.0",
-    "firebase-functions": "^5.0.1"
+    "firebase-admin": "^14.2.0",
+    "firebase-functions": "^7.3.2"
   },
   "overrides": {
+    "brace-expansion": "^5.0.8",
     "form-data": "^4.0.6",
     "uuid": "^11.1.1"
   },

@@ -33,7 +33,8 @@ const TABLE_PAGE_SIZE = WELLTRANS_TABLE_PAGE_SIZE;
 const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const {
-    settings, logs, worker, manifest, coverage, workerOnline, workerCalibrated, workerUpgradeRequired,
+    settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, manifest, coverage,
+    workerOnline, workerCalibrated, workerUpgradeRequired,
     requiredWorkerVersion, workerStandby, loading, completedTrips, readyTrips,
     latestByTrip, healthScore, successfulCount,
   } = useWellTransSync(trips, syncDate);
@@ -428,7 +429,72 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
         </div>
       </div>
 
+      {/* Multi-agent operations strip */}
+      <div className="shrink-0 border-b border-slate-100 bg-slate-50/80 px-4 py-2">
+        <div className="flex items-center gap-3 overflow-x-auto">
+          <div className="flex shrink-0 items-center gap-2 pr-2">
+            <Activity size={13} className="text-slate-500" />
+            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Agent fleet</span>
+            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+              activeWorkers.length ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+            }`}>
+              {activeWorkers.length} online
+            </span>
+            {standbyWorkers.length > 0 && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700">
+                {standbyWorkers.length} standby
+              </span>
+            )}
+            {activeWorkers.length > 1 && (
+              <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[9px] font-bold text-cyan-700">
+                Failover ready
+              </span>
+            )}
+          </div>
+          {workers.length ? workers.slice(0, 6).map(item => {
+            const ageLabel = Number.isFinite(item.ageMs)
+              ? item.ageMs < 60_000
+                ? `${Math.max(0, Math.round(item.ageMs / 1000))}s ago`
+                : `${Math.round(item.ageMs / 60_000)}m ago`
+              : 'never';
+            return (
+              <div key={item.id}
+                className={`flex shrink-0 items-center gap-2 rounded-lg border bg-white px-2.5 py-1 ${
+                  item.online ? 'border-emerald-200' : 'border-slate-200 opacity-60'
+                }`}>
+                <span className={`h-2 w-2 rounded-full ${item.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                <div className="leading-tight">
+                  <p className="max-w-[140px] truncate text-[10px] font-bold text-slate-700">
+                    {item.workerId || item.id}
+                  </p>
+                  <p className="text-[9px] text-slate-400">
+                    v{item.version || '?'} · {String(item.state || 'unknown').replaceAll('_', ' ')}
+                    {item.selectedDate ? ` · ${item.selectedDate}` : ''} · {ageLabel}
+                  </p>
+                </div>
+              </div>
+            );
+          }) : (
+            <span className="text-[10px] font-medium text-slate-400">No enrolled Agent heartbeat has been received.</span>
+          )}
+        </div>
+      </div>
+
       {/* Notifications */}
+      {operations && ['critical', 'degraded'].includes(operations.state) && (
+        <div className={`shrink-0 flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold ${
+          operations.state === 'critical'
+            ? 'border-rose-200 bg-rose-50 text-rose-800'
+            : 'border-amber-200 bg-amber-50 text-amber-800'
+        }`}>
+          <AlertTriangle size={14} className="shrink-0" />
+          <span>
+            Operations {operations.state}: {operations.activeWorkerCount || 0} active agents,
+            {' '}{operations.staleProcessingCount || 0} stuck jobs,
+            {' '}{operations.blockedDateCount || 0} blocked dates.
+          </span>
+        </div>
+      )}
       {notice && (
         <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs font-medium text-amber-800">
           <AlertTriangle size={14} className="shrink-0" />

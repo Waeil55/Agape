@@ -39,8 +39,9 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.2.0';
+const workerVersion = '3.3.0';
 let requestedServiceDate = '';
+let activeServiceDate = '';
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
 let lastAuthoritativeReconcileAt = 0;
@@ -58,6 +59,7 @@ const heartbeatPayload = state => ({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
   version: workerVersion, requestedDate: requestedServiceDate || null,
+  selectedDate: activeServiceDate || null,
   reviewSessionId: reviewSessionId || null,
   workerInstanceId,
   indexedBookings: portalGridIndex?.bookingCount || 0,
@@ -70,6 +72,29 @@ const publishHeartbeat = (state = 'online') => Promise.all([
   db.doc('welltrans_worker_status/primary').set(heartbeatPayload(state), { merge: true }),
   db.doc(`welltrans_workers/${workerInstanceId}`).set(heartbeatPayload(state), { merge: true }),
 ]);
+
+async function commitSyncTransition(ref, update, event = {}) {
+  const batch = db.batch();
+  batch.update(ref, update);
+  batch.set(db.collection('welltrans_sync_events').doc(), {
+    provider: 'welltrans',
+    logId: ref.id,
+    tripId: event.tripId || null,
+    bookingId: event.bookingId || null,
+    serviceDate: event.serviceDate || null,
+    type: event.type || 'state_transition',
+    status: event.status || update.status || null,
+    stage: event.stage || update.stage || null,
+    sourceFingerprint: event.sourceFingerprint || null,
+    portalVerified: event.portalVerified === true,
+    reviewSessionId: reviewSessionId || null,
+    workerId,
+    workerInstanceId,
+    workerVersion,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+}
 const assertAllowedPortal = value => {
   const url = new URL(value);
   const configured = (process.env.WELLTRANS_ALLOWED_HOSTS || new URL(process.env.WELLTRANS_PORTAL_URL).hostname)
@@ -718,7 +743,7 @@ async function verifyClosedReviewBatch(page, serviceDate) {
         gridIndex: portalGridIndex,
       });
       if (!portalAudit.verified || sourceChanged) {
-        await document.ref.update({
+        await commitSyncTransition(document.ref, {
           status: 'pending',
           stage: 'requeued_after_manual_dialog_close',
           errorMessage: '',
@@ -726,10 +751,18 @@ async function verifyClosedReviewBatch(page, serviceDate) {
           portalVerification: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
           workerVersion,
+        }, {
+          tripId: data.tripId,
+          bookingId: data.bookingId,
+          serviceDate,
+          type: 'manual_dialog_closed_without_persisted_values',
+          status: 'pending',
+          stage: 'requeued_after_manual_dialog_close',
+          sourceFingerprint: current.sourceFingerprint,
         });
         result.requeued += 1;
       } else {
-        await document.ref.update({
+        await commitSyncTransition(document.ref, {
           status: 'completed',
           stage: 'manual_apply_live_verified',
           completedAt: FieldValue.serverTimestamp(),
@@ -737,17 +770,33 @@ async function verifyClosedReviewBatch(page, serviceDate) {
           portalVerification: { ...portalAudit, reviewSessionId },
           updatedAt: FieldValue.serverTimestamp(),
           workerVersion,
+        }, {
+          tripId: data.tripId,
+          bookingId: data.bookingId,
+          serviceDate,
+          type: 'manual_apply_live_verified',
+          status: 'completed',
+          stage: 'manual_apply_live_verified',
+          sourceFingerprint: current.sourceFingerprint,
+          portalVerified: true,
         });
         result.verified += 1;
       }
     } catch (error) {
-      await document.ref.update({
+      await commitSyncTransition(document.ref, {
         status: 'failed',
         stage: 'manual_apply_verification_failed',
         errorMessage: String(error?.message || error).slice(0, 2000),
         completedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         workerVersion,
+      }, {
+        tripId: data.tripId,
+        bookingId: data.bookingId,
+        serviceDate,
+        type: 'manual_apply_verification_failed',
+        status: 'failed',
+        stage: 'manual_apply_verification_failed',
       });
       result.failed += 1;
     }
@@ -785,7 +834,7 @@ async function processJob(job, existingSession = null) {
       settings.fieldMapping || {},
       portalGridIndex,
     );
-    await job.ref.update({
+    await commitSyncTransition(job.ref, {
       status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
       warnings: result.warnings || [], verification: result.verification || {},
@@ -794,6 +843,14 @@ async function processJob(job, existingSession = null) {
         job.queuedSourceFingerprint && job.queuedSourceFingerprint !== stagedSourceFingerprint,
       ),
       workerVersion, reviewSessionId,
+    }, {
+      tripId: job.tripId,
+      bookingId: payload.bookingId,
+      serviceDate: payload.serviceDate,
+      type: 'trip_staged_and_verified',
+      status: 'awaiting_review',
+      stage: 'awaiting_manual_apply',
+      sourceFingerprint: stagedSourceFingerprint,
     });
     stagingDurations.push(Date.now() - stagingStartedAt);
     if (stagingDurations.length > 50) stagingDurations.shift();
@@ -817,7 +874,7 @@ async function processJob(job, existingSession = null) {
     const rollbackVerified = error?.welltransRollbackVerified === true;
     const rollbackErrors = Array.isArray(error?.welltransRollbackErrors)
       ? error.welltransRollbackErrors.slice(0, 20) : [];
-    await job.ref.update({
+    await commitSyncTransition(job.ref, {
       status: 'failed',
       stage: safeToContinue ? 'failed_no_partial_changes' : 'failed_review_close_required',
       completedAt: FieldValue.serverTimestamp(),
@@ -829,6 +886,14 @@ async function processJob(job, existingSession = null) {
       mutationStarted: error?.welltransMutationStarted === true,
       rollbackVerified,
       rollbackErrors,
+    }, {
+      tripId: job.tripId,
+      bookingId: job.bookingId,
+      serviceDate: job.serviceDate || job.payload?.serviceDate,
+      type: 'trip_staging_failed',
+      status: 'failed',
+      stage: safeToContinue ? 'failed_no_partial_changes' : 'failed_review_close_required',
+      sourceFingerprint: job.queuedSourceFingerprint,
     });
     // Dismiss only a transient cell/dropdown editor so one failed row cannot
     // poison the next job. Keep the itinerary itself open and never Apply.
@@ -1072,6 +1137,7 @@ async function main() {
   try {
     let selectedDate = await getSelectedPortalDate(session.page);
     selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
+    activeServiceDate = selectedDate;
     await waitForDateLease(selectedDate);
     reviewSessionId = randomUUID();
     await publishHeartbeat('indexing_schedule');
@@ -1098,6 +1164,7 @@ async function main() {
       const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
       if (activeDate !== selectedDate) {
         selectedDate = activeDate;
+        activeServiceDate = selectedDate;
         await waitForDateLease(selectedDate);
         reviewSessionId = randomUUID();
         await publishHeartbeat('indexing_schedule');

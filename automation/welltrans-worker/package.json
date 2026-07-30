@@ -1,6 +1,6 @@
 {
   "name": "agape-welltrans-worker",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,9 @@
     "calibrate-run": "node src/index.js",
     "start": "node src/index.js",
     "once": "node src/index.js --once",
-    "check": "node --check src/index.js"
+    "check": "node --check src/index.js",
+    "test": "node --test test/*.node-test.js",
+    "test:twin": "node --test test/tripspark.digital-twin.node-test.js"
   },
   "dependencies": {
     "firebase-admin": "^14.2.0",
