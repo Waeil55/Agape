@@ -347,25 +347,83 @@ async function ensureLiveRow(grid, row) {
   throw new Error(`Booking ${row.bookingRaw} ${row.activity} row is not currently addressable in the virtual grid`);
 }
 
-async function exactCell(grid, top, left, columnTitle) {
-  // Re-resolve by coordinates immediately before each action. TripSpark
-  // recycles virtual-grid nodes after editor dismissal, so nth(index) can
-  // silently drift into another column between lookup and double-click.
-  const escapedTitle = String(columnTitle).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-  const spaced = `.GridCell[style*="top: ${top}px"][style*="left: ${left}px"]`;
-  const compact = `.GridCell[style*="top:${top}px"][style*="left:${left}px"]`;
-  const cell = grid.locator(
-    `${spaced}:not([title="${escapedTitle}"]), ${compact}:not([title="${escapedTitle}"])`,
-  ).first();
-  return await cell.count() ? cell : null;
-}
-
-async function resolveColumnLeft(grid, columnTitle) {
-  return grid.evaluate((element, title) => {
+export async function boundCellHandle(grid, row, columnTitle) {
+  // TripSpark virtualizes and recycles grid nodes. A CSS locator based only on
+  // top/left coordinates can therefore re-resolve to a stale clone or another
+  // row after the editor closes. Resolve the exact Booking ID + Activity +
+  // column in one browser-context operation and retain that exact DOM node as
+  // an ElementHandle for the immediate read or double-click.
+  await ensureLiveRow(grid, row);
+  const handle = await grid.evaluateHandle((element, criteria) => {
+    const normalize = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const normalizeBookingValue = value => String(value ?? '')
+      .trim().replace(/\s+/g, '').replace(/^TRIP-/i, '').toLowerCase();
     const cells = [...element.querySelectorAll('.GridCell')];
-    const header = cells.find(cell => cell.style.top === '0px' && cell.title === title);
-    return header ? Number.parseFloat(header.style.left) : null;
-  }, columnTitle);
+    const header = title => cells.find(cell => cell.style.top === '0px' && cell.title === title);
+    const headerCells = new Set(criteria.columnTitles.map(header).filter(Boolean));
+    const bookingLeft = Number.parseFloat(header('Booking Id')?.style.left);
+    const activityLeft = Number.parseFloat(header('Activity')?.style.left);
+    const targetLeft = Number.parseFloat(header(criteria.columnTitle)?.style.left);
+    if (![bookingLeft, activityLeft, targetLeft].every(Number.isFinite)) {
+      return {
+        error: 'missing_column',
+        columnTitle: criteria.columnTitle,
+      };
+    }
+
+    const visibleDataCells = cells.filter(cell => {
+      if (headerCells.has(cell) || !cell.isConnected) return false;
+      const rect = cell.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    const matchingRows = visibleDataCells
+      .filter(cell =>
+        Number.parseFloat(cell.style.left) === bookingLeft
+        && normalizeBookingValue(cell.title || cell.textContent) === criteria.bookingId)
+      .filter(bookingCell => {
+        const top = Number.parseFloat(bookingCell.style.top);
+        return visibleDataCells.some(cell =>
+          Number.parseFloat(cell.style.top) === top
+          && Number.parseFloat(cell.style.left) === activityLeft
+          && normalize(cell.title || cell.textContent) === criteria.activity);
+      });
+    if (matchingRows.length !== 1) {
+      return {
+        error: 'ambiguous_row',
+        bookingId: criteria.bookingId,
+        activity: criteria.activity,
+        matchCount: matchingRows.length,
+      };
+    }
+
+    const top = Number.parseFloat(matchingRows[0].style.top);
+    const targetCells = visibleDataCells.filter(cell =>
+      Number.parseFloat(cell.style.top) === top
+      && Number.parseFloat(cell.style.left) === targetLeft);
+    if (targetCells.length !== 1) {
+      return {
+        error: 'ambiguous_cell',
+        bookingId: criteria.bookingId,
+        activity: criteria.activity,
+        columnTitle: criteria.columnTitle,
+        matchCount: targetCells.length,
+      };
+    }
+    return targetCells[0];
+  }, {
+    bookingId: normalizeBooking(row.bookingRaw),
+    activity: normalized(row.activity),
+    columnTitle,
+    columnTitles: GRID_COLUMNS,
+  });
+  const cell = handle.asElement();
+  if (cell) return cell;
+  const details = await handle.jsonValue().catch(() => null);
+  await handle.dispose().catch(() => {});
+  throw new Error(
+    `Exact cell binding failed for Booking ${row.bookingRaw} ${row.activity} ${columnTitle}`
+    + `${details?.error ? ` (${details.error}, matches=${details.matchCount ?? 'n/a'})` : ''}`,
+  );
 }
 
 const normalized = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -379,6 +437,50 @@ const normalizedTime = value => {
   return match ? `${match[1].padStart(2, '0')}:${match[2]}` : normalized(value);
 };
 const normalizedNumber = value => String(value ?? '').replace(/[^\d.-]/g, '');
+const EDITABLE_COLUMNS = [
+  'Driver', 'Vehicle', 'Arrival Time', 'Departure Time',
+  'Mileage/Odometer', 'Signature Captured?',
+];
+
+async function captureVisibleEditableSnapshot(grid) {
+  const rows = await visibleGridRows(grid);
+  return new Map(rows.map(row => [
+    `${normalizeBooking(row.bookingRaw)}|${normalized(row.activity)}`,
+    {
+      bookingRaw: row.bookingRaw,
+      activity: row.activity,
+      values: Object.fromEntries(EDITABLE_COLUMNS.map(column => [
+        column,
+        String(row.values?.[column] ?? '').trim(),
+      ])),
+    },
+  ]));
+}
+
+async function assertNoCrossBookingMutation(grid, before, allowedBookingId) {
+  const after = await captureVisibleEditableSnapshot(grid);
+  const allowed = normalizeBooking(allowedBookingId);
+  const unexpected = [];
+  for (const [key, prior] of before) {
+    if (normalizeBooking(prior.bookingRaw) === allowed || !after.has(key)) continue;
+    const current = after.get(key);
+    for (const column of EDITABLE_COLUMNS) {
+      if (equalCellValue(column, current.values[column], prior.values[column])) continue;
+      unexpected.push(
+        `${prior.bookingRaw} ${prior.activity} ${column}: `
+        + `"${prior.values[column]}" -> "${current.values[column]}"`,
+      );
+    }
+  }
+  if (unexpected.length) {
+    const error = new Error(
+      `Cross-booking mutation detected while staging Booking ${allowedBookingId}: `
+      + unexpected.slice(0, 5).join('; '),
+    );
+    error.welltransCrossBookingMutation = true;
+    throw error;
+  }
+}
 
 function equalCellValue(column, actual, expected) {
   if (column === 'Arrival Time' || column === 'Departure Time') {
@@ -673,17 +775,17 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
     if (required) throw new Error(`${column} is required for ${row.activity}`);
     return false;
   }
-  const colLeft = await resolveColumnLeft(grid, column);
-  if (colLeft === null) throw new Error(`${column} column not found in grid`);
-  const liveRow = await ensureLiveRow(grid, row);
-  if (equalCellValue(column, liveRow.values?.[column], value)) return true;
-
-  const cell = await exactCell(grid, liveRow.top, colLeft, column);
-  if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity} (top=${liveRow.top})`);
+  const current = await readCellValue(grid, row, column);
+  if (equalCellValue(column, current, value)) return true;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await dismissActiveEditor(page);
-    await cell.dblclick({ force: true });
+    const cell = await boundCellHandle(grid, row, column);
+    try {
+      await cell.dblclick({ force: true });
+    } finally {
+      await cell.dispose().catch(() => {});
+    }
     await waitForEditorSurface(page);
 
     const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
@@ -728,18 +830,18 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
 async function setListCell(page, grid, row, column, option) {
   if (option === undefined || option === null || option === '') return;
 
-  const colLeft = await resolveColumnLeft(grid, column);
-  if (colLeft === null) throw new Error(`${column} column not found in grid`);
-  const liveRow = await ensureLiveRow(grid, row);
-  if (equalCellValue(column, liveRow.values?.[column], option)) return;
+  const current = await readCellValue(grid, row, column);
+  if (equalCellValue(column, current, option)) return;
 
   let selected = '';
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await dismissActiveEditor(page);
-    const currentRow = await ensureLiveRow(grid, row);
-    const cell = await exactCell(grid, currentRow.top, colLeft, column);
-    if (!cell) throw new Error(`${column} cell unavailable at row ${row.activity}`);
-    await cell.dblclick({ force: true });
+    const cell = await boundCellHandle(grid, row, column);
+    try {
+      await cell.dblclick({ force: true });
+    } finally {
+      await cell.dispose().catch(() => {});
+    }
     await waitForEditorSurface(page, 2500);
 
     const listbox = page.locator('.EditorWidgets core\\:listbox:visible');
@@ -788,8 +890,9 @@ const safePreflightError = error => {
   return error;
 };
 
-const capabilityKey = (column, value, kind) =>
-  `${kind}|${normalized(column)}|${kind === 'list' ? normalized(value) : '*'}`;
+const capabilityKey = (row, column, value, kind) =>
+  `${normalizeBooking(row.bookingRaw)}|${normalized(row.activity)}|`
+  + `${kind}|${normalized(column)}|${kind === 'list' ? normalized(value) : '*'}`;
 
 async function preflightCell(page, grid, row, column, value, {
   required = false,
@@ -816,7 +919,7 @@ async function preflightCell(page, grid, row, column, value, {
   const expectedKind = ['Driver', 'Vehicle', 'Signature Captured?'].includes(column)
     ? 'list'
     : 'text';
-  const cached = provenEditorCapabilities.get(capabilityKey(column, value, expectedKind));
+  const cached = provenEditorCapabilities.get(capabilityKey(row, column, value, expectedKind));
   if (cached) {
     if (cached.skip) {
       return {
@@ -841,18 +944,15 @@ async function preflightCell(page, grid, row, column, value, {
     };
   }
 
-  const colLeft = await resolveColumnLeft(grid, column);
-  if (colLeft === null) {
-    throw safePreflightError(new Error(`${column} column not found in grid`));
-  }
-  const liveRow = await ensureLiveRow(grid, row);
-  const cell = await exactCell(grid, liveRow.top, colLeft, column);
-  if (!cell) {
-    throw safePreflightError(new Error(`${column} cell unavailable for ${row.activity}`));
-  }
-
   await dismissActiveEditor(page);
-  await cell.dblclick({ force: true });
+  const cell = await boundCellHandle(grid, row, column).catch(error => {
+    throw safePreflightError(error);
+  });
+  try {
+    await cell.dblclick({ force: true });
+  } finally {
+    await cell.dispose().catch(() => {});
+  }
   await waitForEditorSurface(page);
   const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
@@ -873,7 +973,7 @@ async function preflightCell(page, grid, row, column, value, {
 
     if (!exactMatch) {
       if (optionalExactList) {
-        provenEditorCapabilities.set(capabilityKey(column, value, 'list'), {
+        provenEditorCapabilities.set(capabilityKey(row, column, value, 'list'), {
           skip: true,
           reason: 'no_unique_exact_match',
           availableOptions: options.slice(0, 20),
@@ -889,7 +989,7 @@ async function preflightCell(page, grid, row, column, value, {
         + `${options.length ? ` Available: ${options.slice(0, 20).join(', ')}` : ' Dropdown was empty.'}`,
       ));
     }
-    provenEditorCapabilities.set(capabilityKey(column, value, 'list'), {
+    provenEditorCapabilities.set(capabilityKey(row, column, value, 'list'), {
       target: exactMatch,
       provenAt: Date.now(),
     });
@@ -907,7 +1007,7 @@ async function preflightCell(page, grid, row, column, value, {
       }
       throw safePreflightError(new Error(`${column} exact-option editor was unavailable for ${row.activity}`));
     }
-    provenEditorCapabilities.set(capabilityKey(column, value, 'text'), {
+    provenEditorCapabilities.set(capabilityKey(row, column, value, 'text'), {
       target: value,
       provenAt: Date.now(),
     });
@@ -929,11 +1029,13 @@ async function restorePlanEntry(page, grid, entry) {
     if (entry.original) {
       await setListCell(page, grid, entry.row, entry.column, entry.original);
     } else {
-      const colLeft = await resolveColumnLeft(grid, entry.column);
-      const liveRow = await ensureLiveRow(grid, entry.row);
-      const cell = await exactCell(grid, liveRow.top, colLeft, entry.column);
-      if (!cell) throw new Error(`${entry.row.activity} ${entry.column} rollback cell was unavailable`);
-      await cell.dblclick({ force: true });
+      await dismissActiveEditor(page);
+      const cell = await boundCellHandle(grid, entry.row, entry.column);
+      try {
+        await cell.dblclick({ force: true });
+      } finally {
+        await cell.dispose().catch(() => {});
+      }
       await page.waitForTimeout(250);
       const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
       if (await editor.count()) {
@@ -969,13 +1071,10 @@ async function rollbackAttemptedEntries(page, grid, attempted) {
 }
 
 async function readCellValue(grid, row, column) {
-  const left = await resolveColumnLeft(grid, column);
-  if (left === null) throw new Error(`${column} column not found in grid`);
-  const liveRow = await ensureLiveRow(grid, row);
-  const cell = await exactCell(grid, liveRow.top, left, column);
-  if (!cell) throw new Error(`${column} cell unavailable for ${row.activity}`);
-  if (column === 'Signature Captured') {
-    return cell.evaluate(element => {
+  const cell = await boundCellHandle(grid, row, column);
+  try {
+    if (column === 'Signature Captured') {
+      return await cell.evaluate(element => {
       const nodes = [element, ...element.querySelectorAll('*')];
       for (const node of nodes) {
         if (node instanceof HTMLInputElement && node.type === 'checkbox' && node.checked) return true;
@@ -998,9 +1097,12 @@ async function readCellValue(grid, row, column) {
         }
       }
       return false;
-    });
+      });
+    }
+    return await cell.evaluate(element => String(element.title || element.textContent || '').trim());
+  } finally {
+    await cell.dispose().catch(() => {});
   }
-  return cell.evaluate(element => String(element.title || element.textContent || '').trim());
 }
 
 export async function validateWellTransTrip(page, payload) {
@@ -1165,6 +1267,9 @@ export async function syncWellTransTrip(page, payload, _fieldMapping = {}, gridI
       // Record the attempt before editing because a browser/editor exception
       // can occur after the cell value has already changed.
       attempted.push(entry);
+      await ensureLiveRow(grid, entry.row);
+      await dismissActiveEditor(page);
+      const neighboringRowsBefore = await captureVisibleEditableSnapshot(grid);
       if (entry.kind === 'list') {
         try {
           await setListCell(page, grid, entry.row, entry.column, entry.target);
@@ -1181,6 +1286,13 @@ export async function syncWellTransTrip(page, payload, _fieldMapping = {}, gridI
       } else {
         await setTextCell(page, grid, entry.row, entry.column, entry.target, true);
       }
+      await ensureLiveRow(grid, entry.row);
+      await dismissActiveEditor(page);
+      await assertNoCrossBookingMutation(
+        grid,
+        neighboringRowsBefore,
+        entry.row.bookingRaw,
+      );
       const actual = await readCellValue(grid, entry.row, entry.column);
       if (!equalCellValue(entry.column, actual, entry.target)) {
         throw new Error(

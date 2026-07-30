@@ -117,16 +117,31 @@ describe('WellTrans staging safety contract', () => {
     expect(driver).toBeLessThan(vehicle);
   });
 
-  it('re-resolves a virtual-grid cell by stable coordinates before every action', () => {
+  it('binds every virtual-grid cell atomically by Booking ID, Activity and column', () => {
     const source = readFileSync(tripSourcePath, 'utf8');
-    const exactCell = source.slice(
-      source.indexOf('async function exactCell'),
-      source.indexOf('async function resolveColumnLeft'),
+    const boundCell = source.slice(
+      source.indexOf('async function boundCellHandle'),
+      source.indexOf('const normalized ='),
     );
-    expect(exactCell).toContain('[style*="top: ${top}px"]');
-    expect(exactCell).toContain('[style*="left: ${left}px"]');
-    expect(exactCell).toContain(':not([title="${escapedTitle}"])');
-    expect(exactCell).not.toContain('.nth(');
+    expect(boundCell).toContain('await ensureLiveRow(grid, row)');
+    expect(boundCell).toContain('grid.evaluateHandle');
+    expect(boundCell).toContain("header('Booking Id')");
+    expect(boundCell).toContain("header('Activity')");
+    expect(boundCell).toContain('criteria.columnTitle');
+    expect(boundCell).toContain('matchingRows.length !== 1');
+    expect(boundCell).toContain('targetCells.length !== 1');
+    expect(boundCell).toContain('const cell = handle.asElement()');
+    expect(boundCell).not.toContain('.first()');
+    expect(source).not.toContain('async function exactCell');
+  });
+
+  it('halts when editing one Booking ID changes a visible neighboring booking', () => {
+    const source = readFileSync(tripSourcePath, 'utf8');
+    expect(source).toContain('async function captureVisibleEditableSnapshot');
+    expect(source).toContain('async function assertNoCrossBookingMutation');
+    expect(source).toContain('Cross-booking mutation detected while staging Booking');
+    expect(source).toContain('const neighboringRowsBefore = await captureVisibleEditableSnapshot(grid)');
+    expect(source).toContain('await assertNoCrossBookingMutation(');
   });
 
   it('does not discard TripSpark first-row cells that share top:0 with the header layer', () => {
@@ -285,7 +300,8 @@ describe('WellTrans staging safety contract', () => {
     expect(trip).toContain('capabilityCacheHit: true');
     expect(trip).toContain('async function waitForEditorSurface');
     expect(trip).toContain('export function resetWellTransSessionCaches()');
-    expect(trip).toContain('Re-resolve by coordinates immediately before each action');
+    expect(trip).toContain('Resolve the exact Booking ID + Activity +');
+    expect(trip).toContain('capabilityKey(row, column, value, expectedKind)');
     expect(trip).not.toContain('return index >= 0 ? cells.nth(index) : null');
   });
 

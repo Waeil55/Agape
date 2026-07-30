@@ -65,12 +65,12 @@ the exact requested WellTrans date is visible.
   operator to click **Close**, never **Apply**.
 - Every staged cell is re-located in the virtual grid and verified before the
   trip is marked ready for review.
-- Before showing the green review-ready state, Agent 3.5.1 performs an exhaustive
+- Before showing the green review-ready state, Agent 3.5.2 performs an exhaustive
   second pass across every staged trip. Mismatches and changed Agape source
   records are requeued and repaired automatically before review.
 - The worker never clicks **Apply** or **Close**. An operator reviews every
   staged field and clicks **Apply**. When the itinerary dialog closes, Agent
-  3.5.1 reads every affected portal row back, marks only persisted values
+  3.5.2 reads every affected portal row back, marks only persisted values
   complete, and requeues anything that was closed without being saved.
 - A safe preflight failure or verified rollback does not stop later trips.
   An unverified rollback stops the batch immediately.
