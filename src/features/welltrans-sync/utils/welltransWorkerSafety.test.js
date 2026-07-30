@@ -170,4 +170,12 @@ describe('WellTrans staging safety contract', () => {
     expect(source).toContain('Apply confirmation is locked');
     expect(source).toContain('["awaiting_review", "completed"]');
   });
+
+  it('never trusts staged rows from a closed browser review session', () => {
+    const source = readFileSync(workerSourcePath, 'utf8');
+    expect(source).toContain("reviewSessionId = randomUUID()");
+    expect(source).toContain('async function recoverStaleReviewJobs(serviceDate)');
+    expect(source).toContain("stage: 'requeued_for_new_review_session'");
+    expect(source).toContain('item.reviewSessionId === reviewSessionId');
+  });
 });

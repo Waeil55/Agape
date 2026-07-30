@@ -1,6 +1,7 @@
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { performManualLogin } from './welltrans.login.js';
 import { openWellTransBrowser } from './welltrans.browser.js';
@@ -14,26 +15,25 @@ initializeApp({
 });
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const wellTransSourceFingerprint = payload => {
-  const canonical = JSON.stringify({
+const wellTransSourceFingerprint = payload => createHash('sha256')
+  .update(JSON.stringify({
     bookingId: payload.bookingId,
     serviceDate: payload.serviceDate,
     driver: payload.driver,
     vehicle: payload.vehicle,
     pickup: payload.pickup,
     dropoff: payload.dropoff,
-  });
-  // This is an audit fingerprint, not a credential or authentication token.
-  return globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
-    .then(buffer => [...new Uint8Array(buffer)].map(byte => byte.toString(16).padStart(2, '0')).join(''));
-};
+  }))
+  .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.5.0';
+const workerVersion = '2.5.1';
 let requestedServiceDate = '';
+let reviewSessionId = '';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
   version: workerVersion, requestedDate: requestedServiceDate || null,
+  reviewSessionId: reviewSessionId || null,
 }, { merge: true });
 const assertAllowedPortal = value => {
   const url = new URL(value);
@@ -163,10 +163,15 @@ async function publishDateReviewSummary(serviceDate) {
   const latestByTrip = new Map();
   for (const document of snapshot.docs) {
     const data = document.data();
-    const current = latestByTrip.get(data.tripId);
+    const key = String(data.tripId);
+    const current = latestByTrip.get(key);
     const updatedAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
     if (!current || updatedAt > current.updatedAt) {
-      latestByTrip.set(data.tripId, { status: data.status, updatedAt });
+      latestByTrip.set(key, {
+        status: data.status,
+        reviewSessionId: data.reviewSessionId || '',
+        updatedAt,
+      });
     }
   }
   const manifest = manifestSnapshot.exists ? manifestSnapshot.data() || {} : {};
@@ -189,7 +194,11 @@ async function publishDateReviewSummary(serviceDate) {
       summary.missing += 1;
       continue;
     }
-    if (item.status === 'awaiting_review') summary.staged += 1;
+    if (item.status === 'awaiting_review' && item.reviewSessionId === reviewSessionId) {
+      summary.staged += 1;
+    } else if (item.status === 'awaiting_review') {
+      summary.missing += 1;
+    }
     else if (Object.hasOwn(summary, item.status)) summary[item.status] += 1;
   }
   const verified = summary.staged + summary.completed;
@@ -228,6 +237,41 @@ async function publishDateReviewSummary(serviceDate) {
   }
   await Promise.all(writes);
   return summary;
+}
+
+async function recoverStaleReviewJobs(serviceDate) {
+  const snapshot = await db.collection('welltrans_sync_logs')
+    .where('serviceDate', '==', serviceDate).limit(1000).get();
+  const latestByTrip = new Map();
+  for (const document of snapshot.docs) {
+    const data = document.data();
+    const key = String(data.tripId);
+    const current = latestByTrip.get(key);
+    const updatedAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
+    if (!current || updatedAt > current.updatedAt) {
+      latestByTrip.set(key, { ref: document.ref, data, updatedAt });
+    }
+  }
+  const stale = [...latestByTrip.values()].filter(item =>
+    item.data.status === 'awaiting_review'
+    && item.data.reviewSessionId !== reviewSessionId);
+  for (let offset = 0; offset < stale.length; offset += 400) {
+    const batch = db.batch();
+    for (const item of stale.slice(offset, offset + 400)) {
+      batch.update(item.ref, {
+        status: 'pending',
+        stage: 'requeued_for_new_review_session',
+        previousReviewSessionId: item.data.reviewSessionId || null,
+        reviewSessionId,
+        stagedAt: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+        leaseExpiresAt: FieldValue.delete(),
+        errorMessage: '',
+      });
+    }
+    await batch.commit();
+  }
+  return stale.length;
 }
 
 async function resolveBookingAlias(sourceBookingId, serviceDate) {
@@ -275,7 +319,7 @@ async function processJob(job, existingSession = null) {
       driver: settings.driverValueMapping?.[validation.payload.driver] || validation.payload.driver,
       vehicle: settings.vehicleValueMapping?.[validation.payload.vehicle] || validation.payload.vehicle,
     };
-    const stagedSourceFingerprint = await wellTransSourceFingerprint(validation.payload);
+    const stagedSourceFingerprint = wellTransSourceFingerprint(validation.payload);
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
     if (!page.url().startsWith(new URL(portalUrl).origin)) {
       throw new Error('Calibrated WellTrans page is not on the allowed portal host');
@@ -297,7 +341,7 @@ async function processJob(job, existingSession = null) {
       sourceChangedAfterQueue: Boolean(
         job.queuedSourceFingerprint && job.queuedSourceFingerprint !== stagedSourceFingerprint,
       ),
-      workerVersion,
+      workerVersion, reviewSessionId,
     });
     return { success: true, safeToContinue: true };
   } catch (error) {
@@ -572,15 +616,22 @@ async function main() {
   try {
     let selectedDate = await getSelectedPortalDate(session.page);
     selectedDate = await waitForRequestedSchedule(session.page, selectedDate);
+    reviewSessionId = randomUUID();
+    const recovered = await recoverStaleReviewJobs(selectedDate);
     await publishHeartbeat('calibrated');
     await db.doc('welltrans_worker_status/primary').set({
       selectedDate, calibratedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
-    process.stdout.write(`Worker calibrated to WellTrans schedule ${selectedDate}. Only this date will be processed.\n`);
+    process.stdout.write(
+      `Worker calibrated to WellTrans schedule ${selectedDate}. `
+      + `${recovered} stale review trip(s) will be rebuilt in this browser session.\n`,
+    );
     do {
       const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
       if (activeDate !== selectedDate) {
         selectedDate = activeDate;
+        reviewSessionId = randomUUID();
+        await recoverStaleReviewJobs(selectedDate);
         await db.doc('welltrans_worker_status/primary').set({
           selectedDate, calibratedAt: FieldValue.serverTimestamp(),
         }, { merge: true });

@@ -21,6 +21,9 @@ For every requested service date it must:
 10. Never click Apply or Close. A human reviews and applies the complete date.
 11. Never report `review_ready` while a completed trip is missing, invalid,
     pending, processing, failed, blocked, or unverified.
+12. Bind every staged trip to the current browser review-session ID. If that
+    browser closes before confirmation, rebuild every stale staged trip in the
+    next browser; never reuse an old `awaiting_review` result.
 
 AI may explain failures and propose diagnostics. AI must never invent broker
 records, infer medical-trip values, bypass validation, or directly enter data.
