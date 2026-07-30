@@ -11,6 +11,10 @@ const workerSourcePath = fileURLToPath(new URL(
   '../../../../automation/welltrans-worker/src/index.js',
   import.meta.url,
 ));
+const functionsSourcePath = fileURLToPath(new URL(
+  '../../../../functions/index.js',
+  import.meta.url,
+));
 
 describe('WellTrans staging safety contract', () => {
   it('accepts only a unique normalized-exact broker option', () => {
@@ -146,5 +150,24 @@ describe('WellTrans staging safety contract', () => {
     expect(source).toContain("page.locator('.DropDownDialog:visible core\\\\:listitem:visible')");
     expect(source).toContain('await listbox.count() || await directDialog.count()');
     expect(source).toContain('if (!await listbox.count() && !await directDialog.count())');
+  });
+
+  it('blocks review-ready until the authoritative completed-trip manifest has full coverage', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const backend = readFileSync(functionsSourcePath, 'utf8');
+    expect(worker).toContain("db.doc(`welltrans_sync_manifests/${serviceDate}`).get()");
+    expect(worker).toContain('verified === summary.total');
+    expect(worker).toContain('summary.missing === 0');
+    expect(worker).toContain('summary.blocked === 0');
+    expect(backend).toContain('authoritative_firestore_completed_trip_scan');
+    expect(backend).toContain('const authoritativeTrips = fullDateMode');
+    expect(backend).toContain('expectedTripIds: requestedIds');
+  });
+
+  it('requires complete date reconciliation before manual Apply confirmation', () => {
+    const source = readFileSync(functionsSourcePath, 'utf8');
+    expect(source).toContain('exports.confirmWellTransDateApplied');
+    expect(source).toContain('Apply confirmation is locked');
+    expect(source).toContain('["awaiting_review", "completed"]');
   });
 });

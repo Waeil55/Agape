@@ -37,6 +37,18 @@ export const subscribeWellTransLogs = (serviceDate, callback, onError) => {
 export const subscribeWellTransWorker = (callback, onError) =>
   onSnapshot(doc(db, 'welltrans_worker_status', 'primary'), snapshot => callback(snapshot.exists() ? snapshot.data() : null), onError);
 
+export const subscribeWellTransManifest = (serviceDate, callback, onError) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(serviceDate || ''))) {
+    callback(null);
+    return () => {};
+  }
+  return onSnapshot(
+    doc(db, 'welltrans_sync_manifests', serviceDate),
+    snapshot => callback(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null),
+    onError,
+  );
+};
+
 export const saveWellTransSettings = (settings, actorId) => {
   const {
     portalUsername: _portalUsername,
@@ -67,6 +79,9 @@ export const queueWellTransSync = (tripIds, mode, serviceDate) =>
 
 export const confirmWellTransApplied = logId =>
   httpsCallable(functions, 'confirmWellTransApplied')({ logId });
+
+export const confirmWellTransDateApplied = serviceDate =>
+  httpsCallable(functions, 'confirmWellTransDateApplied')({ serviceDate });
 
 export const isWellTransFailureRetryable = log => {
   if (!log || log.status !== 'failed') return false;

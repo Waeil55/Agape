@@ -827,7 +827,7 @@ export async function syncWellTransTrip(page, payload) {
     plan.push(await preflightCell(page, grid, pickup, 'Mileage/Odometer', payload.pickup.mileage ?? 0, { required: true }));
     plan.push(await preflightCell(page, grid, dropoff, 'Driver', payload.driver, { required: true }));
     plan.push(await preflightCell(page, grid, dropoff, 'Arrival Time', payload.dropoff.arrival, { required: true }));
-    plan.push(await preflightCell(page, grid, dropoff, 'Departure Time', payload.dropoff.departure));
+    plan.push(await preflightCell(page, grid, dropoff, 'Departure Time', payload.dropoff.departure, { required: true }));
     plan.push(await preflightCell(page, grid, dropoff, 'Mileage/Odometer', payload.dropoff.mileage, { required: true }));
     // Optional vehicle edits are last and require a semantic, unique, exact
     // option. Otherwise WellTrans keeps both vehicle cells unchanged.
@@ -840,6 +840,7 @@ export async function syncWellTransTrip(page, payload) {
 
   const actionable = plan.filter(entry => !entry.skip && entry.needsWrite);
   const attempted = [];
+  let verifiedFields = [];
   try {
     for (const entry of actionable) {
       // Record the attempt before editing because a browser/editor exception
@@ -883,6 +884,7 @@ export async function syncWellTransTrip(page, payload) {
     if (mismatches.length) {
       throw new Error(`Full-trip verification failed for Booking ${payload.bookingId}: ${mismatches.join('; ')}`);
     }
+    verifiedFields = expected.map(([row, column]) => `${normalized(row.activity)}.${column}`);
 
     // Signature Captured is a read-only indicator derived from the exact
     // Signature Captured? reason. TripSpark versions render its green check as
@@ -920,6 +922,15 @@ export async function syncWellTransTrip(page, payload) {
 
   return {
     selectedDate, stagedForReview: true, verified: true,
+    verification: {
+      bookingId: String(payload.bookingId),
+      pickupRows: 1,
+      dropoffRows: 1,
+      requiredFieldCount: verifiedFields.length,
+      verifiedFields,
+      exactBookingMatch: true,
+      manualApplyRequired: true,
+    },
     warnings: [
       ...(plan.some(entry => entry.row === pickup && entry.column === 'Vehicle' && entry.skip)
         ? ['Pickup vehicle was left unchanged because no unique exact WellTrans match was found.'] : []),

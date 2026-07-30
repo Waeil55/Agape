@@ -9,7 +9,7 @@ import { auth } from '../../../config/firebase';
 import { useWellTransSync } from '../hooks/useWellTransSync';
 import { useWellTransAutoSync } from '../hooks/useWellTransAutoSync';
 import {
-  confirmWellTransApplied, explainWellTransFailure, exportWellTransLogsCSV,
+  confirmWellTransApplied, confirmWellTransDateApplied, explainWellTransFailure, exportWellTransLogsCSV,
   isWellTransFailureRetryable, queueWellTransSync, saveWellTransSettings,
   categorizeFailure, FAILURE_CATEGORIES,
 } from '../services/welltransService';
@@ -30,7 +30,7 @@ const AUTHORIZED_ROLES = ['admin', 'superadmin', 'dispatcher', 'manager', 'bille
 const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const {
-    settings, logs, worker, workerOnline, workerCalibrated, workerUpgradeRequired,
+    settings, logs, worker, manifest, coverage, workerOnline, workerCalibrated, workerUpgradeRequired,
     requiredWorkerVersion, workerStandby, loading, completedTrips, readyTrips,
     latestByTrip, healthScore, successfulCount,
   } = useWellTransSync(trips, syncDate);
@@ -75,10 +75,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   const workerConnecting = worker?.state === 'connecting';
   const workerNeedsDate = worker?.state === 'date_selection_required';
   const workerReviewError = worker?.state === 'review_error';
+  const workerReconciliationBlocked = worker?.state === 'reconciliation_blocked';
   const workerStatusLabel = !settings.enabled
     ? 'Disabled'
     : workerReviewError
       ? 'Safety stop — discard review'
+    : workerReconciliationBlocked
+      ? 'Incomplete date — action required'
     : workerNeedsLogin
       ? 'Sign-in required'
       : workerNeedsDate
@@ -91,7 +94,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             ? 'Standby'
             : 'Offline';
   const workerHealthy = settings.enabled && workerOnline
-    && !workerNeedsLogin && !workerNeedsDate && !workerConnecting && !workerReviewError;
+    && !workerNeedsLogin && !workerNeedsDate && !workerConnecting
+    && !workerReviewError && !workerReconciliationBlocked;
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const stagedCount = currentLogs.filter(l => l.status === 'awaiting_review').length;
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
@@ -155,21 +159,29 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     setBusy('start-fill');
     setNotice('');
     window.location.href = `agape-welltrans://start?date=${encodeURIComponent(syncDate)}`;
-    if (!readyTrips.length) {
-      setNotice(`Agent start requested for ${syncDate}. Existing pending trips will continue automatically.`);
+    if (!completedTrips.length) {
+      setNotice(`Agent start requested for ${syncDate}. Agape has no completed trips for this date.`);
       setBusy('');
       return;
     }
-    setSyncProgress({ done: 0, total: readyTrips.length });
+    setSyncProgress({ done: 0, total: completedTrips.length });
     try {
-      const result = await queueWellTransSync(readyTrips.map(trip => trip.id), 'start-fill', syncDate);
+      // Full-date mode is reconciled again by the trusted backend. Passing the
+      // complete client set is a second independent guard against UI filters
+      // silently omitting an invalid, failed, or never-queued completed trip.
+      const result = await queueWellTransSync(
+        completedTrips.map(trip => trip.id),
+        'full-date',
+        syncDate,
+      );
       setSyncProgress({
         done: result.data.queued + (result.data.rejected || 0),
-        total: readyTrips.length,
+        total: result.data.expected || completedTrips.length,
       });
       setNotice(
-        `Agent requested for ${syncDate}. ${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued; `
-        + `${result.data.rejected || 0} rejected by validation.`,
+        `Full-date reconciliation requested for ${syncDate}: ${result.data.expected || completedTrips.length} completed, `
+        + `${result.data.queued} queued, ${result.data.covered || 0} already covered, `
+        + `${result.data.rejected || 0} blocked for correction.`,
       );
       setSelectedIds([]);
       setTimeout(() => setSyncProgress(null), 5000);
@@ -179,7 +191,29 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     } finally {
       setBusy('');
     }
-  }, [busy, readyTrips, settings.enabled, syncDate]);
+  }, [busy, completedTrips, settings.enabled, syncDate]);
+
+  const confirmDateApplied = useCallback(async () => {
+    if (!coverage.reviewReady) {
+      setNotice(
+        `Cannot confirm ${syncDate}: ${coverage.missingCount} missing, ${coverage.blockedCount} blocked, `
+        + `${coverage.pending + coverage.processing} still active.`,
+      );
+      return;
+    }
+    if (!window.confirm(
+      `Confirm that you reviewed all ${coverage.staged} staged trips and clicked Apply in WellTrans for ${syncDate}?`,
+    )) return;
+    setBusy('confirm-date');
+    try {
+      const result = await confirmWellTransDateApplied(syncDate);
+      setNotice(`${result.data.confirmed} verified trips confirmed for ${syncDate}.`);
+    } catch (error) {
+      setNotice(error.message || 'The date could not be confirmed.');
+    } finally {
+      setBusy('');
+    }
+  }, [coverage, syncDate]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -307,7 +341,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               disabled={!settings.enabled || Boolean(busy)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 transition"
             >
-              <Play size={13} className="fill-current" /> Start & Fill {syncDate}
+              <Play size={13} className="fill-current" /> Reconcile & Fill {syncDate}
             </button>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="relative flex h-2.5 w-2.5">
@@ -342,11 +376,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
         <div className="flex items-center gap-4 overflow-x-auto">
           {[
             { label: 'Total', value: completedTrips.length, color: 'text-slate-900' },
-            { label: 'Ready', value: readyTrips.length, color: 'text-blue-600' },
+            { label: 'Verified', value: coverage.verified, color: 'text-blue-600' },
             { label: 'Synced', value: successfulCount, color: 'text-emerald-600' },
             { label: 'Review', value: stagedCount, color: 'text-purple-600' },
             { label: 'Failed', value: failedLogs.length, color: 'text-rose-600' },
-            { label: 'Health', value: `${healthScore}%`, color: 'text-amber-600' },
+            { label: 'Missing', value: coverage.missingCount, color: coverage.missingCount ? 'text-rose-600' : 'text-emerald-600' },
+            { label: 'Blocked', value: coverage.blockedCount, color: coverage.blockedCount ? 'text-rose-600' : 'text-emerald-600' },
+            { label: 'Coverage', value: `${healthScore}%`, color: coverage.coverageComplete ? 'text-emerald-600' : 'text-amber-600' },
           ].map(({ label, value, color }) => (
             <div key={label} className="flex items-center gap-1.5 shrink-0">
               <span className={`text-sm font-bold ${color}`}>{value}</span>
@@ -380,7 +416,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             onClick={startAndFillDate}
             className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition">
             {busy === 'start-fill' ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
-            Start & Fill Date ({readyTrips.length})
+            Reconcile & Fill Date ({completedTrips.length})
+          </button>
+          <button disabled={!coverage.reviewReady || Boolean(busy)}
+            onClick={confirmDateApplied}
+            className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-40 transition">
+            <CheckCircle2 size={12} className="inline mr-1" />
+            I Applied This Date ({coverage.staged})
           </button>
           <button disabled={!settings.enabled || !selectedIds.length || Boolean(busy)}
             onClick={() => runQueue(selectedIds, 'selected')}
@@ -425,7 +467,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
 
       {/* Worker warnings */}
       {(workerUpgradeRequired || workerReviewError || workerNeedsDate
-        || (workerCalibrated && !workerDateMatches) || unmatchedCount > 0) && (
+        || (workerCalibrated && !workerDateMatches) || unmatchedCount > 0
+        || coverage.missingCount > 0 || coverage.invalid > 0) && (
         <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2 space-y-1.5">
           {workerReviewError && (
             <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-300 px-3 py-2 text-[11px] font-semibold text-rose-800">
@@ -456,6 +499,22 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           {unmatchedCount > 0 && (
             <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px] font-medium text-amber-700">
               <AlertTriangle size={13} /> {unmatchedCount} trip(s) with unmatched Booking IDs
+            </div>
+          )}
+          {(coverage.missingCount > 0 || coverage.invalid > 0) && (
+            <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+              <span>
+                Date is not complete: {coverage.missingCount} completed trip(s) are not queued or verified
+                and {coverage.invalid} have incomplete Agape source data. Reconcile &amp; Fill will include
+                every completed trip and keep Apply confirmation locked until coverage reaches 100%.
+              </span>
+            </div>
+          )}
+          {manifest?.state === 'blocked' && (
+            <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
+              <ShieldCheck size={13} className="mt-0.5 shrink-0" />
+              <span>Server reconciliation is blocked: {manifest.blockedCount || 0} trip(s) require correction.</span>
             </div>
           )}
         </div>

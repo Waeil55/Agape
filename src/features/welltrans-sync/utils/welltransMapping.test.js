@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildWellTransPayload, calculateTripMileage, normalizeBookingId, normalizeServiceDate, validateTripForWellTrans } from './welltransMapping';
+import {
+  buildWellTransCoverage, buildWellTransPayload, calculateTripMileage,
+  normalizeBookingId, normalizeServiceDate, validateTripForWellTrans,
+} from './welltransMapping';
 
 describe('WellTrans mapping', () => {
   it('matches by booking ID and never passenger name', () => {
@@ -26,7 +29,7 @@ describe('WellTrans mapping', () => {
       driverId: 'DRV-GGQOR7', driverName: 'Agape Care Medical Transportation Inc.',
       vehicle: 'prius_350025', arrivalTime: '2026-07-25T10:49:00Z',
       departedPickupTime: '2026-07-25T10:49:00Z', arrivalDropoffTime: '2026-07-25T11:18:00Z',
-      pickupOdometer: 263206, dropoffOdometer: 263223,
+      pickupOdometer: 263206, dropoffOdometer: 263223, signatureCaptured: true,
     });
     expect(result.valid).toBe(true);
   });
@@ -35,9 +38,46 @@ describe('WellTrans mapping', () => {
       bookingId: '107405172', date: '2026-07-24', status: 'Completed',
       driverId: 'DRV-GGQOR7', arrivalTime: '2026-07-24T10:00:00Z',
       departedPickupTime: '2026-07-24T10:01:00Z', arrivalDropoffTime: '2026-07-24T10:30:00Z',
-      pickupOdometer: 262986, dropoffOdometer: 263003,
+      pickupOdometer: 262986, dropoffOdometer: 263003, signatureCaptured: true,
     });
     expect(result.valid).toBe(true);
     expect(result.payload.vehicle).toBe('');
+  });
+
+  it('never reports complete coverage while a completed trip has no verified log', () => {
+    const completeTrip = id => ({
+      id, bookingId: id, dateKey: '2026-07-27', status: 'Completed',
+      driverName: 'Mikhaeil Waeil', pickupArrival: '10:00', pickupDeparture: '10:01',
+      dropoffArrival: '10:20', pickupOdometer: 100, dropoffOdometer: 110,
+      signatureCaptured: true,
+    });
+    const coverage = buildWellTransCoverage(
+      [completeTrip('100'), completeTrip('101')],
+      new Map([['100', { tripId: '100', status: 'awaiting_review' }]]),
+    );
+    expect(coverage.expected).toBe(2);
+    expect(coverage.verified).toBe(1);
+    expect(coverage.missingCount).toBe(1);
+    expect(coverage.coverageComplete).toBe(false);
+    expect(coverage.reviewReady).toBe(false);
+  });
+
+  it('unlocks date confirmation only when every completed trip is verified', () => {
+    const completeTrip = id => ({
+      id, bookingId: id, dateKey: '2026-07-27', status: 'Completed',
+      driverName: 'Mikhaeil Waeil', pickupArrival: '10:00', pickupDeparture: '10:01',
+      dropoffArrival: '10:20', pickupOdometer: 100, dropoffOdometer: 110,
+      signatureCaptured: true,
+    });
+    const coverage = buildWellTransCoverage(
+      [completeTrip('100'), completeTrip('101')],
+      new Map([
+        ['100', { tripId: '100', status: 'completed' }],
+        ['101', { tripId: '101', status: 'awaiting_review' }],
+      ]),
+    );
+    expect(coverage.coveragePercent).toBe(100);
+    expect(coverage.coverageComplete).toBe(true);
+    expect(coverage.reviewReady).toBe(true);
   });
 });

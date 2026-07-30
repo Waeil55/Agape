@@ -623,6 +623,13 @@ const wellTransServiceDate = (trip = {}) => {
   const value = trip.dateKey || trip.serviceDate || trip.tripDate || trip.scheduledDate || trip.pickupDate || trip.date;
   if (!value) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) return String(value).trim();
+  const iso = String(value).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[1]}-${String(iso[2]).padStart(2, "0")}-${String(iso[3]).padStart(2, "0")}`;
+  const us = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (us) {
+    const year = us[3].length === 2 ? `20${us[3]}` : us[3];
+    return `${year}-${String(us[1]).padStart(2, "0")}-${String(us[2]).padStart(2, "0")}`;
+  }
   const date = value?.toDate?.() || new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Indiana/Indianapolis" }).format(date);
@@ -639,8 +646,8 @@ const buildWellTransJobPayload = (trip = {}) => {
     bookingId, tripId: String(trip.id || bookingId), serviceDate: wellTransServiceDate(trip),
     driver: trip.completedDriverName || trip.driverName || trip.driver || "",
     vehicle: trip.completedVehicle || trip.vehicle || trip.vehicleName || "",
-    pickup: { arrival: wellTransClock(trip.pickupArrival || trip.arrivalTime || trip.arrivedPickupTime), departure: wellTransClock(trip.pickupDeparture || trip.departedPickupTime || trip.departureTime), mileage: Number.isFinite(start) ? start : 0, signatureCaptured: false },
-    dropoff: { arrival: wellTransClock(trip.dropoffArrival || trip.arrivalDropoffTime || trip.completedAt), departure: wellTransClock(trip.dropoffDeparture || trip.departedDropoffTime || trip.arrivalDropoffTime || trip.completedAt), mileage: Number.isFinite(end) ? end : (mileage === null ? null : Number(mileage.toFixed(3))), signatureCaptured: Boolean(trip.signatureCaptured || trip.paperSignatureConfirmed || trip.signatureUrl || trip.signature) },
+    pickup: { arrival: wellTransClock(trip.pickupArrival || trip.arrivalTime || trip.arrivedPickupTime), departure: wellTransClock(trip.pickupDeparture || trip.departedPickupTime || trip.departureTime), mileage: Number.isFinite(start) ? start : null, signatureCaptured: false },
+    dropoff: { arrival: wellTransClock(trip.dropoffArrival || trip.arrivalDropoffTime || trip.completedAt), departure: wellTransClock(trip.dropoffDeparture || trip.departedDropoffTime || trip.dropoffArrival || trip.arrivalDropoffTime || trip.completedAt), mileage: Number.isFinite(end) ? end : (mileage === null ? null : Number(mileage.toFixed(3))), signatureCaptured: Boolean(trip.signatureCaptured || trip.paperSignatureConfirmed || trip.signatureUrl || trip.signature) },
   };
   const errors = [];
   if (!bookingId) errors.push("Trip has no Booking ID");
@@ -654,11 +661,56 @@ const buildWellTransJobPayload = (trip = {}) => {
   if (!assignmentValid(payload.driver)) errors.push("A valid assigned driver is missing");
   if (!payload.pickup.departure) errors.push("Pickup departure is missing");
   if (!payload.dropoff.arrival) errors.push("Dropoff arrival is missing");
-  if (payload.dropoff.mileage === null) errors.push("Mileage or valid odometer readings are missing");
+  if (!payload.dropoff.departure) errors.push("Dropoff departure is missing");
+  if (!Number.isFinite(payload.pickup.mileage) || payload.pickup.mileage <= 0) errors.push("Pickup odometer is missing");
+  if (!Number.isFinite(payload.dropoff.mileage) || payload.dropoff.mileage < payload.pickup.mileage) {
+    errors.push("Dropoff odometer is missing or precedes pickup odometer");
+  }
+  if (!payload.dropoff.signatureCaptured) errors.push("Captured rider signature is missing");
   return { payload, errors };
 };
 
-exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
+const isWellTransCompletedTrip = (trip = {}) => {
+  const status = String(trip.status || "").trim().toLowerCase();
+  return ["completed", "complete", "done"].includes(status)
+    || status.includes("completed")
+    || status.includes("complete")
+    || Boolean(trip.completedAt);
+};
+
+const loadCompletedWellTransTrips = async (serviceDate) => {
+  // A full collection reconciliation is deliberate: legacy trips do not all
+  // share one canonical date field. Filtering only dateKey was the source of
+  // silent omissions in earlier builds.
+  const snapshot = await admin.firestore().collection("trips").get();
+  return snapshot.docs
+    .map((document) => ({ id: document.id, ...document.data() }))
+    .filter((trip) => isWellTransCompletedTrip(trip) && wellTransServiceDate(trip) === serviceDate);
+};
+
+const wellTransSourceFingerprint = (payload) => crypto
+  .createHash("sha256")
+  .update(JSON.stringify({
+    bookingId: payload.bookingId,
+    serviceDate: payload.serviceDate,
+    driver: payload.driver,
+    vehicle: payload.vehicle,
+    pickup: payload.pickup,
+    dropoff: payload.dropoff,
+  }))
+  .digest("hex");
+
+const unsafeWellTransRetry = (log = {}) => {
+  const failure = String(log.errorMessage || "").toLowerCase();
+  return failure.includes("expected exactly one of each")
+    || failure.includes("does not match trip service date")
+    || failure.includes("source trip")
+    || failure.includes("rollback could not be proven");
+};
+
+exports.queueWellTransSync = functions
+  .runWith({ timeoutSeconds: 540, memory: "512MB" })
+  .https.onCall(async (data, context) => {
   await requireAdmin(context);
   const settingsSnap = await admin.firestore().doc("welltrans_settings/primary").get();
   const settings = settingsSnap.exists ? settingsSnap.data() : {};
@@ -668,15 +720,50 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedServiceDate)) {
     throw new functions.https.HttpsError("invalid-argument", "A valid selected service date is required.");
   }
-  const requestedIds = [...new Set((Array.isArray(data?.tripIds) ? data.tripIds : []).map(String))].slice(0, 500);
-  if (!requestedIds.length) throw new functions.https.HttpsError("invalid-argument", "Select at least one trip.");
+  const mode = String(data?.mode || "selected");
+  const fullDateMode = mode === "full-date" || mode === "start-fill";
+  const authoritativeTrips = fullDateMode
+    ? await loadCompletedWellTransTrips(requestedServiceDate)
+    : [];
+  const authoritativeById = new Map(authoritativeTrips.map((trip) => [String(trip.id), trip]));
+  const clientIds = [...new Set((Array.isArray(data?.tripIds) ? data.tripIds : []).map(String))];
+  const requestedIds = fullDateMode ? [...authoritativeById.keys()] : clientIds;
+  if (!requestedIds.length && !fullDateMode) {
+    throw new functions.https.HttpsError("invalid-argument", "Select at least one trip.");
+  }
+  if (requestedIds.length > 1000) {
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      `The selected date contains ${requestedIds.length} completed trips; split the date before synchronization.`,
+    );
+  }
+  const manifestRef = admin.firestore().doc(`welltrans_sync_manifests/${requestedServiceDate}`);
+  if (fullDateMode) {
+    await manifestRef.set({
+      provider: "welltrans",
+      serviceDate: requestedServiceDate,
+      state: "reconciling",
+      expectedTripIds: requestedIds,
+      expectedCount: requestedIds.length,
+      clientTripCount: clientIds.length,
+      source: "authoritative_firestore_completed_trip_scan",
+      requestedBy: context.auth.uid,
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
   let queued = 0;
+  let covered = 0;
   let rejected = 0;
   const rejectionDetails = [];
-  for (const tripId of requestedIds) {
-    const tripSnap = await admin.firestore().doc(`trips/${tripId}`).get();
-    if (!tripSnap.exists) { rejected++; rejectionDetails.push({ tripId, errors: ["Trip not found"] }); continue; }
-    const trip = { id: tripSnap.id, ...tripSnap.data() };
+  const processTrip = async (tripId) => {
+    const tripSnap = authoritativeById.has(tripId)
+      ? null
+      : await admin.firestore().doc(`trips/${tripId}`).get();
+    if (!authoritativeById.has(tripId) && !tripSnap.exists) {
+      return { tripId, rejected: true, errors: ["Trip not found"] };
+    }
+    const trip = authoritativeById.get(tripId) || { id: tripSnap.id, ...tripSnap.data() };
     if (trip.driverId && (!trip.driverName || /medical transportation inc/i.test(trip.driverName))) {
       const driverSnap = await admin.firestore().doc(`drivers/${trip.driverId}`).get();
       if (driverSnap.exists && driverSnap.data().name) trip.completedDriverName = driverSnap.data().name;
@@ -685,7 +772,9 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
     if (payload.serviceDate !== requestedServiceDate) {
       errors.push(`Trip belongs to ${payload.serviceDate || "an unknown date"}, not selected date ${requestedServiceDate}`);
     }
-    if (errors.length) { rejected++; rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors }); continue; }
+    if (errors.length) {
+      return { tripId, bookingId: payload.bookingId, rejected: true, errors };
+    }
     const logsQuery = admin.firestore().collection("welltrans_sync_logs").where("tripId", "==", tripId);
     const newLogRef = admin.firestore().collection("welltrans_sync_logs").doc();
     const decision = await admin.firestore().runTransaction(async transaction => {
@@ -699,40 +788,82 @@ exports.queueWellTransSync = functions.https.onCall(async (data, context) => {
           return rightTime - leftTime;
         });
       const latest = datedAttempts[0];
-      if (data?.mode === "retry") {
+      if (mode === "retry") {
         if (!latest || latest.status !== "failed") {
           return { queued: false, error: latest ? `Latest status is ${latest.status}, not failed` : "No failed attempt exists for the selected date" };
         }
-        const failure = String(latest.errorMessage || "").toLowerCase();
-        if (failure.includes("expected exactly one of each") || failure.includes("does not match trip service date")) {
+        if (unsafeWellTransRetry(latest)) {
           return { queued: false, error: "Failure requires Booking ID/date correction in WellTrans and is not safe for automatic retry" };
         }
       } else if (latest && ["pending", "processing", "awaiting_review", "completed"].includes(latest.status)) {
-        return { queued: false, error: `Already ${latest.status.replace("_", " ")} for the selected date` };
+        return fullDateMode
+          ? { queued: false, covered: true, existingStatus: latest.status }
+          : { queued: false, error: `Already ${latest.status.replace("_", " ")} for the selected date` };
+      } else if (fullDateMode && latest?.status === "failed" && unsafeWellTransRetry(latest)) {
+        return { queued: false, error: "Unsafe failed attempt requires supervised correction before this date can be complete" };
       }
       transaction.create(newLogRef, {
         tripId, bookingId: payload.bookingId, serviceDate: requestedServiceDate,
         status: "pending", stage: "queued",
         startedAt: null, completedAt: null, errorMessage: "", screenshot: "",
         syncedBy: context.auth.uid, createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(), attempt: datedAttempts.length,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(), attempt: datedAttempts.length + 1,
         provider: "welltrans", automationMethod: "playwright", payload,
+        manifestId: fullDateMode ? requestedServiceDate : null,
+        queuedSourceFingerprint: wellTransSourceFingerprint(payload),
       });
       return { queued: true };
     });
-    if (decision.queued) queued++;
-    else {
-      rejected++;
-      rejectionDetails.push({ tripId, bookingId: payload.bookingId, errors: [decision.error] });
+    if (decision.queued) return { tripId, bookingId: payload.bookingId, queued: true };
+    if (decision.covered) {
+      return {
+        tripId, bookingId: payload.bookingId, covered: true,
+        existingStatus: decision.existingStatus,
+      };
     }
+    return { tripId, bookingId: payload.bookingId, rejected: true, errors: [decision.error] };
+  };
+  for (let offset = 0; offset < requestedIds.length; offset += 20) {
+    const results = await Promise.all(requestedIds.slice(offset, offset + 20).map(processTrip));
+    for (const result of results) {
+      if (result.queued) queued++;
+      else if (result.covered) covered++;
+      else {
+        rejected++;
+        rejectionDetails.push({
+          tripId: result.tripId,
+          bookingId: result.bookingId || "",
+          errors: result.errors || ["Unknown reconciliation failure"],
+        });
+      }
+    }
+  }
+  if (fullDateMode) {
+    await manifestRef.set({
+      state: rejected > 0 ? "blocked" : (requestedIds.length ? "queued" : "empty"),
+      expectedCount: requestedIds.length,
+      eligibleCount: requestedIds.length - rejected,
+      queuedCount: queued,
+      coveredCount: covered,
+      blockedCount: rejected,
+      blockedTrips: rejectionDetails.slice(0, 200),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
   }
   await admin.firestore().collection("audit_logs").add({
     action: "welltrans.sync.queued", entityType: "broker_sync", actorId: context.auth.uid,
-    mode: data?.mode || "selected", serviceDate: requestedServiceDate,
-    requested: requestedIds.length, queued, rejected,
+    mode, serviceDate: requestedServiceDate,
+    requested: requestedIds.length, queued, covered, rejected,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  return { queued, rejected, rejectionDetails: rejectionDetails.slice(0, 50) };
+  return {
+    expected: requestedIds.length,
+    queued,
+    covered,
+    rejected,
+    reconciliationState: rejected > 0 ? "blocked" : "queued",
+    rejectionDetails: rejectionDetails.slice(0, 200),
+  };
 });
 
 exports.confirmWellTransApplied = functions.https.onCall(async (data, context) => {
@@ -762,6 +893,90 @@ exports.confirmWellTransApplied = functions.https.onCall(async (data, context) =
   });
   return { confirmed: true };
 });
+
+exports.confirmWellTransDateApplied = functions
+  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .https.onCall(async (data, context) => {
+    await requireAdmin(context);
+    const serviceDate = String(data?.serviceDate || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
+      throw new functions.https.HttpsError("invalid-argument", "A valid service date is required.");
+    }
+    const manifestRef = admin.firestore().doc(`welltrans_sync_manifests/${serviceDate}`);
+    const [manifestSnapshot, logsSnapshot] = await Promise.all([
+      manifestRef.get(),
+      admin.firestore().collection("welltrans_sync_logs")
+        .where("serviceDate", "==", serviceDate).get(),
+    ]);
+    if (!manifestSnapshot.exists) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Run Reconcile & Fill Date before confirming Apply.",
+      );
+    }
+    const manifest = manifestSnapshot.data() || {};
+    const expectedTripIds = [...new Set((manifest.expectedTripIds || []).map(String))];
+    if (!expectedTripIds.length) {
+      throw new functions.https.HttpsError("failed-precondition", "The date manifest contains no completed trips.");
+    }
+    const latestByTrip = new Map();
+    for (const document of logsSnapshot.docs) {
+      const log = { id: document.id, ref: document.ref, ...document.data() };
+      const current = latestByTrip.get(String(log.tripId));
+      const updated = log.updatedAt?.toMillis?.() || log.createdAt?.toMillis?.() || 0;
+      const currentUpdated = current?.updatedAt?.toMillis?.() || current?.createdAt?.toMillis?.() || 0;
+      if (!current || updated > currentUpdated) latestByTrip.set(String(log.tripId), log);
+    }
+    const incomplete = expectedTripIds.filter((tripId) =>
+      !["awaiting_review", "completed"].includes(latestByTrip.get(tripId)?.status));
+    if (incomplete.length || Number(manifest.blockedCount || 0) > 0) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `Apply confirmation is locked: ${incomplete.length} trips are not verified and ${manifest.blockedCount || 0} are blocked.`,
+      );
+    }
+    const awaiting = expectedTripIds
+      .map((tripId) => latestByTrip.get(tripId))
+      .filter((log) => log?.status === "awaiting_review");
+    for (let offset = 0; offset < awaiting.length; offset += 400) {
+      const batch = admin.firestore().batch();
+      for (const log of awaiting.slice(offset, offset + 400)) {
+        batch.update(log.ref, {
+          status: "completed",
+          stage: "completed_after_manual_apply",
+          appliedBy: context.auth.uid,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    }
+    await Promise.all([
+      manifestRef.set({
+        state: "completed",
+        confirmedCount: expectedTripIds.length,
+        stagedCount: 0,
+        completedCount: expectedTripIds.length,
+        missingCount: 0,
+        failedCount: 0,
+        confirmedBy: context.auth.uid,
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }),
+      admin.firestore().doc("welltrans_settings/primary").set({
+        lastSync: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }),
+      admin.firestore().collection("audit_logs").add({
+        action: "welltrans.sync.date_manually_applied",
+        entityType: "broker_sync_manifest",
+        entityId: serviceDate,
+        actorId: context.auth.uid,
+        confirmed: expectedTripIds.length,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }),
+    ]);
+    return { confirmed: expectedTripIds.length };
+  });
 
 exports.auditWellTransSettings = functions.firestore
   .document("welltrans_settings/{settingsId}")

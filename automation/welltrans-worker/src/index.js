@@ -14,8 +14,21 @@ initializeApp({
 });
 const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const wellTransSourceFingerprint = payload => {
+  const canonical = JSON.stringify({
+    bookingId: payload.bookingId,
+    serviceDate: payload.serviceDate,
+    driver: payload.driver,
+    vehicle: payload.vehicle,
+    pickup: payload.pickup,
+    dropoff: payload.dropoff,
+  });
+  // This is an audit fingerprint, not a credential or authentication token.
+  return globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
+    .then(buffer => [...new Uint8Array(buffer)].map(byte => byte.toString(16).padStart(2, '0')).join(''));
+};
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
-const workerVersion = '2.4.1';
+const workerVersion = '2.5.0';
 let requestedServiceDate = '';
 const publishHeartbeat = (state = 'online') => db.doc('welltrans_worker_status/primary').set({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
@@ -143,8 +156,10 @@ async function claimJobById(logId) {
 }
 
 async function publishDateReviewSummary(serviceDate) {
-  const snapshot = await db.collection('welltrans_sync_logs')
-    .where('serviceDate', '==', serviceDate).limit(500).get();
+  const [snapshot, manifestSnapshot] = await Promise.all([
+    db.collection('welltrans_sync_logs').where('serviceDate', '==', serviceDate).limit(1000).get(),
+    db.doc(`welltrans_sync_manifests/${serviceDate}`).get(),
+  ]);
   const latestByTrip = new Map();
   for (const document of snapshot.docs) {
     const data = document.data();
@@ -154,17 +169,64 @@ async function publishDateReviewSummary(serviceDate) {
       latestByTrip.set(data.tripId, { status: data.status, updatedAt });
     }
   }
-  const summary = { total: latestByTrip.size, staged: 0, failed: 0, pending: 0, processing: 0 };
-  for (const item of latestByTrip.values()) {
+  const manifest = manifestSnapshot.exists ? manifestSnapshot.data() || {} : {};
+  const expectedTripIds = manifestSnapshot.exists
+    ? [...new Set((manifest.expectedTripIds || []).map(String))]
+    : [...latestByTrip.keys()];
+  const summary = {
+    total: expectedTripIds.length,
+    staged: 0,
+    completed: 0,
+    failed: 0,
+    pending: 0,
+    processing: 0,
+    missing: 0,
+    blocked: Number(manifest.blockedCount || 0),
+  };
+  for (const tripId of expectedTripIds) {
+    const item = latestByTrip.get(tripId);
+    if (!item) {
+      summary.missing += 1;
+      continue;
+    }
     if (item.status === 'awaiting_review') summary.staged += 1;
     else if (Object.hasOwn(summary, item.status)) summary[item.status] += 1;
   }
-  await db.doc('welltrans_worker_status/primary').set({
-    state: summary.staged > 0 && summary.pending === 0 && summary.processing === 0
-      ? 'review_ready' : 'calibrated',
-    selectedDate: serviceDate, reviewSummary: summary,
+  const verified = summary.staged + summary.completed;
+  const coverageComplete = summary.total > 0
+    && verified === summary.total
+    && summary.failed === 0
+    && summary.pending === 0
+    && summary.processing === 0
+    && summary.missing === 0
+    && summary.blocked === 0;
+  const state = coverageComplete
+    ? (summary.staged > 0 ? 'review_ready' : 'completed')
+    : (summary.failed || summary.blocked || summary.missing ? 'reconciliation_blocked' : 'calibrated');
+  const update = {
+    state,
+    selectedDate: serviceDate,
+    reviewSummary: { ...summary, verified, coverageComplete },
     reviewSummaryAt: FieldValue.serverTimestamp(),
-  }, { merge: true });
+  };
+  const writes = [db.doc('welltrans_worker_status/primary').set(update, { merge: true })];
+  if (manifestSnapshot.exists) {
+    writes.push(manifestSnapshot.ref.set({
+      state,
+      stagedCount: summary.staged,
+      completedCount: summary.completed,
+      pendingCount: summary.pending,
+      processingCount: summary.processing,
+      failedCount: summary.failed,
+      missingCount: summary.missing,
+      verifiedCount: verified,
+      coverageComplete,
+      workerVersion,
+      reconciledAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true }));
+  }
+  await Promise.all(writes);
   return summary;
 }
 
@@ -213,6 +275,7 @@ async function processJob(job, existingSession = null) {
       driver: settings.driverValueMapping?.[validation.payload.driver] || validation.payload.driver,
       vehicle: settings.vehicleValueMapping?.[validation.payload.vehicle] || validation.payload.vehicle,
     };
+    const stagedSourceFingerprint = await wellTransSourceFingerprint(validation.payload);
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
     if (!page.url().startsWith(new URL(portalUrl).origin)) {
       throw new Error('Calibrated WellTrans page is not on the allowed portal host');
@@ -229,7 +292,12 @@ async function processJob(job, existingSession = null) {
     await job.ref.update({
       status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
-      warnings: result.warnings || [], workerVersion,
+      warnings: result.warnings || [], verification: result.verification || {},
+      stagedSourceFingerprint,
+      sourceChangedAfterQueue: Boolean(
+        job.queuedSourceFingerprint && job.queuedSourceFingerprint !== stagedSourceFingerprint,
+      ),
+      workerVersion,
     });
     return { success: true, safeToContinue: true };
   } catch (error) {

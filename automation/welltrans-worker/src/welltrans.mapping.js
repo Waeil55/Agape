@@ -40,6 +40,7 @@ export const toClockTime = value => {
   const date = value?.toDate?.() || new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString('en-US', {
+    timeZone: 'America/Indiana/Indianapolis',
     hour12: false,
     hour: '2-digit',
     minute: '2-digit',
@@ -75,14 +76,14 @@ export const buildWellTransPayload = (trip = {}) => {
       departure: toClockTime(firstValue(trip, ['pickupDeparture', 'departedPickupTime', 'departureTime'])),
       mileage: Number.isFinite(Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage'])))
         ? Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage']))
-        : 0,
+        : null,
       signatureCaptured: false,
     },
     dropoff: {
       arrival: toClockTime(firstValue(trip, ['dropoffArrival', 'arrivalDropoffTime', 'completedAt'])),
       departure: toClockTime(firstValue(
         trip,
-        ['dropoffDeparture', 'departedDropoffTime', 'arrivalDropoffTime', 'completedAt'],
+        ['dropoffDeparture', 'departedDropoffTime', 'dropoffArrival', 'arrivalDropoffTime', 'completedAt'],
       )),
       mileage: Number.isFinite(Number(firstValue(
         trip,
@@ -113,6 +114,14 @@ export const validateTripForWellTrans = (trip = {}) => {
   if (payload && !isOperationalAssignment(payload.driver) && !trip.driverId) errors.push('A valid assigned driver is missing');
   if (payload && !payload.pickup.departure) errors.push('Pickup departure is missing');
   if (payload && !payload.dropoff.arrival) errors.push('Dropoff arrival is missing');
-  if (payload && payload.dropoff.mileage === null) errors.push('Mileage or valid odometer readings are missing');
+  if (payload && !payload.dropoff.departure) errors.push('Dropoff departure is missing');
+  if (payload && (!Number.isFinite(payload.pickup.mileage) || payload.pickup.mileage <= 0)) {
+    errors.push('Pickup odometer is missing');
+  }
+  if (payload && (!Number.isFinite(payload.dropoff.mileage)
+    || payload.dropoff.mileage < payload.pickup.mileage)) {
+    errors.push('Dropoff odometer is missing or precedes pickup odometer');
+  }
+  if (payload && !payload.dropoff.signatureCaptured) errors.push('Captured rider signature is missing');
   return { valid: errors.length === 0, errors, payload };
 };

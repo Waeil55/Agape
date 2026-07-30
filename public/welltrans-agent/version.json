@@ -1,8 +1,8 @@
 {
-    "publishedAt":  "2026-07-30T00:41:12.2992181Z",
-    "sha256":  "21df826c87cf34b8c5a7fd5a4c80510d67ab9f0fbf8212a1768f77ca87522932",
-    "version":  "2.4.1",
+    "publishedAt":  "2026-07-30T01:20:01.0290130Z",
+    "sha256":  "b2b2e7b7dfb2a9a40aa82756f741fa3b951b55f4b678f05d548c1afdd513f13d",
+    "version":  "2.5.0",
     "file":  "agape-welltrans-agent.zip",
     "setupFile":  "AgapeWellTransAgentSetup.exe",
-    "setupSha256":  "26661428f4510ae1030c0ac43855a59f48d1cfde8619ca102d1acd8459a3ebf7"
+    "setupSha256":  "bac89ac5404bd6c25485947a91bd08d5500c4eab089a682792530cbfd05f7745"
 }

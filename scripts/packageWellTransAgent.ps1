@@ -17,6 +17,7 @@ try {
     'package-lock.json',
     'README.md',
     'README-FIRST.txt',
+    'AGENT_POLICY.md',
     'Install-Agent.cmd'
   )) {
     Copy-Item -LiteralPath (Join-Path $workerRoot $file) -Destination (Join-Path $packageRoot $file)

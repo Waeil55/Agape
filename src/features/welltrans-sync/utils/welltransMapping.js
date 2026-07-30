@@ -46,7 +46,12 @@ export const toClockTime = (value) => {
   if (/^\d{1,2}:\d{2}$/.test(String(value).trim())) return String(value).trim().padStart(5, '0');
   const date = value?.toDate?.() || new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString('en-US', {
+    timeZone: 'America/Indiana/Indianapolis',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 export const calculateTripMileage = (trip = {}) => {
@@ -73,12 +78,15 @@ export const buildWellTransPayload = (trip = {}) => {
       departure: toClockTime(firstValue(trip, ['pickupDeparture', 'departedPickupTime', 'departureTime'])),
       mileage: Number.isFinite(Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage'])))
         ? Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage']))
-        : 0,
+        : null,
       signatureCaptured: false,
     },
     dropoff: {
       arrival: toClockTime(firstValue(trip, ['dropoffArrival', 'arrivalDropoffTime', 'completedAt'])),
-      departure: toClockTime(firstValue(trip, ['dropoffDeparture', 'departedDropoffTime', 'arrivalDropoffTime', 'completedAt'])),
+      departure: toClockTime(firstValue(
+        trip,
+        ['dropoffDeparture', 'departedDropoffTime', 'dropoffArrival', 'arrivalDropoffTime', 'completedAt'],
+      )),
       mileage: Number.isFinite(Number(firstValue(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'odometer'])))
         ? Number(firstValue(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'odometer']))
         : mileage,
@@ -96,7 +104,15 @@ export const validateTripForWellTrans = (trip = {}) => {
   if (payload && !isOperationalAssignment(payload.driver) && !trip.driverId) errors.push('A valid assigned driver is missing');
   if (payload && !payload.pickup.departure) errors.push('Pickup departure is missing');
   if (payload && !payload.dropoff.arrival) errors.push('Dropoff arrival is missing');
-  if (payload && payload.dropoff.mileage === null) errors.push('Mileage or valid odometer readings are missing');
+  if (payload && !payload.dropoff.departure) errors.push('Dropoff departure is missing');
+  if (payload && (!Number.isFinite(payload.pickup.mileage) || payload.pickup.mileage <= 0)) {
+    errors.push('Pickup odometer is missing');
+  }
+  if (payload && (!Number.isFinite(payload.dropoff.mileage)
+    || payload.dropoff.mileage < payload.pickup.mileage)) {
+    errors.push('Dropoff odometer is missing or precedes pickup odometer');
+  }
+  if (payload && !payload.dropoff.signatureCaptured) errors.push('Captured rider signature is missing');
   return { valid: errors.length === 0, errors, payload };
 };
 
@@ -106,3 +122,55 @@ export const calculateSyncHealthScore = (completedTripsCount = 0, successfulCoun
   return Math.round((successfulCount / totalAttempted) * 100);
 };
 
+const COVERED_SYNC_STATUSES = new Set(['pending', 'processing', 'awaiting_review', 'completed']);
+
+export const buildWellTransCoverage = (completedTrips = [], latestByTrip = new Map()) => {
+  const trips = completedTrips.map(trip => {
+    const validation = validateTripForWellTrans(trip);
+    const log = latestByTrip.get(String(trip.id)) || latestByTrip.get(trip.id) || null;
+    return {
+      id: String(trip.id),
+      bookingId: normalizeBookingId(trip),
+      valid: validation.valid,
+      errors: validation.errors,
+      status: log?.status || 'not_queued',
+      log,
+    };
+  });
+  const count = status => trips.filter(item => item.status === status).length;
+  const blocked = trips.filter(item => !item.valid || item.status === 'failed');
+  const missing = trips.filter(item =>
+    item.valid && !COVERED_SYNC_STATUSES.has(item.status));
+  const verified = count('awaiting_review') + count('completed');
+  const expected = trips.length;
+  const pending = count('pending');
+  const processing = count('processing');
+  const staged = count('awaiting_review');
+  const completed = count('completed');
+  const failed = count('failed');
+  const coverageComplete = expected > 0
+    && verified === expected
+    && pending === 0
+    && processing === 0
+    && blocked.length === 0
+    && missing.length === 0;
+  return {
+    expected,
+    valid: trips.filter(item => item.valid).length,
+    invalid: trips.filter(item => !item.valid).length,
+    pending,
+    processing,
+    staged,
+    completed,
+    failed,
+    verified,
+    missingCount: missing.length,
+    blockedCount: blocked.length,
+    coveragePercent: expected ? Math.round((verified / expected) * 100) : 100,
+    coverageComplete,
+    reviewReady: coverageComplete && staged > 0,
+    missing,
+    blocked,
+    trips,
+  };
+};
