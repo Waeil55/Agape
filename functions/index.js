@@ -2,11 +2,35 @@ const functions = require("firebase-functions/v1");
 const { onTaskDispatched } = require("firebase-functions/tasks");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const { getAuth } = require("firebase-admin/auth");
+const { FieldValue, Timestamp, getFirestore } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
+const { getStorage } = require("firebase-admin/storage");
 const { getFunctions } = require("firebase-admin/functions");
 const axios = require("axios");
 const crypto = require("crypto");
 
-admin.initializeApp();
+function resolveRuntimeProjectId() {
+  if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
+  if (process.env.GOOGLE_CLOUD_PROJECT) return process.env.GOOGLE_CLOUD_PROJECT;
+  try {
+    return JSON.parse(process.env.FIREBASE_CONFIG || "{}").projectId || null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+const runtimeProjectId = resolveRuntimeProjectId();
+admin.initializeApp(runtimeProjectId ? { projectId: runtimeProjectId } : undefined);
+
+// firebase-admin v14 is modular. Keep the established implementation stable
+// while routing every legacy namespace call through supported modular APIs.
+admin.auth = getAuth;
+admin.firestore = getFirestore;
+admin.firestore.FieldValue = FieldValue;
+admin.firestore.Timestamp = Timestamp;
+admin.messaging = getMessaging;
+admin.storage = getStorage;
 
 const TELNYX_API_BASE = "https://api.telnyx.com/v2";
 const runtimeConfigSecret = defineSecret("AGAPE_RUNTIME_CONFIG");
@@ -129,6 +153,7 @@ async function requireRole(context, allowedRoles) {
   if (!allowedRoles.includes(role)) {
     throw new functions.https.HttpsError("permission-denied", `This action requires one of these roles: ${allowedRoles.join(", ")}.`);
   }
+  return { id: userDoc.id, ...userDoc.data(), tenantId: userDoc.data().tenantId || "agape-care" };
 }
 
 async function requireAdmin(context) {
@@ -550,28 +575,24 @@ exports.diagnoseTelnyx = functions
 });
 
 exports.createAssignments = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "You must be logged in.");
-  }
+  const actor = await requireAdminOrDispatcher(context);
   const { assignments } = data;
   if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
     throw new functions.https.HttpsError("invalid-argument", "'assignments' must be a non-empty array.");
   }
-  let role = null;
-  try {
-    const userDoc = await admin.firestore().doc(`users/${context.auth.uid}`).get();
-    role = userDoc.exists ? userDoc.data().role : null;
-  } catch (e) {
-    functions.logger.warn("createAssignments: could not read user role, proceeding anyway", { uid: context.auth.uid, err: e.message });
-  }
-  if (role && !['admin', 'dispatcher'].includes(role)) {
-    throw new functions.https.HttpsError("permission-denied", `Role '${role}' cannot create assignments.`);
+  if (assignments.length > 450) {
+    throw new functions.https.HttpsError("invalid-argument", "A maximum of 450 assignments is allowed per request.");
   }
   const batch = admin.firestore().batch();
   let count = 0;
   for (const a of assignments) {
     if (!a.id || !a.tripId) continue;
-    batch.set(admin.firestore().doc("assignments", a.id), a, { merge: true });
+    batch.set(admin.firestore().doc("assignments", a.id), {
+      ...a,
+      tenantId: actor.tenantId,
+      updatedBy: context.auth.uid,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
     count++;
   }
   if (count > 0) await batch.commit();
@@ -1458,8 +1479,21 @@ exports.auditWellTransSettings = functions.firestore
   });
 
 exports.createUser = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  const ref = await admin.firestore().collection("users").add(data);
+  const actor = await requireAdmin(context);
+  const allowedRoles = new Set(["admin", "dispatcher", "driver"]);
+  const role = String(data?.role || "").toLowerCase();
+  if (!allowedRoles.has(role)) {
+    throw new functions.https.HttpsError("invalid-argument", "A valid role is required.");
+  }
+  const ref = await admin.firestore().collection("users").add({
+    email: String(data?.email || "").trim().toLowerCase(),
+    name: String(data?.name || "").trim(),
+    username: String(data?.username || "").trim(),
+    role,
+    tenantId: actor.tenantId,
+    createdBy: context.auth.uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
   return { id: ref.id };
 });
 
@@ -1472,13 +1506,14 @@ exports.dayRollover = functions.pubsub.schedule("0 0 * * *").onRun(async (ctx) =
 });
 
 exports.migrateTripDateKeys = functions.https.onCall(async (data, context) => {
-  const tripsSnap = await admin.firestore().collection("trips").get();
+  const actor = await requireAdmin(context);
+  const tripsSnap = await admin.firestore().collection("trips").limit(450).get();
   const batch = admin.firestore().batch();
   let updated = 0;
   tripsSnap.forEach((doc) => {
     const d = doc.data();
     if (!d.dateKey && d.date) {
-      batch.update(doc.ref, { dateKey: d.date });
+      batch.update(doc.ref, { dateKey: d.date, tenantId: d.tenantId || actor.tenantId });
       updated++;
     }
   });
@@ -1487,7 +1522,7 @@ exports.migrateTripDateKeys = functions.https.onCall(async (data, context) => {
 });
 
 exports.sendPushNotification = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+  await requireAdminOrDispatcher(context);
   const { title, body, tokens, type } = data;
   if (!tokens || !tokens.length) return { success: false, message: 'No tokens' };
   const payload = {
@@ -1506,17 +1541,23 @@ exports.sendPushNotification = functions.https.onCall(async (data, context) => {
 
 exports.systemHealthCheck = functions.https.onRequest(async (req, res) => {
   const checks = { firestore: false, auth: false };
+  const diagnostics = {};
   try {
-    await admin.firestore().doc("_health/check").get();
+    await admin.firestore().collection("systemConfig").limit(1).get();
     checks.firestore = true;
-  } catch (e) { /* */ }
-  try {
-    await admin.auth().getUser("_nonexistent_");
   } catch (e) {
-    if (e.code === "auth/user-not-found") checks.auth = true;
+    diagnostics.firestore = e.code || "unknown";
+    functions.logger.error("Health check Firestore probe failed", { code: e.code || "unknown", errorMessage: String(e.message || e).slice(0, 500) });
+  }
+  try {
+    await admin.auth().listUsers(1);
+    checks.auth = true;
+  } catch (e) {
+    diagnostics.auth = e.code || "unknown";
+    functions.logger.error("Health check Auth probe failed", { code: e.code || "unknown", errorMessage: String(e.message || e).slice(0, 500) });
   }
   const healthy = checks.firestore && checks.auth;
-  res.status(healthy ? 200 : 503).json({ status: healthy ? "healthy" : "degraded", checks });
+  res.status(healthy ? 200 : 503).json({ status: healthy ? "healthy" : "degraded", checks, diagnostics });
 });
 
 exports.monitorWellTransOperations = functions.pubsub

@@ -36,6 +36,7 @@ import { useRealtimeReliability } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
 import { useDriverAssignments } from './hooks/useDriverAssignments';
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
+import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -280,11 +281,11 @@ function readRoleCache(uid) {
     return null;
   } catch { return null; }
 }
-function writeRoleCache(uid, role, email) {
+function writeRoleCache(uid, role, email, tenantId = DEFAULT_TENANT_ID) {
   try {
     const normalizedRole = String(role || '').toLowerCase();
     if (!uid || !VALID_ROLES.has(normalizedRole)) return;
-    localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, role: normalizedRole, email, cachedAt: Date.now() }));
+    localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, role: normalizedRole, email, tenantId: tenantIdFromProfile({ tenantId }), cachedAt: Date.now() }));
   } catch {}
 }
 function clearRoleCache() {
@@ -391,6 +392,7 @@ const App = () => {
   
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const roleRef = useRef(null);
   const currentUserRef = useRef(null);
   const driversRef = useRef([]);
@@ -493,7 +495,7 @@ const App = () => {
     setTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
-  } = useFirestoreAppData({ resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
+  } = useFirestoreAppData({ tenantId, resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
@@ -912,7 +914,7 @@ const App = () => {
     }, AUTH_WATCHDOG_TIMEOUT_MS);
 
     // Helper: apply authenticated session state and clear loading immediately
-    const applySession = (userRole, userEmail, userDoc, capturedUser) => {
+    const applySession = (userRole, userEmail, userDoc, capturedUser, cachedTenantId = null) => {
       if (cancelled) return;
       const requestedPortalRole = loginPortalRoleRef.current;
 
@@ -932,7 +934,12 @@ const App = () => {
       }
 
       // Cache the role so next boot is instant
-      writeRoleCache(capturedUser.uid, userRole, userEmail);
+      const profile = userDoc && userDoc.exists?.() ? userDoc.data() : {};
+      const sessionTenantId = cachedTenantId
+        ? tenantIdFromProfile({ tenantId: cachedTenantId })
+        : tenantIdFromProfile(profile);
+      writeRoleCache(capturedUser.uid, userRole, userEmail, sessionTenantId);
+      setTenantId(sessionTenantId);
 
       loginPortalRoleRef.current = null;
       roleRef.current = userRole;
@@ -997,16 +1004,21 @@ const App = () => {
         if (cached && cached.role && (!requestedPortalRole || requestedPortalRole === cached.role)) {
           // Apply session immediately — loading clears in milliseconds
           loginInProgressRef.current = false;
-          applySession(cached.role, userEmail, null, user);
+          applySession(cached.role, userEmail, null, user, cached.tenantId);
 
           // Then verify role from Firestore in the background (non-blocking)
           getDoc(doc(db, 'users', user.uid)).then((freshDoc) => {
             if (cancelled || !freshDoc.exists()) return;
             const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
+            const freshTenantId = tenantIdFromProfile(freshDoc.data());
             if (freshRole && freshRole !== cached.role) {
-              writeRoleCache(user.uid, freshRole, userEmail);
+              writeRoleCache(user.uid, freshRole, userEmail, freshTenantId);
               window.location.reload();
               return;
+            }
+            if (freshTenantId !== tenantIdFromProfile({ tenantId: cached.tenantId })) {
+              writeRoleCache(user.uid, freshRole || cached.role, userEmail, freshTenantId);
+              setTenantId(freshTenantId);
             }
             // Load user settings from Firestore (theme, nav app, etc.)
             // so they survive hard refresh even when the role cache is present.
@@ -1059,6 +1071,7 @@ const App = () => {
                 name: user.displayName || username,
                 loginType: isInternalAuthEmail(normalizedAuthEmail) ? 'username' : 'email',
                 profileId: null,
+                tenantId: DEFAULT_TENANT_ID,
                 bootstrappedAt: new Date().toISOString(),
               },
               { merge: true }

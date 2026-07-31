@@ -28,6 +28,7 @@ import {
   isCorruptedTripRecord,
 } from '../utils/tripIntegrity';
 import { findRemovedDocumentIds } from '../utils/firestorePersistence';
+import { attachTenantScope, normalizeTenantId, recordBelongsToTenant } from '../utils/tenantScope';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -154,7 +155,7 @@ async function safeFirestoreDocId(value, fallbackPrefix = 'trip') {
   return cleaned || `${fallbackPrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function writeTripsToCollection(trips = []) {
+async function writeTripsToCollection(trips = [], tenantId) {
   const now = new Date().toISOString();
   const docs = cleanTripCollection(trips)
     .filter((trip) => trip?.id || trip?.bookingId)
@@ -168,7 +169,7 @@ async function writeTripsToCollection(trips = []) {
         id: docId,
         data: {
           ...sanitizeForFirestore(
-            buildOperationalTripRecord({ ...trip, updatedAtLocal: trip.updatedAtLocal || now })
+            attachTenantScope(buildOperationalTripRecord({ ...trip, updatedAtLocal: trip.updatedAtLocal || now }), tenantId)
           ),
           updatedAt: serverTimestamp(),
         },
@@ -209,11 +210,11 @@ async function writeTripsToCollection(trips = []) {
   }
 }
 
-async function writeDriversToCollection(drivers = []) {
+async function writeDriversToCollection(drivers = [], tenantId) {
   const now = new Date().toISOString();
   const docs = (drivers || [])
     .filter((d) => d?.id)
-    .map((d) => ({ id: String(d.id), data: sanitizeForFirestore({ ...d, updatedAtLocal: d.updatedAtLocal || now }) }));
+    .map((d) => ({ id: String(d.id), data: sanitizeForFirestore(attachTenantScope({ ...d, updatedAtLocal: d.updatedAtLocal || now }, tenantId)) }));
   for (let i = 0; i < docs.length; i += 450) {
     const batch = writeBatch(db);
     docs.slice(i, i + 450).forEach(({ id, data }) => {
@@ -229,7 +230,7 @@ const safeIdPart = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_'
 
 const createAssignmentsFn = httpsCallable(functions, 'createAssignments');
 
-async function writeAssignmentsToCollection(trips = []) {
+async function writeAssignmentsToCollection(trips = [], tenantId) {
   const assignments = cleanTripCollection(trips)
     .filter((trip) => trip?.id && hasAssignedDriver(trip) && !isTerminalTrip(trip))
     .map((trip) => ({
@@ -240,7 +241,7 @@ async function writeAssignmentsToCollection(trips = []) {
       status: trip.assignmentStatus || ASSIGNMENT_STATUSES.OFFERED,
       priority: trip.priority || 'normal', deliveryState: trip.assignmentSeenAt ? 'seen' : 'queued',
       offeredAtLocal: trip.assignedAt || trip.updatedAtLocal || new Date().toISOString(),
-      updatedAtLocal: new Date().toISOString(),
+      updatedAtLocal: new Date().toISOString(), tenantId: normalizeTenantId(tenantId),
       tripSnapshot: { patient: trip.patient || trip.clientName || '', time: trip.time || '', pickup: trip.pickup || '', dropoff: trip.dropoff || '', status: trip.status || '' },
     }));
   if (assignments.length === 0) return;
@@ -250,7 +251,8 @@ async function writeAssignmentsToCollection(trips = []) {
   }
 }
 
-export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {}) {
+export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = true } = {}) {
+  const activeTenantId = normalizeTenantId(tenantId);
   const [state, setState] = useState({
     trips: [], drivers: [], dispatchers: [], vehicles: [], trashedTrips: [], logs: [],
     phoneNumbers: DEFAULT_DATA.phoneNumbers,
@@ -271,7 +273,10 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
     const applyCollectionData = (field, snap) => {
       if (cancelled) return;
       const nextList = [];
-      snap.forEach((itemDoc) => nextList.push({ ...itemDoc.data(), id: itemDoc.id }));
+      snap.forEach((itemDoc) => {
+        const data = itemDoc.data();
+        if (recordBelongsToTenant(data, activeTenantId)) nextList.push({ ...data, id: itemDoc.id });
+      });
       const normalized = normalizeData({ ...dataRef.current, [field]: nextList });
       dataRef.current = normalized;
       setState(prev => ({ ...prev, [field]: normalized[field], loading: false, initialized: true, error: null }));
@@ -285,6 +290,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       const todayKey = localCalendarYmd();
       snap.forEach((tripDoc) => {
         const trip = { ...tripDoc.data(), id: tripDoc.id };
+        if (!recordBelongsToTenant(trip, activeTenantId)) return;
         if (trip.archiveState === 'archived') {
           archivedTrips.push(normalizeTrip(trip));
           return;
@@ -343,7 +349,9 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       if (cancelled) return;
       const progressByTrip = {};
       snap.forEach((progressDoc) => {
-        progressByTrip[progressDoc.id] = { ...progressDoc.data(), id: progressDoc.id };
+        const data = progressDoc.data();
+        if (!recordBelongsToTenant(data, activeTenantId)) return;
+        progressByTrip[progressDoc.id] = { ...data, id: progressDoc.id };
         delete progressByTrip[progressDoc.id].tripId;
       });
       tripProgressRef.current = progressByTrip;
@@ -439,7 +447,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       unsubscribers.forEach((unsub) => unsub());
     };
 
-  }, [resubscribeKey, enabled]);
+  }, [activeTenantId, resubscribeKey, enabled]);
 
   const writeField = useCallback(async (field, value) => {
     const previousData = normalizeData(dataRef.current);
@@ -455,7 +463,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
           .filter((trip) => trip?.id || trip?.bookingId)
           .map((trip) => ({
             id: String(trip.id || trip.bookingId || `archived_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
-            data: sanitizeForFirestore({ ...buildOperationalTripRecord(trip), archiveState: 'archived', archivedAtLocal: trip.archivedAtLocal || new Date().toISOString() }),
+            data: sanitizeForFirestore(attachTenantScope({ ...buildOperationalTripRecord(trip), archiveState: 'archived', archivedAtLocal: trip.archivedAtLocal || new Date().toISOString() }, activeTenantId)),
           }));
         for (let i = 0; i < archivedTrips.length; i += 450) {
           const batch = writeBatch(db);
@@ -473,22 +481,22 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
           return JSON.stringify(prev) !== JSON.stringify(t);
         });
         try {
-          await writeTripsToCollection(changedTrips);
+          await writeTripsToCollection(changedTrips, activeTenantId);
         } catch (tripsErr) {
           console.error('[writeField] writeTripsToCollection failed:', tripsErr.code, tripsErr.message, tripsErr.stack);
           throw tripsErr;
         }
-        await writeAssignmentsToCollection(dataRef.current.trips || []).catch((err) => {
+        await writeAssignmentsToCollection(dataRef.current.trips || [], activeTenantId).catch((err) => {
           console.warn('[writeField] Assignment write non-fatal error:', err?.code, err?.message);
         });
       } else if (field === 'drivers') {
-        await writeDriversToCollection(dataRef.current.drivers || []);
+        await writeDriversToCollection(dataRef.current.drivers || [], activeTenantId);
         const removedIds = findRemovedDocumentIds(previousData.drivers, dataRef.current.drivers);
         await deleteDocsById(DRIVER_PROFILE_COLLECTION, removedIds);
       } else if (field === 'dispatchers') {
         const now = new Date().toISOString();
         const docs = (dataRef.current.dispatchers || []).filter((d) => d?.id).map((d) => ({
-          id: String(d.id), data: sanitizeForFirestore({ ...d, updatedAtLocal: d.updatedAtLocal || now }),
+          id: String(d.id), data: sanitizeForFirestore(attachTenantScope({ ...d, updatedAtLocal: d.updatedAtLocal || now }, activeTenantId)),
         }));
         for (let i = 0; i < docs.length; i += 450) {
           const batch = writeBatch(db);
@@ -502,7 +510,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       } else if (field === 'vehicles') {
         const now = new Date().toISOString();
         const docs = (dataRef.current.vehicles || []).filter((v) => v?.id).map((v) => ({
-          id: String(v.id), data: sanitizeForFirestore({ ...v, updatedAtLocal: v.updatedAtLocal || now }),
+          id: String(v.id), data: sanitizeForFirestore(attachTenantScope({ ...v, updatedAtLocal: v.updatedAtLocal || now }, activeTenantId)),
         }));
         for (let i = 0; i < docs.length; i += 450) {
           const batch = writeBatch(db);
@@ -514,10 +522,10 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
         const removedIds = findRemovedDocumentIds(previousData.vehicles, dataRef.current.vehicles);
         await deleteDocsById(VEHICLE_COLLECTION, removedIds);
       } else if (field === 'phoneNumbers') {
-        await setDoc(doc(db, PHONE_NUMBERS_DOC), sanitized, { merge: true });
+        await setDoc(doc(db, PHONE_NUMBERS_DOC), attachTenantScope(sanitized, activeTenantId), { merge: true });
       } else if (field === 'logs') {
         const logsDoc = doc(db, 'appData', 'logs');
-        await setDoc(logsDoc, { logs: sanitized, updatedAt: serverTimestamp() }, { merge: true });
+        await setDoc(logsDoc, { logs: sanitized, tenantId: activeTenantId, updatedAt: serverTimestamp() }, { merge: true });
       }
 
       const actor = getCurrentEventActor();
@@ -535,7 +543,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       setState(prev => ({ ...prev, [field]: previousData[field] || [], saving: pendingWritesRef.current > 0, error: err.message || `Failed to save ${field}` }));
       return false;
     }
-  }, []);
+  }, [activeTenantId]);
 
   const setTrips = useCallback((updater) => {
     const current = dataRef.current.trips || [];
@@ -552,7 +560,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
   const upsertDriverTrip = useCallback(async (tripId, updates = {}) => {
     if (!tripId) return false;
     const now = new Date().toISOString();
-    const progressDoc = { ...updates, tripId, workflowUpdatedAt: now };
+    const progressDoc = attachTenantScope({ ...updates, tripId, workflowUpdatedAt: now }, activeTenantId);
     
     // Update local state optimistic UI
     const currentTrips = dataRef.current.trips || [];
@@ -567,13 +575,13 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       console.error('Failed to upsert driver trip progress:', err);
       return false;
     }
-  }, []);
+  }, [activeTenantId]);
 
   const upsertDriverProfile = useCallback(async (driverId, updates = {}) => {
     if (!driverId) return false;
     const currentDrivers = dataRef.current.drivers || [];
     const existing = currentDrivers.find((driver) => driver.id === driverId) || { id: driverId };
-    const nextDriver = sanitizeForFirestore({ ...existing, ...updates, id: driverId, updatedAtLocal: updates.updatedAtLocal || new Date().toISOString() });
+    const nextDriver = sanitizeForFirestore(attachTenantScope({ ...existing, ...updates, id: driverId, updatedAtLocal: updates.updatedAtLocal || new Date().toISOString() }, activeTenantId));
     const nextDrivers = currentDrivers.some((driver) => driver.id === driverId)
       ? currentDrivers.map((driver) => (driver.id === driverId ? nextDriver : driver))
       : [...currentDrivers, nextDriver];
@@ -602,7 +610,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       }));
       return false;
     }
-  }, []);
+  }, [activeTenantId]);
 
   const assignVehicleToDriver = useCallback(async (driverId, vehicleName = '') => {
     if (!driverId) throw new Error('A driver is required for vehicle assignment.');
@@ -622,12 +630,12 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       const batch = writeBatch(db);
       for (const changedDriver of nextDrivers.filter((item, index) =>
         item.vehicle !== currentDrivers[index]?.vehicle || item.vehicleId !== currentDrivers[index]?.vehicleId)) {
-        batch.set(doc(db, DRIVER_PROFILE_COLLECTION, changedDriver.id), sanitizeForFirestore(changedDriver), { merge: true });
+        batch.set(doc(db, DRIVER_PROFILE_COLLECTION, changedDriver.id), sanitizeForFirestore(attachTenantScope(changedDriver, activeTenantId)), { merge: true });
       }
       for (const changedVehicle of nextVehicles.filter((item, index) =>
         item.driverId !== currentVehicles[index]?.driverId
         || item.assignedDriver !== currentVehicles[index]?.assignedDriver)) {
-        batch.set(doc(db, VEHICLE_COLLECTION, changedVehicle.id), sanitizeForFirestore(changedVehicle), { merge: true });
+        batch.set(doc(db, VEHICLE_COLLECTION, changedVehicle.id), sanitizeForFirestore(attachTenantScope(changedVehicle, activeTenantId)), { merge: true });
       }
       await batch.commit();
       for (const item of nextDrivers) {
@@ -652,7 +660,7 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
       }));
       throw error;
     }
-  }, []);
+  }, [activeTenantId]);
 
 
   const setDispatchers = useCallback((updater) => { const current = dataRef.current.dispatchers || []; return writeField('dispatchers', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
@@ -662,8 +670,8 @@ export function useFirestoreAppData({ resubscribeKey = 0, enabled = true } = {})
   const setPhoneNumbers = useCallback((updater) => { const current = dataRef.current.phoneNumbers || DEFAULT_DATA.phoneNumbers; return writeField('phoneNumbers', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
 
   const addLog = useCallback(async (log) => {
-    try { await addDoc(collection(db, 'logs'), { ...log, timestamp: serverTimestamp() }); } catch (err) { console.error('Log failed:', err); }
-  }, []);
+    try { await addDoc(collection(db, 'logs'), { ...log, tenantId: activeTenantId, timestamp: serverTimestamp() }); } catch (err) { console.error('Log failed:', err); }
+  }, [activeTenantId]);
 
   const initializeAppData = useCallback(async () => {
     return true;
