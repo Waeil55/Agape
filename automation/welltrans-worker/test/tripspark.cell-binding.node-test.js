@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
-import { boundCellHandle } from '../src/welltrans.trip.js';
+import { boundCellHandle, resolveCapabilityTarget } from '../src/welltrans.trip.js';
 
 let browser;
 let page;
@@ -79,6 +79,14 @@ describe('TripSpark exact virtual-grid cell binding', () => {
     } finally {
       await handle.dispose();
     }
+  });
+
+  it('never reuses another trip value from a text-editor capability cache', () => {
+    assert.equal(resolveCapabilityTarget('text', { target: '10:25' }, '12:19'), '12:19');
+    assert.equal(
+      resolveCapabilityTarget('list', { target: 'Rider Signature Received' }, 'rider signature received'),
+      'Rider Signature Received',
+    );
   });
 
   it('fails closed when two visible target cells occupy the same bound row and column', async () => {

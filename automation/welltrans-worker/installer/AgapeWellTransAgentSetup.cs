@@ -15,8 +15,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Secure Agape Care WellTrans automation agent installer")]
 [assembly: AssemblyCompany("Agape Care Medical Transportation")]
 [assembly: AssemblyProduct("Agape Care WellTrans Agent")]
-[assembly: AssemblyVersion("3.6.4.0")]
-[assembly: AssemblyFileVersion("3.6.4.0")]
+[assembly: AssemblyVersion("3.6.8.0")]
+[assembly: AssemblyFileVersion("3.6.8.0")]
 
 namespace AgapeCare.WellTrans
 {

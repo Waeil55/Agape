@@ -793,6 +793,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
   const current = await readCellValue(grid, row, column);
   if (equalCellValue(column, current, value)) return true;
 
+  let lastObserved = current;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await dismissActiveEditor(page);
     const cell = await boundCellHandle(grid, row, column);
@@ -807,6 +808,32 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
     const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
 
     const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
+    if (await editor.count()) {
+      await editor.click();
+      const target = String(value);
+      if (attempt === 0) {
+        await editor.fill('');
+        await settleUi(page, 50, 15);
+        await editor.fill(target);
+      } else {
+        await page.keyboard.press('Control+A');
+        await page.keyboard.press('Backspace');
+        const typedTarget = attempt === 2 && ['Arrival Time', 'Departure Time'].includes(column)
+          ? target.replace(/[^\d]/g, '')
+          : target;
+        await page.keyboard.type(typedTarget, { delay: attempt === 2 ? 35 : 15 });
+      }
+      await settleUi(page, 150);
+      if (attempt === 2) await page.keyboard.press('Enter').catch(() => {});
+      await page.keyboard.press('Tab').catch(() => {});
+      await settleUi(page, 200);
+      await dismissActiveEditor(page);
+      lastObserved = await readCellValue(grid, row, column);
+      if (equalCellValue(column, lastObserved, value)) return true;
+      await settleUi(page, 180, 60);
+      continue;
+    }
+
     if (await listbox.count() || await directDialog.count()) {
       await openListDropdown(page);
       try {
@@ -823,23 +850,13 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
       }
     }
 
-    if (await editor.count()) {
-      await editor.click();
-      await editor.fill('');
-      await settleUi(page, 50, 15);
-      await editor.fill(String(value));
-      await settleUi(page, 150);
-      await page.keyboard.press('Tab');
-      await settleUi(page, 200);
-      await dismissActiveEditor(page);
-      return true;
-    }
-
     await page.keyboard.press('Escape').catch(() => {});
     await settleUi(page, 150);
   }
   if (column === 'Vehicle') return false;
-  throw new Error(`${column} editor did not open for ${row.activity}`);
+  throw new Error(
+    `${column} did not commit for ${row.activity}: expected "${value}", found "${lastObserved}"`,
+  );
 }
 
 async function setListCell(page, grid, row, column, option) {
@@ -875,7 +892,14 @@ async function setListCell(page, grid, row, column, option) {
     }
 
     await openListDropdown(page);
-    await selectListOption(page, option, column);
+    try {
+      await selectListOption(page, option, column);
+    } catch (error) {
+      await page.keyboard.press('Escape').catch(() => {});
+      await settleUi(page, 180 + (attempt * 80), 60);
+      if (attempt < 2) continue;
+      throw error;
+    }
     await settleUi(page, 250, 80);
     selected = await readCellValue(grid, row, column);
     if (equalCellValue(column, selected, option)) {
@@ -912,9 +936,13 @@ const safePreflightError = error => {
 const capabilityKey = (_row, column, value, kind) =>
   `${kind}|${normalized(column)}|${kind === 'list' ? normalized(value) : '*'}`;
 
+export const resolveCapabilityTarget = (kind, cached, authoritativeValue) =>
+  kind === 'list' ? (cached?.target ?? authoritativeValue) : authoritativeValue;
+
 async function preflightCell(page, grid, row, column, value, {
   required = false,
   optionalExactList = false,
+  probeAttempt = 0,
 } = {}) {
   if (value === undefined || value === null || value === '') {
     if (required) throw safePreflightError(new Error(`${column} is required for ${row.activity}`));
@@ -954,7 +982,11 @@ async function preflightCell(page, grid, row, column, value, {
       row,
       column,
       original,
-      target: cached.target ?? value,
+      // Text editor capability is reusable, but transportation data is not.
+      // Every time/odometer target must always come from this trip's current
+      // authoritative payload. Exact list options may reuse their proven
+      // normalized portal option because the value is part of the cache key.
+      target: resolveCapabilityTarget(expectedKind, cached, value),
       kind: expectedKind,
       needsWrite: true,
       optionalExactList,
@@ -976,6 +1008,17 @@ async function preflightCell(page, grid, row, column, value, {
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
 
   const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
+  if (expectedKind === 'text' && await editor.count()) {
+    await dismissActiveEditor(page);
+    provenEditorCapabilities.set(capabilityKey(row, column, value, 'text'), {
+      target: value,
+      provenAt: Date.now(),
+    });
+    return {
+      row, column, original, target: value, kind: 'text', needsWrite: true,
+    };
+  }
+
   if (await listbox.count() || await directDialog.count()) {
     await openListDropdown(page);
     // Vehicle is deliberately stricter than the other list fields. An input
@@ -1002,6 +1045,14 @@ async function preflightCell(page, grid, row, column, value, {
           availableOptions: options.slice(0, 20),
         };
       }
+      if (probeAttempt < 2) {
+        await settleUi(page, 180 + (probeAttempt * 100), 60);
+        return preflightCell(page, grid, row, column, value, {
+          required,
+          optionalExactList,
+          probeAttempt: probeAttempt + 1,
+        });
+      }
       throw safePreflightError(new Error(
         `${column} requires one unique exact WellTrans option for "${value}".`
         + `${options.length ? ` Available: ${options.slice(0, 20).join(', ')}` : ' Dropdown was empty.'}`,
@@ -1022,6 +1073,14 @@ async function preflightCell(page, grid, row, column, value, {
     if (column === 'Driver' || column === 'Vehicle' || column === 'Signature Captured?') {
       if (optionalExactList) {
         return { skip: true, row, column, original, reason: 'exact_list_unavailable' };
+      }
+      if (probeAttempt < 2) {
+        await settleUi(page, 180 + (probeAttempt * 100), 60);
+        return preflightCell(page, grid, row, column, value, {
+          required,
+          optionalExactList,
+          probeAttempt: probeAttempt + 1,
+        });
       }
       throw safePreflightError(new Error(`${column} exact-option editor was unavailable for ${row.activity}`));
     }
@@ -1203,6 +1262,17 @@ export async function auditWellTransTrip(
   const verifiedFields = [];
   for (const [row, column, target] of expected) {
     const actual = await readCellValue(grid, row, column);
+    if (column === 'Signature Captured' && target === true && actual === false) {
+      // TripSpark renders this derived indicator as different sprites across
+      // releases and may not expose a checked DOM state until Apply. The
+      // editable reason is the deterministic source-of-truth. Accept the
+      // indicator only when that exact reason reads back successfully.
+      const reason = await readCellValue(grid, row, 'Signature Captured?');
+      if (equalCellValue('Signature Captured?', reason, 'Rider Signature Received')) {
+        verifiedFields.push(`${normalized(row.activity)}.Signature Captured (derived)`);
+        continue;
+      }
+    }
     if (!equalCellValue(column, actual, target)) {
       mismatches.push(
         `${row.activity} ${column}: expected "${target}", found "${actual}"`,
@@ -1277,7 +1347,12 @@ export async function syncWellTransTrip(page, payload, _fieldMapping = {}, gridI
     throw safePreflightError(error);
   }
 
-  const actionable = plan.filter(entry => !entry.skip && entry.needsWrite);
+  // Commit scalar fields first. TripSpark dropdowns are harder to clear during
+  // rollback, so a masked time/odometer rejection must be discovered before
+  // Driver, Signature, or Vehicle is changed.
+  const actionable = plan
+    .filter(entry => !entry.skip && entry.needsWrite)
+    .sort((left, right) => Number(left.kind === 'list') - Number(right.kind === 'list'));
   const attempted = [];
   let verifiedFields = [];
   try {
