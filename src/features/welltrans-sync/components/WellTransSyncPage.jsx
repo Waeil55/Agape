@@ -125,6 +125,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     && !workerReviewError && !workerReconciliationBlocked;
   const canaryHealthy = canary?.passed === true
     && (!canary?.serviceDate || canary.serviceDate === syncDate);
+  const liveActiveAgentCount = Math.max(activeWorkers.length, workerOnline ? 1 : 0);
+  const operationsNeedsAttention = Boolean(operations && (
+    Number(operations.staleProcessingCount || 0) > 0
+    || Number(operations.blockedDateCount || 0) > 0
+    || (liveActiveAgentCount === 0 && Number(operations.activeWorkerCount || 0) === 0)
+    || (operations.canaryPassed === false && !canaryHealthy)
+  ));
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const stagedCount = currentLogs.filter(l =>
     l.status === 'awaiting_review'
@@ -501,7 +508,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       </div>
 
       {/* Notifications */}
-      {operations && ['critical', 'degraded'].includes(operations.state) && (
+      {operationsNeedsAttention && ['critical', 'degraded'].includes(operations.state) && (
         <div className={`shrink-0 flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold ${
           operations.state === 'critical'
             ? 'border-rose-200 bg-rose-50 text-rose-800'
@@ -509,7 +516,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
         }`}>
           <AlertTriangle size={14} className="shrink-0" />
           <span>
-            Operations {operations.state}: {operations.activeWorkerCount || 0} active agents,
+            Operations {operations.state}: {liveActiveAgentCount} live agents,
             {' '}{operations.staleProcessingCount || 0} stuck jobs,
             {' '}{operations.blockedDateCount || 0} blocked dates
             {operations.canaryPassed === false ? ', portal contract failed.' : '.'}

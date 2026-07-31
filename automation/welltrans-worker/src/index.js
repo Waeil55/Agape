@@ -50,7 +50,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.8.1';
+const workerVersion = '3.8.2';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -1802,6 +1802,7 @@ async function main() {
     console.error(error);
     process.exitCode = 1;
     operatorControl.fatalReviewError = true;
+    let reviewWasOpen = await isEditItineraryOpen(session.page).catch(() => false);
     process.stdout.write('\nThe agent encountered an error. The review browser will remain open for inspection until it is closed by the operator.\n');
     operatorControl.message = `${error?.message || error} Close or discard the unsaved review, then choose New Safe Session.`;
     while (session.browser.isConnected()) {
@@ -1816,6 +1817,15 @@ async function main() {
         await session.browser.close().catch(() => {});
         return;
       }
+      const reviewIsOpen = await isEditItineraryOpen(session.page).catch(() => false);
+      if (reviewWasOpen && !reviewIsOpen) {
+        operatorControl.message = 'Unsafe review was closed by the operator. Starting a clean session automatically.';
+        await publishHeartbeat('restarting_safe_session').catch(() => {});
+        process.exitCode = 42;
+        await session.browser.close().catch(() => {});
+        return;
+      }
+      reviewWasOpen = reviewWasOpen || reviewIsOpen;
       await sleep(1000);
     }
   }

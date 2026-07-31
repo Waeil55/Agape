@@ -293,6 +293,13 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain('verifiedFields');
   });
 
+  it('automatically starts a clean session after the operator closes an unsafe review', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    expect(worker).toContain('if (reviewWasOpen && !reviewIsOpen)');
+    expect(worker).toContain("process.exitCode = 42");
+    expect(worker).toContain('Unsafe review was closed by the operator');
+  });
+
   it('keeps Apply and Close as explicit human-only actions', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');
     const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
