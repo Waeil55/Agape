@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+$ConfirmPreference = 'None'
+$ProgressPreference = 'SilentlyContinue'
 $installRoot = Split-Path -Parent $PSScriptRoot
 $versionPath = Join-Path $installRoot 'VERSION'
 $agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'

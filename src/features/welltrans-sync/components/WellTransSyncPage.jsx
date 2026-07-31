@@ -613,7 +613,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>
                 Safety stop: this WellTrans review session contains unverified edits. Do not click Apply.
-                Click Close in the Edit Itinerary window, close that agent browser, then click Start &amp; Fill Date
+                Click Close in the Edit Itinerary window, close that agent browser, then click Reconcile &amp; Fill Date
                 to begin a clean verified session.
               </span>
             </div>
@@ -1175,7 +1175,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                   'In Downloads, right-click the ZIP, choose Properties, select Unblock, then Apply.',
                   'Choose Extract All and open the extracted agape-welltrans-agent folder.',
                   'Double-click Install-Agent.cmd. Return to Agape when installation completes.',
-                  'Select the service date and click Start & Fill Date.',
+                  'Select the service date and click Reconcile & Fill Date.',
                 ].map((step, index) => (
                   <li key={step} className="flex gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">

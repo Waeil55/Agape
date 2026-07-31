@@ -45,7 +45,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.5.2';
+const workerVersion = '3.6.3';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -60,6 +60,8 @@ const operatorControl = {
   forceReconcile: false,
   forceVerify: false,
   forceReindex: false,
+  restartRequested: false,
+  fatalReviewError: false,
   message: 'Automatically detecting the opened WellTrans date.',
 };
 const stagingDurations = [];
@@ -171,9 +173,14 @@ async function handleOperatorCommand(action, payload = {}) {
       : 'Paused safely. The current field will finish; no new trip will start.';
   } else if (action === 'reconcile') {
     operatorControl.autoRun = true;
-    operatorControl.forceReconcile = true;
-    operatorControl.forceReindex = true;
-    operatorControl.message = 'Reconciliation and complete-date fill queued.';
+    if (operatorControl.fatalReviewError) {
+      operatorControl.restartRequested = true;
+      operatorControl.message = 'The previous review is unsafe. Starting a clean session, then filling the opened date.';
+    } else {
+      operatorControl.forceReconcile = true;
+      operatorControl.forceReindex = true;
+      operatorControl.message = 'Reconciliation and complete-date fill queued.';
+    }
   } else if (action === 'verify') {
     operatorControl.forceVerify = true;
     operatorControl.message = 'Exhaustive field verification queued.';
@@ -199,7 +206,16 @@ async function handleOperatorCommand(action, payload = {}) {
     operatorControl.forceReconcile = true;
     operatorControl.forceReindex = true;
     operatorControl.autoRun = true;
-    operatorControl.message = `Switching to ${serviceDate}; if a review dialog is open, review and close it manually first.`;
+    if (operatorControl.fatalReviewError) {
+      operatorControl.restartRequested = true;
+      operatorControl.message = `Starting a clean session, then selecting and filling ${serviceDate}.`;
+    } else {
+      operatorControl.message = `Switching to ${serviceDate}; if a review dialog is open, review and close it manually first.`;
+    }
+  } else if (action === 'restart') {
+    operatorControl.restartRequested = true;
+    operatorControl.autoRun = false;
+    operatorControl.message = 'Starting a clean review session. Unsaved WellTrans edits will be discarded; Apply is never clicked.';
   } else {
     throw new Error(`Unsupported operator command: ${action}`);
   }
@@ -208,6 +224,7 @@ async function handleOperatorCommand(action, payload = {}) {
 
 async function updateOperatorConsole(page, summary = {}, extra = {}) {
   await updateWellTransOperatorConsole(page, {
+    version: workerVersion,
     selectedDate: activeServiceDate || requestedServiceDate || '',
     state: extra.state || (operatorControl.autoRun ? 'online' : 'paused'),
     message: extra.message || operatorControl.message,
@@ -1419,6 +1436,17 @@ async function main() {
       + `${authoritative.expected} completed, ${authoritative.blocked} blocked.\n`,
     );
     do {
+      if (operatorControl.restartRequested) {
+        operatorControl.message = 'Closing this unsaved review and starting a clean Agent session.';
+        await updateOperatorConsole(session.page, {}, {
+          state: 'restarting_safe_session',
+          message: operatorControl.message,
+        });
+        await publishHeartbeat('restarting_safe_session');
+        process.exitCode = 42;
+        await session.browser.close().catch(() => {});
+        return;
+      }
       const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
       if (activeDate !== selectedDate) {
         selectedDate = activeDate;
@@ -1620,12 +1648,22 @@ async function main() {
   } catch (error) {
     console.error(error);
     process.exitCode = 1;
+    operatorControl.fatalReviewError = true;
     process.stdout.write('\nThe agent encountered an error. The review browser will remain open for inspection until it is closed by the operator.\n');
-    let keepReviewOpen = true;
-    while (keepReviewOpen) {
+    operatorControl.message = `${error?.message || error} Close or discard the unsaved review, then choose New Safe Session.`;
+    while (session.browser.isConnected()) {
       await publishHeartbeat('review_error').catch(() => {});
-      await sleep(10000);
-      keepReviewOpen = !session.browser.isConnected() ? false : keepReviewOpen;
+      await updateOperatorConsole(session.page, {}, {
+        state: 'review_error_do_not_apply',
+        message: operatorControl.message,
+      });
+      if (operatorControl.restartRequested) {
+        await publishHeartbeat('restarting_safe_session').catch(() => {});
+        process.exitCode = 42;
+        await session.browser.close().catch(() => {});
+        return;
+      }
+      await sleep(1000);
     }
   }
 }

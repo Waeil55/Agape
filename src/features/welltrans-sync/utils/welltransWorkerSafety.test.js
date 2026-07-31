@@ -259,17 +259,26 @@ describe('WellTrans staging safety contract', () => {
     expect(rules).toContain('match /welltrans_operations/{document}');
   });
 
-  it('provides an in-browser operator console with automatic and manual date controls', () => {
+  it('provides a one-line draggable operator toolbar with essential controls only', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');
     const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
-    expect(operatorConsole).toContain('Reconcile & Fill Opened Date');
-    expect(operatorConsole).toContain('Verify Every Field');
-    expect(operatorConsole).toContain('Use Opened Date');
-    expect(operatorConsole).toContain('Switch & Fill');
-    expect(operatorConsole).toContain('<section class="panel collapsed">');
-    expect(operatorConsole).toContain("'bottom:12px'");
+    expect(operatorConsole).toContain('Fill Opened Date');
+    expect(operatorConsole).toContain('Fill Selected');
+    expect(operatorConsole).toContain('Verify All');
+    expect(operatorConsole).toContain('New Safe Session');
+    expect(operatorConsole).toContain('role="toolbar"');
+    expect(operatorConsole).toContain("'top:8px'");
+    expect(operatorConsole).toContain("'left:50%'");
+    expect(operatorConsole).toContain("drag.addEventListener('pointerdown'");
+    expect(operatorConsole).toContain("localStorage.setItem(positionKey");
+    expect(operatorConsole).not.toContain('data-action="reindex"');
+    expect(operatorConsole).not.toContain('data-action="detect-date"');
+    expect(operatorConsole).not.toContain('data-action="collapse"');
     expect(worker).toContain('await installWellTransOperatorConsole(session.page, handleOperatorCommand)');
     expect(worker).toContain('operatorControl.dateOverride');
+    expect(worker).toContain("action === 'restart'");
+    expect(worker).toContain('operatorControl.fatalReviewError');
+    expect(worker).toContain("operatorControl.message = 'The previous review is unsafe. Starting a clean session, then filling the opened date.'");
     expect(worker).toContain('return currentDate;');
   });
 

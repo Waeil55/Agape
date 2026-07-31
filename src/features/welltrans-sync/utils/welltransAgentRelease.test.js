@@ -26,4 +26,24 @@ describe('WellTrans Agent release safety', () => {
     expect(launcher).toContain('Automatic rollback failed');
     expect(launcher).toContain('failed its startup health window and was rolled back');
   });
+
+  it('replaces a visibly running stale Agent and supports clean-session restarts', () => {
+    const launcher = readFileSync(launcherPath, 'utf8');
+    expect(launcher).toContain('$upgradeRequired');
+    expect(launcher).toContain('if ($visibleBrowser)');
+    expect(launcher).toContain('$installedFilesChangedWhileRunning');
+    expect(launcher).toContain('$replacementRequired = $upgradeRequired -or $installedFilesChangedWhileRunning');
+    expect(launcher).toContain('$workerExitCode -eq 42');
+    expect(launcher).toContain('Clean review session restart requested.');
+  });
+
+  it('checks and installs updates silently without closing an open review', () => {
+    const launcher = readFileSync(launcherPath, 'utf8');
+    const updater = readFileSync(updaterPath, 'utf8');
+    expect(launcher).toContain('"${releaseManifestUrl}?cache=');
+    expect(launcher).toContain('& $updater');
+    expect(launcher).toContain("$ConfirmPreference = 'None'");
+    expect(updater).toContain("$ConfirmPreference = 'None'");
+    expect(launcher).toContain('An update never discards unsaved human-review edits');
+  });
 });

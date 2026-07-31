@@ -1,116 +1,142 @@
 const CONSOLE_ID = 'agape-welltrans-operator-console';
 const COMMAND_BINDING = '__agapeWellTransCommand';
+const POSITION_KEY = 'agape-welltrans-toolbar-position-v1';
 
-const consoleBootstrap = ({ consoleId, commandBinding }) => {
+const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   if (window.top !== window || document.getElementById(consoleId)) return;
 
   const host = document.createElement('div');
   host.id = consoleId;
   host.style.cssText = [
     'position:fixed',
-    'bottom:12px',
-    'right:12px',
+    'top:8px',
+    'left:50%',
+    'transform:translateX(-50%)',
     'z-index:2147483647',
-    'width:286px',
+    'max-width:calc(100vw - 16px)',
     'font-family:Inter,Segoe UI,Arial,sans-serif',
   ].join(';');
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>
       *{box-sizing:border-box}
-      .panel{color:#e8eefc;background:rgba(8,15,31,.97);border:1px solid #2b3f66;
-        border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.38);overflow:hidden}
-      .head{padding:9px 10px;background:linear-gradient(135deg,#12264b,#0a1429)}
-      .brand{display:flex;align-items:center;justify-content:space-between;gap:10px}
-      .title{font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase}
-      .badge{padding:3px 6px;border-radius:999px;background:#123c2c;color:#6ee7b7;font-size:9px;font-weight:800}
-      .sub{margin-top:4px;color:#91a4c8;font-size:9px;line-height:1.3}
-      .body{padding:9px 10px 10px}
-      .dateRow{display:grid;grid-template-columns:1fr auto;gap:7px;margin-bottom:8px}
-      input{width:100%;height:34px;border:1px solid #38517e;border-radius:8px;background:#0d1930;
-        color:#fff;padding:0 9px;font:600 12px inherit}
-      button{border:0;border-radius:8px;min-height:34px;padding:7px 10px;font:700 11px inherit;
-        cursor:pointer;color:#eaf1ff;background:#20385f}
-      button:hover{filter:brightness(1.16)}
-      button:disabled{cursor:wait;opacity:.55}
-      .primary{width:100%;min-height:42px;background:linear-gradient(135deg,#2563eb,#3b82f6);
-        font-size:12px;letter-spacing:.02em}
-      .grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}
-      .status{margin-top:10px;padding:9px;border-radius:9px;background:#0d1930;border:1px solid #263d64}
-      .statusTop{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:800}
-      .message{margin-top:4px;color:#a9b8d2;font-size:10px;line-height:1.35;max-height:42px;overflow:auto}
-      .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:9px}
-      .metric{padding:7px 4px;text-align:center;border-radius:8px;background:#111f39}
-      .metric b{display:block;font-size:13px}.metric span{font-size:8px;color:#91a4c8;text-transform:uppercase}
-      .human{margin-top:9px;padding:7px 9px;border-radius:8px;background:#3a1c1c;color:#fecaca;
-        border:1px solid #713232;font-size:9px;font-weight:800;line-height:1.35}
-      .progress{height:4px;margin-top:8px;background:#172743;border-radius:99px;overflow:hidden}
-      .bar{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#60a5fa);transition:width .2s}
-      .collapsed{width:210px}
-      .collapsed .body,.collapsed .sub,.collapsed .badge{display:none}
-      .collapse{min-height:25px;padding:2px 7px;background:#1b2b49}
+      .bar{display:flex;align-items:center;gap:6px;height:42px;max-width:calc(100vw - 16px);
+        padding:5px 7px;color:#eaf1ff;background:rgba(7,15,30,.97);border:1px solid #30476e;
+        border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.38);white-space:nowrap;overflow-x:auto;
+        overflow-y:hidden;scrollbar-width:thin;backdrop-filter:blur(12px)}
+      button,input{height:30px;flex:0 0 auto;border-radius:8px;font:700 10px Inter,Segoe UI,Arial,sans-serif}
+      button{border:1px solid #31496f;padding:0 9px;color:#eaf1ff;background:#172944;cursor:pointer}
+      button:hover{background:#213b61;border-color:#4b6f9f}
+      button:focus-visible,input:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}
+      button:disabled{cursor:wait;opacity:.5}
+      .drag{width:27px;padding:0;cursor:grab;color:#91a4c8;font-size:15px;touch-action:none;user-select:none}
+      .drag:active{cursor:grabbing}
+      .brand{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:900;letter-spacing:.06em}
+      .mark{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#2563eb;color:white}
+      .version{color:#7f94b8;font-size:8px;font-weight:800}
+      .state{max-width:125px;overflow:hidden;text-overflow:ellipsis;padding:4px 7px;border-radius:999px;
+        background:#123c2c;color:#6ee7b7;font-size:9px;font-weight:900}
+      input{width:118px;border:1px solid #38517e;background:#0d1930;color:#fff;padding:0 7px;color-scheme:dark}
+      .primary{background:#2563eb;border-color:#3b82f6;color:#fff}
+      .primary:hover{background:#1d4ed8}
+      .verify{background:#14532d;border-color:#23834a}
+      .restart{background:#5b2230;border-color:#8f3d52}
+      .metric{display:flex;align-items:baseline;gap:3px;padding:3px 6px;border-radius:7px;background:#101f37;
+        color:#91a4c8;font-size:8px;text-transform:uppercase}
+      .metric b{color:#fff;font-size:11px}
+      .message{min-width:130px;max-width:280px;overflow:hidden;text-overflow:ellipsis;color:#a9b8d2;
+        font-size:9px;font-weight:600}
+      .manual{padding:4px 7px;border-radius:7px;background:#3a1c1c;border:1px solid #713232;
+        color:#fecaca;font-size:8px;font-weight:900}
+      @media(max-width:900px){.message{max-width:140px}.brandText{display:none}}
     </style>
-    <section class="panel collapsed">
-      <header class="head">
-        <div class="brand">
-          <div class="title">Agape WellTrans Console</div>
-          <div>
-            <span class="badge" data-role="mode">AUTO</span>
-            <button class="collapse" data-action="collapse" title="Open controls">+</button>
-          </div>
-        </div>
-        <div class="sub">Exact Booking ID • selected-date fencing • field-by-field verification</div>
-      </header>
-      <div class="body">
-        <div class="dateRow">
-          <input data-role="date" type="date" aria-label="WellTrans service date">
-          <button data-action="switch-date">Switch & Fill</button>
-        </div>
-        <button class="primary" data-action="reconcile">Reconcile & Fill Opened Date</button>
-        <div class="grid">
-          <button data-action="verify">Verify Every Field</button>
-          <button data-action="reindex">Refresh Grid Index</button>
-          <button data-action="detect-date">Use Opened Date</button>
-          <button data-action="pause">Pause Auto</button>
-        </div>
-        <div class="status">
-          <div class="statusTop">
-            <span data-role="dateLabel">Detecting date…</span>
-            <span data-role="state">CONNECTING</span>
-          </div>
-          <div class="message" data-role="message">Waiting for the itinerary workspace.</div>
-          <div class="progress"><div class="bar" data-role="bar"></div></div>
-          <div class="metrics">
-            <div class="metric"><b data-role="expected">0</b><span>Expected</span></div>
-            <div class="metric"><b data-role="staged">0</b><span>Filled</span></div>
-            <div class="metric"><b data-role="pending">0</b><span>Pending</span></div>
-            <div class="metric"><b data-role="failed">0</b><span>Blocked</span></div>
-          </div>
-        </div>
-        <div class="human">HUMAN APPLY ONLY — this Agent never clicks Apply or Close. Review the green verified state, then apply yourself.</div>
-      </div>
+    <section class="bar" role="toolbar" aria-label="Agape WellTrans controls">
+      <button class="drag" data-role="drag" title="Drag toolbar" aria-label="Drag toolbar">&#8942;&#8942;</button>
+      <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
+      <span class="state" data-role="state">CONNECTING</span>
+      <input data-role="date" type="date" aria-label="Service date">
+      <button data-action="switch-date" title="Open and fill the selected service date">Fill Selected</button>
+      <button class="primary" data-action="reconcile" title="Detect, reconcile and fill the date currently open in WellTrans">Fill Opened Date</button>
+      <button class="verify" data-action="verify" title="Read every required field back without clicking Apply">Verify All</button>
+      <button data-action="pause">Pause</button>
+      <button class="restart" data-action="restart" title="Discard this unsaved review session and start a clean agent session">New Safe Session</button>
+      <span class="metric"><b data-role="staged">0</b> filled</span>
+      <span class="metric"><b data-role="pending">0</b> pending</span>
+      <span class="metric"><b data-role="failed">0</b> blocked</span>
+      <span class="message" data-role="message" title="Waiting for the itinerary workspace">Waiting for the itinerary workspace</span>
+      <span class="manual" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
     </section>`;
   document.documentElement.appendChild(host);
 
   const $ = selector => shadow.querySelector(selector);
-  const panel = $('.panel');
   const state = { busy: false, paused: false };
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+  try {
+    const stored = JSON.parse(localStorage.getItem(positionKey) || 'null');
+    if (Number.isFinite(stored?.left) && Number.isFinite(stored?.top)) {
+      host.style.transform = 'none';
+      host.style.left = `${clamp(stored.left, 0, Math.max(0, innerWidth - 80))}px`;
+      host.style.top = `${clamp(stored.top, 0, Math.max(0, innerHeight - 42))}px`;
+    }
+  } catch {}
+
+  const drag = $('[data-role="drag"]');
+  drag.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    const rect = host.getBoundingClientRect();
+    const start = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
+    host.style.transform = 'none';
+    host.style.left = `${rect.left}px`;
+    host.style.top = `${rect.top}px`;
+    drag.setPointerCapture(event.pointerId);
+    const move = moveEvent => {
+      const left = clamp(start.left + moveEvent.clientX - start.x, 0, Math.max(0, innerWidth - 80));
+      const top = clamp(start.top + moveEvent.clientY - start.y, 0, Math.max(0, innerHeight - 42));
+      host.style.left = `${left}px`;
+      host.style.top = `${top}px`;
+    };
+    const end = endEvent => {
+      drag.releasePointerCapture(endEvent.pointerId);
+      drag.removeEventListener('pointermove', move);
+      drag.removeEventListener('pointerup', end);
+      drag.removeEventListener('pointercancel', end);
+      const finalRect = host.getBoundingClientRect();
+      try {
+        localStorage.setItem(positionKey, JSON.stringify({ left: finalRect.left, top: finalRect.top }));
+      } catch {}
+    };
+    drag.addEventListener('pointermove', move);
+    drag.addEventListener('pointerup', end);
+    drag.addEventListener('pointercancel', end);
+  });
 
   const setBusy = (busy, message = '') => {
     state.busy = busy;
-    shadow.querySelectorAll('button[data-action]:not([data-action="collapse"])')
-      .forEach(button => { button.disabled = busy; });
-    if (message) $('[data-role="message"]').textContent = message;
+    shadow.querySelectorAll('button[data-action]').forEach(button => { button.disabled = busy; });
+    if (message) {
+      $('[data-role="message"]').textContent = message;
+      $('[data-role="message"]').title = message;
+    }
   };
 
   const send = async (action, payload = {}) => {
     if (state.busy) return;
-    setBusy(true, `Requested: ${action.replaceAll('-', ' ')}…`);
+    setBusy(true, `Sending ${action.replaceAll('-', ' ')}...`);
     try {
+      if (typeof window[commandBinding] !== 'function') {
+        throw new Error('Agent command channel is unavailable. Start a new safe session.');
+      }
       const result = await window[commandBinding](action, payload);
-      if (result?.message) $('[data-role="message"]').textContent = result.message;
+      if (!result?.accepted) throw new Error(result?.message || 'Agent did not accept the command.');
+      if (result.message) {
+        $('[data-role="message"]').textContent = result.message;
+        $('[data-role="message"]').title = result.message;
+      }
     } catch (error) {
-      $('[data-role="message"]').textContent = `Command failed: ${error?.message || error}`;
+      const message = `Command failed: ${error?.message || error}`;
+      $('[data-role="message"]').textContent = message;
+      $('[data-role="message"]').title = message;
     } finally {
       setBusy(false);
     }
@@ -120,11 +146,6 @@ const consoleBootstrap = ({ consoleId, commandBinding }) => {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const action = button.dataset.action;
-    if (action === 'collapse') {
-      panel.classList.toggle('collapsed');
-      button.textContent = panel.classList.contains('collapsed') ? '+' : '−';
-      return;
-    }
     if (action === 'switch-date') {
       send(action, { serviceDate: $('[data-role="date"]').value });
       return;
@@ -138,23 +159,18 @@ const consoleBootstrap = ({ consoleId, commandBinding }) => {
         const element = $(`[data-role="${role}"]`);
         if (element && value !== undefined && value !== null) element.textContent = String(value);
       };
-      if (next.selectedDate) {
-        $('[data-role="date"]').value = next.selectedDate;
-        set('dateLabel', next.selectedDate);
-      }
+      if (next.selectedDate) $('[data-role="date"]').value = next.selectedDate;
+      set('version', next.version ? `v${next.version}` : '');
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());
-      set('message', next.message || '');
-      set('expected', next.expected ?? 0);
       set('staged', next.staged ?? 0);
       set('pending', next.pending ?? 0);
       set('failed', (next.failed ?? 0) + (next.blocked ?? 0) + (next.missing ?? 0));
+      const message = next.message || '';
+      set('message', message);
+      $('[data-role="message"]').title = message;
       state.paused = next.autoRun === false;
-      const pause = shadow.querySelector('[data-action="pause"]');
-      if (pause) pause.textContent = state.paused ? 'Resume Auto' : 'Pause Auto';
-      set('mode', state.paused ? 'PAUSED' : 'AUTO');
-      const total = Math.max(0, Number(next.expected) || 0);
-      const done = Math.max(0, (Number(next.staged) || 0) + (Number(next.completed) || 0));
-      $('[data-role="bar"]').style.width = `${total ? Math.min(100, (done / total) * 100) : 0}%`;
+      const pause = $('[data-action="pause"]');
+      if (pause) pause.textContent = state.paused ? 'Resume' : 'Pause';
     },
   };
 };
@@ -166,14 +182,13 @@ export async function installWellTransOperatorConsole(page, onCommand) {
       onCommand(String(action || ''), payload || {}));
     page.__agapeOperatorBindingInstalled = true;
   }
-  await page.addInitScript(consoleBootstrap, {
+  const options = {
     consoleId: CONSOLE_ID,
     commandBinding: COMMAND_BINDING,
-  });
-  const inject = () => page.evaluate(consoleBootstrap, {
-    consoleId: CONSOLE_ID,
-    commandBinding: COMMAND_BINDING,
-  }).catch(() => {});
+    positionKey: POSITION_KEY,
+  };
+  await page.addInitScript(consoleBootstrap, options);
+  const inject = () => page.evaluate(consoleBootstrap, options).catch(() => {});
   page.on('domcontentloaded', inject);
   await inject();
 }

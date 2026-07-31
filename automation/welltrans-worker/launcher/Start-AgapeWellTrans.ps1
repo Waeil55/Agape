@@ -3,6 +3,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$ConfirmPreference = 'None'
+$ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Security
 try { $Host.UI.RawUI.WindowTitle = 'Agape WellTrans Agent' } catch {}
 
@@ -19,6 +21,30 @@ $agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'
 $rollbackRoot = Join-Path $agentDataRoot 'WellTransAgentRollback'
 $pendingUpdatePath = Join-Path $agentDataRoot 'welltrans-update-pending.json'
 $workerProcess = $null
+$versionPath = Join-Path $workerDirectory 'VERSION'
+$releaseManifestUrl = 'https://agape5.web.app/welltrans-agent/version.json'
+$installedVersion = if (Test-Path -LiteralPath $versionPath) {
+  (Get-Content -LiteralPath $versionPath -Raw).Trim()
+} else {
+  '0.0.0'
+}
+$upgradeRequired = $false
+try {
+  $releaseManifest = Invoke-RestMethod -Uri "${releaseManifestUrl}?cache=$([DateTime]::UtcNow.Ticks)" -TimeoutSec 5
+  $upgradeRequired = $releaseManifest.version -and
+    ([Version]$releaseManifest.version -gt [Version]$installedVersion)
+} catch {
+  $upgradeRequired = $false
+}
+
+# Download and integrity-check the new release without interrupting an open
+# human review. The new files become active only when a safe session starts.
+if ($upgradeRequired) {
+  $updater = Join-Path $PSScriptRoot 'Update-AgapeWellTransAgent.ps1'
+  if (Test-Path -LiteralPath $updater) {
+    & $updater
+  }
+}
 
 $requestedDateMatch = [Regex]::Match(
   [Uri]::UnescapeDataString($ProtocolUrl),
@@ -34,6 +60,9 @@ if (Test-Path -LiteralPath $lockPath) {
   [void][int]::TryParse((Get-Content -LiteralPath $lockPath -Raw).Trim(), [ref]$ownerPid)
   $ownerProcess = if ($ownerPid -gt 0) { Get-Process -Id $ownerPid -ErrorAction SilentlyContinue } else { $null }
   if ($ownerProcess) {
+    $installedFilesChangedWhileRunning = (Test-Path -LiteralPath $versionPath) -and
+      ((Get-Item -LiteralPath $versionPath).LastWriteTimeUtc -gt $ownerProcess.StartTime.ToUniversalTime())
+    $replacementRequired = $upgradeRequired -or $installedFilesChangedWhileRunning
     $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
     $descendantIds = New-Object 'System.Collections.Generic.HashSet[int]'
     [void]$descendantIds.Add([int]$ownerPid)
@@ -75,13 +104,13 @@ public static class AgapeWindowFocus {
       Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'src\\index\.js' } |
       Select-Object -First 1
     $ownerAgeSeconds = ((Get-Date) - $ownerProcess.StartTime).TotalSeconds
-    if (-not $workerNode -or $ownerAgeSeconds -lt 60) {
+    if (-not $replacementRequired -and (-not $workerNode -or $ownerAgeSeconds -lt 60)) {
       exit 0
     }
 
-    # A headed production worker older than one minute must own a visible
-    # browser. If it does not, it is stale and cannot be reviewed. Replace
-    # only this validated Agape process tree.
+    # Replace only this validated Agape process tree when no review browser is
+    # visible. An update never discards unsaved human-review edits and never
+    # clicks Apply or Close.
     $descendantIds |
       Where-Object { $_ -ne $ownerPid } |
       Sort-Object -Descending |
@@ -165,9 +194,20 @@ try {
     $nodeExecutable = (Get-Command node.exe -ErrorAction Stop).Source
   }
   $workerEntry = Join-Path $workerDirectory 'src\index.js'
-  $workerStartedAt = Get-Date
-  $workerProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$workerEntry`"" -NoNewWindow -PassThru
-  $workerProcess.WaitForExit()
+  do {
+    $workerStartedAt = Get-Date
+    $workerProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$workerEntry`"" -NoNewWindow -PassThru
+    $workerProcess.WaitForExit()
+    $workerExitCode = $workerProcess.ExitCode
+    if ($workerExitCode -eq 42) {
+      Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Clean review session restart requested."
+      $updater = Join-Path $PSScriptRoot 'Update-AgapeWellTransAgent.ps1'
+      if (Test-Path -LiteralPath $updater) {
+        & $updater
+      }
+      $workerProcess = $null
+    }
+  } while ($workerExitCode -eq 42)
   if ($workerProcess.ExitCode -ne 0) {
     $workerError = "Agent exited with code $($workerProcess.ExitCode)."
     $workerRuntimeSeconds = ((Get-Date) - $workerStartedAt).TotalSeconds
