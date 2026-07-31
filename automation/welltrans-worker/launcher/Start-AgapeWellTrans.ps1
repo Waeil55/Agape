@@ -103,10 +103,15 @@ public static class AgapeWindowFocus {
       ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId=$_" -ErrorAction SilentlyContinue } |
       Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'src\\index\.js' } |
       Select-Object -First 1
-    $ownerAgeSeconds = ((Get-Date) - $ownerProcess.StartTime).TotalSeconds
-    if (-not $replacementRequired -and (-not $workerNode -or $ownerAgeSeconds -lt 60)) {
+    # A live worker owns the review session even when Windows temporarily
+    # reports no top-level Chrome handle. Duplicate protocol launches must
+    # never kill that process: doing so discards every unsaved staged row.
+    if ($workerNode -and -not $replacementRequired) {
       exit 0
     }
+
+    $ownerAgeSeconds = ((Get-Date) - $ownerProcess.StartTime).TotalSeconds
+    if (-not $replacementRequired -and $ownerAgeSeconds -lt 60) { exit 0 }
 
     # Replace only this validated Agape process tree when no review browser is
     # visible. An update never discards unsaved human-review edits and never
@@ -197,7 +202,23 @@ try {
   do {
     $workerStartedAt = Get-Date
     $workerProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$workerEntry`"" -NoNewWindow -PassThru
+    # A pending release is healthy once its worker remains alive for a full
+    # minute. Clear the rollback marker while it is running; otherwise a later
+    # intentional clean-session restart can be misclassified as startup
+    # failure and silently restore the previous (unsafe) launcher.
+    while (-not $workerProcess.HasExited) {
+      if (((Get-Date) - $workerStartedAt).TotalSeconds -ge 60 -and
+          (Test-Path -LiteralPath $pendingUpdatePath)) {
+        Remove-Item -LiteralPath $pendingUpdatePath -Force
+      }
+      Start-Sleep -Milliseconds 500
+      $workerProcess.Refresh()
+    }
+    # Reading Handle before WaitForExit prevents Windows PowerShell 5.1 from
+    # occasionally returning a null ExitCode for short-lived child processes.
+    [void]$workerProcess.Handle
     $workerProcess.WaitForExit()
+    $workerProcess.Refresh()
     $workerExitCode = $workerProcess.ExitCode
     if ($workerExitCode -eq 42) {
       Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Clean review session restart requested."
