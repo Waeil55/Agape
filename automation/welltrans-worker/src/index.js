@@ -50,7 +50,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.8.2';
+const workerVersion = '3.8.4';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -1200,6 +1200,9 @@ async function processJob(job, existingSession = null) {
     await job.ref.update({
       stage: 'matching_booking',
       updatedAt: FieldValue.serverTimestamp(),
+      payload: validation.payload,
+      stagedPayload: payload,
+      queuedSourceFingerprint: stagedSourceFingerprint,
       sourceBookingId: validation.payload.bookingId,
       portalBookingId: payload.bookingId,
       bookingAliasId: bookingAlias?.id || FieldValue.delete(),
@@ -1215,6 +1218,8 @@ async function processJob(job, existingSession = null) {
       status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
       warnings: result.warnings || [], verification: result.verification || {},
+      payload: validation.payload,
+      stagedPayload: payload,
       stagedSourceFingerprint,
       sourceChangedAfterQueue: Boolean(
         job.queuedSourceFingerprint && job.queuedSourceFingerprint !== stagedSourceFingerprint,

@@ -23,8 +23,32 @@ const firestoreRulesPath = fileURLToPath(new URL(
   '../../../../firestore.rules',
   import.meta.url,
 ));
+const workerPackagePath = fileURLToPath(new URL(
+  '../../../../automation/welltrans-worker/package.json',
+  import.meta.url,
+));
+const workerInstallerPath = fileURLToPath(new URL(
+  '../../../../automation/welltrans-worker/launcher/Install-AgapeWellTransAgent.ps1',
+  import.meta.url,
+));
+const workerSetupPath = fileURLToPath(new URL(
+  '../../../../automation/welltrans-worker/installer/AgapeWellTransAgentSetup.cs',
+  import.meta.url,
+));
 
 describe('WellTrans staging safety contract', () => {
+  it('keeps runtime, installer and package release versions identical', () => {
+    const version = JSON.parse(readFileSync(workerPackagePath, 'utf8')).version;
+    expect(readFileSync(workerSourcePath, 'utf8')).toContain(`const workerVersion = '${version}'`);
+    expect(readFileSync(workerInstallerPath, 'utf8')).toContain(`$agentVersion = '${version}'`);
+    expect(readFileSync(workerSetupPath, 'utf8')).toContain(`AssemblyVersion("${version}.0")`);
+  });
+  it('replaces queued payload snapshots with the authoritative data actually staged', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    expect(worker).toContain('payload: validation.payload');
+    expect(worker).toContain('stagedPayload: payload');
+    expect(worker).toContain('queuedSourceFingerprint: stagedSourceFingerprint');
+  });
   it('accepts only a unique normalized-exact broker option', () => {
     const options = [
       'Rider Unable to Sign',

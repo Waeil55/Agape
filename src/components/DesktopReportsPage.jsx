@@ -35,6 +35,23 @@ const formatClock = (value) => {
   return raw;
 };
 
+const clockMinutes = (value) => {
+  const clock = formatClock(value);
+  const match = String(clock || '').match(/^(\d{1,2}):(\d{2})$/);
+  return match ? (Number(match[1]) * 60) + Number(match[2]) : null;
+};
+
+const reconcilePickupTimelineEdit = (trip, updates) => {
+  const next = { ...trip, ...updates };
+  if (!Object.prototype.hasOwnProperty.call(updates, 'arrivalTime')) return next;
+  const arrival = clockMinutes(next.arrivalTime);
+  const departure = clockMinutes(next.departedPickupTime);
+  if (arrival === null || departure === null || departure >= arrival) return next;
+  // Reports exposes one authoritative pickup-time edit. If that correction
+  // moves beyond the old departure, keep the stored pickup events coherent.
+  return { ...next, departedPickupTime: next.arrivalTime };
+};
+
 const getTripDriver = (trip, drivers) => (
   drivers.find((driver) => driver.id === trip.driverId)
   || drivers.find((driver) => driver.name === trip.driverName)
@@ -186,7 +203,8 @@ const DesktopReportsPage = ({
 
   const finishRowEdit = useCallback(() => {
     if (editingRowSnapshot && onUpdateTrip) {
-      onUpdateTrip(editingRowSnapshot);
+      const original = trips.find(trip => trip.id === editingRowSnapshot.id) || {};
+      onUpdateTrip(reconcilePickupTimelineEdit(original, editingRowSnapshot));
     }
     setEditingRow(null);
     setEditingRowSnapshot(null);
@@ -200,7 +218,7 @@ const DesktopReportsPage = ({
       }
       return next;
     });
-  }, [editingRow, editingRowSnapshot, onUpdateTrip]);
+  }, [editingRow, editingRowSnapshot, onUpdateTrip, trips]);
 
   const revertRowEdit = useCallback(() => {
     setEditingRow(null);
@@ -229,7 +247,7 @@ const DesktopReportsPage = ({
     if (editingRow === trip.id) {
       setEditingRowSnapshot(prev => ({ ...prev, [field]: val }));
     } else {
-      onUpdateTrip?.({ ...trip, [field]: val });
+      onUpdateTrip?.(reconcilePickupTimelineEdit(trip, { [field]: val }));
       setSortKeyOverrides(prev => ({ ...prev }));
     }
     setEditingCell(null);

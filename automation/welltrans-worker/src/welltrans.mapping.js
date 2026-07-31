@@ -57,6 +57,40 @@ export const calculateTripMileage = (trip = {}) => {
   return Number.isFinite(distance) && distance >= 0 ? Number(distance.toFixed(3)) : null;
 };
 
+const clockMinutes = value => {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return (hours * 60) + minutes;
+};
+
+const followsOnSameServiceLeg = (earlier, later) => {
+  const from = clockMinutes(earlier);
+  const to = clockMinutes(later);
+  if (from === null || to === null) return true;
+  if (to >= from) return true;
+  // A genuine service leg may cross midnight. A small backwards movement is
+  // an out-of-order event and must never be staged into the broker portal.
+  return from >= (18 * 60) && to <= (6 * 60);
+};
+
+export const validateWellTransTimeline = payload => {
+  if (!payload) return [];
+  const errors = [];
+  if (!followsOnSameServiceLeg(payload.pickup?.arrival, payload.pickup?.departure)) {
+    errors.push(`Pickup departure ${payload.pickup.departure} precedes pickup arrival ${payload.pickup.arrival}`);
+  }
+  if (!followsOnSameServiceLeg(payload.pickup?.departure, payload.dropoff?.arrival)) {
+    errors.push(`Dropoff arrival ${payload.dropoff.arrival} precedes pickup departure ${payload.pickup.departure}`);
+  }
+  if (!followsOnSameServiceLeg(payload.dropoff?.arrival, payload.dropoff?.departure)) {
+    errors.push(`Dropoff departure ${payload.dropoff.departure} precedes dropoff arrival ${payload.dropoff.arrival}`);
+  }
+  return errors;
+};
+
 export const buildWellTransPayload = (trip = {}) => {
   const bookingId = normalizeBookingId(trip);
   if (!bookingId) throw new Error('Trip has no Booking ID');
@@ -120,6 +154,7 @@ export const validateTripForWellTrans = (trip = {}) => {
   if (payload && !payload.pickup.departure) errors.push('Pickup departure is missing');
   if (payload && !payload.dropoff.arrival) errors.push('Dropoff arrival is missing');
   if (payload && !payload.dropoff.departure) errors.push('Dropoff departure is missing');
+  if (payload) errors.push(...validateWellTransTimeline(payload));
   if (payload && (!Number.isFinite(payload.pickup.mileage) || payload.pickup.mileage <= 0)) {
     errors.push('Pickup odometer is missing');
   }

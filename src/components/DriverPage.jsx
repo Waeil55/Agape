@@ -2985,21 +2985,30 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
     if (showCompleteModal.pickupOdometer && odo < Number(showCompleteModal.pickupOdometer) && !window.confirm(`Warning: final odometer is less than pickup odometer (${Number(showCompleteModal.pickupOdometer).toLocaleString()} mi). Continue anyway?`)) return;
-    setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     const now = new Date().toISOString();
-    const toIso = (timeStr) => {
-      if (!timeStr) return now;
-      const parts = timeStr.match(/(\d{1,2}):(\d{2})/);
-      if (!parts) return now;
-      const d = new Date();
-      d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
-      return d.toISOString();
-    };
+    const serviceDate = tripCalendarDateKey(showCompleteModal.date) || localCalendarYmd();
+    const departedPickupIso = timeToIsoForTripDate(departedTime, serviceDate) || now;
+    const dropoffArrivalIso = showCompleteModal.arrivalDropoffTime
+      || timeToIsoForTripDate(arrivalDropoffTime, serviceDate)
+      || now;
+    const pickupArrivalIso = showCompleteModal.arrivalTime || showCompleteModal.startTime;
+    const pickupArrivalMs = pickupArrivalIso ? new Date(pickupArrivalIso).getTime() : NaN;
+    const pickupDepartureMs = new Date(departedPickupIso).getTime();
+    const dropoffArrivalMs = new Date(dropoffArrivalIso).getTime();
+    if (Number.isFinite(pickupArrivalMs) && pickupDepartureMs < pickupArrivalMs) {
+      setCompleteError(`Pickup departure cannot be before pickup arrival (${formatTimeInput(pickupArrivalIso)}).`);
+      return;
+    }
+    if (dropoffArrivalMs < pickupDepartureMs) {
+      setCompleteError(`Dropoff arrival cannot be before pickup departure (${formatTimeInput(departedPickupIso)}).`);
+      return;
+    }
+    setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     advanceWorkflow(showCompleteModal, 'Completed', {
       dropoffOdometer: odo,
       completedAt: now,
-      departedPickupTime: toIso(departedTime),
-      arrivalDropoffTime: showCompleteModal.arrivalDropoffTime ? showCompleteModal.arrivalDropoffTime : toIso(arrivalDropoffTime),
+      departedPickupTime: departedPickupIso,
+      arrivalDropoffTime: dropoffArrivalIso,
       completedVehicle: me?.vehicle || '',
       ...(completeRating > 0 ? { feedback: { overall: completeRating, driverRating: completeRating } } : {}),
     });
@@ -3036,7 +3045,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         const completedTrip = {
           ...showCompleteModal,
           completedAt: now,
-          arrivalDropoffTime: showCompleteModal.arrivalDropoffTime || toIso(arrivalDropoffTime),
+          arrivalDropoffTime: dropoffArrivalIso,
         };
         const pending = generatePendingClockOut({
           lastTrip: completedTrip,

@@ -23,6 +23,27 @@ describe('WellTrans mapping', () => {
   it('rejects incomplete records before queueing', () => {
     expect(validateTripForWellTrans({ bookingId: '1', status: 'Assigned' }).valid).toBe(false);
   });
+  it('rejects an impossible pickup timeline before it can reach WellTrans', () => {
+    const result = validateTripForWellTrans({
+      bookingId: '107451806', dateKey: '2026-07-27', status: 'Completed',
+      driverName: 'Mikhaeil Waeil', vehicle: 'TOYOTA 002',
+      arrivalTime: '2026-07-27T15:32:00.000Z',
+      departedPickupTime: '2026-07-27T15:20:00.000Z',
+      arrivalDropoffTime: '2026-07-27T15:32:00.000Z',
+      pickupOdometer: 263519, dropoffOdometer: 263522, signatureCaptured: true,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Pickup departure 11:20 precedes pickup arrival 11:32');
+  });
+  it('allows a valid service leg that crosses midnight', () => {
+    const result = validateTripForWellTrans({
+      bookingId: '200', dateKey: '2026-07-27', status: 'Completed',
+      driverName: 'Mikhaeil Waeil', pickupArrival: '23:55', pickupDeparture: '23:58',
+      dropoffArrival: '00:20', dropoffDeparture: '00:20',
+      pickupOdometer: 100, dropoffOdometer: 110, signatureCaptured: true,
+    });
+    expect(result.valid).toBe(true);
+  });
   it('never treats a cancelled trip as completed merely because it has completedAt', () => {
     const result = validateTripForWellTrans({
       bookingId: '107507545',
