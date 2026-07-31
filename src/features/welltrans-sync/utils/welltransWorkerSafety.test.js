@@ -288,7 +288,9 @@ describe('WellTrans staging safety contract', () => {
     const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
     expect(operatorConsole).toContain('Fill Opened Date');
     expect(operatorConsole).toContain('Fill Selected');
-    expect(operatorConsole).toContain('Verify All');
+    expect(operatorConsole).toContain('Run Reviewer');
+    expect(operatorConsole).toContain('data-role="verifier"');
+    expect(operatorConsole).toContain('Agent command acknowledgement timed out.');
     expect(operatorConsole).toContain('New Safe Session');
     expect(operatorConsole).toContain('role="toolbar"');
     expect(operatorConsole).toContain("'top:8px'");

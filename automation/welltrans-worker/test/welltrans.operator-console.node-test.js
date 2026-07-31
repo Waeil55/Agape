@@ -20,12 +20,15 @@ describe('WellTrans one-line operator toolbar', () => {
       return { accepted: true, message: `${action} accepted` };
     });
     await updateWellTransOperatorConsole(page, {
-      version: '3.8.4',
+      version: '3.8.5',
       selectedDate: '2026-07-27',
       state: 'calibrated',
       staged: 4,
       pending: 3,
       failed: 1,
+      verifierState: 'verified',
+      verifierChecked: 4,
+      verifierVerified: 4,
       message: 'Ready for commands.',
     });
   });
@@ -50,8 +53,16 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.ok(layout.top <= 8);
     assert.equal(layout.rows, 1);
     assert.deepEqual(layout.labels, [
-      'Fill Selected', 'Fill Opened Date', 'Verify All', 'Pause', 'New Safe Session',
+      'Fill Selected', 'Fill Opened Date', 'Run Reviewer', 'Pause', 'New Safe Session',
     ]);
+  });
+
+  it('shows a persistent independent-reviewer result', async () => {
+    const result = await page.locator('#agape-welltrans-operator-console').evaluate(host => ({
+      state: host.shadowRoot.querySelector('[data-role="verifier"]').dataset.state,
+      count: host.shadowRoot.querySelector('[data-role="verified"]').textContent,
+    }));
+    assert.deepEqual(result, { state: 'verified', count: '4/4' });
   });
 
   it('delivers opened-date, selected-date, verify, pause and restart commands', async () => {

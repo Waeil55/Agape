@@ -50,7 +50,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.8.4';
+const workerVersion = '3.8.5';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -70,6 +70,7 @@ const operatorControl = {
   forceReindex: false,
   restartRequested: false,
   fatalReviewError: false,
+  lastCommand: null,
   message: 'Automatically detecting the opened WellTrans date.',
 };
 const stagingDurations = [];
@@ -180,6 +181,7 @@ async function persistRequestedServiceDate(value) {
 }
 
 async function handleOperatorCommand(action, payload = {}) {
+  const commandId = randomUUID();
   if (action === 'pause') {
     operatorControl.autoRun = !operatorControl.autoRun;
     operatorControl.message = operatorControl.autoRun
@@ -233,7 +235,10 @@ async function handleOperatorCommand(action, payload = {}) {
   } else {
     throw new Error(`Unsupported operator command: ${action}`);
   }
-  return { accepted: true, message: operatorControl.message };
+  operatorControl.lastCommand = {
+    id: commandId, action, acceptedAt: new Date().toISOString(), message: operatorControl.message,
+  };
+  return { accepted: true, commandId, message: operatorControl.message };
 }
 
 async function updateOperatorConsole(page, summary = {}, extra = {}) {
@@ -250,6 +255,11 @@ async function updateOperatorConsole(page, summary = {}, extra = {}) {
     failed: summary.failed ?? 0,
     blocked: summary.blocked ?? 0,
     missing: summary.missing ?? 0,
+    verifierState: verifierTelemetry.state,
+    verifierChecked: verifierTelemetry.checked,
+    verifierVerified: verifierTelemetry.verified,
+    verifierCorrections: verifierTelemetry.correctionsIssued,
+    verifierBlocked: verifierTelemetry.blocked,
   });
 }
 
@@ -338,6 +348,9 @@ async function waitForRequestedSchedule(page, selectedDate) {
     const currentDate = await readVisiblePortalDate(page, selectedDate)
       || await getSelectedPortalDate(page).catch(() => selectedDate);
     requestedServiceDate = await readEffectiveRequestedServiceDate();
+    if (operatorControl.restartRequested || !operatorControl.autoRun) {
+      return currentDate;
+    }
     if (!requestedServiceDate) {
       return currentDate;
     }
@@ -1643,22 +1656,28 @@ async function main() {
         state: operatorControl.autoRun ? 'calibrated' : 'paused',
         message: operatorControl.message,
       });
-      if (operatorControl.forceVerify && summary.staged > 0 && await isEditItineraryOpen(session.page)) {
+      if (operatorControl.forceVerify) {
         operatorControl.forceVerify = false;
-        operatorControl.message = `Verifying every staged field for ${selectedDate}.`;
-        await publishHeartbeat('verifying_staged_records');
-        await updateOperatorConsole(session.page, summary, {
-          state: 'verifying_every_field',
-          message: operatorControl.message,
-        });
-        const forcedAudit = await auditStagedReviewBatch(session.page, selectedDate);
-        finalReviewAuditValid = forcedAudit.requeued === 0 && forcedAudit.failed === 0;
-        summary = await publishDateReviewSummary(selectedDate);
-        operatorControl.message = `${forcedAudit.verified}/${forcedAudit.checked} trips and ${forcedAudit.verifiedFields} fields verified before Apply.`;
-        await updateOperatorConsole(session.page, summary, {
-          state: finalReviewAuditValid ? 'verified' : 'repairing_mismatches',
-          message: operatorControl.message,
-        });
+        if (summary.staged === 0) {
+          operatorControl.message = 'Reviewer finished: no staged trips are waiting for manual Apply.';
+        } else if (!await isEditItineraryOpen(session.page)) {
+          operatorControl.message = 'Reviewer could not start because the Edit Itinerary review grid is closed.';
+        } else {
+          operatorControl.message = `Independent reviewer is checking every staged field for ${selectedDate}.`;
+          await publishHeartbeat('verifying_staged_records');
+          await updateOperatorConsole(session.page, summary, {
+            state: 'verifying_every_field',
+            message: operatorControl.message,
+          });
+          const forcedAudit = await auditStagedReviewBatch(session.page, selectedDate);
+          finalReviewAuditValid = forcedAudit.requeued === 0 && forcedAudit.failed === 0;
+          summary = await publishDateReviewSummary(selectedDate);
+          operatorControl.message = `${forcedAudit.verified}/${forcedAudit.checked} trips and ${forcedAudit.verifiedFields} fields verified before Apply.`;
+          await updateOperatorConsole(session.page, summary, {
+            state: finalReviewAuditValid ? 'verified' : 'repairing_mismatches',
+            message: operatorControl.message,
+          });
+        }
       }
       if (summary.staged > 0
         && (summary.staged >= reviewBatchSize || summary.pending === 0)) {
@@ -1697,10 +1716,14 @@ async function main() {
         const hasCoverageBlockers = summary.failed > 0
           || summary.blocked > 0
           || summary.missing > 0;
-        const state = hasCoverageBlockers
+        const state = !operatorControl.autoRun
+          ? 'paused_review_ready'
+          : hasCoverageBlockers
           ? 'reconciliation_blocked_do_not_apply'
           : (summary.pending === 0 ? 'review_ready_verified' : 'review_batch_verified');
-        operatorControl.message = hasCoverageBlockers
+        operatorControl.message = !operatorControl.autoRun
+          ? `Paused safely with ${summary.staged} verified trip(s) open for manual review.`
+          : hasCoverageBlockers
           ? `${summary.failed + summary.blocked + summary.missing} completed trip(s) remain blocked or missing. Do not Apply yet; correct them and run Reconcile & Fill Date.`
           : operatorControl.message;
         await db.doc('welltrans_worker_status/primary').set({
