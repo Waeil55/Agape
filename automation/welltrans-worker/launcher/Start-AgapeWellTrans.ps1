@@ -202,6 +202,11 @@ try {
   do {
     $workerStartedAt = Get-Date
     $workerProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$workerEntry`"" -NoNewWindow -PassThru
+    # Materialize the native process handle immediately. Windows PowerShell
+    # 5.1 can lose the exit-code handle when a short-lived worker exits before
+    # it is first observed, producing a null ExitCode and preventing the
+    # supervisor from honoring the safe-session restart signal (42).
+    [void]$workerProcess.Handle
     # A pending release is healthy once its worker remains alive for a full
     # minute. Clear the rollback marker while it is running; otherwise a later
     # intentional clean-session restart can be misclassified as startup
@@ -214,9 +219,6 @@ try {
       Start-Sleep -Milliseconds 500
       $workerProcess.Refresh()
     }
-    # Reading Handle before WaitForExit prevents Windows PowerShell 5.1 from
-    # occasionally returning a null ExitCode for short-lived child processes.
-    [void]$workerProcess.Handle
     $workerProcess.WaitForExit()
     $workerProcess.Refresh()
     $workerExitCode = $workerProcess.ExitCode

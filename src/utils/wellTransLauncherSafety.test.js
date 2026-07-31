@@ -26,8 +26,10 @@ describe('WellTrans launcher session ownership', () => {
 
   it('forces PowerShell to materialize a reliable child exit code', () => {
     const handleRead = source.indexOf('[void]$workerProcess.Handle');
+    const exitPoll = source.indexOf('while (-not $workerProcess.HasExited)');
     const exitCodeRead = source.indexOf('$workerExitCode = $workerProcess.ExitCode');
     expect(handleRead).toBeGreaterThan(-1);
+    expect(exitPoll).toBeGreaterThan(handleRead);
     expect(exitCodeRead).toBeGreaterThan(handleRead);
   });
 });

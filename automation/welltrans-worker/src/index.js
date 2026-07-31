@@ -50,7 +50,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.8.0';
+const workerVersion = '3.8.1';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
