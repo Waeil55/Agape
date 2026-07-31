@@ -87,8 +87,9 @@ service cloud.firestore {
 
     match /audit_logs/{auditId} {
       allow read: if request.auth != null && isDispatcher();
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && isAdmin();
+      // Immutable server-authored evidence. Cloud Functions/Admin SDK bypass
+      // client rules; browsers must never forge, rewrite, or erase audit data.
+      allow create, update, delete: if false;
     }
     match /tripLedger/{tripId} {
       allow read: if request.auth != null;

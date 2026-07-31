@@ -5,13 +5,36 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    match /chat_attachments/{userId}/{fileName} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.auth.uid == userId &&
+    function isAdmin() {
+      return signedIn() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isChannelParticipant(channelId) {
+      return signedIn() &&
+        request.auth.uid in firestore.get(
+          /databases/(default)/documents/chat_channels/$(channelId)
+        ).data.participants;
+    }
+
+    // Channel-scoped attachments: only channel participants can read, and
+    // only the authenticated uploader can create under their own segment.
+    match /chat_attachments/{channelId}/{userId}/{fileName} {
+      allow read: if isChannelParticipant(channelId);
+      allow create: if isChannelParticipant(channelId) && request.auth.uid == userId &&
         request.resource.size < 10 * 1024 * 1024 &&
         request.resource.contentType.matches('(image/.*|application/pdf|text/plain)');
-      allow delete: if signedIn() && request.auth.uid == userId;
+      allow delete: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow update: if false;
+    }
+
+    // Read-only compatibility for attachments created before channel scoping.
+    // New legacy uploads are forbidden. Owners and administrators may remove
+    // historical objects while the migration job relocates them.
+    match /chat_attachments/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if false;
+      allow delete: if signedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /{allPaths=**} {

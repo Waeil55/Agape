@@ -121,7 +121,11 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       for (let index = 0; index < pendingFiles.length; index += 1) {
         const file = pendingFiles[index];
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fileRef = storageRef(storage, `chat_attachments/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}-${safeName}`);
+        if (!activeChannelId) throw new Error('A verified chat channel is required before uploading attachments.');
+        const fileRef = storageRef(
+          storage,
+          `chat_attachments/${activeChannelId}/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}-${safeName}`,
+        );
         const task = uploadBytesResumable(fileRef, file, { contentType: file.type });
         await new Promise((resolve, reject) => task.on('state_changed', snapshot => setUploadProgress(Math.round(((index + snapshot.bytesTransferred / snapshot.totalBytes) / pendingFiles.length) * 100)), reject, resolve));
         attachments.push({ url: await getDownloadURL(fileRef), path: fileRef.fullPath, name: file.name, type: file.type, size: file.size });
