@@ -1,6 +1,6 @@
 const CONSOLE_ID = 'agape-welltrans-operator-console';
 const COMMAND_BINDING = '__agapeWellTransCommand';
-const POSITION_KEY = 'agape-welltrans-toolbar-position-v1';
+const POSITION_KEY = 'agape-welltrans-toolbar-position-v2';
 
 const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   if (window.top !== window || document.getElementById(consoleId)) return;
@@ -13,14 +13,16 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     'left:50%',
     'transform:translateX(-50%)',
     'z-index:2147483647',
+    'width:min(1780px, calc(100vw - 16px))',
     'max-width:calc(100vw - 16px)',
+    'box-sizing:border-box',
     'font-family:Inter,Segoe UI,Arial,sans-serif',
   ].join(';');
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>
       *{box-sizing:border-box}
-      .bar{display:flex;align-items:center;gap:6px;height:42px;max-width:calc(100vw - 16px);
+      .bar{display:flex;align-items:center;gap:6px;width:100%;height:42px;max-width:100%;
         padding:5px 7px;color:#eaf1ff;background:rgba(7,15,30,.97);border:1px solid #30476e;
         border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.38);white-space:nowrap;overflow-x:auto;
         overflow-y:hidden;scrollbar-width:thin;backdrop-filter:blur(12px)}
@@ -34,7 +36,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       .brand{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:900;letter-spacing:.06em}
       .mark{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#2563eb;color:white}
       .version{color:#7f94b8;font-size:8px;font-weight:800}
-      .state{max-width:125px;overflow:hidden;text-overflow:ellipsis;padding:4px 7px;border-radius:999px;
+      .state{width:125px;flex:0 0 125px;overflow:hidden;text-overflow:ellipsis;padding:4px 7px;border-radius:999px;
         background:#123c2c;color:#6ee7b7;font-size:9px;font-weight:900}
       input{width:118px;border:1px solid #38517e;background:#0d1930;color:#fff;padding:0 7px;color-scheme:dark}
       .primary{background:#2563eb;border-color:#3b82f6;color:#fff}
@@ -47,11 +49,11 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       .verifier[data-state="verified"]{background:#123c2c;color:#6ee7b7}
       .verifier[data-state="running"],.verifier[data-state="repairing"]{background:#3b2f0c;color:#fde68a}
       .verifier[data-state="blocked"]{background:#4c1d1d;color:#fecaca}
-      .message{min-width:130px;max-width:280px;overflow:hidden;text-overflow:ellipsis;color:#a9b8d2;
+      .message{min-width:130px;flex:1 1 280px;overflow:hidden;text-overflow:ellipsis;color:#a9b8d2;
         font-size:9px;font-weight:600}
       .manual{padding:4px 7px;border-radius:7px;background:#3a1c1c;border:1px solid #713232;
         color:#fecaca;font-size:8px;font-weight:900}
-      @media(max-width:900px){.message{max-width:140px}.brandText{display:none}}
+      @media(max-width:900px){.message{min-width:140px;flex-basis:140px}.brandText{display:none}}
     </style>
     <section class="bar" role="toolbar" aria-label="Agape WellTrans controls">
       <button class="drag" data-role="drag" title="Drag toolbar" aria-label="Drag toolbar">&#8942;&#8942;</button>
@@ -78,9 +80,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
 
   try {
     const stored = JSON.parse(localStorage.getItem(positionKey) || 'null');
-    if (Number.isFinite(stored?.left) && Number.isFinite(stored?.top)) {
-      host.style.transform = 'none';
-      host.style.left = `${clamp(stored.left, 0, Math.max(0, innerWidth - 80))}px`;
+    if (Number.isFinite(stored?.top)) {
       host.style.top = `${clamp(stored.top, 0, Math.max(0, innerHeight - 42))}px`;
     }
   } catch {}
@@ -89,15 +89,18 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   drag.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
     const rect = host.getBoundingClientRect();
-    const start = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
-    host.style.transform = 'none';
-    host.style.left = `${rect.left}px`;
-    host.style.top = `${rect.top}px`;
+    const start = { x: event.clientX, y: event.clientY, top: rect.top };
+    let dragging = false;
     drag.setPointerCapture(event.pointerId);
     const move = moveEvent => {
-      const left = clamp(start.left + moveEvent.clientX - start.x, 0, Math.max(0, innerWidth - 80));
+      const deltaX = moveEvent.clientX - start.x;
+      const deltaY = moveEvent.clientY - start.y;
+      if (!dragging && Math.hypot(deltaX, deltaY) < 8) return;
+      if (!dragging) {
+        dragging = true;
+        host.style.top = `${rect.top}px`;
+      }
       const top = clamp(start.top + moveEvent.clientY - start.y, 0, Math.max(0, innerHeight - 42));
-      host.style.left = `${left}px`;
       host.style.top = `${top}px`;
     };
     const end = endEvent => {
@@ -105,10 +108,12 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       drag.removeEventListener('pointermove', move);
       drag.removeEventListener('pointerup', end);
       drag.removeEventListener('pointercancel', end);
-      const finalRect = host.getBoundingClientRect();
-      try {
-        localStorage.setItem(positionKey, JSON.stringify({ left: finalRect.left, top: finalRect.top }));
-      } catch {}
+      if (dragging) {
+        const finalRect = host.getBoundingClientRect();
+        try {
+          localStorage.setItem(positionKey, JSON.stringify({ top: finalRect.top }));
+        } catch {}
+      }
     };
     drag.addEventListener('pointermove', move);
     drag.addEventListener('pointerup', end);

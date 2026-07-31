@@ -20,7 +20,7 @@ describe('WellTrans one-line operator toolbar', () => {
       return { accepted: true, message: `${action} accepted` };
     });
     await updateWellTransOperatorConsole(page, {
-      version: '3.8.5',
+      version: '3.8.6',
       selectedDate: '2026-07-27',
       state: 'calibrated',
       staged: 4,
@@ -65,6 +65,18 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.deepEqual(result, { state: 'verified', count: '4/4' });
   });
 
+  it('stays pinned when live status and message lengths change', async () => {
+    const host = page.locator('#agape-welltrans-operator-console');
+    const before = await host.boundingBox();
+    await updateWellTransOperatorConsole(page, {
+      state: 'reconciliation_blocked_do_not_apply',
+      message: 'A much longer operational message must not shift the toolbar across the viewport.',
+    });
+    const after = await host.boundingBox();
+    assert.equal(Math.round(after.x), Math.round(before.x));
+    assert.equal(Math.round(after.width), Math.round(before.width));
+  });
+
   it('delivers opened-date, selected-date, verify, pause and restart commands', async () => {
     const host = page.locator('#agape-welltrans-operator-console');
     await host.locator('[data-action="reconcile"]').click();
@@ -79,7 +91,7 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.equal(commands[1].payload.serviceDate, '2026-07-28');
   });
 
-  it('can be dragged and keeps the new position on screen', async () => {
+  it('can be moved vertically without drifting sideways', async () => {
     const host = page.locator('#agape-welltrans-operator-console');
     const before = await host.boundingBox();
     const drag = host.locator('[data-role="drag"]');
@@ -89,7 +101,7 @@ describe('WellTrans one-line operator toolbar', () => {
     await page.mouse.move(handle.x + 120, handle.y + 80, { steps: 4 });
     await page.mouse.up();
     const afterMove = await host.boundingBox();
-    assert.ok(afterMove.x > before.x + 50);
+    assert.equal(Math.round(afterMove.x), Math.round(before.x));
     assert.ok(afterMove.y > before.y + 30);
   });
 });
