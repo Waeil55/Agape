@@ -1259,6 +1259,7 @@ export async function auditWellTransTrip(
   }
 
   const mismatches = [];
+  const observations = [];
   const verifiedFields = [];
   for (const [row, column, target] of expected) {
     const actual = await readCellValue(grid, row, column);
@@ -1269,11 +1270,20 @@ export async function auditWellTransTrip(
       // indicator only when that exact reason reads back successfully.
       const reason = await readCellValue(grid, row, 'Signature Captured?');
       if (equalCellValue('Signature Captured?', reason, 'Rider Signature Received')) {
+        observations.push({
+          row: normalized(row.activity), column,
+          expected: true, actual: true, matched: true, derivedFrom: 'Signature Captured?',
+        });
         verifiedFields.push(`${normalized(row.activity)}.Signature Captured (derived)`);
         continue;
       }
     }
-    if (!equalCellValue(column, actual, target)) {
+    const matched = equalCellValue(column, actual, target);
+    observations.push({
+      row: normalized(row.activity), column,
+      expected: target, actual, matched,
+    });
+    if (!matched) {
       mismatches.push(
         `${row.activity} ${column}: expected "${target}", found "${actual}"`,
       );
@@ -1289,6 +1299,7 @@ export async function auditWellTransTrip(
     pickupRows: 1,
     dropoffRows: 1,
     verifiedFields,
+    observations,
     mismatches,
   };
 }

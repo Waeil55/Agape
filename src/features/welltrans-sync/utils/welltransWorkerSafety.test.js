@@ -285,7 +285,9 @@ describe('WellTrans staging safety contract', () => {
   it('runs an exhaustive pre-Apply audit and automatically repairs mismatched trips', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');
     expect(worker).toContain('async function auditStagedReviewBatch(page, serviceDate)');
-    expect(worker).toContain("stage: 'requeued_by_pre_apply_exhaustive_audit'");
+    expect(worker).toContain("stage: 'correction_command_pending'");
+    expect(worker).toContain('buildVerificationDecision');
+    expect(worker).toContain('validateCorrectionCommand');
     expect(worker).toContain("state: 'verifying_every_field'");
     expect(worker).toContain('finalReviewAuditValid');
     expect(worker).toContain('verifiedFields');

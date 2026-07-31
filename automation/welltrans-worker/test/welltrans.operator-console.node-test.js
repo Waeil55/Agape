@@ -20,7 +20,7 @@ describe('WellTrans one-line operator toolbar', () => {
       return { accepted: true, message: `${action} accepted` };
     });
     await updateWellTransOperatorConsole(page, {
-      version: '3.7.3',
+      version: '3.8.0',
       selectedDate: '2026-07-27',
       state: 'calibrated',
       staged: 4,

@@ -600,6 +600,19 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               )}
             </div>
           )}
+          {worker?.verificationAgent && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-800"
+              title="Independent deterministic read-back. AI cannot authorize transportation-record changes.">
+              <ShieldCheck size={12} />
+              Verifier {worker.verificationAgent.state || 'idle'}
+              <span className="text-emerald-600">
+                {Number(worker.verificationAgent.verified || 0)} verified
+                {Number(worker.verificationAgent.correctionsIssued || 0) > 0
+                  ? ` · ${worker.verificationAgent.correctionsIssued} correcting`
+                  : ''}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

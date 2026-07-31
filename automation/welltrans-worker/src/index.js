@@ -26,6 +26,10 @@ import {
 } from './welltrans.trip.js';
 import { normalizeServiceDate, validateTripForWellTrans } from './welltrans.mapping.js';
 import { recoveryDecision } from './welltrans.recovery.js';
+import {
+  buildVerificationDecision,
+  validateCorrectionCommand,
+} from './welltrans.verifier.js';
 
 initializeApp({
   credential: applicationDefault(),
@@ -46,7 +50,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.7.3';
+const workerVersion = '3.8.0';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -55,6 +59,9 @@ let lastAuthoritativeReconcileAt = 0;
 let portalGridIndex = null;
 let latestPortalCanary = null;
 let finalReviewAuditValid = false;
+let verifierTelemetry = {
+  state: 'idle', checked: 0, verified: 0, correctionsIssued: 0, blocked: 0,
+};
 const operatorControl = {
   autoRun: true,
   dateOverride: null,
@@ -87,6 +94,12 @@ const heartbeatPayload = state => ({
   canaryFingerprint: latestPortalCanary?.contractFingerprint || null,
   canaryCheckedAtMs: latestPortalCanary?.checkedAtMs || null,
   credentialMode: process.env.AGAPE_WORKER_CREDENTIAL_MODE || 'application_default',
+  verificationAgent: {
+    name: 'Agape Independent Verifier',
+    version: '1.0.0',
+    authority: 'deterministic_read_back_only',
+    ...verifierTelemetry,
+  },
   throughputPerMinute: stagingDurations.length
     ? Number((60_000 / (stagingDurations.reduce((sum, value) => sum + value, 0) / stagingDurations.length)).toFixed(1))
     : 0,
@@ -905,6 +918,9 @@ async function auditStagedReviewBatch(page, serviceDate) {
     failed: 0,
     verifiedFields: 0,
   };
+  verifierTelemetry = {
+    state: 'verifying', checked: 0, verified: 0, correctionsIssued: 0, blocked: 0,
+  };
   for (const document of staged) {
     const data = document.data();
     result.checked += 1;
@@ -926,35 +942,99 @@ async function auditStagedReviewBatch(page, serviceDate) {
         data.stagedSourceFingerprint
         && data.stagedSourceFingerprint !== current.sourceFingerprint
       );
-      if (!portalAudit.verified || sourceChanged) {
+      const decision = buildVerificationDecision({
+        logId: document.id,
+        tripId: data.tripId,
+        payload: current.payload,
+        sourceFingerprint: current.sourceFingerprint,
+        stagedSourceFingerprint: data.stagedSourceFingerprint,
+        reviewSessionId,
+        portalAudit,
+      });
+      const verificationRef = db.collection('welltrans_verification_runs').doc();
+      const verificationRecord = {
+        ...decision.evidence,
+        evidenceFingerprint: decision.evidenceFingerprint,
+        status: decision.status,
+        portalVerified: decision.status === 'verified',
+        workerId,
+        workerInstanceId,
+        workerVersion,
+        createdAt: FieldValue.serverTimestamp(),
+      };
+      await verificationRef.set(verificationRecord);
+      verifierTelemetry.checked += 1;
+      if (decision.status === 'blocked') {
+        verifierTelemetry.blocked += 1;
+        await commitSyncTransition(document.ref, {
+          status: 'failed',
+          stage: 'independent_verification_blocked',
+          errorMessage: decision.evidence.blockers.join('; ').slice(0, 2000),
+          verificationRunId: verificationRef.id,
+          independentVerification: verificationRecord,
+          completedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          workerVersion,
+        }, {
+          tripId: data.tripId, bookingId: data.bookingId, serviceDate,
+          type: 'independent_verification_blocked', status: 'failed',
+          stage: 'independent_verification_blocked', sourceFingerprint: current.sourceFingerprint,
+        });
+        result.failed += 1;
+      } else if (decision.status === 'correction_required' || sourceChanged) {
         const reasons = [
           ...(portalAudit.mismatches || []),
           ...(sourceChanged ? ['Agape source data changed after staging'] : []),
         ];
+        const correctionRef = db.collection('welltrans_correction_commands').doc();
+        await correctionRef.set({
+          ...decision.command,
+          status: 'pending',
+          verificationRunId: verificationRef.id,
+          issuedBy: 'agape-independent-verifier',
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        verifierTelemetry.correctionsIssued += 1;
         await commitSyncTransition(document.ref, {
           status: 'pending',
-          stage: 'requeued_by_pre_apply_exhaustive_audit',
+          stage: 'correction_command_pending',
           errorMessage: '',
           completedAt: FieldValue.delete(),
           portalVerification: FieldValue.delete(),
           preApplyMismatch: reasons.slice(0, 30),
           queuedSourceFingerprint: current.sourceFingerprint,
+          verificationRunId: verificationRef.id,
+          correctionCommandId: correctionRef.id,
+          independentVerification: verificationRecord,
           updatedAt: FieldValue.serverTimestamp(),
           workerVersion,
         }, {
           tripId: data.tripId,
           bookingId: data.bookingId,
           serviceDate,
-          type: 'pre_apply_exhaustive_audit_requeued',
+          type: 'independent_verifier_correction_issued',
           status: 'pending',
-          stage: 'requeued_by_pre_apply_exhaustive_audit',
+          stage: 'correction_command_pending',
           sourceFingerprint: current.sourceFingerprint,
         });
         result.requeued += 1;
       } else {
+        verifierTelemetry.verified += 1;
+        if (data.correctionCommandId) {
+          await db.doc(`welltrans_correction_commands/${data.correctionCommandId}`).update({
+            status: 'verified',
+            verifiedByRunId: verificationRef.id,
+            verifiedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          }).catch(() => {});
+        }
         await document.ref.update({
           preApplyVerifiedAt: FieldValue.serverTimestamp(),
           preApplyVerification: { ...portalAudit, reviewSessionId },
+          verificationRunId: verificationRef.id,
+          correctionCommandId: FieldValue.delete(),
+          independentVerification: verificationRecord,
           updatedAt: FieldValue.serverTimestamp(),
           workerVersion,
         });
@@ -981,6 +1061,7 @@ async function auditStagedReviewBatch(page, serviceDate) {
       result.failed += 1;
     }
   }
+  verifierTelemetry.state = result.failed || result.requeued ? 'repairing' : 'verified';
   return result;
 }
 
@@ -1068,18 +1149,50 @@ async function verifyClosedReviewBatch(page, serviceDate) {
   return result;
 }
 
+async function claimCorrectionCommand(job, current) {
+  if (!job.correctionCommandId) return null;
+  const ref = db.doc(`welltrans_correction_commands/${job.correctionCommandId}`);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new Error('The independent verifier correction command is missing');
+  const command = snapshot.data() || {};
+  if (command.reviewSessionId !== reviewSessionId) {
+    await ref.update({
+      status: 'superseded_by_new_review_session',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    await job.ref.update({ correctionCommandId: FieldValue.delete() });
+    return null;
+  }
+  validateCorrectionCommand(command, {
+    logId: job.id,
+    tripId: job.tripId,
+    payload: current.payload,
+    sourceFingerprint: current.sourceFingerprint,
+    reviewSessionId,
+  });
+  await ref.update({
+    status: 'executing',
+    executedBy: workerInstanceId,
+    startedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { ref, command };
+}
+
 async function processJob(job, existingSession = null) {
   if (!existingSession?.browser || !existingSession?.page) {
     throw new Error('WellTrans staging requires a calibrated headed browser session so an operator can review every field before Apply.');
   }
   const page = existingSession.page;
   const stagingStartedAt = Date.now();
+  let correction = null;
   try {
     const current = await buildCurrentPortalPayload(job.tripId);
     const {
       validation, bookingAlias, payload, settings,
       sourceFingerprint: stagedSourceFingerprint,
     } = current;
+    correction = await claimCorrectionCommand(job, current);
     const portalUrl = assertAllowedPortal(settings.portalUrl || process.env.WELLTRANS_PORTAL_URL);
     if (!page.url().startsWith(new URL(portalUrl).origin)) {
       throw new Error('Calibrated WellTrans page is not on the allowed portal host');
@@ -1107,6 +1220,7 @@ async function processJob(job, existingSession = null) {
         job.queuedSourceFingerprint && job.queuedSourceFingerprint !== stagedSourceFingerprint,
       ),
       workerVersion, reviewSessionId,
+      correctionCommandId: correction?.ref.id || FieldValue.delete(),
     }, {
       tripId: job.tripId,
       bookingId: payload.bookingId,
@@ -1116,6 +1230,13 @@ async function processJob(job, existingSession = null) {
       stage: 'awaiting_manual_apply',
       sourceFingerprint: stagedSourceFingerprint,
     });
+    if (correction) {
+      await correction.ref.update({
+        status: 'executed_pending_independent_verification',
+        completedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
     stagingDurations.push(Date.now() - stagingStartedAt);
     if (stagingDurations.length > 50) stagingDurations.shift();
     return { success: true, safeToContinue: true };
@@ -1138,6 +1259,14 @@ async function processJob(job, existingSession = null) {
     const rollbackVerified = error?.welltransRollbackVerified === true;
     const rollbackErrors = Array.isArray(error?.welltransRollbackErrors)
       ? error.welltransRollbackErrors.slice(0, 20) : [];
+    if (correction) {
+      await correction.ref.update({
+        status: 'failed',
+        errorMessage: String(error?.message || error).slice(0, 2000),
+        completedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }).catch(() => {});
+    }
     await commitSyncTransition(job.ref, {
       status: 'failed',
       stage: safeToContinue ? 'failed_no_partial_changes' : 'failed_review_close_required',
