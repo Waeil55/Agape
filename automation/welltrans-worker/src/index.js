@@ -25,6 +25,7 @@ import {
   validateWellTransTrip,
 } from './welltrans.trip.js';
 import { normalizeServiceDate, validateTripForWellTrans } from './welltrans.mapping.js';
+import { recoveryDecision } from './welltrans.recovery.js';
 
 initializeApp({
   credential: applicationDefault(),
@@ -45,7 +46,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.6.8';
+const workerVersion = '3.7.1';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -1626,11 +1627,34 @@ async function main() {
             const outcome = await processJob(job, session);
             if (outcome.success) finalReviewAuditValid = false;
             await publishHeartbeat('calibrated');
-            if (!outcome.safeToContinue) {
-              throw new Error(
-                `Booking ${job.bookingId || job.tripId} could not be rolled back completely. `
-                + 'Processing stopped. Review this browser and click Close to discard the unsaved batch; never click Apply.',
-              );
+            const recovery = recoveryDecision(outcome, {
+              completedAttempts: Number(job.attempt || 0) + 1,
+              maxAttempts: 2,
+            });
+            if (recovery.action === 'restart_clean_session') {
+              if (recovery.retryBooking) {
+                await job.ref.update({
+                  status: 'pending',
+                  stage: 'retry_after_clean_session',
+                  retryReason: 'rollback_unverified',
+                  completedAt: FieldValue.delete(),
+                  leaseExpiresAt: FieldValue.delete(),
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+              }
+              operatorControl.autoRun = false;
+              operatorControl.message = `Booking ${job.bookingId || job.tripId} could not be rolled back completely. `
+                + (recovery.retryBooking
+                  ? 'Discarding this unsafe browser session and retrying once from a clean grid.'
+                  : 'Circuit breaker blocked this booking. Discarding the unsafe session and continuing the remaining trips.');
+              await updateOperatorConsole(session.page, {}, {
+                state: 'recovering_clean_session',
+                message: operatorControl.message,
+              });
+              await publishHeartbeat('recovering_clean_session');
+              process.exitCode = recovery.exitCode;
+              await session.browser.close().catch(() => {});
+              return;
             }
             const currentSummary = await publishDateReviewSummary(selectedDate);
             await updateOperatorConsole(session.page, currentSummary, {
