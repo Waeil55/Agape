@@ -92,4 +92,28 @@ describe('TripSpark exact virtual-grid cell binding', () => {
       /Exact cell binding failed.*ambiguous_cell/,
     );
   });
+
+  it('waits through a transient virtual-row recycle and binds the semantic row', async () => {
+    await page.setContent(gridMarkup());
+    await page.locator('#grid').evaluate(element => {
+      const cells = [...element.querySelectorAll('.GridCell')]
+        .filter(node => node.title === '107433324' || node.title === 'Pickup'
+          || (node.style.top === '0px' && node.style.left === '220px' && !node.title))
+        .filter(node => !String(node.textContent).includes('STALE'));
+      for (const node of cells) node.style.display = 'none';
+      setTimeout(() => {
+        for (const node of cells) node.style.display = 'block';
+      }, 180);
+    });
+    const handle = await boundCellHandle(
+      page.locator('#grid'),
+      { bookingRaw: '107433324', activity: 'Pickup', scrollOffset: 0 },
+      'Driver',
+    );
+    try {
+      assert.equal(await handle.textContent(), 'Mikhaeil Waeil');
+    } finally {
+      await handle.dispose();
+    }
+  });
 });

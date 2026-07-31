@@ -45,7 +45,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.6.3';
+const workerVersion = '3.6.4';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -754,7 +754,7 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
       const retryCount = latest.data.retryWorkerVersion === workerVersion
         ? Number(latest.data.automaticRetryCount || 0)
         : 0;
-      if (!safeRetry || retryCount >= 3) {
+      if (!safeRetry || retryCount >= 1) {
         blockedTrips.push({
           tripId: String(trip.id),
           bookingId: current.validation.payload.bookingId,

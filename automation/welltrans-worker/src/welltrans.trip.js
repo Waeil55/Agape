@@ -353,8 +353,17 @@ export async function boundCellHandle(grid, row, columnTitle) {
   // row after the editor closes. Resolve the exact Booking ID + Activity +
   // column in one browser-context operation and retain that exact DOM node as
   // an ElementHandle for the immediate read or double-click.
-  await ensureLiveRow(grid, row);
-  const handle = await grid.evaluateHandle((element, criteria) => {
+  let lastDetails = null;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    let liveRow;
+    try {
+      liveRow = await ensureLiveRow(grid, row);
+    } catch (error) {
+      lastDetails = { error: 'transient_virtual_row', message: error?.message };
+      await grid.page().waitForTimeout(80 + (attempt * 40));
+      continue;
+    }
+    const handle = await grid.evaluateHandle((element, criteria) => {
     const normalize = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
     const normalizeBookingValue = value => String(value ?? '')
       .trim().replace(/\s+/g, '').replace(/^TRIP-/i, '').toLowerCase();
@@ -410,19 +419,25 @@ export async function boundCellHandle(grid, row, columnTitle) {
       };
     }
     return targetCells[0];
-  }, {
-    bookingId: normalizeBooking(row.bookingRaw),
-    activity: normalized(row.activity),
-    columnTitle,
-    columnTitles: GRID_COLUMNS,
-  });
-  const cell = handle.asElement();
-  if (cell) return cell;
-  const details = await handle.jsonValue().catch(() => null);
-  await handle.dispose().catch(() => {});
+    }, {
+      bookingId: normalizeBooking(liveRow.bookingRaw),
+      activity: normalized(liveRow.activity),
+      columnTitle,
+      columnTitles: GRID_COLUMNS,
+    });
+    const cell = handle.asElement();
+    if (cell) return cell;
+    lastDetails = await handle.jsonValue().catch(() => null);
+    await handle.dispose().catch(() => {});
+    if (lastDetails?.error === 'missing_column') break;
+    // TripSpark recycles the row immediately after a list selection or Tab.
+    // Rebind semantically after the render settles instead of treating that
+    // transient zero-match frame as a failed write and rolling the trip back.
+    await grid.page().waitForTimeout(80 + (attempt * 40));
+  }
   throw new Error(
     `Exact cell binding failed for Booking ${row.bookingRaw} ${row.activity} ${columnTitle}`
-    + `${details?.error ? ` (${details.error}, matches=${details.matchCount ?? 'n/a'})` : ''}`,
+    + `${lastDetails?.error ? ` (${lastDetails.error}, matches=${lastDetails.matchCount ?? 'n/a'})` : ''}`,
   );
 }
 
@@ -890,9 +905,12 @@ const safePreflightError = error => {
   return error;
 };
 
-const capabilityKey = (row, column, value, kind) =>
-  `${normalizeBooking(row.bookingRaw)}|${normalized(row.activity)}|`
-  + `${kind}|${normalized(column)}|${kind === 'list' ? normalized(value) : '*'}`;
+// Editor capabilities are a property of the opened TripSpark schedule/grid,
+// not an individual booking row. Prove each text column once and each exact
+// list option once per review session. This removes thousands of pointless
+// preflight double-clicks while keeping exact-option and fail-closed safety.
+const capabilityKey = (_row, column, value, kind) =>
+  `${kind}|${normalized(column)}|${kind === 'list' ? normalized(value) : '*'}`;
 
 async function preflightCell(page, grid, row, column, value, {
   required = false,
