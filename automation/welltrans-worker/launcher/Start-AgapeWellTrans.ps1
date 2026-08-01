@@ -149,11 +149,13 @@ if (Test-Path -LiteralPath $lockPath) {
       }
     }
 
-    $visibleBrowser = $descendantIds |
+    $browserProcesses = @($descendantIds |
       ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue } |
       Where-Object {
-        $_.ProcessName -match '^(chrome|chromium)$' -and $_.MainWindowHandle -ne 0
-      } |
+        $_.ProcessName -match '^(chrome|chromium)$'
+      })
+    $visibleBrowser = $browserProcesses |
+      Where-Object { $_.MainWindowHandle -ne 0 } |
       Select-Object -First 1
 
     if ($visibleBrowser) {
@@ -174,14 +176,23 @@ public static class AgapeWindowFocus {
       ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId=$_" -ErrorAction SilentlyContinue } |
       Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'src\\index\.js' } |
       Select-Object -First 1
-    # A live worker owns the review session even when Windows temporarily
-    # reports no top-level Chrome handle. Duplicate protocol launches must
-    # never kill that process: doing so discards every unsaved staged row.
+    $ownerAgeSeconds = ((Get-Date) - $ownerProcess.StartTime).TotalSeconds
+    # A newly launched worker may need a few seconds before Chromium owns a
+    # top-level window. Once that grace period expires, a worker whose entire
+    # Chromium tree has no window is stale: the operator has already lost the
+    # review surface, so keeping the orphaned Node supervisor prevents every
+    # later Fill request from reopening WellTrans. Replace only this validated
+    # Agape process tree. A visible review window is always focused above and
+    # is never terminated, preserving all unapplied edits.
     if ($workerNode -and -not $replacementRequired) {
-      exit 0
+      if ($ownerAgeSeconds -lt 30) { exit 0 }
+      Add-Content -LiteralPath $logPath -Value (
+        "[$([DateTime]::Now.ToString('o'))] Replacing stale Agent session: " +
+        "$($browserProcesses.Count) Chromium process(es), no operator window."
+      )
+      $replacementRequired = $true
     }
 
-    $ownerAgeSeconds = ((Get-Date) - $ownerProcess.StartTime).TotalSeconds
     if (-not $replacementRequired -and $ownerAgeSeconds -lt 60) { exit 0 }
 
     # Replace only this validated Agape process tree when no review browser is
