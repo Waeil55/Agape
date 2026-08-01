@@ -6,7 +6,6 @@ import {
   BarChart3, Zap, ListFilter, Activity, Edit2,
   KeyRound, Trash2, Lock,
 } from 'lucide-react';
-import EditTripModal from '../../../components/EditTripModal';
 import {
   auth, EmailAuthProvider, reauthenticateWithCredential,
 } from '../../../config/firebase';
@@ -46,6 +45,46 @@ const statusLabel = {
   failed: 'Needs correction',
 };
 
+const toTripTimeInput = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const clock = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (clock) return `${clock[1].padStart(2, '0')}:${clock[2]}`;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
+};
+
+const tripTimeToIso = (value, serviceDate) => {
+  if (!value) return null;
+  const clock = String(value).match(/^(\d{1,2}):(\d{2})/);
+  if (!clock || !serviceDate) return value;
+  const parsed = new Date(`${serviceDate}T${clock[1].padStart(2, '0')}:${clock[2]}:00`);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+};
+
+const tripOdometerValue = (value) => {
+  if (value === '' || value == null) return null;
+  const parsed = Number(String(value).replace(/,/g, ''));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
+const tripClockMinutes = (value) => {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
+  return match ? (Number(match[1]) * 60) + Number(match[2]) : null;
+};
+
+const createWellTransEditDraft = (trip) => ({
+  ...trip,
+  _pickupArrival: toTripTimeInput(trip.arrivalTime || trip.pickupArrival || trip.startTime),
+  _pickupDeparture: toTripTimeInput(trip.departedPickupTime || trip.pickupDeparture || trip.arrivalTime),
+  _dropoffArrival: toTripTimeInput(trip.arrivalDropoffTime || trip.dropoffArrival || trip.completedAt),
+  _dropoffDeparture: toTripTimeInput(trip.dropoffDeparture || trip.departedDropoffTime || trip.arrivalDropoffTime || trip.completedAt),
+  _pickupOdometer: trip.pickupOdometer ?? '',
+  _dropoffOdometer: trip.dropoffOdometer ?? '',
+  _signed: Boolean(trip.paperSignatureConfirmed),
+});
+
 const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUpdateTrip }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [driverScopeId, setDriverScopeId] = useState('all');
@@ -74,6 +113,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   const [syncProgress, setSyncProgress] = useState(null);
   const [tripDrawer, setTripDrawer] = useState(null);
   const [editingTrip, setEditingTrip] = useState(null);
+  const [savingTripId, setSavingTripId] = useState('');
+  const [recentlySavedTripId, setRecentlySavedTripId] = useState('');
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [queuePage, setQueuePage] = useState(0);
   const [logsPage, setLogsPage] = useState(0);
@@ -92,6 +133,64 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   });
   const bulkMenuRef = useRef(null);
   const pageRef = useRef(null);
+
+  const beginTripEdit = useCallback((trip) => {
+    setEditingTrip(createWellTransEditDraft(trip));
+    setTripDrawer(null);
+  }, []);
+
+  const saveTripEdit = useCallback(async () => {
+    if (!editingTrip || !onUpdateTrip || savingTripId) return;
+    const pickupArrivalMinutes = tripClockMinutes(editingTrip._pickupArrival);
+    const pickupDepartureMinutes = tripClockMinutes(editingTrip._pickupDeparture);
+    const dropoffArrivalMinutes = tripClockMinutes(editingTrip._dropoffArrival);
+    const dropoffDepartureMinutes = tripClockMinutes(editingTrip._dropoffDeparture);
+    const pickupOdometer = tripOdometerValue(editingTrip._pickupOdometer);
+    const dropoffOdometer = tripOdometerValue(editingTrip._dropoffOdometer);
+    if (pickupArrivalMinutes != null && pickupDepartureMinutes != null && pickupDepartureMinutes < pickupArrivalMinutes) {
+      setNotice(`Trip ${editingTrip.bookingId || editingTrip.id} was not saved: pickup departure cannot precede pickup arrival.`);
+      return;
+    }
+    if (dropoffArrivalMinutes != null && dropoffDepartureMinutes != null && dropoffDepartureMinutes < dropoffArrivalMinutes) {
+      setNotice(`Trip ${editingTrip.bookingId || editingTrip.id} was not saved: dropoff departure cannot precede dropoff arrival.`);
+      return;
+    }
+    if (pickupOdometer != null && dropoffOdometer != null && dropoffOdometer < pickupOdometer) {
+      setNotice(`Trip ${editingTrip.bookingId || editingTrip.id} was not saved: end odometer cannot be lower than start odometer.`);
+      return;
+    }
+    const selectedDriver = drivers.find(driver => driver.id === editingTrip.driverId);
+    const serviceDate = editingTrip.date;
+    const updatedTrip = {
+      ...editingTrip,
+      arrivalTime: tripTimeToIso(editingTrip._pickupArrival, serviceDate),
+      startTime: tripTimeToIso(editingTrip._pickupArrival, serviceDate),
+      departedPickupTime: tripTimeToIso(editingTrip._pickupDeparture || editingTrip._pickupArrival, serviceDate),
+      arrivalDropoffTime: tripTimeToIso(editingTrip._dropoffArrival, serviceDate),
+      dropoffDeparture: tripTimeToIso(editingTrip._dropoffDeparture || editingTrip._dropoffArrival, serviceDate),
+      pickupOdometer,
+      dropoffOdometer,
+      paperSignatureConfirmed: Boolean(editingTrip._signed),
+      driverName: selectedDriver?.name || editingTrip.driverName || null,
+      driverEmail: selectedDriver?.email || editingTrip.driverEmail || null,
+      completedDriverName: selectedDriver?.name || editingTrip.completedDriverName || editingTrip.driverName || null,
+      completedVehicle: editingTrip.completedVehicle || '',
+    };
+    Object.keys(updatedTrip).filter(key => key.startsWith('_')).forEach(key => delete updatedTrip[key]);
+    setSavingTripId(editingTrip.id);
+    try {
+      const saved = await Promise.resolve(onUpdateTrip(updatedTrip));
+      if (saved === false) throw new Error('Firestore rejected the trip update.');
+      setRecentlySavedTripId(editingTrip.id);
+      setEditingTrip(null);
+      setNotice(`Trip ${updatedTrip.bookingId || updatedTrip.id} saved. The WellTrans payload and validation now use these changes.`);
+      window.setTimeout(() => setRecentlySavedTripId(current => current === updatedTrip.id ? '' : current), 5000);
+    } catch (error) {
+      setNotice(`Trip ${updatedTrip.bookingId || updatedTrip.id} was not saved: ${error?.message || 'unknown persistence error'}`);
+    } finally {
+      setSavingTripId('');
+    }
+  }, [drivers, editingTrip, onUpdateTrip, savingTripId]);
 
   useEffect(() => {
     let active = true;
@@ -1034,34 +1133,78 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                 ) : displayedTrips.map(trip => {
                   const latest = latestByTrip.get(trip.id);
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
+                  const isEditing = editingTrip?.id === trip.id;
+                  const draft = isEditing ? editingTrip : null;
+                  const inlineInputClass = 'w-full min-w-[70px] rounded-md border border-blue-400 bg-white px-1.5 py-1 font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-200';
+                  const draftMiles = draft?._pickupOdometer !== '' && draft?._dropoffOdometer !== ''
+                    ? Math.max(0, Number(draft._dropoffOdometer || 0) - Number(draft._pickupOdometer || 0))
+                    : null;
                   return (
                     <React.Fragment key={trip.id}>
-                    <tr className={`hover:bg-slate-50/50 cursor-pointer group ${editingTrip?.id === trip.id ? 'bg-blue-50/70' : ''}`} onClick={() => setTripDrawer(trip)}>
+                    <tr className={`group ${isEditing ? 'bg-blue-50/80' : 'cursor-pointer hover:bg-slate-50/50'} ${recentlySavedTripId === trip.id ? 'ring-1 ring-inset ring-emerald-300' : ''}`} onClick={() => { if (!isEditing) setTripDrawer(trip); }}>
                       <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
                         <input type="checkbox" disabled={!trip._valid}
                           checked={selectedIds.includes(trip.id)}
                           onChange={() => setSelectedIds(ids => ids.includes(trip.id) ? ids.filter(id => id !== trip.id) : [...ids, trip.id])}
                           className="rounded border-slate-300" />
                       </td>
-                      <td className="px-2 py-2 font-mono font-semibold text-blue-600">{trip.bookingId || trip.id}</td>
-                      <td className="px-2 py-2 font-medium text-slate-900 truncate" title={trip.patient || trip.clientName}>{trip.patient || trip.clientName || '—'}</td>
-                      <td className="px-2 py-2 text-slate-700 truncate" title={trip._payload?.driver}>{trip._payload?.driver || trip.completedDriverName || '—'}</td>
-                      <td className="px-2 py-2 text-slate-700 truncate" title={trip._payload?.vehicle}>{trip._payload?.vehicle || '—'}</td>
-                      <td className="px-2 py-2 font-mono text-emerald-700">{trip._payload?.pickup?.arrival || '—'}</td>
-                      <td className="px-2 py-2 font-mono text-emerald-700">{trip._payload?.pickup?.departure || '—'}</td>
-                      <td className="px-2 py-2 font-mono text-emerald-700">{trip._payload?.pickup?.mileage ?? '—'}</td>
-                      <td className="px-2 py-2 font-mono text-rose-700">{trip._payload?.dropoff?.arrival || '—'}</td>
-                      <td className="px-2 py-2 font-mono text-rose-700">{trip._payload?.dropoff?.departure || '—'}</td>
-                      <td className="px-2 py-2 font-mono text-rose-700">{trip._payload?.dropoff?.mileage ?? '—'}</td>
-                      <td className="px-2 py-2 font-mono font-semibold text-blue-600">{trip._payload?.pickup?.mileage != null && trip._payload?.dropoff?.mileage != null ? Math.max(0, trip._payload.dropoff.mileage - trip._payload.pickup.mileage) : '—'}</td>
-                      <td className="px-2 py-2 font-semibold text-emerald-700">{trip._payload?.dropoff?.signatureCaptured ? 'Yes' : 'No'}</td>
+                      <td className="px-2 py-2 font-mono font-semibold text-blue-600" onClick={event => event.stopPropagation()}>
+                        {isEditing ? <input value={draft.bookingId || ''} onChange={event => setEditingTrip(current => ({ ...current, bookingId: event.target.value }))} className={inlineInputClass} aria-label="Booking ID" /> : (trip.bookingId || trip.id)}
+                      </td>
+                      <td className="px-2 py-2 font-medium text-slate-900" title={trip.patient || trip.clientName} onClick={event => event.stopPropagation()}>
+                        {isEditing ? <input value={draft.patient || ''} onChange={event => setEditingTrip(current => ({ ...current, patient: event.target.value }))} className={inlineInputClass} aria-label="Passenger" /> : <span className="block truncate">{trip.patient || trip.clientName || '—'}</span>}
+                      </td>
+                      <td className="px-2 py-2 text-slate-700" title={trip._payload?.driver} onClick={event => event.stopPropagation()}>
+                        {isEditing ? (
+                          <select value={draft.driverId || ''} onChange={event => {
+                            const driver = drivers.find(candidate => candidate.id === event.target.value);
+                            setEditingTrip(current => ({ ...current, driverId: event.target.value, completedDriverName: driver?.name || '', completedVehicle: current.completedVehicle || driver?.vehicle || '' }));
+                          }} className={inlineInputClass} aria-label="Driver">
+                            <option value="">Unassigned</option>
+                            {drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name || driver.email}</option>)}
+                          </select>
+                        ) : <span className="block truncate">{trip._payload?.driver || trip.completedDriverName || '—'}</span>}
+                      </td>
+                      <td className="px-2 py-2 text-slate-700" title={trip._payload?.vehicle} onClick={event => event.stopPropagation()}>
+                        {isEditing ? <input value={draft.completedVehicle || ''} onChange={event => setEditingTrip(current => ({ ...current, completedVehicle: event.target.value }))} className={inlineInputClass} aria-label="Vehicle" /> : <span className="block truncate">{trip._payload?.vehicle || '—'}</span>}
+                      </td>
+                      {[
+                        ['_pickupArrival', trip._payload?.pickup?.arrival, 'text-emerald-700', 'Pickup arrival'],
+                        ['_pickupDeparture', trip._payload?.pickup?.departure, 'text-emerald-700', 'Pickup departure'],
+                      ].map(([field, value, tone, label]) => (
+                        <td key={field} className={`px-2 py-2 font-mono ${tone}`} onClick={event => event.stopPropagation()}>
+                          {isEditing ? <input type="time" value={draft[field] || ''} onChange={event => setEditingTrip(current => ({ ...current, [field]: event.target.value }))} className={inlineInputClass} aria-label={label} /> : (value || '—')}
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 font-mono text-emerald-700" onClick={event => event.stopPropagation()}>
+                        {isEditing ? <input type="number" min="0" value={draft._pickupOdometer} onChange={event => setEditingTrip(current => ({ ...current, _pickupOdometer: event.target.value }))} className={inlineInputClass} aria-label="Start odometer" /> : (trip._payload?.pickup?.mileage ?? '—')}
+                      </td>
+                      {[
+                        ['_dropoffArrival', trip._payload?.dropoff?.arrival, 'Dropoff arrival'],
+                        ['_dropoffDeparture', trip._payload?.dropoff?.departure, 'Dropoff departure'],
+                      ].map(([field, value, label]) => (
+                        <td key={field} className="px-2 py-2 font-mono text-rose-700" onClick={event => event.stopPropagation()}>
+                          {isEditing ? <input type="time" value={draft[field] || ''} onChange={event => setEditingTrip(current => ({ ...current, [field]: event.target.value }))} className={inlineInputClass} aria-label={label} /> : (value || '—')}
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 font-mono text-rose-700" onClick={event => event.stopPropagation()}>
+                        {isEditing ? <input type="number" min="0" value={draft._dropoffOdometer} onChange={event => setEditingTrip(current => ({ ...current, _dropoffOdometer: event.target.value }))} className={inlineInputClass} aria-label="End odometer" /> : (trip._payload?.dropoff?.mileage ?? '—')}
+                      </td>
+                      <td className="px-2 py-2 font-mono font-semibold text-blue-600">{isEditing ? (draftMiles ?? '—') : (trip._payload?.pickup?.mileage != null && trip._payload?.dropoff?.mileage != null ? Math.max(0, trip._payload.dropoff.mileage - trip._payload.pickup.mileage) : '—')}</td>
+                      <td className="px-2 py-2 text-center font-semibold text-emerald-700" onClick={event => event.stopPropagation()}>
+                        {isEditing ? <input type="checkbox" checked={draft._signed} onChange={event => setEditingTrip(current => ({ ...current, _signed: event.target.checked }))} className="h-5 w-5 rounded border-slate-300 text-emerald-600" aria-label="Signature captured" /> : (trip._payload?.dropoff?.signatureCaptured ? 'Yes' : 'No')}
+                      </td>
                       <td className="px-2 py-2 relative">
-                        {unmatched ? (
+                        {isEditing ? (
+                          <span className="text-[10px] font-semibold text-blue-700">Editing source</span>
+                        ) : recentlySavedTripId === trip.id ? (
+                          <span className="text-[10px] font-semibold text-emerald-700">Saved</span>
+                        ) : unmatched ? (
                           <span className="text-[10px] font-semibold text-amber-600">Not Found</span>
                         ) : trip._valid ? (
                           <span className="text-[10px] font-semibold text-emerald-600">Valid</span>
                         ) : (
-                          <button type="button" onClick={(event) => { event.stopPropagation(); setEditingTrip(trip); }}
+                          <button type="button" onClick={(event) => { event.stopPropagation(); beginTripEdit(trip); }}
                             className="text-left text-[10px] font-semibold text-rose-600 underline decoration-rose-200 underline-offset-2 hover:text-rose-800"
                             title={`${trip._errors?.join('; ') || 'Invalid'} — click to correct`}>
                             {trip._errors?.[0] || 'Invalid'}
@@ -1081,12 +1224,23 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                       </td>
                       <td className="px-2 py-2 text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          {onUpdateTrip && (
-                            <button onClick={() => setEditingTrip(trip)}
-                              className={`rounded p-1 transition ${trip._valid ? 'text-slate-400 hover:bg-blue-50 hover:text-blue-600' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`} title="Correct source trip">
+                          {onUpdateTrip && (isEditing ? (
+                            <>
+                              <button type="button" onClick={saveTripEdit} disabled={savingTripId === trip.id}
+                                className="rounded bg-emerald-100 p-1.5 text-emerald-700 transition hover:bg-emerald-200 disabled:opacity-50" title="Save changes">
+                                {savingTripId === trip.id ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                              </button>
+                              <button type="button" onClick={() => setEditingTrip(null)} disabled={savingTripId === trip.id}
+                                className="rounded bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 disabled:opacity-50" title="Cancel changes">
+                                <X size={13} />
+                              </button>
+                            </>
+                          ) : (
+                            <button type="button" onClick={() => beginTripEdit(trip)}
+                              className={`rounded p-1 transition ${trip._valid ? 'text-slate-400 hover:bg-blue-50 hover:text-blue-600' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`} title="Edit this row">
                               <Edit2 size={13} />
                             </button>
-                          )}
+                          ))}
                           {latest?.screenshot && (
                             <a href={latest.screenshot} target="_blank" rel="noopener noreferrer"
                               className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600 transition" title="Screenshot">
@@ -1106,24 +1260,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                         </div>
                       </td>
                     </tr>
-                    {editingTrip?.id === trip.id && onUpdateTrip && (
-                      <tr className="bg-blue-50/40">
-                        <td colSpan={16} className="p-0">
-                          <EditTripModal
-                            inline
-                            trip={editingTrip}
-                            drivers={drivers}
-                            context="welltrans"
-                            onClose={() => setEditingTrip(null)}
-                            onUpdate={(updatedTrip) => {
-                              onUpdateTrip(updatedTrip);
-                              setEditingTrip(null);
-                              setNotice(`Trip ${updatedTrip.bookingId || updatedTrip.id} updated. WellTrans validation has been recalculated.`);
-                            }}
-                          />
-                        </td>
-                      </tr>
-                    )}
                     </React.Fragment>
                   );
                 })}

@@ -93,6 +93,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [expandedTripId, setExpandedTripId] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
+  const [savingTripId, setSavingTripId] = useState(null);
+  const [editMessage, setEditMessage] = useState('');
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
   const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('All Drivers');
@@ -192,8 +194,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     setSortKeyOverrides({});
   };
 
-  const saveInlineEdit = () => {
-    if (!editingTripId || !editingTripData) return;
+  const saveInlineEdit = async () => {
+    if (!editingTripId || !editingTripData || savingTripId) return;
     const d = editingTripData;
     const serviceDate = d.date;
     const pickupIso = timeToIsoForTripDate(d._pickupTime, serviceDate);
@@ -220,14 +222,20 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       dropoffOdometer: parseOdometerInput(d._dropoffOdometer),
       notes: d.notes || '',
     };
-    setEditingTripId(null);
-    setEditingTripData(null);
-    setSortKeyOverrides(prev => {
-      const next = { ...prev };
-      if (editingTripId) next[editingTripId] = d.time || prev[editingTripId] || '';
-      return next;
-    });
-    if (onUpdateTrip) onUpdateTrip(editingTripId, payload);
+    setSavingTripId(editingTripId);
+    setEditMessage('');
+    try {
+      const saved = await Promise.resolve(onUpdateTrip?.(editingTripId, payload));
+      if (saved === false) throw new Error('The trip update was rejected.');
+      setEditingTripId(null);
+      setEditingTripData(null);
+      setSortKeyOverrides(prev => ({ ...prev, [editingTripId]: d.time || prev[editingTripId] || '' }));
+      setEditMessage(`Trip ${d.bookingId || editingTripId} saved.`);
+    } catch (error) {
+      setEditMessage(`Trip was not saved: ${error?.message || 'unknown error'}`);
+    } finally {
+      setSavingTripId(null);
+    }
   };
 
   const inputCls = "w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg font-semibold text-[11px] focus:border-blue-600 outline-none transition-all";
@@ -236,6 +244,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain">
       {/* PAGE HEADER */}
       <div className="shrink-0 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
+        {editMessage && <div className={`rounded-lg px-3 py-2 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
       </div>
 
       {/* DATE & FILTERS BAR */}
@@ -494,14 +503,16 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         <>
                           <button
                             onClick={saveInlineEdit}
-                            className="flex items-center justify-center gap-2 bg-blue-600 border border-blue-700 rounded-xl py-3 shadow-sm text-white font-bold text-sm"
+                            disabled={savingTripId === trip.id}
+                            className="flex items-center justify-center gap-2 bg-blue-600 border border-blue-700 rounded-xl py-3 shadow-sm text-white font-bold text-sm disabled:opacity-50"
                           >
                             <Check className="w-4 h-4" />
-                            Save
+                            {savingTripId === trip.id ? 'Saving…' : 'Save'}
                           </button>
                           <button
                             onClick={cancelInlineEdit}
-                            className="flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-xl py-3 shadow-sm text-slate-700 font-bold text-sm"
+                            disabled={savingTripId === trip.id}
+                            className="flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-xl py-3 shadow-sm text-slate-700 font-bold text-sm disabled:opacity-50"
                           >
                             <X className="w-4 h-4" />
                             Cancel

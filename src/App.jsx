@@ -1657,10 +1657,10 @@ const App = () => {
     const updatedTrip = typeof tripIdOrObject === 'string'
       ? (() => { const existing = trips.find(t => t.id === tripIdOrObject); return existing ? { ...existing, ...partialFields } : null; })()
       : tripIdOrObject;
-    if (!updatedTrip) return;
+    if (!updatedTrip) return Promise.resolve(false);
     if (!canControlTrip(updatedTrip)) {
       addAuditLog('Scope Blocked', `${currentUser} attempted to edit an out-of-scope trip.`, 'rose');
-      return;
+      return Promise.resolve(false);
     }
     const prevTrip = trips.find(t => t.id === updatedTrip.id) || null;
     let nextTripState = { ...updatedTrip };
@@ -1692,7 +1692,7 @@ const App = () => {
     }
 
     const enrichedTrip = enrichTripMetrics(nextTripState);
-    setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
+    const persistence = setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
     // Log detailed before/after changes
     if (prevTrip) {
       const changed = [];
@@ -1715,6 +1715,7 @@ const App = () => {
     } else {
       addAuditLog('Trip Updated', `${currentUser} modified trip ${enrichedTrip.id} (${enrichedTrip.patient})`, 'blue');
     }
+    return persistence;
   };
 
   const updateTrashedTrip = (updatedTrip) => {
