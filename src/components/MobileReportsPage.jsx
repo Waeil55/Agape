@@ -90,7 +90,6 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [allDates, setAllDates] = useState(false);
-  const [expandedTripId, setExpandedTripId] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [savingTripId, setSavingTripId] = useState(null);
@@ -180,7 +179,6 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       _dropoffOdometer: trip.dropoffOdometer || '',
       notes: trip.notes || '',
     });
-    setExpandedTripId(trip.id);
     setSortKeyOverrides(() => {
       const next = {};
       next[trip.id] = trip.time || '';
@@ -353,7 +351,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         <div className="agape-mobile-list">
           {filteredTrips.map(trip => {
             const driver = getDriverRecord(trip.driverId);
-            const isExpanded = expandedTripId === trip.id;
+            const isExpanded = true;
             const isEditing = editingTripId === trip.id;
             const ie = isEditing ? editingTripData : null;
             const tone = getReportTripTone(trip);
@@ -362,10 +360,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             
             return (
               <div key={trip.id} className={`agape-trip-list-card agape-trip-${tone}`}>
-                <div 
-                  className="agape-trip-card-summary"
-                  onClick={() => { if (isEditing) cancelInlineEdit(); setExpandedTripId(isExpanded ? null : trip.id); }}
-                >
+                <div className="agape-trip-card-summary">
                   <div className="min-w-0 flex-1">
                     <h2 className="agape-trip-title">{isEditing ? ie.patient : (trip.patient || 'UNKNOWN')}</h2>
                     <p className="agape-trip-id">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</p>
@@ -382,7 +377,11 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                     <span className={`agape-trip-status-dot agape-trip-status-${tone}`} title={displayStatus} aria-label={displayStatus}>
                       <StatusIcon className="w-4 h-4" />
                     </span>
-                    {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
+                    {!isEditing && (
+                      <button type="button" onClick={() => startInlineEdit(trip)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -521,15 +520,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                       ) : (
                         <>
                           <button
-                            onClick={() => startInlineEdit(trip)}
-                            className="flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-xl py-3 shadow-sm hover:bg-slate-50 text-slate-700 font-bold text-sm"
-                          >
-                            <Edit2 className="w-4 h-4 text-slate-500" />
-                            Edit
-                          </button>
-                          <button
                             onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { reviewed: !trip.reviewed })}
-                            className={`flex items-center justify-center gap-2 border rounded-xl py-3 shadow-sm font-bold text-sm transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
+                            className={`col-span-2 flex items-center justify-center gap-2 border rounded-xl py-3 shadow-sm font-bold text-sm transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
                           >
                             <CheckCircle2 className={`w-4 h-4 ${trip.reviewed ? 'text-slate-500' : 'text-white'}`} />
                             {trip.reviewed ? 'Un-Review' : 'Review'}

@@ -780,6 +780,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const [showLegsModal, setShowLegsModal] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
+  const [inlineEditSaving, setInlineEditSaving] = useState(false);
+  const [inlineEditError, setInlineEditError] = useState('');
   const [historySortKeyOverrides, setHistorySortKeyOverrides] = useState({});
   const [activeSortKeyOverrides, setActiveSortKeyOverrides] = useState({});
   const [isEditingDetails, setIsEditingDetails] = useState(false);
@@ -2687,6 +2689,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const handleStartInlineEdit = (trip) => {
     const original = trips.find(t => t.id === trip.id) || trip;
     setEditingTripId(original.id);
+    setInlineEditError('');
     setEditingTripData({
       patient: original.patient || '',
       bookingId: original.bookingId || '',
@@ -2705,6 +2708,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       _dropoffTime: isoToTimeInput(original.arrivalDropoffTime || original.dropoffArrival || original.dropoffTime),
       _dropoffOdometer: original.dropoffOdometer || '',
       _clientSigned: original.paperSignatureConfirmed || false,
+      _password: '',
       notes: original.notes || '',
     });
     const frozenKey = getHistoryFinishedSortMs(original);
@@ -2725,10 +2729,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setEditingTripData(null);
     setHistorySortKeyOverrides({});
     setActiveSortKeyOverrides({});
+    setInlineEditError('');
   };
 
-  const handleSaveInlineEdit = () => {
-    if (!editingTripId || !editingTripData) return;
+  const handleSaveInlineEdit = async () => {
+    if (!editingTripId || !editingTripData || inlineEditSaving) return;
     const d = editingTripData;
     const serviceDate = d.date;
     const pickupIso = timeToIsoForTripDate(d._pickupTime, serviceDate);
@@ -2756,9 +2761,26 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       paperSignatureConfirmed: d._clientSigned,
       notes: d.notes || '',
     };
-    setEditingTripId(null);
-    setEditingTripData(null);
-    setPasswordPrompt({ type: 'edittrip', trip: { ...original, ...cleanData }, editedData: cleanData });
+    const isAdminOrDispatcher = role === 'admin' || role === 'dispatcher';
+    setInlineEditError('');
+    setInlineEditSaving(true);
+    try {
+      if (!isAdminOrDispatcher) {
+        if (!d._password) throw new Error('Enter your password to save this trip.');
+        if (!auth.currentUser?.email) throw new Error('Your sign-in session is unavailable. Sign in again.');
+        const credential = EmailAuthProvider.credential(auth.currentUser.email, d._password);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+      }
+      advanceWorkflow(original, cleanData.status || original.status, cleanData);
+      setShowTripDetails(prev => (prev?.id === original.id ? { ...prev, ...cleanData } : prev));
+      setEditingTripId(null);
+      setEditingTripData(null);
+      setHistorySortKeyOverrides(prev => ({ ...prev, [original.id]: getHistoryFinishedSortMs({ ...original, ...cleanData }) }));
+    } catch (error) {
+      setInlineEditError(error?.message || 'Trip was not saved.');
+    } finally {
+      setInlineEditSaving(false);
+    }
   };
 
   const openScheduleEditor = (trip) => {
@@ -4915,29 +4937,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <p className="text-xs text-slate-500">{showTripDetails.bookingId || '—'}</p>
             </div>
              <div className="flex items-center gap-2">
-              {(role === 'admin' || role === 'dispatcher') && !isEditingDetails ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingDetails(true);
-                    setEditFields({
-                      patient: showTripDetails.patient || '',
-                      bookingId: showTripDetails.bookingId || '',
-                      date: showTripDetails.date || '',
-                      time: showTripDetails.time || '',
-                      type: showTripDetails.type || '',
-                      pickup: typeof showTripDetails.pickup === 'object' ? showTripDetails.pickup?.address || '' : showTripDetails.pickup || '',
-                      dropoff: typeof showTripDetails.dropoff === 'object' ? showTripDetails.dropoff?.address || '' : showTripDetails.dropoff || '',
-                      pickupPhone: showTripDetails.pickupPhone || '',
-                      dropoffPhone: showTripDetails.dropoffPhone || '',
-                      notes: showTripDetails.notes || '',
-                    });
-                  }}
-                  className="h-9 px-3 rounded-xl bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                >
-                  <Edit2 size={16} /> Edit
-                </button>
-              ) : !isEditingDetails ? (
+              {!isEditingDetails && (
                 <button
                   type="button"
                   onClick={() => { handleStartInlineEdit(showTripDetails); setHistoryExpandedId(showTripDetails.id); setShowTripDetails(null); }}
@@ -4945,7 +4945,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 >
                   <Edit2 size={16} /> Edit
                 </button>
-              ) : null}
+              )}
               <button type="button" onClick={() => { setShowTripDetails(null); setIsEditingDetails(false); }} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
             </div>
           </div>
@@ -5339,7 +5339,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       : normalizedHistoryStatus === 'rerouted'
                         ? 'info'
                         : 'pending';
-                const isExpanded = historyExpandedId === trip.id;
+                // History is intentionally always visible so editing replaces the
+                // displayed values in this card instead of opening a second view.
+                const isExpanded = true;
                 const isEditing = editingTripId === trip.id;
                 if (isExpanded) {
                   const ie = isEditing ? editingTripData : null;
@@ -5347,10 +5349,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   return (
                     <div key={trip.id} className="space-y-3">
                       <div className={`agape-trip-list-card agape-trip-${historyTone}`}>
-                        <div
-                          onClick={() => { if (isEditing) { handleCancelInlineEdit(); } setHistoryExpandedId(null); }}
-                          className="agape-trip-card-summary border-b border-slate-100"
-                        >
+                        <div className="agape-trip-card-summary border-b border-slate-100">
                           <div className="min-w-0 flex-1">
                             <h3 className="agape-trip-title">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
                             <p className="agape-trip-id">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
@@ -5362,7 +5361,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <span className={`agape-trip-status-dot agape-trip-status-${historyTone}`} title={statusMeta.label} aria-label={statusMeta.label}>
                               <StatusIcon size={15} />
                             </span>
-                            <ChevronDown size={17} className="text-slate-400" />
+                            {!isEditing && <Edit2 size={16} className="text-slate-400" />}
                           </div>
                         </div>
                         {isEditing ? (
@@ -5463,6 +5462,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Notes</label>
                               <textarea value={ie.notes} onChange={(e) => setEditingTripData(p => ({ ...p, notes: e.target.value }))} className={inputCls} rows="2" placeholder="Update notes..." />
                             </div>
+                            {role !== 'admin' && role !== 'dispatcher' && (
+                              <div>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Password confirmation</label>
+                                <input type="password" value={ie._password || ''} onChange={(e) => setEditingTripData(p => ({ ...p, _password: e.target.value }))} className={inputCls} autoComplete="current-password" placeholder="Required to save" />
+                              </div>
+                            )}
+                            {inlineEditError && <p className="rounded-lg bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700">{inlineEditError}</p>}
                           </div>
                         ) : (
                           <HistoryTripDetailTable trip={trip} driver={me} />
@@ -5471,8 +5477,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       <div className={`grid gap-2 ${isEditing ? 'grid-cols-2' : 'grid-cols-2'}`}>
                         {isEditing ? (
                           <>
-                            <button type="button" onClick={handleSaveInlineEdit} className="h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><CheckCircle2 size={14} /> Save</button>
-                            <button type="button" onClick={handleCancelInlineEdit} className="h-8 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><X size={14} /> Cancel</button>
+                            <button type="button" onClick={handleSaveInlineEdit} disabled={inlineEditSaving} className="h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm disabled:opacity-50"><CheckCircle2 size={14} /> {inlineEditSaving ? 'Saving…' : 'Save'}</button>
+                            <button type="button" onClick={handleCancelInlineEdit} disabled={inlineEditSaving} className="h-8 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm disabled:opacity-50"><X size={14} /> Cancel</button>
                           </>
                         ) : (
                           <>

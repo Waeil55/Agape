@@ -443,9 +443,10 @@ const OperationsCommandCenter = ({
   const [lastIntelRefresh, setLastIntelRefresh] = useState(() => new Date().toISOString());
   const [aiSortOrder, setAiSortOrder] = useState(null);
   const [aiSortLoading, setAiSortLoading] = useState(false);
-  const [editTrip, setEditTrip] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
+  const [inlineEditSaving, setInlineEditSaving] = useState(false);
+  const [inlineEditError, setInlineEditError] = useState('');
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
   const [activeTripRow, setActiveTripRow] = useState(null);
   const [actionsMenuTripId, setActionsMenuTripId] = useState(null);
@@ -899,6 +900,7 @@ const OperationsCommandCenter = ({
       time: original.time || '',
       type: original.type || '',
       status: original.status || 'Assigned',
+      driverId: original.driverId || '',
       pickup: original.pickup || original.pickupAddress || '',
       dropoff: original.dropoff || original.dropoffAddress || '',
       pickupPhone: original.pickupPhone || '',
@@ -910,6 +912,7 @@ const OperationsCommandCenter = ({
       _dropoffOdometer: original.dropoffOdometer || '',
       notes: original.notes || '',
     });
+    setInlineEditError('');
     setSortKeyOverrides(prev => {
       const next = {};
       next[original.id] = original.time || '';
@@ -921,10 +924,11 @@ const OperationsCommandCenter = ({
     setEditingTripId(null);
     setEditingTripData(null);
     setSortKeyOverrides({});
+    setInlineEditError('');
   }, []);
 
-  const saveInlineEdit = useCallback(() => {
-    if (!editingTripId || !editingTripData) return;
+  const saveInlineEdit = useCallback(async () => {
+    if (!editingTripId || !editingTripData || inlineEditSaving) return;
     const d = editingTripData;
     const serviceDate = d.date;
     const pickupIso = timeToIsoForTripDate(d._pickupTime, serviceDate);
@@ -937,6 +941,7 @@ const OperationsCommandCenter = ({
       time: d.time || '',
       type: d.type || '',
       status: d.status || original.status || 'Assigned',
+      driverId: d.driverId || '',
       pickup: d.pickup || '',
       dropoff: d.dropoff || '',
       pickupPhone: d.pickupPhone || '',
@@ -950,16 +955,22 @@ const OperationsCommandCenter = ({
       dropoffOdometer: parseOdometerInput(d._dropoffOdometer),
       notes: d.notes || '',
     };
-    setEditingTripId(null);
-    setEditingTripData(null);
-    setSortKeyOverrides(prev => {
-      const next = { ...prev };
-      if (editingTripId) next[editingTripId] = d.time || prev[editingTripId] || '';
-      return next;
-    });
-    if (updateTrip) updateTrip(editingTripId, payload);
-    addToast?.('Trip Updated', `${d.patient || editingTripId} saved.`, 'success');
-  }, [editingTripId, editingTripData, trips, updateTrip, addToast]);
+    setInlineEditSaving(true);
+    setInlineEditError('');
+    try {
+      const saved = await Promise.resolve(updateTrip?.(editingTripId, payload));
+      if (saved === false) throw new Error('The trip update was rejected.');
+      setEditingTripId(null);
+      setEditingTripData(null);
+      setSortKeyOverrides(prev => ({ ...prev, [editingTripId]: d.time || prev[editingTripId] || '' }));
+      addToast?.('Trip Updated', `${d.patient || editingTripId} saved.`, 'success');
+    } catch (error) {
+      setInlineEditError(error?.message || 'Trip was not saved.');
+      addToast?.('Trip Not Saved', error?.message || 'The update failed.', 'danger');
+    } finally {
+      setInlineEditSaving(false);
+    }
+  }, [editingTripId, editingTripData, trips, updateTrip, addToast, inlineEditSaving]);
 
   const markTripException = useCallback((trip, status) => {
     const run = () => applyTripStatusWithAudit(trip, status, {
@@ -1425,6 +1436,43 @@ const OperationsCommandCenter = ({
     </div>
   );
 
+  const renderInlineTripCard = (trip) => {
+    const draft = editingTripData;
+    if (editingTripId !== trip.id || !draft) return null;
+    const fieldClass = 'w-full rounded-lg border border-blue-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+    return (
+      <div key={trip.id} className="rounded-xl border-2 border-blue-300 bg-blue-50/40 p-3 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div><p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Editing this trip</p><p className="text-xs text-slate-500">Changes stay in this card until saved.</p></div>
+          <div className="flex gap-2">
+            <button type="button" onClick={cancelInlineEdit} disabled={inlineEditSaving} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-50">Cancel</button>
+            <button type="button" onClick={saveInlineEdit} disabled={inlineEditSaving} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{inlineEditSaving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <input value={draft.patient} onChange={event => setEditingTripData(current => ({ ...current, patient: event.target.value }))} className={fieldClass} placeholder="Passenger" aria-label="Passenger" />
+          <input value={draft.bookingId} onChange={event => setEditingTripData(current => ({ ...current, bookingId: event.target.value }))} className={fieldClass} placeholder="Booking ID" aria-label="Booking ID" />
+          <input type="date" value={draft.date} onChange={event => setEditingTripData(current => ({ ...current, date: event.target.value }))} className={fieldClass} aria-label="Service date" />
+          <input type="time" value={isoToTimeInput(draft.time)} onChange={event => setEditingTripData(current => ({ ...current, time: event.target.value }))} className={fieldClass} aria-label="Scheduled time" />
+          <input value={draft.type} onChange={event => setEditingTripData(current => ({ ...current, type: event.target.value }))} className={fieldClass} placeholder="Service type" aria-label="Service type" />
+          <select value={draft.status} onChange={event => setEditingTripData(current => ({ ...current, status: event.target.value }))} className={fieldClass} aria-label="Status">{['Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(status => <option key={status} value={status}>{status}</option>)}</select>
+          <select value={draft.driverId || ''} onChange={event => setEditingTripData(current => ({ ...current, driverId: event.target.value }))} className={fieldClass} aria-label="Driver"><option value="">Unassigned</option>{driverOptions.map(driver => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select>
+          <input type="number" min="0" step="0.1" value={draft.distance} onChange={event => setEditingTripData(current => ({ ...current, distance: event.target.value }))} className={fieldClass} placeholder="Distance" aria-label="Distance" />
+          <textarea value={draft.pickup} onChange={event => setEditingTripData(current => ({ ...current, pickup: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Pickup address" aria-label="Pickup address" />
+          <textarea value={draft.dropoff} onChange={event => setEditingTripData(current => ({ ...current, dropoff: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Dropoff address" aria-label="Dropoff address" />
+          <input type="time" value={draft._pickupTime} onChange={event => setEditingTripData(current => ({ ...current, _pickupTime: event.target.value }))} className={fieldClass} aria-label="Pickup arrival" />
+          <input type="number" min="0" value={draft._pickupOdometer} onChange={event => setEditingTripData(current => ({ ...current, _pickupOdometer: event.target.value }))} className={fieldClass} placeholder="Start odometer" aria-label="Start odometer" />
+          <input type="time" value={draft._dropoffTime} onChange={event => setEditingTripData(current => ({ ...current, _dropoffTime: event.target.value }))} className={fieldClass} aria-label="Dropoff arrival" />
+          <input type="number" min="0" value={draft._dropoffOdometer} onChange={event => setEditingTripData(current => ({ ...current, _dropoffOdometer: event.target.value }))} className={fieldClass} placeholder="End odometer" aria-label="End odometer" />
+          <input value={draft.pickupPhone} onChange={event => setEditingTripData(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Pickup phone" aria-label="Pickup phone" />
+          <input value={draft.dropoffPhone} onChange={event => setEditingTripData(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff phone" aria-label="Dropoff phone" />
+          <textarea value={draft.notes} onChange={event => setEditingTripData(current => ({ ...current, notes: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Notes" aria-label="Notes" />
+        </div>
+        {inlineEditError && <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{inlineEditError}</p>}
+      </div>
+    );
+  };
+
   const renderManifestCard = (trip) => {
     const isExpanded = isTripExpanded(trip.id);
     const isSelected = selectedTasks.includes(trip.id);
@@ -1444,6 +1492,8 @@ const OperationsCommandCenter = ({
     const driverCar = driver ? (driver.vehicle || 'Active') : 'N/A';
     const etaDisplay = trip.eta || 'Pending';
     const routeMileage = trip.estMiles ? `${trip.estMiles} mi` : (trip.distance ? `${trip.distance} mi` : 'N/A');
+
+    if (editingTripId === trip.id) return renderInlineTripCard(trip);
 
     return (
       <div key={trip.id} className={`rounded-xl shadow-sm border p-3 transition-all duration-200 hover:shadow-md ${
@@ -1799,6 +1849,8 @@ const OperationsCommandCenter = ({
                 const routeLegs = routeTripMap[trip.id] || [];
                 const distance = trip.directDistance || '—';
 
+                if (editingTripId === trip.id) return renderInlineTripCard(trip);
+
                 return (
                   <div
                     key={trip.id}
@@ -2118,6 +2170,9 @@ const OperationsCommandCenter = ({
               <tbody className="divide-y divide-slate-200">
                 {visibleTrips.map((trip, index) => {
                   const isExpanded = isTripExpanded(trip.id);
+                  const isEditing = editingTripId === trip.id;
+                  const ie = isEditing ? editingTripData : null;
+                  const inlineCellClass = 'w-full rounded-md border border-blue-400 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100';
                   const isSelected = selectedTasks.includes(trip.id);
                   const urgency = getTripUrgencyLevel(trip);
                   const isLate = urgency === 'late';
@@ -2154,7 +2209,12 @@ const OperationsCommandCenter = ({
                     >
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-start pt-1`}>
-                          <button
+                          {isEditing ? (
+                            <div className="flex gap-1">
+                              <button type="button" onClick={(event) => { event.stopPropagation(); saveInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-emerald-100 p-1.5 text-emerald-700 disabled:opacity-50" title="Save row"><CheckCircle2 size={15} /></button>
+                              <button type="button" onClick={(event) => { event.stopPropagation(); cancelInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-rose-50 p-1.5 text-rose-600 disabled:opacity-50" title="Cancel"><X size={15} /></button>
+                            </div>
+                          ) : <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -2163,15 +2223,16 @@ const OperationsCommandCenter = ({
                             className={`rounded p-0.5 transition-all duration-150 ${isSelected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-600'}`}
                           >
                             {isSelected ? <CheckSquare size={15} /> : <Square size={15} />}
-                          </button>
+                          </button>}
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
-                          <span className="text-xs font-mono text-slate-500">{trip.bookingId || trip.id || '—'}</span>
+                          {isEditing ? <input value={ie.bookingId} onChange={event => setEditingTripData(current => ({ ...current, bookingId: event.target.value }))} className={inlineCellClass} aria-label="Booking ID" /> : <span className="text-xs font-mono text-slate-500">{trip.bookingId || trip.id || '—'}</span>}
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
+                        {isEditing ? <input type="time" value={isoToTimeInput(ie.time)} onChange={event => setEditingTripData(current => ({ ...current, time: event.target.value }))} className={inlineCellClass} aria-label="Scheduled time" /> : (
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col ${densityProfile.lineCount >= 3 ? 'justify-between' : 'justify-center'}`}>
                           <div className="flex items-center gap-1.5">
                             <div className={`font-mono ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'} ${manifestDensity === 'executive' ? 'text-lg' : manifestDensity === 'dense' ? 'text-xs' : densityProfile.lineCount <= 2 ? 'text-xs' : 'text-base'}`}>
@@ -2194,8 +2255,19 @@ const OperationsCommandCenter = ({
                             </div>
                           )}
                         </div>
+                        )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
+                        {isEditing ? (
+                          <div className="space-y-1.5">
+                            <input value={ie.patient} onChange={event => setEditingTripData(current => ({ ...current, patient: event.target.value }))} className={inlineCellClass} aria-label="Passenger" />
+                            <input value={ie.type} onChange={event => setEditingTripData(current => ({ ...current, type: event.target.value }))} className={inlineCellClass} aria-label="Service type" placeholder="Service type" />
+                            <input type="date" value={ie.date} onChange={event => setEditingTripData(current => ({ ...current, date: event.target.value }))} className={inlineCellClass} aria-label="Service date" />
+                            <input value={ie.pickupPhone} onChange={event => setEditingTripData(current => ({ ...current, pickupPhone: event.target.value }))} className={inlineCellClass} aria-label="Pickup phone" placeholder="Pickup phone" />
+                            <input value={ie.dropoffPhone} onChange={event => setEditingTripData(current => ({ ...current, dropoffPhone: event.target.value }))} className={inlineCellClass} aria-label="Dropoff phone" placeholder="Dropoff phone" />
+                            <textarea value={ie.notes} onChange={event => setEditingTripData(current => ({ ...current, notes: event.target.value }))} className={inlineCellClass} rows="2" aria-label="Notes" placeholder="Notes" />
+                          </div>
+                        ) : (
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center gap-0.5`}>
                           <div className="leading-snug text-slate-900 text-xs">
                             {trip.patient || 'Unnamed Client'}
@@ -2242,9 +2314,10 @@ const OperationsCommandCenter = ({
                             </div>
                           )}
                         </div>
+                        )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {densityProfile.lineCount === 1 ? (
+                        {isEditing ? <div className="space-y-1.5"><textarea value={ie.pickup} onChange={event => setEditingTripData(current => ({ ...current, pickup: event.target.value }))} className={inlineCellClass} rows="3" aria-label="Pickup address" /><input type="time" value={ie._pickupTime} onChange={event => setEditingTripData(current => ({ ...current, _pickupTime: event.target.value }))} className={inlineCellClass} aria-label="Pickup arrival" /><input type="number" min="0" value={ie._pickupOdometer} onChange={event => setEditingTripData(current => ({ ...current, _pickupOdometer: event.target.value }))} className={inlineCellClass} aria-label="Pickup odometer" placeholder="Start odometer" /></div> : densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs text-slate-700 truncate`}>
                             {trip.pickup || '—'}
                           </div>
@@ -2267,7 +2340,7 @@ const OperationsCommandCenter = ({
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {densityProfile.lineCount === 1 ? (
+                        {isEditing ? <div className="space-y-1.5"><textarea value={ie.dropoff} onChange={event => setEditingTripData(current => ({ ...current, dropoff: event.target.value }))} className={inlineCellClass} rows="3" aria-label="Dropoff address" /><input type="time" value={ie._dropoffTime} onChange={event => setEditingTripData(current => ({ ...current, _dropoffTime: event.target.value }))} className={inlineCellClass} aria-label="Dropoff arrival" /><input type="number" min="0" value={ie._dropoffOdometer} onChange={event => setEditingTripData(current => ({ ...current, _dropoffOdometer: event.target.value }))} className={inlineCellClass} aria-label="Dropoff odometer" placeholder="End odometer" /></div> : densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs text-slate-700 truncate`}>
                             {trip.dropoff || '—'}
                           </div>
@@ -2287,7 +2360,12 @@ const OperationsCommandCenter = ({
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {densityProfile.lineCount === 1 ? (
+                        {isEditing ? (
+                          <select value={ie.driverId || ''} onChange={event => setEditingTripData(current => ({ ...current, driverId: event.target.value }))} className={inlineCellClass} aria-label="Driver">
+                            <option value="">Unassigned</option>
+                            {drivers.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+                          </select>
+                        ) : densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs truncate`}>
                             {driver ? (
                               <span className="text-slate-800">{driver.name}</span>
@@ -2343,7 +2421,15 @@ const OperationsCommandCenter = ({
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {densityProfile.lineCount === 1 ? (
+                        {isEditing ? (
+                          <div className="space-y-1.5">
+                            <select value={ie.status} onChange={event => setEditingTripData(current => ({ ...current, status: event.target.value }))} className={inlineCellClass} aria-label="Status">
+                              {['Unassigned', 'Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(status => <option key={status} value={status}>{status}</option>)}
+                            </select>
+                            <input type="number" min="0" step="0.1" value={ie.distance} onChange={event => setEditingTripData(current => ({ ...current, distance: event.target.value }))} className={inlineCellClass} aria-label="Distance" placeholder="Distance" />
+                            {inlineEditError && <p className="text-[10px] font-semibold text-rose-700">{inlineEditError}</p>}
+                          </div>
+                        ) : densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>
                               {trip.status}
@@ -2392,6 +2478,11 @@ const OperationsCommandCenter = ({
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center gap-0.5`} onClick={(e) => e.stopPropagation()}>
+                          {!isEditing && (
+                            <button type="button" onClick={() => startInlineEdit(trip)} className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-100 transition-colors" title="Edit this row">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
                           <button onClick={() => setManualAssignTrip(trip)} className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-100 transition-colors" title="Assign / Reassign driver">
                             <Users size={14} />
                           </button>
@@ -2408,9 +2499,6 @@ const OperationsCommandCenter = ({
                               <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                                 <button onClick={() => { setActionsMenuTripId(null); triggerSmartAssign(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
                                   <BrainCircuit size={13} className="text-indigo-500" /> AI Assign
-                                </button>
-                                <button onClick={() => { setActionsMenuTripId(null); startInlineEdit(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700">
-                                  <Edit2 size={13} className="text-blue-500" /> Edit Trip
                                 </button>
                                 <button onClick={() => { setActionsMenuTripId(null); makeCall(getClientPhone(trip), trip.patient); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                   <Phone size={13} className="text-emerald-500" /> Call Client
@@ -2838,101 +2926,6 @@ const OperationsCommandCenter = ({
       {operationsTab === 'willcall' && renderWillCall()}
       {operationsTab === 'fleet' && renderFleetMatrix()}
 
-      {/* Same-view trip editor */}
-      {editingTripId && editingTripData && (() => {
-        const ie = editingTripData;
-        const inputCls = "w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs focus:border-blue-500 focus:bg-white outline-none transition-all";
-        return (
-          <section className="mx-2 my-3 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
-            <div className="bg-white w-full rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col" style={{ fontSize: '97%' }}>
-              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2"><Edit2 size={16} className="text-blue-500" /> Edit Trip</h3>
-                <button onClick={cancelInlineEdit} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={16} /></button>
-              </div>
-              <div className="overflow-y-auto px-5 py-4 flex-1 overflow-x-hidden space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Patient</label>
-                    <input autoFocus value={ie.patient} onChange={(e) => setEditingTripData(p => ({ ...p, patient: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Booking ID</label>
-                    <input value={ie.bookingId} onChange={(e) => setEditingTripData(p => ({ ...p, bookingId: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Date</label>
-                    <input type="date" value={ie.date} onChange={(e) => setEditingTripData(p => ({ ...p, date: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Time</label>
-                    <input value={ie.time} onChange={(e) => setEditingTripData(p => ({ ...p, time: e.target.value }))} className={inputCls} placeholder="8:30 AM" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Service Type</label>
-                    <input value={ie.type} onChange={(e) => setEditingTripData(p => ({ ...p, type: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Status</label>
-                    <select value={ie.status} onChange={(e) => setEditingTripData(p => ({ ...p, status: e.target.value }))} className={inputCls}>
-                      {['Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-blue-50 border border-blue-100 rounded-xl p-3">
-                  <div>
-                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Time</label>
-                    <input type="time" value={ie._pickupTime} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupTime: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Odo</label>
-                    <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Time</label>
-                    <input type="time" value={ie._dropoffTime} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffTime: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Odo</label>
-                    <input type="number" min="0" step="1" placeholder="42750" value={ie._dropoffOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffOdometer: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Address</label>
-                    <PlacesAutocompleteInput value={ie.pickup} onChange={(val) => setEditingTripData(p => ({ ...p, pickup: val }))} className={inputCls} placeholder="Pickup address" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Address</label>
-                    <PlacesAutocompleteInput value={ie.dropoff} onChange={(val) => setEditingTripData(p => ({ ...p, dropoff: val }))} className={inputCls} placeholder="Dropoff address" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Pickup Phone</label>
-                    <input value={ie.pickupPhone} onChange={(e) => setEditingTripData(p => ({ ...p, pickupPhone: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Dropoff Phone</label>
-                    <input value={ie.dropoffPhone} onChange={(e) => setEditingTripData(p => ({ ...p, dropoffPhone: e.target.value }))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Distance</label>
-                    <input value={ie.distance} onChange={(e) => setEditingTripData(p => ({ ...p, distance: e.target.value }))} className={inputCls} />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Notes</label>
-                  <textarea value={ie.notes} onChange={(e) => setEditingTripData(p => ({ ...p, notes: e.target.value }))} className={inputCls} rows="2" placeholder="Update notes..." />
-                </div>
-              </div>
-              <div className="px-5 py-3 border-t border-slate-100 shrink-0 flex gap-2">
-                <button onClick={saveInlineEdit} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/20 active:scale-[0.98] transition">Save Changes</button>
-                <button onClick={cancelInlineEdit} className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm active:scale-[0.98] transition">Cancel</button>
-              </div>
-            </div>
-          </section>
-        );
-      })()}
       {showSmsModal && (
         <SendSmsModal
           trips={trips.filter(t => selectedTasks.includes(t.id))}

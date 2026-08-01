@@ -70,6 +70,10 @@ const AdminTripCard = ({
   requestDeleteTrip, updateTrip, requestAuthAction, currentUser, addToast, role
 }) => {
   const [showActions, setShowActions] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [draft, setDraft] = useState(() => ({ ...trip, pickup: getAddr(trip.pickup), dropoff: getAddr(trip.dropoff) }));
   const statusCfg = getStatusConfig(trip.status);
   const urgency = getUrgency(trip);
   const driver = drivers.find(d => d.id === trip.driverId || (trip.driverName && d.name === trip.driverName));
@@ -118,6 +122,58 @@ const AdminTripCard = ({
       setShowActions(true);
     }
   };
+
+  const saveInline = async (event) => {
+    event.preventDefault();
+    if (!updateTrip || saving) return;
+    setSaving(true);
+    setEditError('');
+    try {
+      const saved = await Promise.resolve(updateTrip(trip.id, draft));
+      if (saved === false) throw new Error('The trip update was rejected.');
+      setEditing(false);
+      setShowActions(false);
+      addToast?.('Trip Updated', `${draft.patient || trip.id} saved.`, 'success');
+    } catch (error) {
+      setEditError(error?.message || 'Trip was not saved.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    const fieldClass = 'w-full rounded-lg border border-blue-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-blue-600';
+    return (
+      <form onSubmit={saveInline} className="w-full rounded-xl border-2 border-blue-400 bg-blue-50/50 p-3 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-700">Editing this card</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setEditing(false); setEditError(''); }} disabled={saving} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={saving} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input autoFocus value={draft.patient || ''} onChange={event => setDraft(current => ({ ...current, patient: event.target.value }))} className={fieldClass} placeholder="Passenger" aria-label="Passenger" />
+          <input value={draft.bookingId || ''} onChange={event => setDraft(current => ({ ...current, bookingId: event.target.value }))} className={fieldClass} placeholder="Booking ID" aria-label="Booking ID" />
+          <input type="date" value={draft.date || ''} onChange={event => setDraft(current => ({ ...current, date: event.target.value }))} className={fieldClass} aria-label="Service date" />
+          <input value={draft.time || ''} onChange={event => setDraft(current => ({ ...current, time: event.target.value }))} className={fieldClass} placeholder="Scheduled time" aria-label="Scheduled time" />
+          <select value={draft.driverId || ''} onChange={event => setDraft(current => ({ ...current, driverId: event.target.value }))} className={fieldClass} aria-label="Driver">
+            <option value="">Unassigned</option>
+            {drivers.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+          </select>
+          <select value={draft.status || ''} onChange={event => setDraft(current => ({ ...current, status: event.target.value }))} className={fieldClass} aria-label="Status">
+            {['Unassigned', 'Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(status => <option key={status} value={status}>{status}</option>)}
+          </select>
+          <textarea value={draft.pickup || ''} onChange={event => setDraft(current => ({ ...current, pickup: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Pickup address" aria-label="Pickup address" />
+          <textarea value={draft.dropoff || ''} onChange={event => setDraft(current => ({ ...current, dropoff: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Dropoff address" aria-label="Dropoff address" />
+          <input value={draft.pickupPhone || draft.patientPhone || ''} onChange={event => setDraft(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Patient phone" aria-label="Patient phone" />
+          <input value={draft.dropoffPhone || ''} onChange={event => setDraft(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff phone" aria-label="Dropoff phone" />
+          <textarea value={draft.notes || ''} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Notes" aria-label="Notes" />
+        </div>
+        {editError && <p className="mt-2 rounded-lg bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700">{editError}</p>}
+      </form>
+    );
+  }
 
   return (
     <>
@@ -377,7 +433,7 @@ const AdminTripCard = ({
               {!isTerminal && updateTrip && (
                 <button
                   type="button"
-                  onClick={() => { onOpenTripDetails?.(trip); setShowActions(false); }}
+                  onClick={() => { setDraft({ ...trip, pickup: getAddr(trip.pickup), dropoff: getAddr(trip.dropoff) }); setEditing(true); setShowActions(false); }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold active:scale-95 transition-all"
                 >
                   <Edit2 size={18} /> Edit Trip
