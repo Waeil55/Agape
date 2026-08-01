@@ -15,6 +15,10 @@ describe('WellTrans mapping', () => {
   it('normalizes the broker service date independently from clock times', () => {
     expect(normalizeServiceDate({ dateKey: '2026-07-25' })).toBe('2026-07-25');
   });
+  it('quarantines malformed legacy timestamp values instead of crashing a date change', () => {
+    expect(normalizeServiceDate({ date: { toDate: () => 'not-a-date' } })).toBe('');
+    expect(normalizeServiceDate({ date: { toDate: () => { throw new Error('corrupt timestamp'); } } })).toBe('');
+  });
   it('maps pickup and dropoff activity rows independently', () => {
     const payload = buildWellTransPayload({ bookingId: '107577968', dateKey: '2026-07-25', driverName: 'waeil2', vehicle: 'prius_350025', arrivalTime: '2026-07-25T10:49:00Z', departedPickupTime: '2026-07-25T10:52:00Z', arrivalDropoffTime: '2026-07-25T11:19:00Z', completedAt: '2026-07-25T11:21:00Z', pickupOdometer: 10, dropoffOdometer: 27, paperSignatureConfirmed: true });
     expect(payload.pickup.mileage).toBe(10);
@@ -110,6 +114,18 @@ describe('WellTrans mapping', () => {
     expect(coverage.missingCount).toBe(1);
     expect(coverage.coverageComplete).toBe(false);
     expect(coverage.reviewReady).toBe(false);
+  });
+
+  it('keeps coverage available when a legacy completed trip cannot be interpreted', () => {
+    const corruptTrip = {
+      id: 'legacy-1',
+      get status() { throw new Error('corrupt status'); },
+    };
+    const coverage = buildWellTransCoverage([corruptTrip], new Map());
+    expect(coverage.expected).toBe(1);
+    expect(coverage.invalid).toBe(1);
+    expect(coverage.coverageComplete).toBe(false);
+    expect(coverage.blocked[0].errors[0]).toContain('Unreadable source trip');
   });
 
   it('unlocks date confirmation only when every completed trip is verified', () => {

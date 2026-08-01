@@ -15,6 +15,10 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
 const REQUIRED_WORKER_VERSION = '4.0.2';
+const isTripRecord = trip => Boolean(trip && typeof trip === 'object' && !Array.isArray(trip));
+const safely = (operation, fallback) => {
+  try { return operation(); } catch { return fallback; }
+};
 
 export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -38,9 +42,12 @@ export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '
     const timer = window.setInterval(() => setNow(Date.now()), 15000);
     return () => window.clearInterval(timer);
   }, []);
-  const scopedLogs = useMemo(() => logs.filter(log => log.serviceDate === serviceDate), [logs, serviceDate]);
+  const scopedLogs = useMemo(() => logs.filter(log =>
+    log && typeof log === 'object' && log.serviceDate === serviceDate), [logs, serviceDate]);
   const dateTrips = useMemo(() => trips.filter(trip =>
-    serviceDate && normalizeServiceDate(trip) === serviceDate), [trips, serviceDate]);
+    isTripRecord(trip)
+      && serviceDate
+      && safely(() => normalizeServiceDate(trip) === serviceDate, false)), [trips, serviceDate]);
   const allCompletedTrips = useMemo(() => dateTrips.filter(trip => {
     const lifecycle = [
       trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
@@ -62,7 +69,7 @@ export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '
     return map;
   }, [scopedLogs]);
   const readyTrips = useMemo(() => completedTrips.filter(trip =>
-    validateTripForWellTrans(trip).valid
+    safely(() => validateTripForWellTrans(trip).valid, false)
       && !['pending', 'processing', 'completed', 'awaiting_review'].includes(latestByTrip.get(trip.id)?.status)
       && (latestByTrip.get(trip.id)?.status !== 'failed'
         || isWellTransFailureRetryable(latestByTrip.get(trip.id)))),

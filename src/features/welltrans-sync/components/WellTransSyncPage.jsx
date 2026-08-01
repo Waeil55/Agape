@@ -110,7 +110,13 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [driverScopeId, setDriverScopeId] = useState('all');
   const hydratedTrips = useMemo(
-    () => trips.map(trip => hydrateWellTransTrip(trip, drivers)),
+    () => trips.reduce((records, trip) => {
+      if (!trip || typeof trip !== 'object' || Array.isArray(trip)) return records;
+      try { records.push(hydrateWellTransTrip(trip, drivers)); } catch {
+        records.push({ ...trip, _wellTransSourceError: 'This legacy trip contains unreadable source fields.' });
+      }
+      return records;
+    }, []),
     [trips, drivers],
   );
   const {
@@ -415,7 +421,11 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
 
   const enrichedTrips = useMemo(() => {
     return completedTrips.map(trip => {
-      const validation = validateTripForWellTrans(trip);
+      let validation;
+      try { validation = validateTripForWellTrans(trip); } catch (error) {
+        validation = { valid: false, errors: [`Unreadable source trip: ${error?.message || 'invalid record'}`] };
+      }
+      if (trip._wellTransSourceError) validation = { valid: false, errors: [trip._wellTransSourceError] };
       let payload = null;
       try { payload = buildWellTransPayload(trip); } catch {}
       return { ...trip, _valid: validation.valid, _errors: validation.errors, _payload: payload };

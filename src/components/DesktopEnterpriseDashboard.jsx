@@ -45,10 +45,26 @@ const LazyFallback = () => (
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null, retryKey: 0 };
   }
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(err) { console.error('[DesktopDashboard ErrorBoundary]', err); }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(err, info) {
+    console.error('[DesktopDashboard ErrorBoundary]', err, info?.componentStack || '');
+    try {
+      sessionStorage.setItem('agape_last_ui_error', JSON.stringify({
+        message: String(err?.message || err || 'Unknown UI error'),
+        componentStack: String(info?.componentStack || '').slice(0, 4000),
+        capturedAt: new Date().toISOString(),
+      }));
+    } catch {}
+  }
+  handleRetry = () => {
+    this.setState(current => ({
+      hasError: false,
+      error: null,
+      retryKey: current.retryKey + 1,
+    }));
+  };
   render() {
     if (this.state.hasError) return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center">
@@ -56,10 +72,16 @@ class ErrorBoundary extends React.Component {
           <AlertTriangle size={20} className="text-red-400" />
         </div>
         <p className="text-sm font-semibold text-slate-700">Something went wrong</p>
-        <p className="text-xs text-slate-500 mt-1">Try navigating to a different section.</p>
+        <p className="mt-1 max-w-lg text-xs text-slate-500">
+          {this.state.error?.message || 'This section encountered an unexpected data error.'}
+        </p>
+        <button type="button" onClick={this.handleRetry}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700">
+          <RefreshCw size={14} /> Reload this section
+        </button>
       </div>
     );
-    return this.props.children;
+    return <React.Fragment key={this.state.retryKey}>{this.props.children}</React.Fragment>;
   }
 }
 

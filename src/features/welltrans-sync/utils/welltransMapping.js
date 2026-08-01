@@ -51,8 +51,13 @@ export const normalizeServiceDate = (trip = {}) => {
     const year = us[3].length === 2 ? `20${us[3]}` : us[3];
     return `${year}-${String(us[1]).padStart(2, '0')}-${String(us[2]).padStart(2, '0')}`;
   }
-  const date = value?.toDate?.() || (typeof value?.seconds === 'number' ? new Date(value.seconds * 1000) : null) || new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  let date;
+  try {
+    date = typeof value?.toDate === 'function'
+      ? value.toDate()
+      : (typeof value?.seconds === 'number' ? new Date(value.seconds * 1000) : new Date(value));
+  } catch { return ''; }
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
@@ -64,8 +69,9 @@ export const normalizeBookingId = (trip = {}) => {
 export const toClockTime = (value) => {
   if (!value) return '';
   if (/^\d{1,2}:\d{2}$/.test(String(value).trim())) return String(value).trim().padStart(5, '0');
-  const date = value?.toDate?.() || new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  let date;
+  try { date = typeof value?.toDate === 'function' ? value.toDate() : new Date(value); } catch { return ''; }
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString('en-US', {
     timeZone: 'America/Indiana/Indianapolis',
     hour12: false,
@@ -183,11 +189,15 @@ const COVERED_SYNC_STATUSES = new Set(['pending', 'processing', 'awaiting_review
 
 export const buildWellTransCoverage = (completedTrips = [], latestByTrip = new Map()) => {
   const trips = completedTrips.map(trip => {
-    const validation = validateTripForWellTrans(trip);
-    const log = latestByTrip.get(String(trip.id)) || latestByTrip.get(trip.id) || null;
+    let validation;
+    try { validation = validateTripForWellTrans(trip); } catch (error) {
+      validation = { valid: false, errors: [`Unreadable source trip: ${error?.message || 'invalid record'}`] };
+    }
+    const tripId = (() => { try { return String(trip?.id || ''); } catch { return ''; } })();
+    const log = latestByTrip.get(tripId) || latestByTrip.get(trip?.id) || null;
     return {
-      id: String(trip.id),
-      bookingId: normalizeBookingId(trip),
+      id: tripId,
+      bookingId: (() => { try { return normalizeBookingId(trip); } catch { return ''; } })(),
       valid: validation.valid,
       errors: validation.errors,
       status: log?.status || 'not_queued',
