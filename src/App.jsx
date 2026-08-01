@@ -37,6 +37,7 @@ import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverL
 import { useDriverAssignments } from './hooks/useDriverAssignments';
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
+import { hydrateTripDriverIdentity } from './utils/driverIdentity';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -1665,13 +1666,8 @@ const App = () => {
     if (nextTripState.driverId) {
       const driver = drivers.find(d => d.id === nextTripState.driverId);
       if (driver) {
-        nextTripState.driverEmail = driver.email || nextTripState.driverEmail;
-        // Preserve the existing driverName on the trip — only set from profile
-        // if the trip doesn't already have one. This prevents overwriting a
-        // correctly-stored driver name with stale/mismatched profile data.
-        if (!nextTripState.driverName) {
-          nextTripState.driverName = driver.name || null;
-        }
+        nextTripState = hydrateTripDriverIdentity(nextTripState, drivers);
+        nextTripState.driverName = driver.name || nextTripState.driverName || null;
       }
     } else if (nextTripState.driverId === '') {
       nextTripState.driverEmail = null;

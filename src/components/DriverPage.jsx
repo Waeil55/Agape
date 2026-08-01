@@ -345,7 +345,7 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
   const rows = [
     { label: 'TRIP ID', value: formatTripDetailValue(trip.bookingId || trip.id), tone: 'blue' },
     { label: 'DATE', value: formatTripDetailValue(getTripHistoryDateKey(trip) || trip.date) },
-    { label: 'DRIVER', value: formatTripDetailValue(trip.driverName || driver?.name || trip.driverId) },
+    { label: 'DRIVER', value: formatTripDetailValue(driver?.name || trip.completedDriverName || trip.driverName || trip.driverId) },
     { label: 'VEHICLE', value: formatTripDetailValue(vehicle) },
     { label: 'PICKUP ARRIVAL', value: pickupClock, tone: 'green' },
     { label: 'DROPOFF ARRIVAL', value: dropoffClock, tone: 'red' },

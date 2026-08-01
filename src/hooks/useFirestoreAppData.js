@@ -29,6 +29,7 @@ import {
 } from '../utils/tripIntegrity';
 import { findRemovedDocumentIds } from '../utils/firestorePersistence';
 import { attachTenantScope, normalizeTenantId, recordBelongsToTenant } from '../utils/tenantScope';
+import { hydrateTripDriverIdentities } from '../utils/driverIdentity';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -113,11 +114,11 @@ function normalizeData(data = {}) {
   return {
     ...DEFAULT_DATA,
     ...data,
-    trips: cleanTripCollection(data.trips || []),
+    trips: hydrateTripDriverIdentities(cleanTripCollection(data.trips || []), normalizedDrivers),
     drivers: normalizedDrivers,
     dispatchers: data.dispatchers || [],
     vehicles: data.vehicles || [],
-    trashedTrips: cleanTripCollection(data.trashedTrips || []),
+    trashedTrips: hydrateTripDriverIdentities(cleanTripCollection(data.trashedTrips || []), normalizedDrivers),
     logs: data.logs || [],
     phoneNumbers: data.phoneNumbers || DEFAULT_DATA.phoneNumbers,
   };
@@ -279,7 +280,14 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       });
       const normalized = normalizeData({ ...dataRef.current, [field]: nextList });
       dataRef.current = normalized;
-      setState(prev => ({ ...prev, [field]: normalized[field], loading: false, initialized: true, error: null }));
+      setState(prev => ({
+        ...prev,
+        [field]: normalized[field],
+        ...(field === 'drivers' ? { trips: normalized.trips, trashedTrips: normalized.trashedTrips } : {}),
+        loading: false,
+        initialized: true,
+        error: null,
+      }));
     };
 
     const applyTripsSnapshot = (snap) => {
@@ -451,7 +459,9 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
 
   const writeField = useCallback(async (field, value) => {
     const previousData = normalizeData(dataRef.current);
-    const preparedValue = MIRRORED_TRIP_FIELDS.has(field) ? cleanTripCollection(value) : value;
+    const preparedValue = MIRRORED_TRIP_FIELDS.has(field)
+      ? hydrateTripDriverIdentities(cleanTripCollection(value), dataRef.current.drivers || [])
+      : value;
     const sanitized = sanitizeForFirestore(preparedValue);
     dataRef.current = { ...previousData, [field]: sanitized };
     pendingWritesRef.current += 1;

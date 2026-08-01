@@ -843,7 +843,7 @@ const DesktopEnterpriseDashboard = ({
                 {(tripDetails.driverName || tripDetails.driverId) && (
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Driver</p>
-                    <p className="text-sm font-medium text-slate-900">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
+                    <p className="text-sm font-medium text-slate-900">{drivers.find(d => d.id === tripDetails.driverId)?.name || tripDetails.driverName || '—'}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                   </div>
                 )}
@@ -1650,7 +1650,7 @@ const DesktopEnterpriseDashboard = ({
               {(tripDetails.driverName || tripDetails.driverId) && (
                 <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Driver</p>
-                  <p className="text-sm font-semibold text-slate-900 mt-0.5">{tripDetails.driverName || drivers.find(d => d.id === tripDetails.driverId)?.name || '—'}</p>
+                  <p className="text-sm font-semibold text-slate-900 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.name || tripDetails.driverName || '—'}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{drivers.find(d => d.id === tripDetails.driverId)?.vehicle || ''}</p>
                 </div>
               )}

@@ -8,6 +8,7 @@ import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 import { normalizeDateValue } from '../utils/normalizeDate';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import { resolveDriverVehicle } from '../utils/vehiclePersistence';
+import { isCompanyDriverPlaceholder } from '../utils/driverIdentity';
 
 
 const timeToMinutes = (t) => {
@@ -952,11 +953,15 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         );
 
         // Extract driver info
-        const driverName = extract(row['_agape_driverName'], m.driver, row['Driver'], row['Driver Name'], row['driver']);
+        const importedDriverName = extract(row['_agape_driverName'], m.driver, row['Driver'], row['Driver Name'], row['driver']);
         let completedVehicle = extract(row['_agape_vehicle'], m.completedVehicle, m.vehicle, row['Vehicle'], row['vehicle']);
-        const driverEmail = extract(m.driverEmail, row['Driver Email'], row['driverEmail'], row['driver_email']);
+        const importedDriverEmail = extract(m.driverEmail, row['Driver Email'], row['driverEmail'], row['driver_email']);
+        const matchedDriver = (drivers || []).find(d =>
+          (importedDriverEmail && d.email && d.email.toLowerCase() === importedDriverEmail.toLowerCase())
+          || (importedDriverName && d.name && d.name.toLowerCase() === importedDriverName.toLowerCase()));
+        const driverName = matchedDriver?.name || (isCompanyDriverPlaceholder(importedDriverName) ? '' : importedDriverName);
+        const driverEmail = matchedDriver?.email || importedDriverEmail;
         if (!completedVehicle && (driverName || driverEmail)) {
-          const matchedDriver = (drivers || []).find(d => (driverName && d.name && d.name.toLowerCase() === driverName.toLowerCase()) || (driverEmail && d.email && d.email.toLowerCase() === driverEmail.toLowerCase()));
           completedVehicle = resolveDriverVehicle(matchedDriver, driverEmail || driverName);
         }
 
@@ -1025,7 +1030,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
           // --- STATUS ---
           status: extract(row['Status'], row['status'], forceCompleted ? 'Completed' : 'Unassigned'),
-          driverId: null,
+          driverId: matchedDriver?.id || null,
           driverName,
           driverEmail,
           completedVehicle,

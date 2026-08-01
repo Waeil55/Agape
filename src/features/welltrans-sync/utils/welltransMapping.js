@@ -1,3 +1,5 @@
+import { resolveTripDriverName } from '../../../utils/driverIdentity';
+
 export const DEFAULT_WELLTRANS_FIELD_MAPPING = Object.freeze({
   tripId: 'Booking Id',
   pickupArrival: 'Arrival Time',
@@ -19,15 +21,8 @@ const isOperationalAssignment = value => {
 };
 
 export const resolveWellTransDriverName = (trip = {}, drivers = []) => {
-  const assignedId = String(firstValue(trip, ['driverId', 'assignedDriverId']) || '').trim();
-  const assignedEmail = String(firstValue(trip, ['driverEmail', 'assignedDriverEmail']) || '').trim().toLowerCase();
-  const authoritativeDriver = drivers.find(driver =>
-    (assignedId && String(driver?.id || '').trim() === assignedId)
-    || (assignedEmail && String(driver?.email || '').trim().toLowerCase() === assignedEmail));
-  const authoritativeName = firstValue(authoritativeDriver, ['name', 'displayName', 'fullName']);
-  if (isOperationalAssignment(authoritativeName)) return String(authoritativeName).trim();
-  const recordedName = firstValue(trip, ['completedDriverName', 'driverName', 'driver']);
-  return isOperationalAssignment(recordedName) ? String(recordedName).trim() : '';
+  const resolved = resolveTripDriverName(trip, drivers);
+  return isOperationalAssignment(resolved) ? resolved : '';
 };
 
 export const hydrateWellTransTrip = (trip = {}, drivers = []) => {
