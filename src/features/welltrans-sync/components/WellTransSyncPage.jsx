@@ -85,6 +85,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   const [credentialUnlocked, setCredentialUnlocked] = useState(false);
   const [credentialUnlockPassword, setCredentialUnlockPassword] = useState('');
   const [credentialUnlockBusy, setCredentialUnlockBusy] = useState(false);
+  const [credentialRefreshKey, setCredentialRefreshKey] = useState(0);
   const [autoRetry, setAutoRetry] = useState(() => {
     try { return JSON.parse(localStorage.getItem('agape_wt_autoRetry') || '{}'); } catch { return {}; }
   });
@@ -128,7 +129,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
         setCredentialError('Open the local WellTrans Agent on this computer, then retry.');
       });
     return () => { active = false; };
-  }, [tab, credentialUnlocked]);
+  }, [tab, credentialUnlocked, credentialRefreshKey]);
 
   useEffect(() => {
     if (!credentialUnlocked) return undefined;
@@ -356,15 +357,19 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
     finally { setBusy(''); }
   }, [activeScope, latestByTrip, syncDate]);
 
-  const startAndFillDate = useCallback(async () => {
-    if (!settings.enabled || busy) return;
-    setBusy('start-fill');
-    setNotice('');
+  const openLocalAgent = useCallback(() => {
     const protocol = new URL('agape-welltrans://start');
     protocol.searchParams.set('date', syncDate);
     protocol.searchParams.set('scope', activeScope.type);
     if (activeScope.type === 'driver') protocol.searchParams.set('driverId', activeScope.driverId);
     window.location.href = protocol.toString();
+  }, [activeScope, syncDate]);
+
+  const startAndFillDate = useCallback(async () => {
+    if (!settings.enabled || busy) return;
+    setBusy('start-fill');
+    setNotice('');
+    openLocalAgent();
     if (!completedTrips.length) {
       setNotice(`Agent start requested for ${syncDate}. Agape has no completed trips for this date.`);
       setBusy('');
@@ -401,7 +406,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
     } finally {
       setBusy('');
     }
-  }, [activeScope, busy, completedTrips, selectedDriverScope, settings.enabled, syncDate]);
+  }, [activeScope, busy, completedTrips, openLocalAgent, selectedDriverScope, settings.enabled, syncDate]);
 
   const confirmReviewBatchApplied = useCallback(async () => {
     if (!workerBatchReady || !worker?.reviewSessionId || !stagedCount) {
@@ -1341,6 +1346,34 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                 </div>
               </div>
               {credentialError && <p className="text-[10px] font-semibold text-rose-700">{credentialError}</p>}
+              {!credentialStatus.connected && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCredentialError('Starting the secure local Agent service…');
+                      openLocalAgent();
+                      window.setTimeout(() => setCredentialRefreshKey(value => value + 1), 2500);
+                    }}
+                    className="rounded-lg bg-slate-900 px-3 py-2 text-[10px] font-semibold text-white hover:bg-slate-800"
+                  >
+                    Start local Agent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCredentialError('');
+                      setCredentialRefreshKey(value => value + 1);
+                    }}
+                    className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-[10px] font-semibold text-amber-900 hover:bg-amber-100"
+                  >
+                    Retry connection
+                  </button>
+                  <span className="text-[9px] text-amber-800">
+                    Your open WellTrans review window will remain open and unchanged.
+                  </span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <button
                   type="button"

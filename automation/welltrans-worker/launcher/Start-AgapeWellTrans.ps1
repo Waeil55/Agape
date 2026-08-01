@@ -75,6 +75,57 @@ if ($requestedDateMatch.Success -and $requestedScopeMatch.Success) {
   } | ConvertTo-Json | Set-Content -LiteralPath $requestedScopePath -Encoding UTF8
 }
 
+# The encrypted credential vault is hosted separately from the browser worker.
+# It therefore remains reachable when an older review window must stay open to
+# protect unsaved human-reviewed rows. This process has no Firebase credential
+# and cannot stage trips or click Apply.
+try {
+  New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+  New-Item -ItemType Directory -Path $secretDirectory -Force | Out-Null
+  $settingsHostEntry = Join-Path $workerDirectory 'src\welltrans.settings-host.js'
+  $settingsHostPidPath = Join-Path $runtimeDirectory 'welltrans-settings-host.pid'
+  $settingsNodeExecutable = Join-Path $workerDirectory 'runtime\node\node.exe'
+  if (-not (Test-Path -LiteralPath $settingsNodeExecutable)) {
+    $settingsNodeExecutable = (Get-Command node.exe -ErrorAction Stop).Source
+  }
+  $env:WELLTRANS_SESSION_KEY = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_KEY', 'User')
+  $env:WELLTRANS_CREDENTIAL_FILE = $wellTransCredentialPath
+  $env:AGAPE_LOCAL_SETTINGS_PORT = '43127'
+  $env:AGAPE_LOCAL_SETTINGS_ORIGINS = 'https://agape5.web.app'
+  if (-not $env:WELLTRANS_SESSION_KEY) {
+    throw 'The local encryption key is not configured.'
+  }
+  if (-not (Test-Path -LiteralPath $settingsHostEntry)) {
+    throw 'The secure local settings component is missing.'
+  }
+
+  $settingsHostProcess = $null
+  if (Test-Path -LiteralPath $settingsHostPidPath) {
+    $settingsHostPid = 0
+    [void][int]::TryParse((Get-Content -LiteralPath $settingsHostPidPath -Raw).Trim(), [ref]$settingsHostPid)
+    if ($settingsHostPid -gt 0) {
+      $settingsHostProcess = Get-Process -Id $settingsHostPid -ErrorAction SilentlyContinue
+      $settingsHostCommand = Get-CimInstance Win32_Process -Filter "ProcessId=$settingsHostPid" -ErrorAction SilentlyContinue
+      if (-not $settingsHostCommand -or $settingsHostCommand.CommandLine -notmatch 'welltrans\.settings-host\.js') {
+        $settingsHostProcess = $null
+      }
+    }
+  }
+  $settingsHostIsStale = $settingsHostProcess -and (Test-Path -LiteralPath $versionPath) -and
+    ((Get-Item -LiteralPath $versionPath).LastWriteTimeUtc -gt $settingsHostProcess.StartTime.ToUniversalTime())
+  if ($settingsHostIsStale) {
+    Stop-Process -Id $settingsHostProcess.Id -Force -ErrorAction SilentlyContinue
+    $settingsHostProcess = $null
+  }
+  if (-not $settingsHostProcess) {
+    $settingsHostProcess = Start-Process -FilePath $settingsNodeExecutable `
+      -ArgumentList "`"$settingsHostEntry`"" -WindowStyle Hidden -PassThru
+    Set-Content -LiteralPath $settingsHostPidPath -Value $settingsHostProcess.Id -NoNewline
+  }
+} catch {
+  Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Secure local settings service unavailable: $($_.Exception.Message)"
+}
+
 if (Test-Path -LiteralPath $lockPath) {
   $ownerPid = 0
   [void][int]::TryParse((Get-Content -LiteralPath $lockPath -Raw).Trim(), [ref]$ownerPid)

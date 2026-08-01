@@ -46,4 +46,14 @@ describe('WellTrans Agent release safety', () => {
     expect(updater).toContain("$ConfirmPreference = 'None'");
     expect(launcher).toContain('An update never discards unsaved human-review edits');
   });
+
+  it('starts the encrypted settings sidecar before preserving an open review window', () => {
+    const launcher = readFileSync(launcherPath, 'utf8');
+    const sidecarStart = launcher.indexOf('welltrans.settings-host.js');
+    const reviewWindowGuard = launcher.indexOf('if ($visibleBrowser)');
+    expect(sidecarStart).toBeGreaterThan(0);
+    expect(reviewWindowGuard).toBeGreaterThan(sidecarStart);
+    expect(launcher).toContain("-WindowStyle Hidden -PassThru");
+    expect(launcher).toContain('This process has no Firebase credential');
+  });
 });

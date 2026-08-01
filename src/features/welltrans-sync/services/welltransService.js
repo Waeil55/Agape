@@ -98,12 +98,17 @@ export const saveWellTransSettings = (settings, actorId) => {
 const LOCAL_AGENT_SETTINGS_URL = 'http://127.0.0.1:43127/v1/welltrans-credentials';
 
 const localAgentRequest = async (method = 'GET', body) => {
-  const response = await fetch(LOCAL_AGENT_SETTINGS_URL, {
-    method,
-    cache: 'no-store',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(LOCAL_AGENT_SETTINGS_URL, {
+      method,
+      cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('The secure local Agent service is not running. Start the local Agent on this computer, then retry.');
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok === false) {
     throw new Error(payload.error || 'The local WellTrans Agent did not accept the request.');
