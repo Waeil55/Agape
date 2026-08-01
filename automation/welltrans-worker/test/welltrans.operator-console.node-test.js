@@ -50,7 +50,7 @@ describe('WellTrans one-line operator toolbar', () => {
     });
     assert.equal(result.value, 'driver-1');
     assert.deepEqual(result.labels, [
-      'All drivers (7)', 'Mikhaeil Waeil (4)', 'Waeil Driver (3) · DONE',
+      'All drivers (7)', 'Mikhaeil Waeil (4)', 'Waeil Driver (3) - DONE',
     ]);
   });
 
@@ -109,6 +109,8 @@ describe('WellTrans one-line operator toolbar', () => {
 
   it('navigates immediately when the operator chooses a different date and waits for verification', async () => {
     const host = page.locator('#agape-welltrans-operator-console');
+    await updateWellTransOperatorConsole(page, { scopeLocked: true });
+    assert.equal(await host.locator('[data-role="date"]').isEnabled(), true);
     await host.locator('[data-action="fill-date"]').click();
     await host.locator('[data-role="date"]').fill('2026-07-28');
     await host.locator('[data-role="date"]').press('Tab');
@@ -116,7 +118,7 @@ describe('WellTrans one-line operator toolbar', () => {
       label: element.shadowRoot.querySelector('[data-action="fill-date"]').textContent,
       disabled: element.shadowRoot.querySelector('[data-action="fill-date"]').disabled,
     }));
-    assert.deepEqual(switching, { label: 'Switching Date…', disabled: true });
+    assert.deepEqual(switching, { label: 'Switching Date...', disabled: true });
     await updateWellTransOperatorConsole(page, {
       selectedDate: '2026-07-28',
       requestedDate: '2026-07-28',

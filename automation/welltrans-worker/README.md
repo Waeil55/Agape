@@ -9,7 +9,9 @@ shown in that schedule.
 Preferred:
 
 1. Click **Download Windows Agent** once on each authorized Windows computer.
-2. Extract the ZIP and run `Install-Agent.cmd`. It installs the agent in the current Windows
+2. Extract the ZIP and run `Install-Agent.cmd`. This is the only Agent installation required.
+   The filling engine, independent deterministic reviewer, correction engine, operator toolbar,
+   updater, and secure local sign-in service are versioned components of the same package. It installs the agent in the current Windows
    profile, registers the private Agape protocol, provisions a private,
    checksum-verified Node.js LTS runtime and Chromium, and creates encrypted
    local session storage. Node.js does not need to be installed separately.
@@ -26,7 +28,9 @@ Preferred:
    communicates only with `127.0.0.1`; credentials never enter Firestore,
    URLs, logs, or another enrolled computer.
 5. If the WellTrans portal is displaying another schedule, the agent opens the
-   schedule chooser and pauses until the exact requested date is visible.
+   schedule chooser and selects the exact requested date. When an unapplied
+   review batch is open, a newly chosen date is queued and begins immediately
+   after the operator manually clicks Apply or Close; dates are never mixed.
 6. Use the **Agape WellTrans Console** inside the Playwright window to
    reconcile and fill the opened date, switch to an exact manual date, refresh
    the virtual-grid index, pause/resume automatic filling, or verify every

@@ -59,9 +59,12 @@ const syncServicePath = fileURLToPath(new URL(
 describe('WellTrans staging safety contract', () => {
   it('keeps runtime, installer and package release versions identical', () => {
     const version = JSON.parse(readFileSync(workerPackagePath, 'utf8')).version;
+    const installer = readFileSync(workerInstallerPath, 'utf8');
     expect(readFileSync(workerSourcePath, 'utf8')).toContain(`const workerVersion = '${version}'`);
-    expect(readFileSync(workerInstallerPath, 'utf8')).toContain(`$agentVersion = '${version}'`);
+    expect(installer).toContain(`$agentVersion = '${version}'`);
     expect(readFileSync(workerSetupPath, 'utf8')).toContain(`AssemblyVersion("${version}.0")`);
+    expect(installer).toContain("'src\\welltrans.verifier.js'");
+    expect(installer).toContain('integrated component $component is missing');
   });
 
   it('stores broker credentials only in the encrypted local Agent vault', () => {
@@ -279,7 +282,9 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).toContain("send('switch-driver'");
     expect(operatorConsole).toContain('state.scopeLocked');
     expect(operatorConsole).toContain("send('switch-date'");
-    expect(operatorConsole).toContain('Switching Date…');
+    expect(operatorConsole).toContain('Switching Date...');
+    expect(operatorConsole).toContain('Choose the next date now. It will switch automatically');
+    expect(worker).toContain('Date ${serviceDate} queued.');
     expect(worker).toContain('await selectExactRequestedSchedule(page, requestedServiceDate)');
     expect(worker).toContain('currentDate === requestedServiceDate');
     expect(worker).toContain('requestedDate: requestedServiceDate');
@@ -371,6 +376,7 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).toContain('Fill Date');
     expect(operatorConsole).toContain('Review &amp; Verify');
     expect(operatorConsole).toContain('data-role="verifier"');
+    expect(operatorConsole).toContain('Independent deterministic reviewer integrated into this installed Agent');
     expect(operatorConsole).toContain('Agent command acknowledgement timed out.');
     expect(operatorConsole).toContain('Reset Session');
     expect(operatorConsole).toContain('role="toolbar"');

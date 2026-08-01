@@ -32,6 +32,14 @@ try {
     version = $packageMetadata.version
     sha256 = $archiveHash
     file = 'agape-welltrans-agent.zip'
+    components = @{
+      fillEngine = 'integrated'
+      independentReviewer = 'integrated'
+      correctionEngine = 'integrated'
+      operatorToolbar = 'integrated'
+      secureLocalSignIn = 'integrated'
+      automaticUpdater = 'integrated'
+    }
     publishedAt = [DateTime]::UtcNow.ToString('o')
   } | ConvertTo-Json
   $utf8WithoutBom = New-Object Text.UTF8Encoding($false)

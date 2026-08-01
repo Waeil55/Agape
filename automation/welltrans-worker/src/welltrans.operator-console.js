@@ -46,7 +46,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       .primary:hover{background:#1d4ed8}
       .verify{background:#14532d;border-color:#23834a}
       .restart{background:#5b2230;border-color:#8f3d52}
-      .restart[hidden],.verifier[hidden]{display:none}
+      .restart[hidden]{display:none}
       .metric{display:flex;align-items:baseline;gap:3px;padding:3px 6px;border-radius:7px;background:#101f37;
         color:#91a4c8;font-size:8px;text-transform:uppercase}
       .metric b{color:#fff;font-size:11px}
@@ -74,7 +74,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       <span class="metric"><b data-role="staged">0</b> filled</span>
       <span class="metric"><b data-role="pending">0</b> pending</span>
       <span class="metric"><b data-role="failed">0</b> blocked</span>
-      <span class="metric verifier" data-role="verifier" data-state="idle" hidden><b data-role="verified">0/0</b> verified</span>
+      <span class="metric verifier" data-role="verifier" data-state="idle" title="Independent deterministic reviewer integrated into this installed Agent"><b data-role="verified">0/0</b> reviewed</span>
       <span class="message" data-role="message" title="Waiting for the itinerary workspace">Waiting for the itinerary workspace</span>
       <span class="manual" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
     </section>`;
@@ -139,7 +139,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     const driver = $('[data-role="driver"]');
     if (driver) driver.disabled = busy || state.scopeLocked;
     const date = $('[data-role="date"]');
-    if (date) date.disabled = busy || state.scopeLocked;
+    if (date) date.disabled = busy;
     const fill = $('[data-action="fill-date"]');
     if (fill) fill.disabled = busy || state.dateSwitchPending;
     if (message) {
@@ -193,13 +193,13 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
 
   $('[data-role="date"]').addEventListener('change', event => {
     const serviceDate = String(event.target.value || '');
-    if (!serviceDate || serviceDate === state.selectedDate || serviceDate === state.requestedDate) return;
+    if (!serviceDate || serviceDate === state.requestedDate) return;
     state.requestedDate = serviceDate;
     state.dateSwitchPending = true;
     const fill = $('[data-action="fill-date"]');
     if (fill) {
       fill.disabled = true;
-      fill.textContent = 'Switching Date…';
+      fill.textContent = 'Switching Date...';
     }
     send('switch-date', { serviceDate });
   });
@@ -237,7 +237,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
           driver.replaceChildren(...options.map(item => {
             const option = document.createElement('option');
             option.value = String(item.id);
-            option.textContent = item.id === 'all' ? item.name : `${item.name} (${item.tripCount ?? 0})${item.state === 'done' ? ' · DONE' : ''}`;
+            option.textContent = item.id === 'all' ? item.name : `${item.name} (${item.tripCount ?? 0})${item.state === 'done' ? ' - DONE' : ''}`;
             option.dataset.driverName = item.name;
             return option;
           }));
@@ -258,15 +258,15 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       }
       const date = $('[data-role="date"]');
       if (date) {
-        date.disabled = state.busy || state.scopeLocked;
+        date.disabled = state.busy;
         date.title = state.scopeLocked
-          ? 'Finish reviewing or close the current staged batch before changing dates.'
+          ? 'Choose the next date now. It will switch automatically after you manually Apply or Close the current review batch.'
           : 'Service date';
       }
       const fill = $('[data-action="fill-date"]');
       if (fill) {
         fill.disabled = state.busy || state.dateSwitchPending;
-        fill.textContent = state.dateSwitchPending ? 'Switching Date…' : 'Fill Date';
+        fill.textContent = state.dateSwitchPending ? 'Switching Date...' : 'Fill Date';
       }
       set('version', next.version ? `v${next.version}` : '');
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());
@@ -277,7 +277,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       const verifier = $('[data-role="verifier"]');
       if (verifier) {
         verifier.dataset.state = verifierState;
-        verifier.hidden = verifierState === 'idle' && Number(next.verifierChecked || 0) === 0;
+        verifier.hidden = false;
       }
       set('verified', `${next.verifierVerified ?? 0}/${next.verifierChecked ?? 0}`);
       const message = next.message || '';

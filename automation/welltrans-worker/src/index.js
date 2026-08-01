@@ -51,7 +51,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.10.2';
+const workerVersion = '3.11.0';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let activeRunScope = { type: 'all', driverId: '', driverName: '' };
@@ -71,6 +71,7 @@ let verifierTelemetry = {
 const operatorControl = {
   autoRun: true,
   dateOverride: null,
+  pendingDateSwitch: '',
   forceReconcile: false,
   forceVerify: false,
   forceReindex: false,
@@ -214,6 +215,18 @@ async function persistRequestedRunScope(serviceDate, scope) {
   }, null, 2), 'utf8');
 }
 
+async function activateRequestedDate(serviceDate) {
+  operatorControl.pendingDateSwitch = '';
+  operatorControl.dateOverride = serviceDate;
+  requestedServiceDate = serviceDate;
+  await persistRequestedServiceDate(serviceDate);
+  activeRunScope = { type: 'all', driverId: '', driverName: '' };
+  await persistRequestedRunScope(serviceDate, activeRunScope);
+  operatorControl.forceReconcile = true;
+  operatorControl.forceReindex = true;
+  operatorControl.autoRun = true;
+}
+
 async function handleOperatorCommand(action, payload = {}) {
   const commandId = randomUUID();
   if (action === 'pause') {
@@ -246,26 +259,23 @@ async function handleOperatorCommand(action, payload = {}) {
     operatorControl.autoRun = true;
     operatorControl.message = 'Following the date currently opened in WellTrans.';
   } else if (action === 'switch-date') {
-    if (Number(latestReviewSummary.staged || 0) > 0 || Number(latestReviewSummary.processing || 0) > 0) {
-      throw new Error('Finish reviewing the current filled batch before changing dates. The Agent will never mix dates.');
-    }
     const serviceDate = String(payload.serviceDate || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
       throw new Error('Choose a valid service date first.');
     }
-    operatorControl.dateOverride = serviceDate;
-    requestedServiceDate = serviceDate;
-    await persistRequestedServiceDate(serviceDate);
-    activeRunScope = { type: 'all', driverId: '', driverName: '' };
-    await persistRequestedRunScope(serviceDate, activeRunScope);
-    operatorControl.forceReconcile = true;
-    operatorControl.forceReindex = true;
-    operatorControl.autoRun = true;
+    const currentReviewOpen = Number(latestReviewSummary.staged || 0) > 0
+      || Number(latestReviewSummary.processing || 0) > 0;
     if (operatorControl.fatalReviewError) {
+      await activateRequestedDate(serviceDate);
       operatorControl.restartRequested = true;
       operatorControl.message = `Starting a clean session, then selecting and filling ${serviceDate}.`;
+    } else if (currentReviewOpen) {
+      operatorControl.pendingDateSwitch = serviceDate;
+      operatorControl.autoRun = true;
+      operatorControl.message = `Date ${serviceDate} queued. Review and manually Apply or Close the current batch; the Agent will switch immediately afterward.`;
     } else {
-      operatorControl.message = `Switching to ${serviceDate}; if a review dialog is open, review and close it manually first.`;
+      await activateRequestedDate(serviceDate);
+      operatorControl.message = `Selecting and filling ${serviceDate}.`;
     }
   } else if (action === 'switch-driver') {
     if (Number(latestReviewSummary.staged || 0) > 0 || Number(latestReviewSummary.processing || 0) > 0) {
@@ -306,7 +316,7 @@ async function updateOperatorConsole(page, summary = {}, extra = {}) {
   await updateWellTransOperatorConsole(page, {
     version: workerVersion,
     selectedDate: extra.selectedDate || activeServiceDate || requestedServiceDate || '',
-    requestedDate: extra.requestedDate ?? requestedServiceDate ?? '',
+    requestedDate: extra.requestedDate ?? (operatorControl.pendingDateSwitch || requestedServiceDate || ''),
     state: extra.state || (operatorControl.autoRun ? 'online' : 'paused'),
     message: extra.message || operatorControl.message,
     autoRun: operatorControl.autoRun,
@@ -394,21 +404,29 @@ async function selectExactRequestedSchedule(page, serviceDate) {
       const input = dateInputs.nth(index);
       await input.fill(serviceDate).catch(() => {});
       await input.dispatchEvent('change').catch(() => {});
+      await input.press('Enter').catch(() => {});
+      await input.blur().catch(() => {});
     }
     const candidates = frame.locator(
-      '.GridCell:visible, [role="gridcell"]:visible, option:visible, [role="option"]:visible, td:visible, button:visible, a:visible',
+      '.GridCell:visible, [role="gridcell"]:visible, option:visible, [role="option"]:visible, '
+      + '[data-date]:visible, td:visible, button:visible, a:visible, label:visible, span:visible, div:visible',
     );
-    const count = Math.min(await candidates.count().catch(() => 0), 1000);
+    const count = Math.min(await candidates.count().catch(() => 0), 3000);
     for (let index = 0; index < count; index += 1) {
       const candidate = candidates.nth(index);
       const value = await candidate.evaluate(element =>
-        String(element.title || element.value || element.textContent || '').trim()).catch(() => '');
-      if (exactLabels.has(normalizeLabel(value))) exactMatches.push(candidate);
+        String(element.dataset?.date || element.title || element.value || element.textContent || '').trim()).catch(() => '');
+      if (exactLabels.has(normalizeLabel(value))) {
+        const box = await candidate.boundingBox().catch(() => null);
+        if (box) exactMatches.push({ candidate, area: box.width * box.height });
+      }
     }
   }
+  if (await readVisiblePortalDate(page, '') === serviceDate) return true;
   if (!exactMatches.length) return false;
 
-  await exactMatches[0].click({ force: true }).catch(() => {});
+  exactMatches.sort((left, right) => left.area - right.area);
+  await exactMatches[0].candidate.click({ force: true }).catch(() => {});
   for (const frame of page.frames()) {
     const proceed = frame.getByRole('button', { name: 'Proceed', exact: true }).last();
     if (await proceed.isVisible().catch(() => false)) {
@@ -417,7 +435,7 @@ async function selectExactRequestedSchedule(page, serviceDate) {
     }
   }
   await page.waitForTimeout(500);
-  return true;
+  return readVisiblePortalDate(page, '').then(value => value === serviceDate).catch(() => false);
 }
 
 async function waitForRequestedSchedule(page, selectedDate) {
@@ -1946,6 +1964,11 @@ async function main() {
             + `${verification.requeued} not persisted and requeued, ${verification.failed} failed.\n`,
           );
           finalReviewAuditValid = false;
+          if (operatorControl.pendingDateSwitch) {
+            const nextDate = operatorControl.pendingDateSwitch;
+            await activateRequestedDate(nextDate);
+            operatorControl.message = `Current review reconciled. Selecting and filling ${nextDate}.`;
+          }
           if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
           continue;
         }
