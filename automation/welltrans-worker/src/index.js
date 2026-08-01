@@ -51,10 +51,13 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.9.0';
+const workerVersion = '3.9.1';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let activeRunScope = { type: 'all', driverId: '', driverName: '' };
+let activeDriverOptions = [];
+let activeAllDriverTripCount = 0;
+let latestReviewSummary = {};
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
 let lastAuthoritativeReconcileAt = 0;
@@ -201,6 +204,16 @@ async function persistRequestedServiceDate(value) {
   await writeFile(process.env.WELLTRANS_REQUEST_FILE, value ? `${value}\n` : '', 'utf8');
 }
 
+async function persistRequestedRunScope(serviceDate, scope) {
+  if (!process.env.WELLTRANS_SCOPE_FILE) return;
+  await writeFile(process.env.WELLTRANS_SCOPE_FILE, JSON.stringify({
+    serviceDate,
+    type: scope.type,
+    driverId: scope.type === 'driver' ? scope.driverId : '',
+    updatedAt: new Date().toISOString(),
+  }, null, 2), 'utf8');
+}
+
 async function handleOperatorCommand(action, payload = {}) {
   const commandId = randomUUID();
   if (action === 'pause') {
@@ -233,6 +246,9 @@ async function handleOperatorCommand(action, payload = {}) {
     operatorControl.autoRun = true;
     operatorControl.message = 'Following the date currently opened in WellTrans.';
   } else if (action === 'switch-date') {
+    if (Number(latestReviewSummary.staged || 0) > 0 || Number(latestReviewSummary.processing || 0) > 0) {
+      throw new Error('Finish reviewing the current filled batch before changing dates. The Agent will never mix dates.');
+    }
     const serviceDate = String(payload.serviceDate || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
       throw new Error('Choose a valid service date first.');
@@ -240,6 +256,8 @@ async function handleOperatorCommand(action, payload = {}) {
     operatorControl.dateOverride = serviceDate;
     requestedServiceDate = serviceDate;
     await persistRequestedServiceDate(serviceDate);
+    activeRunScope = { type: 'all', driverId: '', driverName: '' };
+    await persistRequestedRunScope(serviceDate, activeRunScope);
     operatorControl.forceReconcile = true;
     operatorControl.forceReindex = true;
     operatorControl.autoRun = true;
@@ -249,6 +267,28 @@ async function handleOperatorCommand(action, payload = {}) {
     } else {
       operatorControl.message = `Switching to ${serviceDate}; if a review dialog is open, review and close it manually first.`;
     }
+  } else if (action === 'switch-driver') {
+    if (Number(latestReviewSummary.staged || 0) > 0 || Number(latestReviewSummary.processing || 0) > 0) {
+      throw new Error('Finish reviewing the current filled batch before changing drivers. The Agent will never mix driver scopes.');
+    }
+    const type = payload.type === 'driver' ? 'driver' : 'all';
+    const driverId = type === 'driver' ? String(payload.driverId || '').trim() : '';
+    const option = type === 'driver'
+      ? activeDriverOptions.find(item => item.id === driverId)
+      : null;
+    if (type === 'driver' && !option) {
+      throw new Error('That driver is not an authoritative completed-trip driver for the selected date.');
+    }
+    activeRunScope = type === 'driver'
+      ? { type, driverId, driverName: option.name }
+      : { type: 'all', driverId: '', driverName: '' };
+    await persistRequestedRunScope(activeServiceDate || requestedServiceDate, activeRunScope);
+    operatorControl.forceReconcile = true;
+    operatorControl.forceReindex = true;
+    operatorControl.autoRun = true;
+    operatorControl.message = type === 'driver'
+      ? `Driver scope changed to ${option.name}. Only that driver's completed trips will be filled.`
+      : 'Driver scope changed to All drivers. Trips will be grouped by driver for review.';
   } else if (action === 'restart') {
     operatorControl.restartRequested = true;
     operatorControl.autoRun = false;
@@ -281,6 +321,13 @@ async function updateOperatorConsole(page, summary = {}, extra = {}) {
     verifierVerified: verifierTelemetry.verified,
     verifierCorrections: verifierTelemetry.correctionsIssued,
     verifierBlocked: verifierTelemetry.blocked,
+    scopeType: activeRunScope.type,
+    scopeDriverId: activeRunScope.driverId || '',
+    scopeDriverName: activeRunScope.driverName || '',
+    driverOptions: activeDriverOptions,
+    allDriverTripCount: activeAllDriverTripCount,
+    scopeLocked: Number(summary.staged ?? latestReviewSummary.staged ?? 0) > 0
+      || Number(summary.processing ?? latestReviewSummary.processing ?? 0) > 0,
   });
 }
 
@@ -648,6 +695,7 @@ async function publishDateReviewSummary(serviceDate) {
     }, { merge: true }));
   }
   await Promise.all(writes);
+  latestReviewSummary = summary;
   return summary;
 }
 
@@ -815,6 +863,23 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
   const existingManifest = existingManifestSnapshot.exists
     ? existingManifestSnapshot.data() || {}
     : {};
+  activeAllDriverTripCount = allExpectedTrips.length;
+  const driverTripCounts = new Map();
+  for (const trip of allExpectedTrips) {
+    const driverId = String(trip.driverId || '').trim();
+    if (driverId) driverTripCounts.set(driverId, (driverTripCounts.get(driverId) || 0) + 1);
+  }
+  const driverDocuments = driverTripCounts.size
+    ? await db.getAll(...[...driverTripCounts.keys()].map(id => db.doc(`drivers/${id}`)))
+    : [];
+  activeDriverOptions = driverDocuments
+    .filter(document => document.exists && String(document.data().name || '').trim())
+    .map(document => ({
+      id: document.id,
+      name: String(document.data().name).trim(),
+      tripCount: driverTripCounts.get(document.id) || 0,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
   const requestedScope = await readRequestedRunScope(serviceDate);
   activeRunScope = requestedScope || (existingManifest.scopeType === 'driver' && existingManifest.scopeDriverId
     ? {
@@ -843,6 +908,25 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
       latestByTrip.set(key, { ref: document.ref, data, updatedAt });
     }
   }
+  const tripIdsByDriver = new Map();
+  for (const trip of allExpectedTrips) {
+    const driverId = String(trip.driverId || '').trim();
+    if (!driverId) continue;
+    if (!tripIdsByDriver.has(driverId)) tripIdsByDriver.set(driverId, []);
+    tripIdsByDriver.get(driverId).push(String(trip.id));
+  }
+  activeDriverOptions = activeDriverOptions.map(option => {
+    const tripIds = tripIdsByDriver.get(option.id) || [];
+    const verifiedCount = tripIds.filter(tripId => {
+      const log = latestByTrip.get(tripId)?.data;
+      return log?.status === 'completed' && log?.portalVerification?.verified === true;
+    }).length;
+    return {
+      ...option,
+      verifiedCount,
+      state: tripIds.length > 0 && verifiedCount === tripIds.length ? 'done' : 'open',
+    };
+  });
 
   const blockedTrips = [];
   let queued = 0;

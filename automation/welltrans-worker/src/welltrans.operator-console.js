@@ -26,10 +26,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         padding:5px 7px;color:#eaf1ff;background:rgba(7,15,30,.97);border:1px solid #30476e;
         border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.38);white-space:nowrap;overflow-x:auto;
         overflow-y:hidden;scrollbar-width:thin;backdrop-filter:blur(12px)}
-      button,input{height:30px;flex:0 0 auto;border-radius:8px;font:700 10px Inter,Segoe UI,Arial,sans-serif}
+      button,input,select{height:30px;flex:0 0 auto;border-radius:8px;font:700 10px Inter,Segoe UI,Arial,sans-serif}
       button{border:1px solid #31496f;padding:0 9px;color:#eaf1ff;background:#172944;cursor:pointer}
       button:hover{background:#213b61;border-color:#4b6f9f}
-      button:focus-visible,input:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}
+      button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}
       button:disabled{cursor:wait;opacity:.5}
       .drag{width:27px;padding:0;cursor:grab;color:#91a4c8;font-size:15px;touch-action:none;user-select:none}
       .drag:active{cursor:grabbing}
@@ -39,6 +39,8 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       .state{width:125px;flex:0 0 125px;overflow:hidden;text-overflow:ellipsis;padding:4px 7px;border-radius:999px;
         background:#123c2c;color:#6ee7b7;font-size:9px;font-weight:900}
       input{width:118px;border:1px solid #38517e;background:#0d1930;color:#fff;padding:0 7px;color-scheme:dark}
+      select{width:164px;max-width:210px;border:1px solid #38517e;background:#0d1930;color:#fff;padding:0 7px}
+      select:disabled{cursor:not-allowed;opacity:.55}
       .primary{background:#2563eb;border-color:#3b82f6;color:#fff}
       .primary:hover{background:#1d4ed8}
       .verify{background:#14532d;border-color:#23834a}
@@ -61,6 +63,9 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
       <span class="state" data-role="state">CONNECTING</span>
       <input data-role="date" type="date" aria-label="Service date">
+      <select data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
+        <option value="all">All drivers</option>
+      </select>
       <button class="primary" data-action="fill-date" title="Reconcile and fill the selected date; the Agent verifies the opened WellTrans date before writing">Fill Date</button>
       <button class="verify" data-action="verify" title="Read every staged field back without clicking Apply">Review &amp; Verify</button>
       <button data-action="pause">Pause</button>
@@ -79,7 +84,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   hostGuard.observe(document.documentElement, { childList: true });
 
   const $ = selector => shadow.querySelector(selector);
-  const state = { busy: false, paused: false, commandSequence: 0, selectedDate: '' };
+  const state = { busy: false, paused: false, commandSequence: 0, selectedDate: '', selectedDriverId: 'all', scopeLocked: false };
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
   try {
@@ -127,6 +132,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   const setBusy = (busy, message = '') => {
     state.busy = busy;
     shadow.querySelectorAll('button[data-action]').forEach(button => { button.disabled = busy; });
+    const driver = $('[data-role="driver"]');
+    if (driver) driver.disabled = busy || state.scopeLocked;
+    const date = $('[data-role="date"]');
+    if (date) date.disabled = busy || state.scopeLocked;
     if (message) {
       $('[data-role="message"]').textContent = message;
       $('[data-role="message"]').title = message;
@@ -174,6 +183,16 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     send(action);
   });
 
+  $('[data-role="driver"]').addEventListener('change', event => {
+    const driverId = String(event.target.value || 'all');
+    const option = event.target.selectedOptions[0];
+    send('switch-driver', {
+      type: driverId === 'all' ? 'all' : 'driver',
+      driverId: driverId === 'all' ? '' : driverId,
+      driverName: driverId === 'all' ? '' : String(option?.dataset.driverName || option?.textContent || '').trim(),
+    });
+  });
+
   window.__agapeWellTransPanel = {
     update(next = {}) {
       const set = (role, value) => {
@@ -183,6 +202,40 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       if (next.selectedDate) {
         state.selectedDate = next.selectedDate;
         $('[data-role="date"]').value = next.selectedDate;
+      }
+      const driver = $('[data-role="driver"]');
+      if (driver && Array.isArray(next.driverOptions)) {
+        const options = [{ id: 'all', name: `All drivers (${next.allDriverTripCount ?? next.expected ?? 0})` }, ...next.driverOptions];
+        const signature = JSON.stringify(options);
+        if (driver.dataset.options !== signature) {
+          driver.replaceChildren(...options.map(item => {
+            const option = document.createElement('option');
+            option.value = String(item.id);
+            option.textContent = item.id === 'all' ? item.name : `${item.name} (${item.tripCount ?? 0})${item.state === 'done' ? ' · DONE' : ''}`;
+            option.dataset.driverName = item.name;
+            return option;
+          }));
+          driver.dataset.options = signature;
+        }
+      }
+      state.selectedDriverId = next.scopeType === 'driver' && next.scopeDriverId ? String(next.scopeDriverId) : 'all';
+      if (driver) {
+        driver.value = state.selectedDriverId;
+        if (!driver.value) driver.value = 'all';
+      }
+      state.scopeLocked = Boolean(next.scopeLocked);
+      if (driver) {
+        driver.disabled = state.busy || state.scopeLocked;
+        driver.title = state.scopeLocked
+          ? 'Finish reviewing or close the current staged batch before changing drivers.'
+          : 'Fill all drivers or one authoritative driver';
+      }
+      const date = $('[data-role="date"]');
+      if (date) {
+        date.disabled = state.busy || state.scopeLocked;
+        date.title = state.scopeLocked
+          ? 'Finish reviewing or close the current staged batch before changing dates.'
+          : 'Service date';
       }
       set('version', next.version ? `v${next.version}` : '');
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());

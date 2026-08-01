@@ -227,6 +227,7 @@ describe('WellTrans staging safety contract', () => {
     const trip = readFileSync(tripSourcePath, 'utf8');
     const page = readFileSync(syncPagePath, 'utf8');
     const launcher = readFileSync(workerLauncherPath, 'utf8');
+    const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
     expect(page).toContain('aria-label="Choose drivers to fill"');
     expect(page).toContain("{ type: 'driver', driverId: selectedDriverScope.id }");
     expect(page).toContain("protocol.searchParams.set('driverId', activeScope.driverId)");
@@ -238,6 +239,12 @@ describe('WellTrans staging safety contract', () => {
     expect(trip).toContain('export async function sortWellTransReviewGridByDriver');
     expect(trip).toContain("cell.title === 'Driver'");
     expect(launcher).toContain("requested-sync-scope.json");
+    expect(worker).toContain("action === 'switch-driver'");
+    expect(worker).toContain('persistRequestedRunScope');
+    expect(worker).toContain('The Agent will never mix driver scopes.');
+    expect(operatorConsole).toContain('data-role="driver"');
+    expect(operatorConsole).toContain("send('switch-driver'");
+    expect(operatorConsole).toContain('state.scopeLocked');
   });
 
   it('marks a driver batch done only after every scoped trip is live-verified', () => {

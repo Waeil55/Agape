@@ -29,8 +29,29 @@ describe('WellTrans one-line operator toolbar', () => {
       verifierState: 'verified',
       verifierChecked: 4,
       verifierVerified: 4,
+      scopeType: 'driver',
+      scopeDriverId: 'driver-1',
+      driverOptions: [
+        { id: 'driver-1', name: 'Mikhaeil Waeil', tripCount: 4 },
+        { id: 'driver-2', name: 'Waeil Driver', tripCount: 3, state: 'done' },
+      ],
+      allDriverTripCount: 7,
       message: 'Ready for commands.',
     });
+  });
+
+  it('offers authoritative all-driver and single-driver scopes in the same row', async () => {
+    const result = await page.locator('#agape-welltrans-operator-console').evaluate(host => {
+      const select = host.shadowRoot.querySelector('[data-role="driver"]');
+      return {
+        value: select.value,
+        labels: [...select.options].map(option => option.textContent),
+      };
+    });
+    assert.equal(result.value, 'driver-1');
+    assert.deepEqual(result.labels, [
+      'All drivers (7)', 'Mikhaeil Waeil (4)', 'Waeil Driver (3) · DONE',
+    ]);
   });
 
   after(async () => {
@@ -84,12 +105,16 @@ describe('WellTrans one-line operator toolbar', () => {
     await host.locator('[data-action="fill-date"]').click();
     await host.locator('[data-action="verify"]').click();
     await host.locator('[data-action="pause"]').click();
+    await host.locator('[data-role="driver"]').selectOption('driver-2');
     await updateWellTransOperatorConsole(page, { state: 'review_error' });
     await host.locator('[data-action="restart"]').click();
     assert.deepEqual(commands.map(item => item.action), [
-      'reconcile', 'switch-date', 'verify', 'pause', 'restart',
+      'reconcile', 'switch-date', 'verify', 'pause', 'switch-driver', 'restart',
     ]);
     assert.equal(commands[1].payload.serviceDate, '2026-07-28');
+    assert.deepEqual(commands[4].payload, {
+      type: 'driver', driverId: 'driver-2', driverName: 'Waeil Driver',
+    });
   });
 
   it('can be moved vertically without drifting sideways', async () => {
