@@ -6,12 +6,6 @@ import { ToastProvider } from './hooks/useToast';
 import { AccessibilityProvider } from './contexts/AccessibilityContext';
 import './index.css';
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
-
 // Global table row selection logic for desktop view
 document.addEventListener('click', (e) => {
   const tr = e.target.closest('table tbody tr');

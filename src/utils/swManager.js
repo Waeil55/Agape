@@ -29,7 +29,9 @@ export const registerServiceWorker = async () => {
 
     swRegistration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
+      updateViaCache: 'none',
     });
+    await swRegistration.update().catch(() => {});
 
     // Listen for updates
     updateFoundHandler = () => {

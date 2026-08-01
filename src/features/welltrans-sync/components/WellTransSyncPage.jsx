@@ -411,20 +411,12 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) =>
             <p className="text-[11px] text-slate-500 mt-0.5">Broker sync · field mapping · worker telemetry</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <a
-              href="/welltrans-agent/agape-welltrans-agent.zip"
-              download
-              onClick={() => setShowInstallHelp(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
-            >
-              <Download size={13} /> Download Agent ZIP
-            </a>
             <button
               type="button"
               onClick={() => setShowInstallHelp(true)}
-              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-slate-500 transition hover:border-blue-300 hover:text-blue-700"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
             >
-              Windows install help
+              <Download size={13} /> Agent setup
             </button>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="relative flex h-2.5 w-2.5">
@@ -583,11 +575,13 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) =>
               Confirm Applied Batch ({stagedCount})
             </button>
           )}
-          <button disabled={!settings.enabled || !selectedIds.length || Boolean(busy)}
-            onClick={() => runQueue(selectedIds, 'selected')}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition">
-            Sync Selected ({selectedIds.length})
-          </button>
+          {selectedIds.length > 0 && (
+            <button disabled={!settings.enabled || Boolean(busy)}
+              onClick={() => runQueue(selectedIds, 'selected')}
+              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition">
+              Process Selected ({selectedIds.length})
+            </button>
+          )}
 
           {/* Bulk select dropdown */}
           <div className="relative" ref={bulkMenuRef}>
@@ -615,11 +609,11 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) =>
           </button>
           <button onClick={exportAllTripsCSV}
             className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition">
-            <Download size={12} className="inline mr-1" /> Export Queue
+            <Download size={12} className="inline mr-1" /> Export trips
           </button>
           <button onClick={() => exportWellTransLogsCSV(logs, syncDate)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition">
-            <Download size={12} className="inline mr-1" /> Logs
+            <Download size={12} className="inline mr-1" /> Export history
           </button>
           {Number(worker?.throughputPerMinute) > 0 && (
             <div className="ml-auto flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] font-semibold text-cyan-800">

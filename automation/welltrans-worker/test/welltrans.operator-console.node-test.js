@@ -20,7 +20,7 @@ describe('WellTrans one-line operator toolbar', () => {
       return { accepted: true, message: `${action} accepted` };
     });
     await updateWellTransOperatorConsole(page, {
-      version: '3.8.6',
+      version: '3.8.7',
       selectedDate: '2026-07-27',
       state: 'calibrated',
       staged: 4,
@@ -40,20 +40,20 @@ describe('WellTrans one-line operator toolbar', () => {
   it('renders every control in one compact top row', async () => {
     const layout = await page.locator('#agape-welltrans-operator-console').evaluate(host => {
       const bar = host.shadowRoot.querySelector('.bar');
-      const children = [...bar.children].map(child => child.getBoundingClientRect());
+      const children = [...bar.children].filter(child => !child.hidden).map(child => child.getBoundingClientRect());
       const barRect = bar.getBoundingClientRect();
       return {
         height: barRect.height,
         top: barRect.top,
         rows: new Set(children.map(rect => Math.round(rect.top + rect.height / 2))).size,
-        labels: [...bar.querySelectorAll('button[data-action]')].map(button => button.textContent.trim()),
+        labels: [...bar.querySelectorAll('button[data-action]:not([hidden])')].map(button => button.textContent.trim()),
       };
     });
     assert.equal(layout.height, 42);
     assert.ok(layout.top <= 8);
     assert.equal(layout.rows, 1);
     assert.deepEqual(layout.labels, [
-      'Fill Selected', 'Fill Opened Date', 'Run Reviewer', 'Pause', 'New Safe Session',
+      'Fill Date', 'Review & Verify', 'Pause',
     ]);
   });
 
@@ -77,13 +77,14 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.equal(Math.round(after.width), Math.round(before.width));
   });
 
-  it('delivers opened-date, selected-date, verify, pause and restart commands', async () => {
+  it('uses one fill action for opened and manually selected dates', async () => {
     const host = page.locator('#agape-welltrans-operator-console');
-    await host.locator('[data-action="reconcile"]').click();
+    await host.locator('[data-action="fill-date"]').click();
     await host.locator('[data-role="date"]').fill('2026-07-28');
-    await host.locator('[data-action="switch-date"]').click();
+    await host.locator('[data-action="fill-date"]').click();
     await host.locator('[data-action="verify"]').click();
     await host.locator('[data-action="pause"]').click();
+    await updateWellTransOperatorConsole(page, { state: 'review_error' });
     await host.locator('[data-action="restart"]').click();
     assert.deepEqual(commands.map(item => item.action), [
       'reconcile', 'switch-date', 'verify', 'pause', 'restart',

@@ -15,8 +15,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Secure Agape Care WellTrans automation agent installer")]
 [assembly: AssemblyCompany("Agape Care Medical Transportation")]
 [assembly: AssemblyProduct("Agape Care WellTrans Agent")]
-[assembly: AssemblyVersion("3.8.6.0")]
-[assembly: AssemblyFileVersion("3.8.6.0")]
+[assembly: AssemblyVersion("3.8.7.0")]
+[assembly: AssemblyFileVersion("3.8.7.0")]
 
 namespace AgapeCare.WellTrans
 {
@@ -193,7 +193,7 @@ namespace AgapeCare.WellTrans
                 statusLabel.Text = "Agent " + Convert.ToString(args.Result) + " is installed and ready.";
                 MessageBox.Show(
                     this,
-                    "Installation is complete. Return to Agape and click Start & Fill Selected Date.",
+                    "Installation is complete. Return to Agape and click Reconcile & Fill Date.",
                     "Agape WellTrans Agent",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information

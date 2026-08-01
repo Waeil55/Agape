@@ -17,7 +17,7 @@ Preferred:
    `agape-worker-wif.json` external-account configuration so Google issues
    short-lived credentials. Existing DPAPI-protected service-account
    enrollment remains a clearly reported legacy fallback during migration.
-3. Choose the service date in Agape and click **Start & Fill Selected Date**.
+3. Choose the service date in Agape and click **Reconcile & Fill Date**.
 4. If the saved WellTrans session has expired, complete the legitimate broker
    login in the opened browser. The agent detects login and TRIPS - ASSIGNED
    automatically; there is no terminal window and no Enter-key confirmation.
@@ -44,7 +44,7 @@ Manual fallback:
 
 The Agape dashboard shows `Calibrated` and the exact locked date. Queue only
 trips for that date. To change dates, choose another date in Agape and click
-**Start & Fill Selected Date**. The running agent receives the new date,
+**Reconcile & Fill Date**. The running agent receives the new date,
 opens the schedule selector when possible, and remains safely paused until
 the exact requested WellTrans date is visible.
 

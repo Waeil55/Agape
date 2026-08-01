@@ -43,6 +43,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       .primary:hover{background:#1d4ed8}
       .verify{background:#14532d;border-color:#23834a}
       .restart{background:#5b2230;border-color:#8f3d52}
+      .restart[hidden],.verifier[hidden]{display:none}
       .metric{display:flex;align-items:baseline;gap:3px;padding:3px 6px;border-radius:7px;background:#101f37;
         color:#91a4c8;font-size:8px;text-transform:uppercase}
       .metric b{color:#fff;font-size:11px}
@@ -60,22 +61,21 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
       <span class="state" data-role="state">CONNECTING</span>
       <input data-role="date" type="date" aria-label="Service date">
-      <button data-action="switch-date" title="Open and fill the selected service date">Fill Selected</button>
-      <button class="primary" data-action="reconcile" title="Detect, reconcile and fill the date currently open in WellTrans">Fill Opened Date</button>
-      <button class="verify" data-action="verify" title="Run the independent deterministic reviewer across every staged field">Run Reviewer</button>
+      <button class="primary" data-action="fill-date" title="Reconcile and fill the selected date; the Agent verifies the opened WellTrans date before writing">Fill Date</button>
+      <button class="verify" data-action="verify" title="Read every staged field back without clicking Apply">Review &amp; Verify</button>
       <button data-action="pause">Pause</button>
-      <button class="restart" data-action="restart" title="Discard this unsaved review session and start a clean agent session">New Safe Session</button>
+      <button class="restart" data-action="restart" title="Discard an unsafe unsaved session and start clean" hidden>Reset Session</button>
       <span class="metric"><b data-role="staged">0</b> filled</span>
       <span class="metric"><b data-role="pending">0</b> pending</span>
       <span class="metric"><b data-role="failed">0</b> blocked</span>
-      <span class="metric verifier" data-role="verifier" data-state="idle"><b data-role="verified">0/0</b> reviewer</span>
+      <span class="metric verifier" data-role="verifier" data-state="idle" hidden><b data-role="verified">0/0</b> verified</span>
       <span class="message" data-role="message" title="Waiting for the itinerary workspace">Waiting for the itinerary workspace</span>
       <span class="manual" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
     </section>`;
   document.documentElement.appendChild(host);
 
   const $ = selector => shadow.querySelector(selector);
-  const state = { busy: false, paused: false, commandSequence: 0 };
+  const state = { busy: false, paused: false, commandSequence: 0, selectedDate: '' };
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
   try {
@@ -158,8 +158,13 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const action = button.dataset.action;
-    if (action === 'switch-date') {
-      send(action, { serviceDate: $('[data-role="date"]').value });
+    if (action === 'fill-date') {
+      const requestedDate = $('[data-role="date"]').value;
+      if (requestedDate && requestedDate !== state.selectedDate) {
+        send('switch-date', { serviceDate: requestedDate });
+      } else {
+        send('reconcile');
+      }
       return;
     }
     send(action);
@@ -171,7 +176,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         const element = $(`[data-role="${role}"]`);
         if (element && value !== undefined && value !== null) element.textContent = String(value);
       };
-      if (next.selectedDate) $('[data-role="date"]').value = next.selectedDate;
+      if (next.selectedDate) {
+        state.selectedDate = next.selectedDate;
+        $('[data-role="date"]').value = next.selectedDate;
+      }
       set('version', next.version ? `v${next.version}` : '');
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());
       set('staged', next.staged ?? 0);
@@ -179,7 +187,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       set('failed', (next.failed ?? 0) + (next.blocked ?? 0) + (next.missing ?? 0));
       const verifierState = String(next.verifierState || 'idle').toLowerCase();
       const verifier = $('[data-role="verifier"]');
-      if (verifier) verifier.dataset.state = verifierState;
+      if (verifier) {
+        verifier.dataset.state = verifierState;
+        verifier.hidden = verifierState === 'idle' && Number(next.verifierChecked || 0) === 0;
+      }
       set('verified', `${next.verifierVerified ?? 0}/${next.verifierChecked ?? 0}`);
       const message = next.message || '';
       set('message', message);
@@ -187,6 +198,8 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       state.paused = next.autoRun === false;
       const pause = $('[data-action="pause"]');
       if (pause) pause.textContent = state.paused ? 'Resume' : 'Pause';
+      const restart = $('[data-action="restart"]');
+      if (restart) restart.hidden = !/(error|blocked|unsafe|failed)/i.test(String(next.state || ''));
     },
   };
 };

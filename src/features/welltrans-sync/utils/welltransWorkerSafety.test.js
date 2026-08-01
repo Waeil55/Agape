@@ -286,12 +286,11 @@ describe('WellTrans staging safety contract', () => {
   it('provides a one-line draggable operator toolbar with essential controls only', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');
     const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
-    expect(operatorConsole).toContain('Fill Opened Date');
-    expect(operatorConsole).toContain('Fill Selected');
-    expect(operatorConsole).toContain('Run Reviewer');
+    expect(operatorConsole).toContain('Fill Date');
+    expect(operatorConsole).toContain('Review &amp; Verify');
     expect(operatorConsole).toContain('data-role="verifier"');
     expect(operatorConsole).toContain('Agent command acknowledgement timed out.');
-    expect(operatorConsole).toContain('New Safe Session');
+    expect(operatorConsole).toContain('Reset Session');
     expect(operatorConsole).toContain('role="toolbar"');
     expect(operatorConsole).toContain("'top:8px'");
     expect(operatorConsole).toContain("'left:50%'");
