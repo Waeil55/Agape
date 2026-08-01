@@ -39,6 +39,10 @@ try {
       operatorToolbar = 'integrated'
       secureLocalSignIn = 'integrated'
       automaticUpdater = 'integrated'
+      capabilityKernel = 'integrated'
+      roleSupervisor = 'integrated'
+      localIntelligence = 'integrated_no_external_api'
+      brokerTransportBoundary = 'integrated'
     }
     publishedAt = [DateTime]::UtcNow.ToString('o')
   } | ConvertTo-Json

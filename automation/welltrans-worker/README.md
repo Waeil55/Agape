@@ -102,6 +102,15 @@ the exact requested WellTrans date is visible.
 
 ## Enterprise verification
 
+Agent v4 runs one installed package with capability-isolated internal roles:
+reconciliation, portal indexing, one exclusive portal writer, independent
+verification, recovery, and local-only diagnostics. Capability tokens are
+process-local and signed; a verifier or analyst cannot call the staging API.
+The local diagnostic engine never uses Gemini or another network model and has
+no authority to change transportation records. TripSpark API and file-exchange
+transports are present as fail-closed adapter boundaries and remain unavailable
+until certified vendor access is configured.
+
 The Agent includes a separate deterministic verification contract after staging.
 It records field-level expected/actual evidence in `welltrans_verification_runs`.
 Any supported mismatch creates an integrity-bound command in

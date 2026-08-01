@@ -31,6 +31,10 @@ import {
   buildVerificationDecision,
   validateCorrectionCommand,
 } from './welltrans.verifier.js';
+import { AGENT_ROLES, capabilityManifest, createCapabilityKernel } from './agent.capability-kernel.js';
+import { createAgentSupervisor } from './agent.supervisor.js';
+import { analyzeLocally } from './agent.local-intelligence.js';
+import { selectBrokerTransport } from './broker.transport.js';
 
 initializeApp({
   credential: applicationDefault(),
@@ -51,7 +55,18 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.11.0';
+const workerVersion = '4.0.0';
+const capabilityKernel = createCapabilityKernel(workerInstanceId);
+const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
+const supervisor = createAgentSupervisor([
+  { id: 'reconciler', role: AGENT_ROLES.RECONCILER, authority: 'source_read_queue_write' },
+  { id: 'portal_indexer', role: AGENT_ROLES.INDEXER, authority: 'portal_read_only' },
+  { id: 'portal_writer', role: AGENT_ROLES.WRITER, authority: 'single_exclusive_staging_writer' },
+  { id: 'independent_verifier', role: AGENT_ROLES.VERIFIER, authority: 'read_back_and_scoped_corrections' },
+  { id: 'recovery', role: AGENT_ROLES.RECOVERY, authority: 'rollback_and_queue_recovery' },
+  { id: 'local_analyst', role: AGENT_ROLES.LOCAL_ANALYST, authority: 'local_diagnostics_only' },
+]);
+const brokerTransport = selectBrokerTransport(process.env.WELLTRANS_TRANSPORT || 'playwright');
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let activeRunScope = { type: 'all', driverId: '', driverName: '' };
@@ -105,6 +120,12 @@ const heartbeatPayload = state => ({
   canaryFingerprint: latestPortalCanary?.contractFingerprint || null,
   canaryCheckedAtMs: latestPortalCanary?.checkedAtMs || null,
   credentialMode: process.env.AGAPE_WORKER_CREDENTIAL_MODE || 'application_default',
+  agentV4: {
+    ...supervisor.snapshot(),
+    capabilityPolicy: capabilityManifest(),
+    activeTransport: brokerTransport,
+    localIntelligence: { engine: 'agape_local_rules_v1', networkUsed: false, authority: 'diagnostic_only' },
+  },
   verificationAgent: {
     name: 'Agape Independent Verifier',
     version: '1.0.0',
@@ -1481,12 +1502,11 @@ async function processJob(job, existingSession = null) {
       bookingAliasId: bookingAlias?.id || FieldValue.delete(),
       bookingMatchMethod: bookingAlias?.matchMethod || 'exact_booking_id',
     });
-    const result = await syncWellTransTrip(
-      page,
-      payload,
-      settings.fieldMapping || {},
-      portalGridIndex,
-    );
+    const result = await supervisor.run('portal_writer', () => capabilityKernel.runExclusiveWrite(
+      writerCapability,
+      `${payload.serviceDate}:${payload.bookingId}`,
+      () => syncWellTransTrip(page, payload, settings.fieldMapping || {}, portalGridIndex),
+    ));
     await commitSyncTransition(job.ref, {
       status: 'awaiting_review', stage: 'awaiting_manual_apply', stagedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), leaseExpiresAt: FieldValue.delete(), errorMessage: '',
@@ -1519,6 +1539,10 @@ async function processJob(job, existingSession = null) {
     if (stagingDurations.length > 50) stagingDurations.shift();
     return { success: true, safeToContinue: true };
   } catch (error) {
+    const localDiagnostic = analyzeLocally(error, {
+      bookingId: job.bookingId || job.payload?.bookingId,
+      serviceDate: job.serviceDate || job.payload?.serviceDate,
+    });
     let screenshot = '';
     let screenshotError = '';
     if (page) {
@@ -1557,6 +1581,7 @@ async function processJob(job, existingSession = null) {
       mutationStarted: error?.welltransMutationStarted === true,
       rollbackVerified,
       rollbackErrors,
+      localDiagnostic,
     }, {
       tripId: job.tripId,
       bookingId: job.bookingId,

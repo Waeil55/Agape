@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $ConfirmPreference = 'None'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Security
-$agentVersion = '3.11.0'
+$agentVersion = '4.0.0'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'
@@ -36,7 +36,11 @@ try {
     'src\index.js',
     'src\welltrans.operator-console.js',
     'src\welltrans.verifier.js',
-    'src\welltrans.trip.js'
+    'src\welltrans.trip.js',
+    'src\agent.capability-kernel.js',
+    'src\agent.supervisor.js',
+    'src\agent.local-intelligence.js',
+    'src\broker.transport.js'
   )) {
     if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot $component))) {
       throw "Agent package is incomplete: integrated component $component is missing."

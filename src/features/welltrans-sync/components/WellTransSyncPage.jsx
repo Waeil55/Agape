@@ -567,6 +567,13 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
               <span>v{worker.version || '?'}</span>
             </div>
           )}
+          {worker?.agentV4 && (
+            <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${
+              worker.agentV4.healthy ? 'border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-rose-200 bg-rose-50 text-rose-800'
+            }`} title={`${worker.agentV4.components?.length || 0} capability-isolated internal components · one exclusive portal writer · local diagnostics`}>
+              <Bot size={11} /> V4 {worker.agentV4.healthy ? 'secured' : 'degraded'} · {worker.agentV4.components?.length || 0} roles
+            </div>
+          )}
           <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${canaryHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
             <ShieldCheck size={11} /> Portal {canaryHealthy ? 'verified' : 'check'}
           </div>
