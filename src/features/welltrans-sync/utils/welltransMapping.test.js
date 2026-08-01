@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildWellTransCoverage, buildWellTransPayload, calculateTripMileage,
+  buildWellTransCoverage, buildWellTransPayload, calculateTripMileage, calculateWellTransDraftMileage,
   hydrateWellTransTrip, normalizeBookingId, normalizeServiceDate,
   resolveWellTransDriverName, validateTripForWellTrans,
 } from './welltransMapping';
@@ -11,6 +11,10 @@ describe('WellTrans mapping', () => {
   });
   it('derives mileage from odometers before distance', () => {
     expect(calculateTripMileage({ pickupOdometer: 263206, dropoffOdometer: 263223, distance: 99 })).toBe(17);
+  });
+  it('does not dereference a missing inline-edit draft while rendering another date', () => {
+    expect(calculateWellTransDraftMileage(null)).toBeNull();
+    expect(calculateWellTransDraftMileage({ _pickupOdometer: 263206, _dropoffOdometer: 263223 })).toBe(17);
   });
   it('normalizes the broker service date independently from clock times', () => {
     expect(normalizeServiceDate({ dateKey: '2026-07-25' })).toBe('2026-07-25');

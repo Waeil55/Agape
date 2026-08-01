@@ -88,6 +88,16 @@ export const calculateTripMileage = (trip = {}) => {
   return Number.isFinite(distance) && distance >= 0 ? Number(distance.toFixed(3)) : null;
 };
 
+export const calculateWellTransDraftMileage = (draft) => {
+  if (!draft || typeof draft !== 'object') return null;
+  if (draft._pickupOdometer === '' || draft._pickupOdometer == null
+    || draft._dropoffOdometer === '' || draft._dropoffOdometer == null) return null;
+  const pickup = Number(draft._pickupOdometer);
+  const dropoff = Number(draft._dropoffOdometer);
+  if (!Number.isFinite(pickup) || !Number.isFinite(dropoff)) return null;
+  return Math.max(0, dropoff - pickup);
+};
+
 const clockMinutes = value => {
   const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;

@@ -20,7 +20,7 @@ import {
   categorizeFailure, FAILURE_CATEGORIES,
 } from '../services/welltransService';
 import {
-  buildWellTransPayload, DEFAULT_WELLTRANS_FIELD_MAPPING, hydrateWellTransTrip,
+  buildWellTransPayload, calculateWellTransDraftMileage, DEFAULT_WELLTRANS_FIELD_MAPPING, hydrateWellTransTrip,
   validateTripForWellTrans,
 } from '../utils/welltransMapping';
 import { pageWellTransRows, WELLTRANS_TABLE_PAGE_SIZE } from '../utils/welltransScale';
@@ -1189,9 +1189,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                   const isEditing = editingTrip?.id === trip.id;
                   const draft = isEditing ? editingTrip : null;
                   const inlineInputClass = 'w-full min-w-[70px] rounded-md border border-blue-400 bg-white px-1.5 py-1 font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-200';
-                  const draftMiles = draft?._pickupOdometer !== '' && draft?._dropoffOdometer !== ''
-                    ? Math.max(0, Number(draft._dropoffOdometer || 0) - Number(draft._pickupOdometer || 0))
-                    : null;
+                  const draftMiles = calculateWellTransDraftMileage(draft);
                   return (
                     <React.Fragment key={trip.id}>
                     <tr className={`group ${isEditing ? 'bg-blue-50/80' : 'cursor-pointer hover:bg-slate-50/50'} ${recentlySavedTripId === trip.id ? 'ring-1 ring-inset ring-emerald-300' : ''}`} onClick={() => { if (!isEditing) setTripDrawer(trip); }}>
