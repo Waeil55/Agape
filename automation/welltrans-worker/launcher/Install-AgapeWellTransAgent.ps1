@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $ConfirmPreference = 'None'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Security
-$agentVersion = '4.0.1'
+$agentVersion = '4.0.2'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'

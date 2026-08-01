@@ -63,7 +63,6 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       <button class="drag" data-role="drag" title="Drag toolbar" aria-label="Drag toolbar">&#8942;&#8942;</button>
       <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
       <span class="state" data-role="state">CONNECTING</span>
-      <span class="metric" title="Date currently detected in the WellTrans itinerary"><b data-role="open-date">--</b> open</span>
       <input data-role="date" type="date" aria-label="Go to WellTrans service date" title="Choose a date; the Agent will navigate WellTrans and verify the exact schedule automatically">
       <select data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
         <option value="all">All drivers</option>
@@ -274,7 +273,6 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         fill.textContent = state.dateSwitchPending ? 'Retry Date' : 'Fill Date';
       }
       set('version', next.version ? `v${next.version}` : '');
-      set('open-date', state.selectedDate || '--');
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());
       set('staged', next.staged ?? 0);
       set('pending', next.pending ?? 0);

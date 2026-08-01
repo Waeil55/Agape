@@ -360,6 +360,14 @@ describe('WellTrans staging safety contract', () => {
     expect(rules).toContain('allow write: if false;');
   });
 
+  it('isolates launcher transcripts so duplicate clicks cannot crash a live review', () => {
+    const launcher = readFileSync(workerLauncherPath, 'utf8');
+    expect(launcher).toContain('welltrans-worker-events-$PID.log');
+    expect(launcher).toContain('welltrans-worker-transcript-$PID.log');
+    expect(launcher).toContain('Start-Transcript -Path $transcriptPath');
+    expect(launcher).not.toContain('Start-Transcript -Path $logPath');
+  });
+
   it('monitors active agents, stuck jobs, and blocked dates without client write access', () => {
     const backend = readFileSync(functionsSourcePath, 'utf8');
     const rules = readFileSync(firestoreRulesPath, 'utf8');

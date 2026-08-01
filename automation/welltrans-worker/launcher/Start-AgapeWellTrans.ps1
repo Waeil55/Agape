@@ -17,7 +17,8 @@ $runtimeCredentialPath = Join-Path $runtimeDirectory "welltrans-credential-$PID.
 $requestedDatePath = Join-Path $runtimeDirectory 'requested-service-date.txt'
 $requestedScopePath = Join-Path $runtimeDirectory 'requested-sync-scope.json'
 $wellTransCredentialPath = Join-Path $secretDirectory 'welltrans-login.vault'
-$logPath = Join-Path $secretDirectory 'welltrans-worker.log'
+$logPath = Join-Path $secretDirectory "welltrans-worker-events-$PID.log"
+$transcriptPath = Join-Path $secretDirectory "welltrans-worker-transcript-$PID.log"
 $lockPath = Join-Path $secretDirectory 'welltrans-worker.pid'
 $agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'
 $rollbackRoot = Join-Path $agentDataRoot 'WellTransAgentRollback'
@@ -233,7 +234,11 @@ try {
 
 $workerError = $null
 try {
-  Start-Transcript -Path $logPath -Append | Out-Null
+  # Never share a transcript path between protocol launches. PowerShell holds
+  # an exclusive file handle while transcription is active; writing events to
+  # that same file (or starting a duplicate launcher on it) previously turned
+  # harmless toolbar actions into fatal file-lock errors.
+  Start-Transcript -Path $transcriptPath -Append | Out-Null
 
   New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
   if (Test-Path -LiteralPath $federatedCredentialPath) {

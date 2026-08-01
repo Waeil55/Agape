@@ -126,6 +126,7 @@ describe('WellTrans one-line operator toolbar', () => {
     await host.locator('[data-action="detect-date"]').click();
     await host.locator('[data-action="verify"]').click();
     await host.locator('[data-action="pause"]').click();
+    assert.equal(page.isClosed(), false);
     await host.locator('[data-role="driver"]').selectOption('driver-2');
     await updateWellTransOperatorConsole(page, { state: 'review_error' });
     await host.locator('[data-action="restart"]').click();
