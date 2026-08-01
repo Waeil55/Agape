@@ -5,6 +5,7 @@ import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { isNativeShell } from '../utils/platform';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { tripMatchesSearch } from '../utils/search';
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
 
@@ -123,16 +124,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
         if (!(trip.status === 'Unassigned' || urgency === 'late' || urgency === 'soon')) return false;
       }
       if (!searchTerm.trim()) return true;
-      const q = searchTerm.trim().toLowerCase();
-      return [
-        trip.patient,
-        trip.bookingId,
-        trip.pickup,
-        trip.dropoff,
-        trip.pickupPhone,
-        trip.dropoffPhone,
-        trip.notes,
-      ].some((value) => String(value || '').toLowerCase().includes(q));
+      return tripMatchesSearch(trip, searchTerm);
     })
     .sort((a, b) => {
       if (sortBy === 'time') {

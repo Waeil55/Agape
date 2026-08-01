@@ -23,6 +23,7 @@ import {
   Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair
 } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
+import { tripMatchesSearch } from '../utils/search';
 import {
   TIME_TRACKING_STATES,
   POLICY_MODES,
@@ -1953,12 +1954,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' :
       normalizeWorkflowStatus(t.status) === 'rerouted';
     if (!matchFilter) return false;
-    const q = historySearch.trim().toLowerCase();
-    if (!q) return true;
-    return (t.patient || '').toLowerCase().includes(q) ||
-      (t.bookingId || '').toLowerCase().includes(q) ||
-      (t.pickup || '').toLowerCase().includes(q) ||
-      (t.dropoff || '').toLowerCase().includes(q);
+    return tripMatchesSearch(t, historySearch);
   }), [selectedHistoryDayTrips, historyFilter, historySearch]);
 
   const sortedFilteredHistory = useMemo(() => [...filteredHistory].sort((a, b) => {

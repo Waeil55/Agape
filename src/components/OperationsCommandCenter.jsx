@@ -18,6 +18,7 @@ import CommandIntelligencePanel from './CommandIntelligencePanel';
 import { aiPrioritizeTrips } from '../config/ai';
 import { getDriverLiveStatus } from '../constants/statuses';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { tripMatchesSearch } from '../utils/search';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -580,12 +581,9 @@ const OperationsCommandCenter = ({
   }, []);
 
   const searchedTrips = searchQuery
-    ? todayTrips.filter(t =>
-        t.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.bookingId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.pickup || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.dropoff || '').toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? todayTrips.filter(t => tripMatchesSearch(t, searchQuery, [
+        drivers.find(driver => driver.id === t.driverId)?.phone,
+      ]))
     : todayTrips;
 
   const routeTripMap = useMemo(() => {

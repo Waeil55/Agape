@@ -8,6 +8,7 @@ import { useChat } from '../../hooks/useChat';
 import { makeCall } from '../../utils/nativeActions';
 import { storage, storageRef, uploadBytesResumable, getDownloadURL } from '../../config/firebase';
 import { isAllowedChatAttachment, isMessageSeen } from '../../utils/chatLifecycle';
+import { recordMatchesSearch } from '../../utils/search';
 
 export const formatDisplayName = (user) => {
   if (!user) return 'User';
@@ -218,19 +219,14 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const filteredChannels = channels.filter(ch => {
     const other = getOtherParticipant(ch);
     if (!other) return false;
-    const name = (other.name || other.username || '').toLowerCase();
-    const email = (other.email || '').toLowerCase();
     const lastMsgText = (ch.lastMessage?.text || '').toLowerCase();
     const query = searchQuery.toLowerCase();
-    return name.includes(query) || email.includes(query) || lastMsgText.includes(query);
+    return recordMatchesSearch(other, query, ['name', 'username', 'email', 'phone']) || lastMsgText.includes(query);
   });
 
   // Filter contacts (users not in active chats or all search matching contacts)
   const filteredContacts = users.filter(u => {
-    const name = (u.name || u.username || '').toLowerCase();
-    const email = (u.email || '').toLowerCase();
-    const query = searchQuery.toLowerCase();
-    return name.includes(query) || email.includes(query);
+    return recordMatchesSearch(u, searchQuery, ['name', 'username', 'email', 'phone']);
   });
 
   const getAvatarUrl = (user) => {

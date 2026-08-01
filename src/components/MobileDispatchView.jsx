@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { getDriverLiveStatus } from "../constants/statuses";
 import { tripCalendarDateKey, localCalendarYmd } from "../utils/tripDate";
+import { tripMatchesSearch } from "../utils/search";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 const timeToMinutes = (t) => {
@@ -483,14 +484,7 @@ const MobileDispatchView = ({
     else if (filter === "cancelled") r = r.filter(t => t.status === "Cancelled" || t.status === "No Show" || t.status === "Rerouted");
     else if (filter === "willcall") r = r.filter(t => t.time === "Will Call");
     if (localSearch) {
-      const q = localSearch.toLowerCase();
-      r = r.filter(t => 
-        (t.patient || "").toLowerCase().includes(q) ||
-        (t.bookingId || "").toLowerCase().includes(q) ||
-        getAddr(t.pickup).toLowerCase().includes(q) ||
-        getAddr(t.dropoff).toLowerCase().includes(q) ||
-        (t.driverName || "").toLowerCase().includes(q)
-      );
+      r = r.filter(t => tripMatchesSearch(t, localSearch));
     }
     return r;
   }, [todayTrips, filter, localSearch]);

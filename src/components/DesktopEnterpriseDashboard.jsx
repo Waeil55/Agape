@@ -13,6 +13,7 @@ import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config
 import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
+import { tripMatchesSearch } from '../utils/search';
 import { useChat } from '../hooks/useChat';
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
@@ -317,12 +318,9 @@ const DesktopEnterpriseDashboard = ({
   const willCallTrips = activeTrips.filter(t => t.time === 'Will Call');
 
   const searchedTrips = searchQuery
-    ? sortedScheduled.filter(t =>
-        (t.patient || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.bookingId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.pickup || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.dropoff || '').toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? sortedScheduled.filter(t => tripMatchesSearch(t, searchQuery, [
+        drivers.find(driver => driver.id === t.driverId)?.phone,
+      ]))
     : sortedScheduled;
 
   const workspaceMeta = {

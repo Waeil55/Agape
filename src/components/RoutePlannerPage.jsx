@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { timeToMinutes } from '../utils/tripDate';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
+import { tripMatchesSearch } from '../utils/search';
 
 const to12hr = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return t || 'WC';
@@ -109,14 +110,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     let list = [...activeTrips];
     if (filterStatus !== 'all') list = list.filter(t => t.status === filterStatus);
     if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      list = list.filter(t =>
-        t.patient?.toLowerCase().includes(q) ||
-        t.pickup?.toLowerCase().includes(q) ||
-        t.dropoff?.toLowerCase().includes(q) ||
-        (t.bookingId || '').includes(q) ||
-        (t.driverName || t.driver || '').toLowerCase().includes(q)
-      );
+      list = list.filter(t => tripMatchesSearch(t, searchQ));
     }
     return list.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
   }, [activeTrips, filterStatus, searchQ]);

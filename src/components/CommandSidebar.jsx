@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Route, Truck, ArrowRight, Target, MapPin, Compass, ChevronUp, ChevronDown } from 'lucide-react';
 import { formatMovementState, formatTelemetryDuration } from '../utils/driverTelemetry';
+import { recordMatchesSearch } from '../utils/search';
 
 function formatAge(iso) {
   if (!iso) return 'No live ping';
@@ -91,7 +92,9 @@ export default function CommandSidebar({
           <div className="flex flex-col gap-3">
             {driverSummaries.length === 0 && <p className="p-6 text-center text-sm font-medium text-slate-500">No drivers available.</p>}
             {driverSummaries
-              .filter(s => !hudSearch || s.driver.name?.toLowerCase().includes(hudSearch.toLowerCase()))
+              .filter(summary => recordMatchesSearch(summary.driver, hudSearch, [
+                'name', 'email', 'phone', 'vehicle', 'currentZone',
+              ]))
               .map(summary => {
                 const { driver, currentTrip, upcoming, completed, movementState, fresh } = summary;
                 const isSelected = selectedDriverId === driver.id;

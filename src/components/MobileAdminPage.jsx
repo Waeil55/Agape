@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
+import { recordMatchesSearch } from '../utils/search';
 import {
   AdminShell, AdminCard, AdminCardHead, AdminBadge, AdminButton,
   AdminIconButton, AdminAvatar, AdminSearch, AdminEmpty,
@@ -274,24 +275,17 @@ const MobileAdminPage = ({
   const filteredDrivers = useMemo(() => {
     const q = driverQuery.trim().toLowerCase();
     if (!q) return sortedDrivers;
-    return sortedDrivers.filter((driver) => (
-      String(driver.name || '').toLowerCase().includes(q) ||
-      String(driver.email || '').toLowerCase().includes(q) ||
-      String(driver.vehicle || '').toLowerCase().includes(q) ||
-      String(driver.currentZone || '').toLowerCase().includes(q)
-    ));
+    return sortedDrivers.filter(driver => recordMatchesSearch(driver, q, [
+      'name', 'email', 'phone', 'vehicle', 'currentZone',
+    ]));
   }, [driverQuery, sortedDrivers]);
 
   const filteredUsers = useMemo(() => {
     const q = peopleQuery.trim().toLowerCase();
     if (!q) return allUsers;
-    return allUsers.filter((user) => (
-      String(user.name || '').toLowerCase().includes(q) ||
-      String(user.email || '').toLowerCase().includes(q) ||
-      String(user.phone || '').toLowerCase().includes(q) ||
-      String(user.vehicle || '').toLowerCase().includes(q) ||
-      String(user._role || '').toLowerCase().includes(q)
-    ));
+    return allUsers.filter(user => recordMatchesSearch(user, q, [
+      'name', 'email', 'phone', 'vehicle', '_role',
+    ]));
   }, [allUsers, peopleQuery]);
 
   const timeoutRefs = useRef([]);

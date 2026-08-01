@@ -5,6 +5,7 @@ import {
   Download, Repeat
 } from 'lucide-react';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
+import { tripMatchesSearch } from '../utils/search';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
@@ -88,6 +89,7 @@ const normalizeStatus = (status) => {
 const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUploadModal }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
+  const [allDates, setAllDates] = useState(false);
   const [expandedTripId, setExpandedTripId] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
@@ -96,22 +98,20 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [driverFilter, setDriverFilter] = useState('All Drivers');
 
   const uniqueDrivers = useMemo(() => ['All Drivers', ...new Set(
-    trips.filter(t => tripCalendarDateKey(t.date) === dateStr).map(t => {
+    trips.filter(t => allDates || tripCalendarDateKey(t.date) === dateStr).map(t => {
       const d = drivers.find(d => d.id === t.driverId);
       return d ? d.name : (t.driverName || '');
     }).filter(Boolean)
-  )], [trips, drivers, dateStr]);
+  )], [trips, drivers, dateStr, allDates]);
 
   const filteredTrips = useMemo(() => {
-    let filtered = trips.filter(t => tripCalendarDateKey(t.date) === dateStr);
+    let filtered = trips.filter(t => allDates || tripCalendarDateKey(t.date) === dateStr);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(t => 
-        (t.patient && t.patient.toLowerCase().includes(q)) || 
-        (t.bookingId && t.bookingId.toLowerCase().includes(q)) ||
-        (t.pickup && t.pickup.toLowerCase().includes(q)) ||
-        (t.dropoff && t.dropoff.toLowerCase().includes(q))
-      );
+      filtered = filtered.filter(t => {
+        const driver = drivers.find(item => item.id === t.driverId);
+        return tripMatchesSearch(t, q, [driver?.name, driver?.phone]);
+      });
     }
     if (statusFilter !== 'all') {
       filtered = filtered.filter(t => {
@@ -131,7 +131,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       const bKey = sortKeyOverrides[b.id] ?? (b.time || '');
       return aKey.localeCompare(bKey);
     });
-  }, [trips, dateStr, searchQuery, statusFilter, driverFilter, drivers, sortKeyOverrides]);
+  }, [trips, dateStr, allDates, searchQuery, statusFilter, driverFilter, drivers, sortKeyOverrides]);
 
   useEffect(() => {
     if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
@@ -245,12 +245,16 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button className="agape-mobile-date-pill">
-            {new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            {allDates ? 'All dates' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             <span>({filteredTrips.length})</span>
           </button>
           <button onClick={() => shiftDate(1)} className="agape-mobile-icon-btn" aria-label="Next date">
             <ChevronRight className="w-5 h-5" />
           </button>
+
+          <label className="flex min-h-[40px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600">
+            <input type="checkbox" checked={allDates} onChange={event => setAllDates(event.target.checked)} /> All dates
+          </label>
 
           {[
             { id: 'all', label: 'All', Icon: Clock },
@@ -298,7 +302,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             <Search className="w-5 h-5 text-slate-400 shrink-0" />
             <input 
               type="text" 
-              placeholder="Search by patient, ID..." 
+              placeholder="Patient, trip, phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"

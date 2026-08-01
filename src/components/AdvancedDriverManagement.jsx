@@ -9,6 +9,7 @@ import {
   BarChart3, Map, Gauge, CheckCircle, Clock, Smartphone, Download
 } from 'lucide-react';
 import { aiGenerateDriverCoaching, aiDetectAnomalies } from '../config/aiAdvanced';
+import { recordMatchesSearch } from '../utils/search';
 
 /**
  * Driver Performance Score Card
@@ -328,9 +329,9 @@ const AdvancedDriverManagement = ({ drivers = [], trips = [], onEditDriver }) =>
   };
 
   const filteredDrivers = useMemo(() => {
-    return drivers.filter(d => {
-      return d.name.toLowerCase().includes(searchTerm.toLowerCase());
-    });
+    return drivers.filter(driver => recordMatchesSearch(driver, searchTerm, [
+      'name', 'email', 'phone', 'vehicle', 'currentZone',
+    ]));
   }, [drivers, searchTerm]);
 
   return (

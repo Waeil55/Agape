@@ -9,6 +9,7 @@ import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteAp
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
 import { isInOutTrip } from '../utils/inOutTrips';
+import { recordMatchesSearch } from '../utils/search';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import UsersPage from './UsersPage';
 import DriverAvatar from './DriverAvatar';
@@ -740,25 +741,18 @@ const DesktopAdminPage = ({
   const filteredDrivers = useMemo(() => {
     const q = driverQuery.trim().toLowerCase();
     if (!q) return activeDrivers;
-    return activeDrivers.filter((driver) => (
-      String(driver.name || '').toLowerCase().includes(q) ||
-      String(driver.email || '').toLowerCase().includes(q) ||
-      String(driver.vehicle || '').toLowerCase().includes(q) ||
-      String(driver.currentZone || '').toLowerCase().includes(q)
-    ));
+    return activeDrivers.filter(driver => recordMatchesSearch(driver, q, [
+      'name', 'email', 'phone', 'vehicle', 'currentZone',
+    ]));
   }, [activeDrivers, driverQuery]);
 
   const filteredUsers = useMemo(() => {
     const q = teamQuery.trim().toLowerCase();
     const sorted = [...allUsers].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     if (!q) return sorted;
-    return sorted.filter((user) => (
-      String(user.name || '').toLowerCase().includes(q) ||
-      String(user.email || '').toLowerCase().includes(q) ||
-      String(user.phone || '').toLowerCase().includes(q) ||
-      String(user.vehicle || '').toLowerCase().includes(q) ||
-      String(user._role || '').toLowerCase().includes(q)
-    ));
+    return sorted.filter(user => recordMatchesSearch(user, q, [
+      'name', 'email', 'phone', 'vehicle', '_role',
+    ]));
   }, [allUsers, teamQuery]);
 
   const overviewDrivers = filteredDrivers.slice(0, 6);

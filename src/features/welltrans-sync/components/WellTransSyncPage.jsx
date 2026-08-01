@@ -25,6 +25,7 @@ import {
   validateTripForWellTrans,
 } from '../utils/welltransMapping';
 import { pageWellTransRows, WELLTRANS_TABLE_PAGE_SIZE } from '../utils/welltransScale';
+import { tripMatchesSearch } from '../../../utils/search';
 
 const statusStyle = {
   pending: 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -283,11 +284,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
 
   const filteredTrips = useMemo(() => {
     return enrichedTrips.filter(trip => {
-      const q = searchQuery.toLowerCase().trim();
-      const bid = (trip.bookingId || trip.id || '').toLowerCase();
-      const patient = (trip.patient || trip.clientName || '').toLowerCase();
-      const driver = (trip.completedDriverName || trip._payload?.driver || trip.driverName || '').toLowerCase();
-      if (q && !bid.includes(q) && !patient.includes(q) && !driver.includes(q)) return false;
+      if (!tripMatchesSearch(trip, searchQuery, [trip._payload?.driver])) return false;
       if (statusFilter === 'all') return true;
       const latest = latestByTrip.get(trip.id);
       if (statusFilter === 'ready') return trip._valid && !latest;

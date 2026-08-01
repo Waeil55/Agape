@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Archive, Calendar, RefreshCcw, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Check, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
+import { tripMatchesSearch } from '../utils/search';
 
 const today = localCalendarYmd();
 
@@ -341,16 +342,10 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
     if (endDate) list = list.filter(t => (t.date || '') <= endDate);
 
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(t =>
-        (t.patient || '').toLowerCase().includes(q) ||
-        (t.bookingId || '').toLowerCase().includes(q) ||
-        (t.id || '').toLowerCase().includes(q) ||
-        (t.pickup || '').toLowerCase().includes(q) ||
-        (t.dropoff || '').toLowerCase().includes(q) ||
-        (t.driverName || '').toLowerCase().includes(q) ||
-        getDriverLabel(t, drivers).toLowerCase().includes(q)
-      );
+      list = list.filter(t => tripMatchesSearch(t, searchQuery, [
+        getDriverLabel(t, drivers),
+        drivers.find(driver => driver.id === t.driverId)?.phone,
+      ]));
     }
 
     list.sort((a, b) => {

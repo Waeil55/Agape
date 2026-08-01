@@ -5,6 +5,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
+import { tripMatchesSearch } from '../utils/search';
 
 const DASH = '-';
 
@@ -165,6 +166,7 @@ const DesktopReportsPage = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedTripId, setExpandedTripId] = useState(null);
   const [dateStr, setDateStr] = useState(localCalendarYmd());
+  const [allDates, setAllDates] = useState(false);
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('agape_reportsDesktopView') || 'review');
   const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('all');
@@ -426,15 +428,15 @@ const DesktopReportsPage = ({
   const reportRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return trips
-      .filter((trip) => tripCalendarDateKey(trip.date) === dateStr)
+      .filter((trip) => allDates || tripCalendarDateKey(trip.date) === dateStr)
       .filter((trip) => {
         if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
         if (driverFilter !== 'all' && trip.driverId !== driverFilter) return false;
         if (reviewFilter === 'reviewed' && !trip.reviewed) return false;
         if (reviewFilter === 'pending' && trip.reviewed) return false;
         if (!q) return true;
-        return [trip.patient, trip.bookingId, trip.id, trip.pickup, trip.dropoff, trip.driverName]
-          .some((value) => String(value || '').toLowerCase().includes(q));
+        const driver = getTripDriver(trip, drivers);
+        return tripMatchesSearch(trip, q, [driver?.name, driver?.phone]);
       })
       .map((trip) => {
         const driver = getTripDriver(trip, drivers);
@@ -448,17 +450,17 @@ const DesktopReportsPage = ({
         const bKey = sortKeyOverrides[b.trip.id] ?? (b.trip.arrivalDropoffTime || b.trip.completedAt || b.trip.time || '');
         return String(aKey).localeCompare(String(bKey));
       });
-  }, [trips, drivers, dateStr, searchQuery, statusFilter, driverFilter, reviewFilter, sortKeyOverrides]);
+  }, [trips, drivers, dateStr, allDates, searchQuery, statusFilter, driverFilter, reviewFilter, sortKeyOverrides]);
 
   const allDayRows = useMemo(() => trips
-    .filter((trip) => tripCalendarDateKey(trip.date) === dateStr)
+    .filter((trip) => allDates || tripCalendarDateKey(trip.date) === dateStr)
     .map((trip) => ({
       trip,
       driver: getTripDriver(trip, drivers),
       travelMinutes: trip.travelTime
         ? Number(trip.travelTime)
         : calcDurationMinutes(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt),
-    })), [trips, drivers, dateStr]);
+    })), [trips, drivers, dateStr, allDates]);
 
   const summary = useMemo(() => {
     const reviewed = reportRows.filter(({ trip }) => trip.reviewed).length;
@@ -845,10 +847,17 @@ const DesktopReportsPage = ({
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search..."
+              placeholder="Name, trip, phone..."
               className="w-full bg-transparent text-[11px] font-medium text-slate-700 placeholder:text-slate-400 outline-none"
             />
           </div>
+
+          <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+
+          <label className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
+            <input type="checkbox" checked={allDates} onChange={(event) => setAllDates(event.target.checked)} className="h-3 w-3 rounded border-slate-300" />
+            All dates
+          </label>
 
           <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
@@ -905,7 +914,7 @@ const DesktopReportsPage = ({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <CalendarDays size={16} className="text-slate-500" />
-              <span className="text-lg font-semibold text-slate-800">{formatDateLabel(dateStr, true)}</span>
+              <span className="text-lg font-semibold text-slate-800">{allDates ? 'All service dates' : formatDateLabel(dateStr, true)}</span>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{reportRows.length} trips</span>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{summary.reviewed}/{reportRows.length} reviewed</span>

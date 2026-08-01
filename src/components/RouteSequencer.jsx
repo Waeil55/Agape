@@ -33,6 +33,7 @@ import {
 import { db, doc, getDocFromServer, setDoc } from '../config/firebase';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { timeToMinutes } from '../utils/tripDate';
+import { recordMatchesSearch } from '../utils/search';
 import {
   ROUTE_ASSIGNMENT_STATUS,
   getEndOfDayIso,
@@ -297,13 +298,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
     if (filterStatus === 'unassigned') pool = pool.filter(c => !c.driverName && c.tripStatus === 'Unassigned');
     if (filterStatus === 'assigned') pool = pool.filter(c => c.driverName || c.tripStatus !== 'Unassigned');
     if (poolSearch.trim()) {
-      const q = poolSearch.trim().toLowerCase();
-      pool = pool.filter(c =>
-        String(c.name || '').toLowerCase().includes(q) ||
-        String(c.bookingId || '').toLowerCase().includes(q) ||
-        String(c.pu || '').toLowerCase().includes(q) ||
-        String(c.do || '').toLowerCase().includes(q)
-      );
+      pool = pool.filter(c => recordMatchesSearch(c, poolSearch, [
+        'name', 'bookingId', 'pu', 'do', 'patientPhone', 'pickupPhone', 'dropoffPhone', 'phone',
+      ]));
     }
     return pool;
   }, [allClients, skippedIds, filterStatus, poolSearch]);
