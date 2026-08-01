@@ -41,6 +41,7 @@ const statusLabel = {
 
 const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUpdateTrip }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [driverScopeId, setDriverScopeId] = useState('all');
   const hydratedTrips = useMemo(
     () => trips.map(trip => hydrateWellTransTrip(trip, drivers)),
     [trips, drivers],
@@ -48,9 +49,9 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   const {
     settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, canary, coverage,
     workerOnline, workerCalibrated, workerUpgradeRequired,
-    requiredWorkerVersion, workerStandby, loading, completedTrips, readyTrips,
+    requiredWorkerVersion, workerStandby, loading, allCompletedTrips, completedTrips, readyTrips,
     latestByTrip, healthScore, successfulCount,
-  } = useWellTransSync(hydratedTrips, syncDate);
+  } = useWellTransSync(hydratedTrips, syncDate, driverScopeId === 'all' ? '' : driverScopeId);
 
   const [selectedIds, setSelectedIds] = useState([]);
   const [tab, setTab] = useState('queue');
@@ -145,12 +146,64 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
     || Number(operations.blockedDateCount || 0) > 0
     || (liveActiveAgentCount === 0 && Number(operations.activeWorkerCount || 0) === 0)
   ));
-  const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
+  const scopedCompletedTripIds = useMemo(
+    () => new Set(completedTrips.map(trip => String(trip.id))),
+    [completedTrips],
+  );
+  const currentLogs = useMemo(() => [...latestByTrip.values()]
+    .filter(log => scopedCompletedTripIds.has(String(log.tripId))),
+  [latestByTrip, scopedCompletedTripIds]);
   const stagedCount = currentLogs.filter(l =>
     l.status === 'awaiting_review'
     && (!worker?.reviewSessionId || l.reviewSessionId === worker.reviewSessionId)).length;
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
   const retryableFailed = failedLogs.filter(isWellTransFailureRetryable);
+  const driverScopes = useMemo(() => {
+    const grouped = new Map();
+    for (const trip of allCompletedTrips) {
+      const driverId = String(trip.driverId || '').trim();
+      if (!driverId) continue;
+      let payload = null;
+      try { payload = buildWellTransPayload(trip); } catch {}
+      const driverName = String(
+        trip.completedDriverName || payload?.driver || trip.driverName || driverId,
+      ).trim();
+      if (!grouped.has(driverId)) grouped.set(driverId, { id: driverId, name: driverName, trips: [] });
+      grouped.get(driverId).trips.push(trip);
+    }
+    return [...grouped.values()].map(item => {
+      const states = item.trips.map(trip => latestByTrip.get(trip.id));
+      const verified = states.filter(log => log?.status === 'completed'
+        && log?.portalVerification?.verified === true).length;
+      const reviewing = states.filter(log => log?.status === 'awaiting_review').length;
+      const active = states.filter(log => ['pending', 'processing'].includes(log?.status)).length;
+      const issues = states.filter(log => log?.status === 'failed').length;
+      const state = verified === item.trips.length && item.trips.length
+        ? 'done'
+        : issues
+          ? 'needs correction'
+          : reviewing
+            ? 'ready for review'
+            : active
+              ? 'filling'
+              : 'not started';
+      return { ...item, total: item.trips.length, verified, state };
+    }).sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
+  }, [allCompletedTrips, latestByTrip]);
+  const selectedDriverScope = driverScopeId === 'all'
+    ? null
+    : driverScopes.find(item => item.id === driverScopeId) || null;
+  const activeScope = useMemo(() => selectedDriverScope
+    ? { type: 'driver', driverId: selectedDriverScope.id }
+    : { type: 'all' }, [selectedDriverScope]);
+
+  useEffect(() => {
+    if (driverScopeId !== 'all' && !driverScopes.some(item => item.id === driverScopeId)) {
+      const timer = window.setTimeout(() => setDriverScopeId('all'), 0);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [driverScopeId, driverScopes]);
 
   const { autoLog } = useWellTransAutoSync({
     settings: effectiveSettings, worker, readyTrips, retryableFailed,
@@ -177,7 +230,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
       const latest = latestByTrip.get(trip.id);
       if (statusFilter === 'ready') return trip._valid && !latest;
       if (statusFilter === 'staged') return latest?.status === 'awaiting_review';
-      if (statusFilter === 'synced') return latest?.status === 'completed';
+      if (statusFilter === 'synced') return latest?.status === 'completed'
+        && latest?.portalVerification?.verified === true;
       if (statusFilter === 'failed') return latest?.status === 'failed';
       if (statusFilter === 'invalid') return !trip._valid;
       return true;
@@ -230,7 +284,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
     }
     setBusy(mode); setNotice(''); setSyncProgress({ done: 0, total: requestedIds.length });
     try {
-      const result = await queueWellTransSync(requestedIds, mode, syncDate);
+      const result = await queueWellTransSync(requestedIds, mode, syncDate, activeScope);
       setNotice(`${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued`
         + `${alreadyCovered ? `, ${alreadyCovered} already covered` : ''}`
         + `${needsCorrection ? `, ${needsCorrection} needing correction` : ''}.`);
@@ -239,13 +293,17 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
       setTimeout(() => setSyncProgress(null), 5000);
     } catch (e) { setNotice(e.message || 'Unable to create queue.'); setSyncProgress(null); }
     finally { setBusy(''); }
-  }, [latestByTrip, syncDate]);
+  }, [activeScope, latestByTrip, syncDate]);
 
   const startAndFillDate = useCallback(async () => {
     if (!settings.enabled || busy) return;
     setBusy('start-fill');
     setNotice('');
-    window.location.href = `agape-welltrans://start?date=${encodeURIComponent(syncDate)}`;
+    const protocol = new URL('agape-welltrans://start');
+    protocol.searchParams.set('date', syncDate);
+    protocol.searchParams.set('scope', activeScope.type);
+    if (activeScope.type === 'driver') protocol.searchParams.set('driverId', activeScope.driverId);
+    window.location.href = protocol.toString();
     if (!completedTrips.length) {
       setNotice(`Agent start requested for ${syncDate}. Agape has no completed trips for this date.`);
       setBusy('');
@@ -260,6 +318,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
         completedTrips.map(trip => trip.id),
         'full-date',
         syncDate,
+        activeScope,
       );
       setSyncProgress({
         done: result.data.orchestrated
@@ -267,7 +326,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
         total: result.data.expected || completedTrips.length,
       });
       setNotice(result.data.orchestrated != null
-        ? `${result.data.orchestrated} completed trips prepared for ${syncDate}. The Agent will reconcile every trip.`
+        ? `${result.data.orchestrated} completed trips prepared for ${syncDate}`
+          + `${selectedDriverScope ? ` for ${selectedDriverScope.name}` : ' across all drivers'}. The Agent will reconcile every scoped trip.`
         : `${result.data.expected || completedTrips.length} completed trips prepared: `
           + `${result.data.queued} queued, ${result.data.covered || 0} already covered, `
           + `${result.data.rejected || 0} requiring correction.`);
@@ -280,7 +340,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
     } finally {
       setBusy('');
     }
-  }, [busy, completedTrips, settings.enabled, syncDate]);
+  }, [activeScope, busy, completedTrips, selectedDriverScope, settings.enabled, syncDate]);
 
   const confirmReviewBatchApplied = useCallback(async () => {
     if (!workerBatchReady || !worker?.reviewSessionId || !stagedCount) {
@@ -453,10 +513,24 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
               className="w-[108px] bg-transparent text-[10px] font-bold text-slate-800 outline-none" />
             <button onClick={() => navigateDate(1)} className="rounded p-1 text-slate-500 hover:bg-white"><ChevronRight size={13} /></button>
           </div>
+          <select value={driverScopeId} disabled={stagedCount > 0 || Boolean(busy)} onChange={event => {
+            setDriverScopeId(event.target.value);
+            setSelectedIds([]);
+            setQueuePage(0);
+          }} aria-label="Choose drivers to fill"
+            title="Fill every driver or isolate one authoritative driver batch"
+            className="h-8 max-w-[235px] rounded-lg border border-indigo-200 bg-indigo-50 px-2 text-[10px] font-bold text-indigo-800 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">
+            <option value="all">All drivers ({allCompletedTrips.length})</option>
+            {driverScopes.map(item => (
+              <option key={item.id} value={item.id}>
+                {item.name} ({item.total}) · {item.state === 'done' ? 'DONE' : item.state}
+              </option>
+            ))}
+          </select>
           <button disabled={!settings.enabled || Boolean(busy)} onClick={startAndFillDate}
             className="h-8 rounded-lg bg-blue-600 px-3 text-[10px] font-bold text-white hover:bg-blue-700 disabled:opacity-40">
             {busy === 'start-fill' ? <Loader2 size={11} className="mr-1 inline animate-spin" /> : null}
-            Reconcile &amp; Fill ({completedTrips.length})
+            Fill {selectedDriverScope ? selectedDriverScope.name : 'All Drivers'} ({completedTrips.length})
           </button>
           <button disabled={!selectedIds.length || !settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
             className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-semibold text-blue-700 disabled:opacity-40">
@@ -925,8 +999,14 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                         )}
                       </td>
                       <td className="px-2 py-2">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${statusStyle[latest?.status] || 'bg-slate-100 text-slate-500'}`}>
-                          {statusLabel[latest?.status] || 'Not queued'}
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                          latest?.status === 'completed' && latest?.portalVerification?.verified !== true
+                            ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                            : statusStyle[latest?.status] || 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {latest?.status === 'completed' && latest?.portalVerification?.verified !== true
+                            ? 'Verifying Apply'
+                            : statusLabel[latest?.status] || 'Not queued'}
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right" onClick={e => e.stopPropagation()}>

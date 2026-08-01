@@ -765,6 +765,11 @@ const wellTransOutboxId = (serviceDate, tripId) => crypto
   .update(`welltrans:${serviceDate}:${tripId}`)
   .digest("hex");
 
+const wellTransDriverRunId = (serviceDate, driverId) => crypto
+  .createHash("sha256")
+  .update(`welltrans-driver:${serviceDate}:${driverId}`)
+  .digest("hex");
+
 // Durable completion outbox. The worker can discover changed trips for one
 // service date without repeatedly downloading the entire trips collection.
 exports.captureWellTransTripCompletion = functions.firestore
@@ -934,6 +939,9 @@ const reconcileWellTransShard = async ({ serviceDate, shardId, orchestrationId, 
         payload,
         manifestId: serviceDate,
         runId: serviceDate,
+        scopeType: shard.scopeType || "all",
+        scopeDriverId: shard.scopeDriverId || null,
+        scopeDriverName: shard.scopeDriverName || null,
         shardId,
         orchestrationId,
         queuedSourceFingerprint: wellTransSourceFingerprint(payload),
@@ -991,9 +999,29 @@ exports.queueWellTransSync = functions
   }
   const mode = String(data?.mode || "selected");
   const fullDateMode = mode === "full-date" || mode === "start-fill";
-  const authoritativeTrips = fullDateMode
+  const requestedScope = data?.scope && typeof data.scope === "object" ? data.scope : {};
+  const scopeType = requestedScope.type === "driver" ? "driver" : "all";
+  const scopeDriverId = scopeType === "driver" ? String(requestedScope.driverId || "").trim() : "";
+  if (scopeType === "driver" && !scopeDriverId) {
+    throw new functions.https.HttpsError("invalid-argument", "Choose an authoritative driver before starting a driver-only run.");
+  }
+  let scopeDriverName = "";
+  if (scopeDriverId) {
+    const scopeDriverSnapshot = await admin.firestore().doc(`drivers/${scopeDriverId}`).get();
+    if (!scopeDriverSnapshot.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "The selected driver no longer exists in the driver directory.");
+    }
+    scopeDriverName = String(scopeDriverSnapshot.data().name || "").trim();
+    if (!scopeDriverName) {
+      throw new functions.https.HttpsError("failed-precondition", "The selected driver has no authoritative directory name.");
+    }
+  }
+  const allAuthoritativeTrips = fullDateMode
     ? await loadCompletedWellTransTrips(requestedServiceDate)
     : [];
+  const authoritativeTrips = scopeType === "driver"
+    ? allAuthoritativeTrips.filter((trip) => String(trip.driverId || "") === scopeDriverId)
+    : allAuthoritativeTrips;
   const authoritativeById = new Map(authoritativeTrips.map((trip) => [String(trip.id), trip]));
   const clientIds = [...new Set((Array.isArray(data?.tripIds) ? data.tripIds : []).map(String))];
   const requestedIds = fullDateMode ? [...authoritativeById.keys()] : clientIds;
@@ -1035,6 +1063,9 @@ exports.queueWellTransSync = functions
           tripCount: tripIds.length,
           state: "queued",
           orchestrationId,
+          scopeType,
+          scopeDriverId: scopeDriverId || null,
+          scopeDriverName: scopeDriverName || null,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }
@@ -1050,12 +1081,31 @@ exports.queueWellTransSync = functions
       shardCount,
       clientTripCount: clientIds.length,
       source: "authoritative_firestore_completed_trip_scan",
+      scopeType,
+      scopeDriverId: scopeDriverId || null,
+      scopeDriverName: scopeDriverName || null,
       orchestrationId,
       orchestrationState: "dispatching",
       requestedBy: context.auth.uid,
       requestedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+    if (scopeType === "driver") {
+      await admin.firestore().doc(
+        `welltrans_driver_sync_status/${wellTransDriverRunId(requestedServiceDate, scopeDriverId)}`,
+      ).set({
+        provider: "welltrans",
+        serviceDate: requestedServiceDate,
+        driverId: scopeDriverId,
+        driverName: scopeDriverName,
+        state: requestedIds.length ? "reconciling" : "empty",
+        expectedCount: requestedIds.length,
+        verifiedCount: 0,
+        requestedBy: context.auth.uid,
+        orchestrationId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
     const taskQueue = getFunctions().taskQueue("wellTransReconcileShard");
     for (let shardOffset = 0; shardOffset < shardCount; shardOffset += 50) {
       const enqueues = [];
@@ -1093,6 +1143,9 @@ exports.queueWellTransSync = functions
       mode,
       serviceDate: requestedServiceDate,
       orchestrationId,
+      scopeType,
+      scopeDriverId: scopeDriverId || null,
+      scopeDriverName: scopeDriverName || null,
       requested: requestedIds.length,
       shardCount,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1105,6 +1158,9 @@ exports.queueWellTransSync = functions
       orchestrated: requestedIds.length,
       shardCount,
       orchestrationId,
+      scopeType,
+      scopeDriverId: scopeDriverId || null,
+      scopeDriverName: scopeDriverName || null,
       reconciliationState: requestedIds.length ? "dispatching" : "empty",
     };
   }
@@ -1142,6 +1198,14 @@ exports.queueWellTransSync = functions
       return { tripId, rejected: true, errors: ["Trip not found"] };
     }
     const trip = authoritativeById.get(tripId) || { id: tripSnap.id, ...tripSnap.data() };
+    if (scopeType === "driver" && String(trip.driverId || "") !== scopeDriverId) {
+      return {
+        tripId,
+        bookingId: String(trip.bookingId || tripId),
+        rejected: true,
+        errors: ["Trip does not belong to the selected authoritative driver"],
+      };
+    }
     if (trip.driverId && (!trip.driverName || /medical transportation inc/i.test(trip.driverName))) {
       if (fullDateMode) {
         if (driverNames.get(trip.driverId)) trip.completedDriverName = driverNames.get(trip.driverId);
@@ -1190,6 +1254,9 @@ exports.queueWellTransSync = functions
           provider: "welltrans", automationMethod: "playwright", payload,
           manifestId: requestedServiceDate,
           runId: requestedServiceDate,
+          scopeType,
+          scopeDriverId: scopeDriverId || null,
+          scopeDriverName: scopeDriverName || null,
           shardId: shardByTrip.get(tripId),
           queuedSourceFingerprint: wellTransSourceFingerprint(payload),
         },
@@ -1230,6 +1297,9 @@ exports.queueWellTransSync = functions
         updatedAt: admin.firestore.FieldValue.serverTimestamp(), attempt: datedAttempts.length + 1,
         provider: "welltrans", automationMethod: "playwright", payload,
         manifestId: fullDateMode ? requestedServiceDate : null,
+        scopeType,
+        scopeDriverId: scopeDriverId || null,
+        scopeDriverName: scopeDriverName || null,
         queuedSourceFingerprint: wellTransSourceFingerprint(payload),
       });
       return { queued: true };
@@ -1282,6 +1352,7 @@ exports.queueWellTransSync = functions
   await admin.firestore().collection("audit_logs").add({
     action: "welltrans.sync.queued", entityType: "broker_sync", actorId: context.auth.uid,
     mode, serviceDate: requestedServiceDate,
+    scopeType, scopeDriverId: scopeDriverId || null, scopeDriverName: scopeDriverName || null,
     requested: requestedIds.length, queued, covered, rejected,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });

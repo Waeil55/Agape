@@ -15,6 +15,7 @@ $federatedCredentialPath = Join-Path $secretDirectory 'agape-worker-wif.json'
 $runtimeDirectory = Join-Path $env:LOCALAPPDATA 'AgapeCare\Runtime'
 $runtimeCredentialPath = Join-Path $runtimeDirectory "welltrans-credential-$PID.json"
 $requestedDatePath = Join-Path $runtimeDirectory 'requested-service-date.txt'
+$requestedScopePath = Join-Path $runtimeDirectory 'requested-sync-scope.json'
 $logPath = Join-Path $secretDirectory 'welltrans-worker.log'
 $lockPath = Join-Path $secretDirectory 'welltrans-worker.pid'
 $agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'
@@ -53,6 +54,24 @@ $requestedDateMatch = [Regex]::Match(
 if ($requestedDateMatch.Success) {
   New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
   Set-Content -LiteralPath $requestedDatePath -Value $requestedDateMatch.Groups[1].Value -NoNewline
+}
+$decodedProtocolUrl = [Uri]::UnescapeDataString($ProtocolUrl)
+$requestedScopeMatch = [Regex]::Match($decodedProtocolUrl, '(?:[?&])scope=(all|driver)(?:&|$)')
+$requestedDriverMatch = [Regex]::Match($decodedProtocolUrl, '(?:[?&])driverId=([^&]{1,200})(?:&|$)')
+if ($requestedDateMatch.Success -and $requestedScopeMatch.Success) {
+  $scopeType = $requestedScopeMatch.Groups[1].Value
+  $scopeDriverId = if ($scopeType -eq 'driver' -and $requestedDriverMatch.Success) {
+    $requestedDriverMatch.Groups[1].Value.Trim()
+  } else { '' }
+  if ($scopeType -eq 'driver' -and -not $scopeDriverId) {
+    throw 'The driver-only WellTrans request did not contain a driver ID.'
+  }
+  @{
+    serviceDate = $requestedDateMatch.Groups[1].Value
+    type = $scopeType
+    driverId = $scopeDriverId
+    requestedAtUtc = [DateTime]::UtcNow.ToString('o')
+  } | ConvertTo-Json | Set-Content -LiteralPath $requestedScopePath -Encoding UTF8
 }
 
 if (Test-Path -LiteralPath $lockPath) {
@@ -187,6 +206,7 @@ try {
   $env:WELLTRANS_ALLOWED_HOSTS = [Environment]::GetEnvironmentVariable('WELLTRANS_ALLOWED_HOSTS', 'User')
   $env:WELLTRANS_ENABLE_WRITES = 'true'
   $env:WELLTRANS_REQUEST_FILE = $requestedDatePath
+  $env:WELLTRANS_SCOPE_FILE = $requestedScopePath
   $env:WELLTRANS_POLL_MS = '1500'
 
   if (-not $env:WELLTRANS_SESSION_KEY -or -not $env:WELLTRANS_SESSION_FILE -or -not $env:WELLTRANS_PORTAL_URL) {

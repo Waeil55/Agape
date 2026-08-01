@@ -35,6 +35,14 @@ const workerSetupPath = fileURLToPath(new URL(
   '../../../../automation/welltrans-worker/installer/AgapeWellTransAgentSetup.cs',
   import.meta.url,
 ));
+const syncPagePath = fileURLToPath(new URL(
+  '../components/WellTransSyncPage.jsx',
+  import.meta.url,
+));
+const workerLauncherPath = fileURLToPath(new URL(
+  '../../../../automation/welltrans-worker/launcher/Start-AgapeWellTrans.ps1',
+  import.meta.url,
+));
 
 describe('WellTrans staging safety contract', () => {
   it('keeps runtime, installer and package release versions identical', () => {
@@ -209,8 +217,37 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain('summary.missing === 0');
     expect(worker).toContain('summary.blocked === 0');
     expect(backend).toContain('authoritative_firestore_completed_trip_scan');
-    expect(backend).toContain('const authoritativeTrips = fullDateMode');
+    expect(backend).toContain('const allAuthoritativeTrips = fullDateMode');
     expect(backend).toContain('expectedTripIds: requestedIds');
+  });
+
+  it('isolates driver runs by authoritative driver ID and groups all-driver review work', () => {
+    const backend = readFileSync(functionsSourcePath, 'utf8');
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const trip = readFileSync(tripSourcePath, 'utf8');
+    const page = readFileSync(syncPagePath, 'utf8');
+    const launcher = readFileSync(workerLauncherPath, 'utf8');
+    expect(page).toContain('aria-label="Choose drivers to fill"');
+    expect(page).toContain("{ type: 'driver', driverId: selectedDriverScope.id }");
+    expect(page).toContain("protocol.searchParams.set('driverId', activeScope.driverId)");
+    expect(backend).toContain('String(trip.driverId || "") === scopeDriverId');
+    expect(backend).toContain('Trip does not belong to the selected authoritative driver');
+    expect(worker).toContain("allExpectedTrips.filter(trip => String(trip.driverId || '') === activeRunScope.driverId)");
+    expect(worker).toContain("String(left.data().payload?.driver || '').localeCompare");
+    expect(worker).toContain('expectedIds.has(String(document.data().tripId))');
+    expect(trip).toContain('export async function sortWellTransReviewGridByDriver');
+    expect(trip).toContain("cell.title === 'Driver'");
+    expect(launcher).toContain("requested-sync-scope.json");
+  });
+
+  it('marks a driver batch done only after every scoped trip is live-verified', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const page = readFileSync(syncPagePath, 'utf8');
+    expect(worker).toContain("welltrans_driver_sync_status/${driverStatusId}");
+    expect(worker).toContain("summary.completed === summary.total && summary.total > 0");
+    expect(worker).toContain("? 'done'");
+    expect(page).toContain("log?.portalVerification?.verified === true");
+    expect(page).toContain("? 'Verifying Apply'");
   });
 
   it('requires complete date reconciliation before manual Apply confirmation', () => {

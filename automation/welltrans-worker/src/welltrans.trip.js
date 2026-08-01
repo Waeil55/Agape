@@ -76,6 +76,22 @@ export const isEditItineraryOpen = async page =>
     `${GRID_SELECTOR}:visible:has(.GridCell[title="Signature Captured?"])`,
   ).count().catch(() => 0));
 
+export async function sortWellTransReviewGridByDriver(page) {
+  const grid = await openEditItinerary(page);
+  const sorted = await grid.evaluate(element => {
+    const header = [...element.querySelectorAll('.GridCell')]
+      .find(cell => cell.style.top === '0px' && cell.title === 'Driver');
+    if (!header) return false;
+    header.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    header.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    header.click();
+    return true;
+  });
+  if (!sorted) throw new Error('TripSpark Driver column header is unavailable for review grouping');
+  await page.waitForTimeout(350);
+  return true;
+}
+
 const normalizeBooking = value => String(value ?? '').trim().replace(/\s+/g, '').replace(/^TRIP-/i, '').toLowerCase();
 
 async function gridModel(grid, bookingId) {

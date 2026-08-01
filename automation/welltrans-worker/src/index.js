@@ -21,6 +21,7 @@ import {
   inspectWellTransPortalContract,
   isEditItineraryOpen,
   resetWellTransSessionCaches,
+  sortWellTransReviewGridByDriver,
   syncWellTransTrip,
   validateWellTransTrip,
 } from './welltrans.trip.js';
@@ -50,15 +51,17 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.8.9';
+const workerVersion = '3.9.0';
 let requestedServiceDate = '';
 let activeServiceDate = '';
+let activeRunScope = { type: 'all', driverId: '', driverName: '' };
 let reviewSessionId = '';
 let lastCompletedPortalAuditAt = 0;
 let lastAuthoritativeReconcileAt = 0;
 let portalGridIndex = null;
 let latestPortalCanary = null;
 let finalReviewAuditValid = false;
+let reviewGridSortedForSession = false;
 let verifierTelemetry = {
   state: 'idle', checked: 0, verified: 0, correctionsIssued: 0, blocked: 0,
 };
@@ -87,6 +90,9 @@ const heartbeatPayload = state => ({
   adapter: 'tripspark-novusmed', lastSeenAt: FieldValue.serverTimestamp(),
   version: workerVersion, requestedDate: requestedServiceDate || null,
   selectedDate: activeServiceDate || null,
+  scopeType: activeRunScope.type,
+  scopeDriverId: activeRunScope.driverId || null,
+  scopeDriverName: activeRunScope.driverName || null,
   reviewSessionId: reviewSessionId || null,
   workerInstanceId,
   indexedBookings: portalGridIndex?.bookingCount || 0,
@@ -174,6 +180,21 @@ const readEffectiveRequestedServiceDate = async () => (
     ? readRequestedServiceDate()
     : operatorControl.dateOverride
 );
+
+const readRequestedRunScope = async serviceDate => {
+  if (!process.env.WELLTRANS_SCOPE_FILE) return null;
+  const value = await readFile(process.env.WELLTRANS_SCOPE_FILE, 'utf8').catch(() => '');
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value.replace(/^\uFEFF/, ''));
+    if (String(parsed.serviceDate || '') !== String(serviceDate || '')) return null;
+    if (parsed.type === 'driver' && String(parsed.driverId || '').trim()) {
+      return { type: 'driver', driverId: String(parsed.driverId).trim(), driverName: '' };
+    }
+    if (parsed.type === 'all') return { type: 'all', driverId: '', driverName: '' };
+  } catch {}
+  return null;
+};
 
 async function persistRequestedServiceDate(value) {
   if (!process.env.WELLTRANS_REQUEST_FILE) return;
@@ -409,17 +430,37 @@ async function waitForRequestedSchedule(page, selectedDate) {
 }
 
 async function listPendingJobIdsForDate(serviceDate, limit = reviewBatchSize) {
-  const snapshot = await db.collection('welltrans_sync_logs')
-    .where('serviceDate', '==', serviceDate)
-    .where('status', '==', 'pending')
-    .limit(Math.max(1, Math.min(reviewBatchSize, limit)))
-    .get();
-  const candidates = [...snapshot.docs].sort((left, right) => {
+  const [snapshot, manifestSnapshot] = await Promise.all([
+    db.collection('welltrans_sync_logs')
+      .where('serviceDate', '==', serviceDate)
+      .where('status', '==', 'pending')
+      .get(),
+    db.doc(`welltrans_sync_manifests/${serviceDate}`).get(),
+  ]);
+  const expectedIds = manifestSnapshot.exists
+    ? new Set((manifestSnapshot.data().expectedTripIds || []).map(String))
+    : null;
+  const candidates = [...snapshot.docs]
+    .filter(document => !expectedIds || expectedIds.has(String(document.data().tripId)))
+    .sort((left, right) => {
+    const driverOrder = String(left.data().payload?.driver || '').localeCompare(
+      String(right.data().payload?.driver || ''), undefined, { sensitivity: 'base' },
+    );
+    if (driverOrder) return driverOrder;
+    const pickupOrder = String(left.data().payload?.pickup?.arrival || '').localeCompare(
+      String(right.data().payload?.pickup?.arrival || ''),
+    );
+    if (pickupOrder) return pickupOrder;
+    const bookingOrder = String(left.data().bookingId || left.data().tripId || '').localeCompare(
+      String(right.data().bookingId || right.data().tripId || ''), undefined, { numeric: true },
+    );
+    if (bookingOrder) return bookingOrder;
     const leftTime = left.data().createdAt?.toMillis?.() || 0;
     const rightTime = right.data().createdAt?.toMillis?.() || 0;
     return leftTime - rightTime;
   });
-  return candidates.map(document => document.id);
+  return candidates.slice(0, Math.max(1, Math.min(reviewBatchSize, limit)))
+    .map(document => document.id);
 }
 
 async function claimJobById(logId) {
@@ -551,6 +592,9 @@ async function publishDateReviewSummary(serviceDate) {
     estimatedMinutesRemaining: stagingDurations.length
       ? Number(((summary.pending * (stagingDurations.reduce((sum, value) => sum + value, 0) / stagingDurations.length)) / 60_000).toFixed(1))
       : null,
+    scopeType: manifest.scopeType || activeRunScope.type,
+    scopeDriverId: manifest.scopeDriverId || activeRunScope.driverId || null,
+    scopeDriverName: manifest.scopeDriverName || activeRunScope.driverName || null,
   };
   const writes = [db.doc('welltrans_worker_status/primary').set(update, { merge: true })];
   if (manifestSnapshot.exists) {
@@ -569,12 +613,52 @@ async function publishDateReviewSummary(serviceDate) {
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true }));
   }
+  if ((manifest.scopeType || activeRunScope.type) === 'driver'
+      && (manifest.scopeDriverId || activeRunScope.driverId)) {
+    const driverId = manifest.scopeDriverId || activeRunScope.driverId;
+    const driverName = manifest.scopeDriverName || activeRunScope.driverName || driverId;
+    const driverStatusId = createHash('sha256')
+      .update(`welltrans-driver:${serviceDate}:${driverId}`).digest('hex');
+    writes.push(db.doc(`welltrans_driver_sync_status/${driverStatusId}`).set({
+      provider: 'welltrans',
+      serviceDate,
+      driverId,
+      driverName,
+      state: summary.completed === summary.total && summary.total > 0
+        ? 'done'
+        : summary.staged > 0 && summary.failed === 0 && summary.blocked === 0 && summary.missing === 0
+          ? 'ready_for_review'
+          : summary.failed || summary.blocked || summary.missing
+            ? 'needs_correction'
+            : summary.processing > 0
+              ? 'filling'
+              : 'queued',
+      expectedCount: summary.total,
+      stagedCount: summary.staged,
+      verifiedCount: summary.completed,
+      pendingCount: summary.pending + summary.processing,
+      failedCount: summary.failed + summary.blocked + summary.missing,
+      reviewSessionId: reviewSessionId || null,
+      workerId,
+      workerVersion,
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(summary.completed === summary.total && summary.total > 0
+        ? { completedAt: FieldValue.serverTimestamp() }
+        : {}),
+    }, { merge: true }));
+  }
   await Promise.all(writes);
   return summary;
 }
 
 async function recoverStaleReviewJobs(serviceDate) {
-  const documents = await loadAllLogsForDate(serviceDate);
+  const [documents, manifestSnapshot] = await Promise.all([
+    loadAllLogsForDate(serviceDate),
+    db.doc(`welltrans_sync_manifests/${serviceDate}`).get(),
+  ]);
+  const expectedIds = manifestSnapshot.exists
+    ? new Set((manifestSnapshot.data().expectedTripIds || []).map(String))
+    : null;
   const latestByTrip = new Map();
   for (const document of documents) {
     const data = document.data();
@@ -587,7 +671,8 @@ async function recoverStaleReviewJobs(serviceDate) {
   }
   const stale = [...latestByTrip.values()].filter(item =>
     item.data.status === 'awaiting_review'
-    && item.data.reviewSessionId !== reviewSessionId);
+    && item.data.reviewSessionId !== reviewSessionId
+    && (!expectedIds || expectedIds.has(String(item.data.tripId))));
   for (let offset = 0; offset < stale.length; offset += 400) {
     const batch = db.batch();
     for (const item of stale.slice(offset, offset + 400)) {
@@ -722,10 +807,32 @@ async function loadAuthoritativeTripsForDate(serviceDate) {
 }
 
 async function reconcileAuthoritativeCompletedTrips(serviceDate) {
-  const [expectedTrips, logDocuments] = await Promise.all([
+  const [allExpectedTrips, logDocuments, existingManifestSnapshot] = await Promise.all([
     loadAuthoritativeTripsForDate(serviceDate),
     loadAllLogsForDate(serviceDate),
+    db.doc(`welltrans_sync_manifests/${serviceDate}`).get(),
   ]);
+  const existingManifest = existingManifestSnapshot.exists
+    ? existingManifestSnapshot.data() || {}
+    : {};
+  const requestedScope = await readRequestedRunScope(serviceDate);
+  activeRunScope = requestedScope || (existingManifest.scopeType === 'driver' && existingManifest.scopeDriverId
+    ? {
+      type: 'driver',
+      driverId: String(existingManifest.scopeDriverId),
+      driverName: String(existingManifest.scopeDriverName || existingManifest.scopeDriverId),
+    }
+    : { type: 'all', driverId: '', driverName: '' });
+  if (activeRunScope.type === 'driver' && !activeRunScope.driverName) {
+    const driverSnapshot = await db.doc(`drivers/${activeRunScope.driverId}`).get();
+    if (!driverSnapshot.exists || !String(driverSnapshot.data().name || '').trim()) {
+      throw new Error(`Requested driver ${activeRunScope.driverId} is not available in the authoritative driver directory`);
+    }
+    activeRunScope.driverName = String(driverSnapshot.data().name).trim();
+  }
+  const expectedTrips = activeRunScope.type === 'driver'
+    ? allExpectedTrips.filter(trip => String(trip.driverId || '') === activeRunScope.driverId)
+    : allExpectedTrips;
   const latestByTrip = new Map();
   for (const document of logDocuments) {
     const data = document.data();
@@ -780,6 +887,9 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
         automationMethod: 'playwright',
         payload: current.validation.payload,
         manifestId: serviceDate,
+        scopeType: activeRunScope.type,
+        scopeDriverId: activeRunScope.driverId || null,
+        scopeDriverName: activeRunScope.driverName || null,
         queuedSourceFingerprint: current.sourceFingerprint,
         workerVersion,
       });
@@ -827,6 +937,9 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
           ? latest.data.reviewSessionId
           : latest.data.previousReviewSessionId || null,
         reviewSessionId,
+        scopeType: activeRunScope.type,
+        scopeDriverId: activeRunScope.driverId || null,
+        scopeDriverName: activeRunScope.driverName || null,
         updatedAt: FieldValue.serverTimestamp(),
         workerVersion,
       });
@@ -848,6 +961,9 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
     blockedCount: blockedTrips.length,
     blockedTrips: blockedTrips.slice(0, 200),
     source: 'authoritative_worker_completed_trip_scan',
+    scopeType: activeRunScope.type,
+    scopeDriverId: activeRunScope.driverId || null,
+    scopeDriverName: activeRunScope.driverName || null,
     workerId,
     workerVersion,
     reconciledAt: FieldValue.serverTimestamp(),
@@ -858,7 +974,13 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
 }
 
 async function auditCompletedPortalTrips(page, serviceDate) {
-  const documents = await loadAllLogsForDate(serviceDate);
+  const [documents, manifestSnapshot] = await Promise.all([
+    loadAllLogsForDate(serviceDate),
+    db.doc(`welltrans_sync_manifests/${serviceDate}`).get(),
+  ]);
+  const expectedIds = manifestSnapshot.exists
+    ? new Set((manifestSnapshot.data().expectedTripIds || []).map(String))
+    : null;
   const latestByTrip = new Map();
   for (const document of documents) {
     const data = document.data();
@@ -871,7 +993,8 @@ async function auditCompletedPortalTrips(page, serviceDate) {
   }
 
   const completed = [...latestByTrip.values()]
-    .filter(item => item.data.status === 'completed');
+    .filter(item => item.data.status === 'completed'
+      && (!expectedIds || expectedIds.has(String(item.data.tripId))));
   const result = { audited: 0, verified: 0, requeued: 0, failed: 0 };
   for (const item of completed) {
     result.audited += 1;
@@ -938,10 +1061,24 @@ async function auditCompletedPortalTrips(page, serviceDate) {
 }
 
 async function auditStagedReviewBatch(page, serviceDate) {
-  const documents = await loadAllLogsForDate(serviceDate);
+  if (!reviewGridSortedForSession) {
+    await sortWellTransReviewGridByDriver(page);
+    resetWellTransSessionCaches();
+    portalGridIndex = await buildWellTransGridIndex(page, serviceDate);
+    reviewGridSortedForSession = true;
+  }
+  const [documents, manifestSnapshot] = await Promise.all([
+    loadAllLogsForDate(serviceDate),
+    db.doc(`welltrans_sync_manifests/${serviceDate}`).get(),
+  ]);
+  const expectedIds = manifestSnapshot.exists
+    ? new Set((manifestSnapshot.data().expectedTripIds || []).map(String))
+    : null;
   const staged = documents.filter(document => {
     const data = document.data();
-    return data.status === 'awaiting_review' && data.reviewSessionId === reviewSessionId;
+    return data.status === 'awaiting_review'
+      && data.reviewSessionId === reviewSessionId
+      && (!expectedIds || expectedIds.has(String(data.tripId)));
   });
   const result = {
     checked: 0,
@@ -1588,6 +1725,7 @@ async function main() {
     await waitForDateLease(selectedDate);
     reviewSessionId = randomUUID();
     resetWellTransSessionCaches();
+    reviewGridSortedForSession = false;
     await publishHeartbeat('indexing_schedule');
     portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
     await runPortalContractCanary(session.page, selectedDate);
@@ -1633,6 +1771,7 @@ async function main() {
         await waitForDateLease(selectedDate);
         reviewSessionId = randomUUID();
         resetWellTransSessionCaches();
+        reviewGridSortedForSession = false;
         await publishHeartbeat('indexing_schedule');
         portalGridIndex = await buildWellTransGridIndex(session.page, selectedDate);
         await runPortalContractCanary(session.page, selectedDate);
@@ -1655,6 +1794,7 @@ async function main() {
         operatorControl.forceReindex = false;
         finalReviewAuditValid = false;
         resetWellTransSessionCaches();
+        reviewGridSortedForSession = false;
         operatorControl.message = `Re-indexing every visible and virtual row for ${selectedDate}.`;
         await updateOperatorConsole(session.page, {}, {
           state: 'indexing_schedule',
@@ -1812,7 +1952,10 @@ async function main() {
           if (job) {
             await publishHeartbeat('staging');
             const outcome = await processJob(job, session);
-            if (outcome.success) finalReviewAuditValid = false;
+            if (outcome.success) {
+              finalReviewAuditValid = false;
+              reviewGridSortedForSession = false;
+            }
             await publishHeartbeat('calibrated');
             const recovery = recoveryDecision(outcome, {
               completedAttempts: Number(job.attempt || 0) + 1,

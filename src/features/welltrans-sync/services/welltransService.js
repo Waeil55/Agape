@@ -95,8 +95,8 @@ export const saveWellTransSettings = (settings, actorId) => {
   }, { merge: true });
 };
 
-export const queueWellTransSync = (tripIds, mode, serviceDate) =>
-  httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate });
+export const queueWellTransSync = (tripIds, mode, serviceDate, scope = { type: 'all' }) =>
+  httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate, scope });
 
 export const explainWellTransFailureAI = logId =>
   httpsCallable(functions, 'explainWellTransFailureAI')({ logId });

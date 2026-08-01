@@ -14,9 +14,9 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '3.8.3';
+const REQUIRED_WORKER_VERSION = '3.9.0';
 
-export const useWellTransSync = (trips = [], serviceDate = '') => {
+export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [logs, setLogs] = useState([]);
   const [primaryWorker, setPrimaryWorker] = useState(null);
@@ -41,7 +41,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const scopedLogs = useMemo(() => logs.filter(log => log.serviceDate === serviceDate), [logs, serviceDate]);
   const dateTrips = useMemo(() => trips.filter(trip =>
     serviceDate && normalizeServiceDate(trip) === serviceDate), [trips, serviceDate]);
-  const completedTrips = useMemo(() => dateTrips.filter(trip => {
+  const allCompletedTrips = useMemo(() => dateTrips.filter(trip => {
     const lifecycle = [
       trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
     ].map(value => String(value || '').toLowerCase().trim()).join(' ');
@@ -49,6 +49,10 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     const s = String(trip.status || '').toLowerCase().trim();
     return s === 'completed' || s === 'complete' || s === 'done' || s.includes('completed') || s.includes('complete') || trip.completedAt;
   }), [dateTrips]);
+  const completedTrips = useMemo(() => driverScopeId
+    ? allCompletedTrips.filter(trip => String(trip.driverId || '') === String(driverScopeId))
+    : allCompletedTrips,
+  [allCompletedTrips, driverScopeId]);
   const latestByTrip = useMemo(() => {
     const map = new Map();
     scopedLogs.forEach(log => {
@@ -128,8 +132,14 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const workerStandby = Boolean(heartbeatMs && now - heartbeatMs < 45000
     && ['standby', 'lease_standby'].includes(worker?.state));
 
-  const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
-  const successfulCount = useMemo(() => currentLogs.filter(log => log.status === 'completed').length, [currentLogs]);
+  const scopedTripIds = useMemo(
+    () => new Set(completedTrips.map(trip => String(trip.id))),
+    [completedTrips],
+  );
+  const currentLogs = useMemo(() => [...latestByTrip.values()]
+    .filter(log => scopedTripIds.has(String(log.tripId))), [latestByTrip, scopedTripIds]);
+  const successfulCount = useMemo(() => currentLogs.filter(log =>
+    log.status === 'completed' && log.portalVerification?.verified === true).length, [currentLogs]);
   const failedCount = useMemo(() => currentLogs.filter(log => log.status === 'failed').length, [currentLogs]);
   const coverage = useMemo(
     () => buildWellTransCoverage(completedTrips, latestByTrip),
@@ -143,7 +153,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     settings, logs: scopedLogs, worker, workers: visibleWorkers, activeWorkers, standbyWorkers, operations, canary,
     manifest, coverage, workerOnline, workerCalibrated,
     workerUpgradeRequired, requiredWorkerVersion: REQUIRED_WORKER_VERSION,
-    workerStandby, loading, dateTrips, completedTrips, readyTrips, latestByTrip,
+    workerStandby, loading, dateTrips, allCompletedTrips, completedTrips, readyTrips, latestByTrip,
     healthScore, successfulCount, failedCount,
   };
 };

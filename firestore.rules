@@ -151,6 +151,10 @@ service cloud.firestore {
       allow read: if request.auth != null && isAdmin();
       allow write: if false;
     }
+    match /welltrans_driver_sync_status/{driverRunId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
     match /welltrans_sync_shards/{shardId} {
       allow read: if request.auth != null && isAdmin();
       allow write: if false;
