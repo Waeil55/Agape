@@ -4469,9 +4469,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
       {/* ===== SCHEDULE / TYPE EDITOR ===== */}
       {scheduleEditorTrip && scheduleEditDraft && (
-        <div className="fixed inset-0 z-[125] flex items-end sm:items-center justify-center p-3">
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={closeScheduleEditor} />
-          <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+        <section className="mx-2 my-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
+          <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-base font-semibold text-slate-950">Update Trip Time</h3>
@@ -4481,7 +4480,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             </div>
 
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { id: 'time', label: 'Set Time', hint: 'Exact pickup time' },
                   { id: 'willcall', label: 'Will Call', hint: 'No fixed time' },
@@ -4529,7 +4528,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
               {scheduleEditDraft.mode === 'urgent' && (
                 <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Deadline Date</label>
                       <input
@@ -4596,7 +4595,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               <button type="button" onClick={saveScheduleEdit} className="flex-1 h-7 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer">Save</button>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}

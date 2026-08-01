@@ -646,18 +646,18 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         )}
       </div>
 
-      {/* Edit Timesheet Modal */}
+      {/* Same-view timesheet editor */}
       {editTimesheet && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-lg">
+        <section className="mx-2 my-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 w-full">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-lg font-semibold text-slate-900">Edit Timesheet — {formatDate(editTimesheet.date + 'T12:00:00')}</h3>
               <button onClick={() => setEditTimesheet(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
               {editTimesheet.events.sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)).map((event, index) => (
-                <div key={index} className="flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl">
-                  <select value={event.type} onChange={(e) => { const n = [...editTimesheet.events]; n[index].type = e.target.value; setEditTimesheet({ ...editTimesheet, events: n }); }}
+                <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl">
+                  <select autoFocus={index === 0} value={event.type} onChange={(e) => { const n = [...editTimesheet.events]; n[index].type = e.target.value; setEditTimesheet({ ...editTimesheet, events: n }); }}
                     className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
                     <option value="IN">Clock In</option>
                     <option value="OUT">Clock Out</option>
@@ -684,7 +684,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               </button>
             </div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

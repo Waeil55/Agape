@@ -654,10 +654,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
         </div>
       )}
 
-      {/* Edit Dispatcher Modal */}
+      {/* Same-view dispatcher editor */}
       {editingDispatcher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm max-w-sm w-full mx-0 sm:mx-4">
+        <section className="mx-3 mb-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-6 sm:p-3">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm w-full">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <h3 className="text-lg sm:text-xl font-semibold text-slate-900">Edit Dispatcher</h3>
@@ -666,7 +666,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Name</label>
-                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
+                  <input autoFocus type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs" placeholder="Name" />
                 </div>
                 <div>
@@ -681,7 +681,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               </div>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Log Details Modal */}

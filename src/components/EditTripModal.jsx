@@ -40,7 +40,7 @@ const parseOdometerInput = (value) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-const EditTripModal = ({ trip, onClose, onUpdate, drivers = [], onSave, driverMode, context = 'trip' }) => {
+const EditTripModal = ({ trip, onClose, onUpdate, drivers = [], onSave, driverMode, context = 'trip', inline = true }) => {
   const [editTrip, setEditTrip] = useState(null);
 
   useEffect(() => {
@@ -112,9 +112,9 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers = [], onSave, driverMo
   const inputClass = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-[0.875em] focus:border-blue-500 focus:bg-white outline-none transition-all";
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl relative z-10 border border-slate-200 max-h-[90vh] overflow-hidden flex flex-col" style={{ fontSize: '97%' }}>
+    <div className={inline ? 'w-full p-2 sm:p-3' : 'fixed inset-0 z-[120] flex items-center justify-center p-3'}>
+      {!inline && <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />}
+      <div className={`bg-white w-full rounded-2xl relative border border-blue-200 overflow-hidden flex flex-col ${inline ? 'shadow-sm max-h-none' : 'max-w-lg z-10 max-h-[90vh] shadow-2xl'}`} style={{ fontSize: '97%' }}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
           <h3 className="text-[1em] font-semibold text-slate-900 flex items-center gap-2">
             <Edit2 size={18} className="text-blue-500" /> {context === 'welltrans' ? 'Correct WellTrans Source Data' : 'Edit Trip'}

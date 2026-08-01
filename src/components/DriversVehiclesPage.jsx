@@ -783,10 +783,10 @@ const [form, setForm] = useState({
         </div>
       )}
 
-      {/* Schedule Editor Modal */}
+      {/* Same-view schedule editor */}
       {editScheduleDriver && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white border border-slate-100/50 rounded-xl shadow-sm max-w-lg w-full max-h-[90vh] overflow-y-auto mx-0 sm:mx-4">
+        <section className="mx-2 my-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm w-full overflow-x-hidden">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div>
@@ -853,7 +853,7 @@ const [form, setForm] = useState({
               {/* Add/Edit Schedule Block Form */}
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                 <p className="text-xs font-semibold text-slate-700 mb-3">{editingScheduleIdx !== null ? 'Edit Block' : 'Add New Block'}</p>
-                <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Start</label>
                     <select value={scheduleForm.start} onChange={(e) => setScheduleForm({ ...scheduleForm, start: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
@@ -889,7 +889,7 @@ const [form, setForm] = useState({
               </div>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* AI Driver Analysis Modal */}
@@ -917,8 +917,8 @@ const [form, setForm] = useState({
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-slate-100/50 rounded-xl shadow-sm max-w-md w-full">
+        <section className="mx-2 my-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-slate-900">{editing ? 'Edit Driver' : 'Add Driver'}</h3>
@@ -927,7 +927,7 @@ const [form, setForm] = useState({
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Name</label>
-                  <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Driver name" />
+                  <input autoFocus type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Driver name" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
@@ -990,23 +990,23 @@ const [form, setForm] = useState({
               </div>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Vehicle Form Modal */}
       {vehicleForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-slate-100/50 rounded-xl shadow-sm max-w-md w-full">
+        <section className="mx-2 my-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm w-full">
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
                 <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={20} /></button>
               </div>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Vehicle Name</label>
-                    <input type="text" required value={vForm.name} onChange={(e) => setVForm({ ...vForm, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Van #42" />
+                    <input autoFocus type="text" required value={vForm.name} onChange={(e) => setVForm({ ...vForm, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Van #42" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Make</label>
@@ -1044,7 +1044,7 @@ const [form, setForm] = useState({
               </div>
             </div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

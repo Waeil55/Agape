@@ -891,7 +891,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                   const latest = latestByTrip.get(trip.id);
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
                   return (
-                    <tr key={trip.id} className="hover:bg-slate-50/50 cursor-pointer group" onClick={() => setTripDrawer(trip)}>
+                    <React.Fragment key={trip.id}>
+                    <tr className={`hover:bg-slate-50/50 cursor-pointer group ${editingTrip?.id === trip.id ? 'bg-blue-50/70' : ''}`} onClick={() => setTripDrawer(trip)}>
                       <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
                         <input type="checkbox" disabled={!trip._valid}
                           checked={selectedIds.includes(trip.id)}
@@ -955,6 +956,25 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                         </div>
                       </td>
                     </tr>
+                    {editingTrip?.id === trip.id && onUpdateTrip && (
+                      <tr className="bg-blue-50/40">
+                        <td colSpan={16} className="p-0">
+                          <EditTripModal
+                            inline
+                            trip={editingTrip}
+                            drivers={drivers}
+                            context="welltrans"
+                            onClose={() => setEditingTrip(null)}
+                            onUpdate={(updatedTrip) => {
+                              onUpdateTrip(updatedTrip);
+                              setEditingTrip(null);
+                              setNotice(`Trip ${updatedTrip.bookingId || updatedTrip.id} updated. WellTrans validation has been recalculated.`);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -1397,19 +1417,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
         </div>
       )}
 
-      {editingTrip && onUpdateTrip && (
-        <EditTripModal
-          trip={editingTrip}
-          drivers={drivers}
-          context="welltrans"
-          onClose={() => setEditingTrip(null)}
-          onUpdate={(updatedTrip) => {
-            onUpdateTrip(updatedTrip);
-            setEditingTrip(null);
-            setNotice(`Trip ${updatedTrip.bookingId || updatedTrip.id} updated. WellTrans validation has been recalculated.`);
-          }}
-        />
-      )}
     </div>
   );
 };

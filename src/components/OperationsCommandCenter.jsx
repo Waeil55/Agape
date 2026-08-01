@@ -2840,23 +2840,22 @@ const OperationsCommandCenter = ({
       {operationsTab === 'willcall' && renderWillCall()}
       {operationsTab === 'fleet' && renderFleetMatrix()}
 
-      {/* Inline Edit Modal */}
+      {/* Same-view trip editor */}
       {editingTripId && editingTripData && (() => {
         const ie = editingTripData;
         const inputCls = "w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs focus:border-blue-500 focus:bg-white outline-none transition-all";
         return (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-3">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={cancelInlineEdit} />
-            <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl relative z-10 border border-slate-200 max-h-[90vh] overflow-hidden flex flex-col" style={{ fontSize: '97%' }}>
+          <section className="mx-2 my-3 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
+            <div className="bg-white w-full rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col" style={{ fontSize: '97%' }}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
                 <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2"><Edit2 size={16} className="text-blue-500" /> Edit Trip</h3>
                 <button onClick={cancelInlineEdit} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200"><X size={16} /></button>
               </div>
               <div className="overflow-y-auto px-5 py-4 flex-1 overflow-x-hidden space-y-3">
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Patient</label>
-                    <input value={ie.patient} onChange={(e) => setEditingTripData(p => ({ ...p, patient: e.target.value }))} className={inputCls} />
+                    <input autoFocus value={ie.patient} onChange={(e) => setEditingTripData(p => ({ ...p, patient: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Booking ID</label>
@@ -2883,7 +2882,7 @@ const OperationsCommandCenter = ({
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2.5 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-blue-50 border border-blue-100 rounded-xl p-3">
                   <div>
                     <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Pickup Time</label>
                     <input type="time" value={ie._pickupTime} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupTime: e.target.value }))} className={inputCls} />
@@ -2909,7 +2908,7 @@ const OperationsCommandCenter = ({
                     <PlacesAutocompleteInput value={ie.dropoff} onChange={(val) => setEditingTripData(p => ({ ...p, dropoff: val }))} className={inputCls} placeholder="Dropoff address" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Pickup Phone</label>
                     <input value={ie.pickupPhone} onChange={(e) => setEditingTripData(p => ({ ...p, pickupPhone: e.target.value }))} className={inputCls} />
@@ -2933,7 +2932,7 @@ const OperationsCommandCenter = ({
                 <button onClick={cancelInlineEdit} className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm active:scale-[0.98] transition">Cancel</button>
               </div>
             </div>
-          </div>
+          </section>
         );
       })()}
       {showSmsModal && (
