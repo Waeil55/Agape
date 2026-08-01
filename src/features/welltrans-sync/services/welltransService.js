@@ -95,6 +95,29 @@ export const saveWellTransSettings = (settings, actorId) => {
   }, { merge: true });
 };
 
+const LOCAL_AGENT_SETTINGS_URL = 'http://127.0.0.1:43127/v1/welltrans-credentials';
+
+const localAgentRequest = async (method = 'GET', body) => {
+  const response = await fetch(LOCAL_AGENT_SETTINGS_URL, {
+    method,
+    cache: 'no-store',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || 'The local WellTrans Agent did not accept the request.');
+  }
+  return payload;
+};
+
+export const getLocalWellTransCredentialStatus = () => localAgentRequest('GET');
+
+export const saveLocalWellTransCredentials = (username, password) =>
+  localAgentRequest('PUT', { username, password });
+
+export const clearLocalWellTransCredentials = () => localAgentRequest('DELETE');
+
 export const queueWellTransSync = (tripIds, mode, serviceDate, scope = { type: 'all' }) =>
   httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate, scope });
 

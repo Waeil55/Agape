@@ -78,6 +78,15 @@ describe('WellTrans one-line operator toolbar', () => {
     ]);
   });
 
+  it('does not block manual WellTrans controls outside its own inputs and buttons', async () => {
+    const interaction = await page.locator('#agape-welltrans-operator-console').evaluate(host => ({
+      host: host.style.pointerEvents,
+      bar: getComputedStyle(host.shadowRoot.querySelector('.bar')).pointerEvents,
+      fill: getComputedStyle(host.shadowRoot.querySelector('[data-action="fill-date"]')).pointerEvents,
+    }));
+    assert.deepEqual(interaction, { host: 'none', bar: 'none', fill: 'auto' });
+  });
+
   it('shows a persistent independent-reviewer result', async () => {
     const result = await page.locator('#agape-welltrans-operator-console').evaluate(host => ({
       state: host.shadowRoot.querySelector('[data-role="verifier"]').dataset.state,

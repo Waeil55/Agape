@@ -16,6 +16,7 @@ $runtimeDirectory = Join-Path $env:LOCALAPPDATA 'AgapeCare\Runtime'
 $runtimeCredentialPath = Join-Path $runtimeDirectory "welltrans-credential-$PID.json"
 $requestedDatePath = Join-Path $runtimeDirectory 'requested-service-date.txt'
 $requestedScopePath = Join-Path $runtimeDirectory 'requested-sync-scope.json'
+$wellTransCredentialPath = Join-Path $secretDirectory 'welltrans-login.vault'
 $logPath = Join-Path $secretDirectory 'welltrans-worker.log'
 $lockPath = Join-Path $secretDirectory 'welltrans-worker.pid'
 $agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'
@@ -204,6 +205,9 @@ try {
   $env:WELLTRANS_SESSION_FILE = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_FILE', 'User')
   $env:WELLTRANS_PORTAL_URL = [Environment]::GetEnvironmentVariable('WELLTRANS_PORTAL_URL', 'User')
   $env:WELLTRANS_ALLOWED_HOSTS = [Environment]::GetEnvironmentVariable('WELLTRANS_ALLOWED_HOSTS', 'User')
+  $env:WELLTRANS_CREDENTIAL_FILE = $wellTransCredentialPath
+  $env:AGAPE_LOCAL_SETTINGS_PORT = '43127'
+  $env:AGAPE_LOCAL_SETTINGS_ORIGINS = 'https://agape5.web.app'
   $env:WELLTRANS_ENABLE_WRITES = 'true'
   $env:WELLTRANS_REQUEST_FILE = $requestedDatePath
   $env:WELLTRANS_SCOPE_FILE = $requestedScopePath

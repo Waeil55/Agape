@@ -43,6 +43,14 @@ const workerLauncherPath = fileURLToPath(new URL(
   '../../../../automation/welltrans-worker/launcher/Start-AgapeWellTrans.ps1',
   import.meta.url,
 ));
+const localSettingsPath = fileURLToPath(new URL(
+  '../../../../automation/welltrans-worker/src/welltrans.local-settings.js',
+  import.meta.url,
+));
+const syncServicePath = fileURLToPath(new URL(
+  '../services/welltransService.js',
+  import.meta.url,
+));
 
 describe('WellTrans staging safety contract', () => {
   it('keeps runtime, installer and package release versions identical', () => {
@@ -50,6 +58,19 @@ describe('WellTrans staging safety contract', () => {
     expect(readFileSync(workerSourcePath, 'utf8')).toContain(`const workerVersion = '${version}'`);
     expect(readFileSync(workerInstallerPath, 'utf8')).toContain(`$agentVersion = '${version}'`);
     expect(readFileSync(workerSetupPath, 'utf8')).toContain(`AssemblyVersion("${version}.0")`);
+  });
+
+  it('stores broker credentials only in the encrypted local Agent vault', () => {
+    const localSettings = readFileSync(localSettingsPath, 'utf8');
+    const launcher = readFileSync(workerLauncherPath, 'utf8');
+    const service = readFileSync(syncServicePath, 'utf8');
+    expect(localSettings).toContain("server.listen(port, '127.0.0.1')");
+    expect(localSettings).toContain('saveEncryptedCredentials');
+    expect(localSettings).toContain("'https://agape5.web.app'");
+    expect(localSettings).not.toContain('firebase');
+    expect(launcher).toContain('$env:WELLTRANS_CREDENTIAL_FILE = $wellTransCredentialPath');
+    expect(service).toContain('http://127.0.0.1:43127/v1/welltrans-credentials');
+    expect(service).toContain('portalPassword: deleteField()');
   });
   it('replaces queued payload snapshots with the authoritative data actually staged', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');

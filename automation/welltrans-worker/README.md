@@ -21,6 +21,10 @@ Preferred:
 4. If the saved WellTrans session has expired, complete the legitimate broker
    login in the opened browser. The agent detects login and TRIPS - ASSIGNED
    automatically; there is no terminal window and no Enter-key confirmation.
+   Alternatively, open **WellTrans → Settings** in Agape and save the broker
+   username and password to the encrypted local Agent vault. The Settings page
+   communicates only with `127.0.0.1`; credentials never enter Firestore,
+   URLs, logs, or another enrolled computer.
 5. If the WellTrans portal is displaying another schedule, the agent opens the
    schedule chooser and pauses until the exact requested date is visible.
 6. Use the **Agape WellTrans Console** inside the Playwright window to
@@ -65,12 +69,12 @@ the exact requested WellTrans date is visible.
   operator to click **Close**, never **Apply**.
 - Every staged cell is re-located in the virtual grid and verified before the
   trip is marked ready for review.
-- Before showing the green review-ready state, Agent 3.8.3 performs an exhaustive
+- Before showing the green review-ready state, the Agent performs an exhaustive
   second pass across every staged trip. Mismatches and changed Agape source
   records are requeued and repaired automatically before review.
 - The worker never clicks **Apply** or **Close**. An operator reviews every
   staged field and clicks **Apply**. When the itinerary dialog closes, Agent
-  3.8.3 reads every affected portal row back, marks only persisted values
+  reads every affected portal row back, marks only persisted values
   complete, and requeues anything that was closed without being saved.
 - A safe preflight failure or verified rollback does not stop later trips.
   An unverified rollback stops the batch immediately.
@@ -94,7 +98,7 @@ the exact requested WellTrans date is visible.
 
 ## Enterprise verification
 
-Agent 3.8.3 adds a separate deterministic verification contract after staging.
+The Agent includes a separate deterministic verification contract after staging.
 It records field-level expected/actual evidence in `welltrans_verification_runs`.
 Any supported mismatch creates an integrity-bound command in
 `welltrans_correction_commands`; Playwright accepts it only when its Booking ID,

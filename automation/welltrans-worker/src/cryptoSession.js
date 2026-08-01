@@ -8,17 +8,17 @@ const keyFromEnvironment = () => {
   return key;
 };
 
-export async function saveEncryptedSession(filePath, state) {
+async function saveEncryptedJson(filePath, value, marker) {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', keyFromEnvironment(), iv);
-  const encrypted = Buffer.concat([cipher.update(JSON.stringify(state), 'utf8'), cipher.final()]);
-  const payload = Buffer.concat([Buffer.from('AGWT1'), iv, cipher.getAuthTag(), encrypted]);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final()]);
+  const payload = Buffer.concat([Buffer.from(marker), iv, cipher.getAuthTag(), encrypted]);
   await fs.writeFile(filePath, payload, { mode: 0o600 });
 }
 
-export async function loadEncryptedSession(filePath) {
+async function loadEncryptedJson(filePath, marker) {
   const payload = await fs.readFile(filePath);
-  if (payload.subarray(0, 5).toString() !== 'AGWT1') throw new Error('Invalid encrypted session format');
+  if (payload.subarray(0, 5).toString() !== marker) throw new Error('Invalid encrypted local vault format');
   const iv = payload.subarray(5, 17);
   const tag = payload.subarray(17, 33);
   const decipher = crypto.createDecipheriv('aes-256-gcm', keyFromEnvironment(), iv);
@@ -26,3 +26,18 @@ export async function loadEncryptedSession(filePath) {
   return JSON.parse(Buffer.concat([decipher.update(payload.subarray(33)), decipher.final()]).toString('utf8'));
 }
 
+export async function saveEncryptedSession(filePath, state) {
+  await saveEncryptedJson(filePath, state, 'AGWT1');
+}
+
+export async function loadEncryptedSession(filePath) {
+  return loadEncryptedJson(filePath, 'AGWT1');
+}
+
+export async function saveEncryptedCredentials(filePath, credentials) {
+  await saveEncryptedJson(filePath, credentials, 'AGWC1');
+}
+
+export async function loadEncryptedCredentials(filePath) {
+  return loadEncryptedJson(filePath, 'AGWC1');
+}

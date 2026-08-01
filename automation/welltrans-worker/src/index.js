@@ -31,6 +31,7 @@ import {
   buildVerificationDecision,
   validateCorrectionCommand,
 } from './welltrans.verifier.js';
+import { startLocalWellTransSettingsServer } from './welltrans.local-settings.js';
 
 initializeApp({
   credential: applicationDefault(),
@@ -51,7 +52,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.9.2';
+const workerVersion = '3.10.0';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let activeRunScope = { type: 'all', driverId: '', driverName: '' };
@@ -1559,6 +1560,14 @@ async function processJob(job, existingSession = null) {
 }
 
 async function main() {
+  if (!process.argv.slice(2).some(argument => argument.startsWith('--'))) {
+    startLocalWellTransSettingsServer({
+      onCredentialsChanged: async () => {
+        operatorControl.message = 'Local WellTrans credentials updated securely. Automatic sign-in will retry when the login page is visible.';
+        await publishHeartbeat('credentials_updated').catch(() => {});
+      },
+    });
+  }
   requestedServiceDate = await readEffectiveRequestedServiceDate();
   if (process.argv.includes('--login')) {
     await publishHeartbeat('waiting_for_login');

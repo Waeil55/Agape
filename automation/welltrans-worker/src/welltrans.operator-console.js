@@ -17,16 +17,17 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     'max-width:calc(100vw - 16px)',
     'box-sizing:border-box',
     'font-family:Inter,Segoe UI,Arial,sans-serif',
+    'pointer-events:none',
   ].join(';');
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>
       *{box-sizing:border-box}
-      .bar{display:flex;align-items:center;gap:6px;width:100%;height:42px;max-width:100%;
+      .bar{display:flex;align-items:center;gap:6px;width:100%;height:42px;max-width:100%;pointer-events:none;
         padding:5px 7px;color:#eaf1ff;background:rgba(7,15,30,.97);border:1px solid #30476e;
         border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.38);white-space:nowrap;overflow-x:auto;
         overflow-y:hidden;scrollbar-width:thin;backdrop-filter:blur(12px)}
-      button,input,select{height:30px;flex:0 0 auto;border-radius:8px;font:700 10px Inter,Segoe UI,Arial,sans-serif}
+      button,input,select{height:30px;flex:0 0 auto;border-radius:8px;font:700 10px Inter,Segoe UI,Arial,sans-serif;pointer-events:auto}
       button{border:1px solid #31496f;padding:0 9px;color:#eaf1ff;background:#172944;cursor:pointer}
       button:hover{background:#213b61;border-color:#4b6f9f}
       button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}

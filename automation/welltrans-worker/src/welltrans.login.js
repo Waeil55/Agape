@@ -1,5 +1,6 @@
 import { openWellTransBrowser } from './welltrans.browser.js';
 import { saveEncryptedSession } from './cryptoSession.js';
+import { loadLocalWellTransCredentials } from './welltrans.local-settings.js';
 
 async function autoLogin(page, username, password) {
   const loginInput = page.getByRole('textbox', { name: /login name|username|email/i }).first();
@@ -59,8 +60,9 @@ export async function performManualLogin({
   await page.goto(process.env.WELLTRANS_PORTAL_URL, { waitUntil: 'domcontentloaded' });
   await onBrowserReady?.(page);
 
-  const username = process.env.WELLTRANS_USERNAME || '';
-  const password = process.env.WELLTRANS_PASSWORD || '';
+  const localCredentials = await loadLocalWellTransCredentials();
+  const username = localCredentials?.username || process.env.WELLTRANS_USERNAME || '';
+  const password = localCredentials?.password || process.env.WELLTRANS_PASSWORD || '';
 
   if (username && password) {
     process.stdout.write('Attempting auto-login with credentials stored on this worker computer...\n');
@@ -85,9 +87,22 @@ export async function performManualLogin({
 
   process.stdout.write('WellTrans agent is monitoring the browser. Sign in when required; no terminal confirmation is needed.\n');
   let itineraryPage = null;
+  let lastCredentialSignature = username && password ? `${username}\u0000${password}` : '';
   while (browser.isConnected() && !itineraryPage) {
     itineraryPage = await detectAndOpenAssignedTask(context);
     if (itineraryPage) break;
+    const refreshedCredentials = await loadLocalWellTransCredentials();
+    const credentialSignature = refreshedCredentials
+      ? `${refreshedCredentials.username}\u0000${refreshedCredentials.password}`
+      : '';
+    if (credentialSignature && credentialSignature !== lastCredentialSignature) {
+      lastCredentialSignature = credentialSignature;
+      try {
+        await autoLogin(page, refreshedCredentials.username, refreshedCredentials.password);
+      } catch (error) {
+        process.stdout.write(`Saved local credentials could not sign in: ${error.message}\n`);
+      }
+    }
     await onWaiting?.();
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
