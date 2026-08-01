@@ -42,7 +42,7 @@ import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES }
 import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
-import { resolveDriverVehicle } from '../utils/vehiclePersistence';
+import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -341,7 +341,7 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
   const dropoffClock = getFirstTripClock(trip, ['arrivalDropoffTime', 'dropoffArrival', 'dropoffArrivalTime', 'actualDropoffTime', 'dropoffTime']);
   const pickupOdometer = getFirstTripOdometer(trip, ['pickupOdometer', 'startOdometer', 'startMileage', 'pickupMileage']);
   const dropoffOdometer = getFirstTripOdometer(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'dropoffMileage']);
-  const vehicle = trip.completedVehicle || trip.vehicle || driver?.vehicle || 'PENDING ASSIGNMENT';
+  const vehicle = resolveTripVehicle(trip, driver) || 'PENDING ASSIGNMENT';
   const rows = [
     { label: 'TRIP ID', value: formatTripDetailValue(trip.bookingId || trip.id), tone: 'blue' },
     { label: 'DATE', value: formatTripDetailValue(getTripHistoryDateKey(trip) || trip.date) },

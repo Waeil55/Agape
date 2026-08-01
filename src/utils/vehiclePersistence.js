@@ -102,8 +102,10 @@ export function planVehicleAssignment(drivers = [], vehicles = [], driverId, veh
   if (normalizedName && !vehicle) throw new Error('The selected vehicle no longer exists.');
 
   const nextDrivers = drivers.map(item => {
-    const occupiesSelected = normalizedName
-      && String(item.vehicle || '').trim().toLowerCase() === normalizedName.toLowerCase();
+    const occupiesSelected = normalizedName && (
+      String(item.vehicle || '').trim().toLowerCase() === normalizedName.toLowerCase()
+      || (vehicle?.id && item.vehicleId === vehicle.id)
+    );
     if (item.id === driverId) {
       return { ...item, vehicle: normalizedName, vehicleId: vehicle?.id || '' };
     }
@@ -122,6 +124,47 @@ export function planVehicleAssignment(drivers = [], vehicles = [], driverId, veh
   return { nextDrivers, nextVehicles, vehicle };
 }
 
+const isMeaningfulVehicleName = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return Boolean(normalized) && !['pending', 'pending assignment', 'no vehicle', 'n/a'].includes(normalized);
+};
+
+/**
+ * Reconciles the two-sided driver/vehicle relationship for display after reload.
+ * The fleet vehicle owner is authoritative when present, preventing two drivers
+ * from appearing to hold the same vehicle while preserving legacy name-only data.
+ */
+export function reconcileVehicleOwnership(drivers = [], vehicles = []) {
+  const vehicleByOwner = new Map();
+  const vehicleById = new Map();
+  const vehicleByName = new Map();
+  vehicles.forEach((vehicle) => {
+    if (!vehicle?.id) return;
+    vehicleById.set(vehicle.id, vehicle);
+    vehicleByName.set(String(vehicle.name || '').trim().toLowerCase(), vehicle);
+    const ownerId = vehicle.driverId || vehicle.assignedDriver;
+    if (ownerId && !vehicleByOwner.has(ownerId)) vehicleByOwner.set(ownerId, vehicle);
+  });
+
+  return drivers.map((driver) => {
+    const ownedVehicle = vehicleByOwner.get(driver.id);
+    if (ownedVehicle) return { ...driver, vehicle: ownedVehicle.name || '', vehicleId: ownedVehicle.id };
+
+    const referencedVehicle = vehicleById.get(driver.vehicleId)
+      || vehicleByName.get(String(driver.vehicle || '').trim().toLowerCase());
+    const referencedOwner = referencedVehicle?.driverId || referencedVehicle?.assignedDriver || '';
+    if (referencedVehicle && referencedOwner && referencedOwner !== driver.id) {
+      return { ...driver, vehicle: '', vehicleId: '' };
+    }
+    if (referencedVehicle) {
+      return { ...driver, vehicle: referencedVehicle.name || '', vehicleId: referencedVehicle.id };
+    }
+    return isMeaningfulVehicleName(driver.vehicle)
+      ? driver
+      : { ...driver, vehicle: '', vehicleId: '' };
+  });
+}
+
 /**
  * Intelligently resolves a driver's vehicle by checking profile properties first,
  * then falling back to remembered persistent storage.
@@ -129,7 +172,8 @@ export function planVehicleAssignment(drivers = [], vehicles = [], driverId, veh
  * @param {string} fallbackEmail - Current user email or ID
  * @returns {string} Resolved vehicle name
  */
-export function resolveDriverVehicle(driver = {}, fallbackEmail = '') {
+export function resolveDriverVehicle(driver = {}, fallbackEmail = '', options = {}) {
+  const { allowRemembered = true } = options;
   const explicitVehicle =
     driver?.vehicle ||
     driver?.assignedVehicle ||
@@ -150,6 +194,8 @@ export function resolveDriverVehicle(driver = {}, fallbackEmail = '') {
     saveAssignedVehicle(driver?.id || driver?.email || fallbackEmail, explicitVehicle);
     return explicitVehicle.trim();
   }
+
+  if (!allowRemembered) return '';
 
   const remembered =
     getAssignedVehicle(driver?.id) ||

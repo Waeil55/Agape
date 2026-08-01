@@ -3,7 +3,6 @@ import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, 
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiAnalyzeDriver } from '../config/ai';
-import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 
 const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled }) => {
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
@@ -13,8 +12,8 @@ const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfi
     const targetName = String(v.name || '').trim().toLowerCase();
     return drivers.find(d => 
       (d.id && (d.id === v.driverId || d.id === v.assignedDriver)) ||
-      (d.vehicle && String(d.vehicle).trim().toLowerCase() === targetName) ||
-      (resolveDriverVehicle(d).trim().toLowerCase() === targetName)
+      (d.vehicleId && d.vehicleId === v.id) ||
+      (d.vehicle && String(d.vehicle).trim().toLowerCase() === targetName)
     );
   }, [drivers]);
 
@@ -93,10 +92,21 @@ const [form, setForm] = useState({
     if (!vForm.name.trim()) return;
     setAssignmentError('');
     try {
+      const normalizedName = vForm.name.trim().toLowerCase();
+      const duplicate = vehicles.find(vehicle => vehicle.id !== editVehicleId
+        && String(vehicle.name || '').trim().toLowerCase() === normalizedName);
+      if (duplicate) throw new Error(`Vehicle name “${vForm.name.trim()}” is already in use.`);
+      const previouslyAssignedDriver = editVehicleId
+        ? drivers.find(driver => driver.vehicleId === editVehicleId
+          || String(driver.vehicle || '').trim().toLowerCase() === String(vehicles.find(vehicle => vehicle.id === editVehicleId)?.name || '').trim().toLowerCase())
+        : null;
       const saved = editVehicleId
         ? await setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm } : v))
         : await setVehicles(prev => [...prev, { ...vForm, id: `VHC-${Date.now()}`, status: 'Available' }]);
       if (saved === false) throw new Error('Firestore did not confirm the vehicle save.');
+      if (editVehicleId && previouslyAssignedDriver && assignVehicleToDriver) {
+        await assignVehicleToDriver(previouslyAssignedDriver.id, vForm.name.trim());
+      }
       addAuditLog(
         editVehicleId ? 'Vehicle Updated' : 'Vehicle Added',
         `${currentUser} ${editVehicleId ? 'updated' : 'added'} vehicle ${vForm.name}.`,

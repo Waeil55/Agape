@@ -17,6 +17,7 @@ import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDrive
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playNotificationSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS } from './utils/nativeActions';
+import { resolveTripVehicle } from './utils/vehiclePersistence';
 import { initPlatform } from './utils/platform';
 import {
   buildTelemetryDocId,
@@ -1683,6 +1684,13 @@ const App = () => {
       }
     }
 
+    if (String(nextTripState.status || '').trim().toLowerCase() === 'completed') {
+      const completionDriver = drivers.find(driver => driver.id === nextTripState.driverId)
+        || drivers.find(driver => normalizeEmail(driver.email) === normalizeEmail(nextTripState.driverEmail));
+      nextTripState.completedVehicle = resolveTripVehicle(nextTripState, completionDriver) || '';
+      nextTripState.completedDriverName = completionDriver?.name || nextTripState.completedDriverName || nextTripState.driverName || '';
+    }
+
     const enrichedTrip = enrichTripMetrics(nextTripState);
     setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
     // Log detailed before/after changes
@@ -2042,11 +2050,15 @@ const App = () => {
       return;
     }
     const completedAt = new Date().toISOString();
+    const completionDriver = driversRef.current.find(driver => driver.id === driverId)
+      || driversRef.current.find(driver => normalizeEmail(driver.email) === normalizeEmail(trip.driverEmail));
     const nextTrip = enrichTripMetrics({
       ...trip,
       status: 'Completed',
       dropoffOdometer: odometer,
       completedAt,
+      completedVehicle: resolveTripVehicle(trip, completionDriver) || '',
+      completedDriverName: completionDriver?.name || trip.completedDriverName || trip.driverName || '',
     });
     if (role === 'driver') {
       upsertDriverTrip(tripId, nextTrip);
@@ -2061,7 +2073,7 @@ const App = () => {
         diffs.push({ field: key, before: trip?.[key], after: nextTrip?.[key] });
       }
     });
-    const driver = driversRef.current.find(d => d.id === driverId);
+    const driver = completionDriver;
     addAuditLog(
       'Trip Completed',
       `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`,

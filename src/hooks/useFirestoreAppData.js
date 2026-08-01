@@ -6,6 +6,7 @@ import {
   addDoc,
   serverTimestamp,
   writeBatch,
+  runTransaction,
   getDocs,
   getDoc,
   onSnapshot,
@@ -95,6 +96,7 @@ function normalizeTrip(trip) {
 import {
   clearAssignedVehicle,
   planVehicleAssignment,
+  reconcileVehicleOwnership,
   resolveDriverVehicle,
   saveAssignedVehicle,
 } from '../utils/vehiclePersistence';
@@ -106,10 +108,13 @@ function cleanTripCollection(trips = []) {
 
 function normalizeData(data = {}) {
   const rawDrivers = data.drivers || [];
-  const normalizedDrivers = rawDrivers.map(d => {
-    const resolvedVehicle = resolveDriverVehicle(d);
-    return resolvedVehicle && resolvedVehicle !== d.vehicle ? { ...d, vehicle: resolvedVehicle } : d;
+  const explicitDrivers = rawDrivers.map(d => {
+    // Firestore is authoritative for live fleet ownership. Local memory is only
+    // a historical display fallback and must never resurrect an unassignment.
+    const resolvedVehicle = resolveDriverVehicle(d, '', { allowRemembered: false });
+    return resolvedVehicle !== d.vehicle ? { ...d, vehicle: resolvedVehicle } : d;
   });
+  const normalizedDrivers = reconcileVehicleOwnership(explicitDrivers, data.vehicles || []);
 
   return {
     ...DEFAULT_DATA,
@@ -283,7 +288,11 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       setState(prev => ({
         ...prev,
         [field]: normalized[field],
-        ...(field === 'drivers' ? { trips: normalized.trips, trashedTrips: normalized.trashedTrips } : {}),
+        ...((field === 'drivers' || field === 'vehicles') ? {
+          drivers: normalized.drivers,
+          trips: normalized.trips,
+          trashedTrips: normalized.trashedTrips,
+        } : {}),
         loading: false,
         initialized: true,
         error: null,
@@ -637,17 +646,57 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     dataRef.current = { ...normalizeData(dataRef.current), drivers: nextDrivers, vehicles: nextVehicles };
     setState(prev => ({ ...prev, drivers: nextDrivers, vehicles: nextVehicles, saving: true, error: null }));
     try {
-      const batch = writeBatch(db);
-      for (const changedDriver of nextDrivers.filter((item, index) =>
-        item.vehicle !== currentDrivers[index]?.vehicle || item.vehicleId !== currentDrivers[index]?.vehicleId)) {
-        batch.set(doc(db, DRIVER_PROFILE_COLLECTION, changedDriver.id), sanitizeForFirestore(attachTenantScope(changedDriver, activeTenantId)), { merge: true });
-      }
-      for (const changedVehicle of nextVehicles.filter((item, index) =>
-        item.driverId !== currentVehicles[index]?.driverId
-        || item.assignedDriver !== currentVehicles[index]?.assignedDriver)) {
-        batch.set(doc(db, VEHICLE_COLLECTION, changedVehicle.id), sanitizeForFirestore(attachTenantScope(changedVehicle, activeTenantId)), { merge: true });
-      }
-      await batch.commit();
+      await runTransaction(db, async (transaction) => {
+        const targetRef = doc(db, DRIVER_PROFILE_COLLECTION, driverId);
+        const targetSnap = await transaction.get(targetRef);
+        const targetData = targetSnap.exists() ? targetSnap.data() : (currentDrivers.find(item => item.id === driverId) || {});
+        const selectedVehicle = planned.vehicle;
+        const selectedRef = selectedVehicle ? doc(db, VEHICLE_COLLECTION, selectedVehicle.id) : null;
+        const selectedSnap = selectedRef ? await transaction.get(selectedRef) : null;
+        const selectedData = selectedSnap?.exists() ? selectedSnap.data() : selectedVehicle;
+        const priorOccupantId = selectedData?.driverId || selectedData?.assignedDriver || '';
+        const staleOccupantIds = new Set(nextDrivers
+          .filter((item, index) => item.id !== driverId && currentDrivers[index]?.vehicle && !item.vehicle)
+          .map(item => item.id));
+        if (priorOccupantId && priorOccupantId !== driverId) staleOccupantIds.add(priorOccupantId);
+
+        const occupantEntries = [];
+        for (const occupantId of staleOccupantIds) {
+          const occupantRef = doc(db, DRIVER_PROFILE_COLLECTION, occupantId);
+          const occupantSnap = await transaction.get(occupantRef);
+          occupantEntries.push({ occupantRef, occupantSnap });
+        }
+
+        const oldVehicleId = targetData.vehicleId || '';
+        const oldVehicleRef = oldVehicleId && oldVehicleId !== selectedVehicle?.id
+          ? doc(db, VEHICLE_COLLECTION, oldVehicleId)
+          : null;
+        const oldVehicleSnap = oldVehicleRef ? await transaction.get(oldVehicleRef) : null;
+
+        occupantEntries.forEach(({ occupantRef, occupantSnap }) => {
+          if (occupantSnap.exists()) transaction.set(occupantRef, {
+            vehicle: '', vehicleId: '', updatedAtLocal: timestamp,
+          }, { merge: true });
+        });
+        transaction.set(targetRef, sanitizeForFirestore(attachTenantScope({
+          ...targetData,
+          id: driverId,
+          vehicle: selectedVehicle?.name || '',
+          vehicleId: selectedVehicle?.id || '',
+          updatedAtLocal: timestamp,
+        }, activeTenantId)), { merge: true });
+        if (selectedRef) transaction.set(selectedRef, sanitizeForFirestore(attachTenantScope({
+          ...selectedData,
+          id: selectedVehicle.id,
+          name: selectedVehicle.name,
+          driverId,
+          assignedDriver: driverId,
+          updatedAtLocal: timestamp,
+        }, activeTenantId)), { merge: true });
+        if (oldVehicleRef && oldVehicleSnap?.exists()) transaction.set(oldVehicleRef, {
+          driverId: '', assignedDriver: '', updatedAtLocal: timestamp,
+        }, { merge: true });
+      });
       for (const item of nextDrivers) {
         if (item.vehicle) {
           saveAssignedVehicle(item.id, item.vehicle);

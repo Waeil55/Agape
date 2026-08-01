@@ -7,6 +7,7 @@ import {
   clearVehiclePersistence,
   clearAssignedVehicle,
   planVehicleAssignment,
+  reconcileVehicleOwnership,
 } from './vehiclePersistence';
 
 describe('vehiclePersistence', () => {
@@ -33,6 +34,11 @@ describe('vehiclePersistence', () => {
     saveAssignedVehicle('DRV-99', 'Chevy Suburban #99');
     const driver = { id: 'DRV-99', vehicle: '' };
     expect(resolveDriverVehicle(driver)).toBe('Chevy Suburban #99');
+  });
+
+  it('does not resurrect a remembered vehicle when authoritative mode is requested', () => {
+    saveAssignedVehicle('DRV-99', 'Chevy Suburban #99');
+    expect(resolveDriverVehicle({ id: 'DRV-99', vehicle: '' }, '', { allowRemembered: false })).toBe('');
   });
 
   it('resolves trip vehicle from driver when trip completedVehicle is missing', () => {
@@ -73,6 +79,42 @@ describe('vehiclePersistence', () => {
     expect(result.nextVehicles).toEqual([
       { id: 'V-1', name: 'Toyota 001', driverId: 'DRV-2', assignedDriver: 'DRV-2' },
       { id: 'V-2', name: 'Ford 002', driverId: '', assignedDriver: '' },
+    ]);
+  });
+
+  it('clears a duplicate owner identified by vehicleId even when its vehicle name is missing', () => {
+    const result = planVehicleAssignment(
+      [
+        { id: 'DRV-1', vehicle: '', vehicleId: 'V-1' },
+        { id: 'DRV-2', vehicle: '', vehicleId: '' },
+      ],
+      [{ id: 'V-1', name: 'Toyota 001', driverId: 'DRV-1', assignedDriver: 'DRV-1' }],
+      'DRV-2',
+      'Toyota 001',
+    );
+    expect(result.nextDrivers).toEqual([
+      { id: 'DRV-1', vehicle: '', vehicleId: '' },
+      { id: 'DRV-2', vehicle: 'Toyota 001', vehicleId: 'V-1' },
+    ]);
+  });
+
+  it('restores a driver assignment from the authoritative vehicle owner after reload', () => {
+    expect(reconcileVehicleOwnership(
+      [{ id: 'DRV-1', vehicle: '', vehicleId: '' }],
+      [{ id: 'V-1', name: 'Toyota 001', driverId: 'DRV-1' }],
+    )).toEqual([{ id: 'DRV-1', vehicle: 'Toyota 001', vehicleId: 'V-1' }]);
+  });
+
+  it('hides a stale duplicate driver claim when the vehicle belongs to someone else', () => {
+    expect(reconcileVehicleOwnership(
+      [
+        { id: 'DRV-1', vehicle: 'Toyota 001', vehicleId: 'V-1' },
+        { id: 'DRV-2', vehicle: 'Toyota 001', vehicleId: 'V-1' },
+      ],
+      [{ id: 'V-1', name: 'Toyota 001', driverId: 'DRV-2' }],
+    )).toEqual([
+      { id: 'DRV-1', vehicle: '', vehicleId: '' },
+      { id: 'DRV-2', vehicle: 'Toyota 001', vehicleId: 'V-1' },
     ]);
   });
 });
