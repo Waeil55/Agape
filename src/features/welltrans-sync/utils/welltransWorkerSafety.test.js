@@ -385,7 +385,8 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).toContain("drag.addEventListener('pointerdown'");
     expect(operatorConsole).toContain("localStorage.setItem(positionKey");
     expect(operatorConsole).not.toContain('data-action="reindex"');
-    expect(operatorConsole).not.toContain('data-action="detect-date"');
+    expect(operatorConsole).toContain('data-action="detect-date"');
+    expect(operatorConsole).toContain('Use Open Date');
     expect(operatorConsole).not.toContain('data-action="collapse"');
     expect(worker).toContain('await installWellTransOperatorConsole(session.page, handleOperatorCommand)');
     expect(worker).toContain('operatorControl.dateOverride');

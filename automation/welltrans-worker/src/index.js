@@ -55,7 +55,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '4.0.0';
+const workerVersion = '4.0.1';
 const capabilityKernel = createCapabilityKernel(workerInstanceId);
 const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
 const supervisor = createAgentSupervisor([
@@ -273,6 +273,7 @@ async function handleOperatorCommand(action, payload = {}) {
     operatorControl.message = 'Portal grid re-index queued.';
   } else if (action === 'detect-date') {
     operatorControl.dateOverride = '';
+    operatorControl.pendingDateSwitch = '';
     requestedServiceDate = '';
     await persistRequestedServiceDate('');
     operatorControl.forceReconcile = true;

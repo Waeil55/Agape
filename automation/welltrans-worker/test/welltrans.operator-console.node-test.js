@@ -74,7 +74,7 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.ok(layout.top <= 8);
     assert.equal(layout.rows, 1);
     assert.deepEqual(layout.labels, [
-      'Fill Date', 'Review & Verify', 'Pause',
+      'Fill Date', 'Use Open Date', 'Review & Verify', 'Pause',
     ]);
   });
 
@@ -118,21 +118,22 @@ describe('WellTrans one-line operator toolbar', () => {
       label: element.shadowRoot.querySelector('[data-action="fill-date"]').textContent,
       disabled: element.shadowRoot.querySelector('[data-action="fill-date"]').disabled,
     }));
-    assert.deepEqual(switching, { label: 'Switching Date...', disabled: true });
+    assert.deepEqual(switching, { label: 'Retry Date', disabled: false });
     await updateWellTransOperatorConsole(page, {
       selectedDate: '2026-07-28',
       requestedDate: '2026-07-28',
     });
+    await host.locator('[data-action="detect-date"]').click();
     await host.locator('[data-action="verify"]').click();
     await host.locator('[data-action="pause"]').click();
     await host.locator('[data-role="driver"]').selectOption('driver-2');
     await updateWellTransOperatorConsole(page, { state: 'review_error' });
     await host.locator('[data-action="restart"]').click();
     assert.deepEqual(commands.map(item => item.action), [
-      'reconcile', 'switch-date', 'verify', 'pause', 'switch-driver', 'restart',
+      'reconcile', 'switch-date', 'detect-date', 'verify', 'pause', 'switch-driver', 'restart',
     ]);
     assert.equal(commands[1].payload.serviceDate, '2026-07-28');
-    assert.deepEqual(commands[4].payload, {
+    assert.deepEqual(commands[5].payload, {
       type: 'driver', driverId: 'driver-2', driverName: 'Waeil Driver',
     });
   });

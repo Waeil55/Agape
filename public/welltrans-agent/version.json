@@ -1,6 +1,6 @@
 {
-    "publishedAt":  "2026-08-01T20:25:15.1074288Z",
-    "sha256":  "ad735306237fc371c05b47317c3d975fc45d60e46dc19b30494147af0a9d7917",
+    "publishedAt":  "2026-08-01T20:51:53.5941682Z",
+    "sha256":  "3bdb95c42ce1d993d74c8627da5e52c788ece5d031fe9dd50dd3eb64551d59fa",
     "components":  {
                        "automaticUpdater":  "integrated",
                        "localIntelligence":  "integrated_no_external_api",
@@ -13,10 +13,10 @@
                        "brokerTransportBoundary":  "integrated",
                        "capabilityKernel":  "integrated"
                    },
-    "version":  "4.0.0",
+    "version":  "4.0.1",
     "file":  "agape-welltrans-agent.zip",
     "setupFile":  "AgapeWellTransAgentSetup.exe",
-    "setupSha256":  "91ef91ec2f353c98b2d0ad6a2f3226b611057fa6bc8ebd72dd19da52d583a072",
+    "setupSha256":  "0a2fa52145773163c28fb1881fb1f69579e84550c1b5fa6b8d80ac0c2ccfe67b",
     "setupSignatureStatus":  "Unsigned",
     "signed":  false
 }

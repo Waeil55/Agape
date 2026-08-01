@@ -63,11 +63,13 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       <button class="drag" data-role="drag" title="Drag toolbar" aria-label="Drag toolbar">&#8942;&#8942;</button>
       <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
       <span class="state" data-role="state">CONNECTING</span>
+      <span class="metric" title="Date currently detected in the WellTrans itinerary"><b data-role="open-date">--</b> open</span>
       <input data-role="date" type="date" aria-label="Go to WellTrans service date" title="Choose a date; the Agent will navigate WellTrans and verify the exact schedule automatically">
       <select data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
         <option value="all">All drivers</option>
       </select>
       <button class="primary" data-action="fill-date" title="Reconcile and fill the selected date; the Agent verifies the opened WellTrans date before writing">Fill Date</button>
+      <button data-action="detect-date" title="Cancel a pending date switch and use the date currently open in WellTrans">Use Open Date</button>
       <button class="verify" data-action="verify" title="Read every staged field back without clicking Apply">Review &amp; Verify</button>
       <button data-action="pause">Pause</button>
       <button class="restart" data-action="restart" title="Discard an unsafe unsaved session and start clean" hidden>Reset Session</button>
@@ -141,7 +143,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     const date = $('[data-role="date"]');
     if (date) date.disabled = busy;
     const fill = $('[data-action="fill-date"]');
-    if (fill) fill.disabled = busy || state.dateSwitchPending;
+    if (fill) {
+      fill.disabled = busy;
+      if (!busy && state.dateSwitchPending) fill.textContent = 'Retry Date';
+    }
     if (message) {
       $('[data-role="message"]').textContent = message;
       $('[data-role="message"]').title = message;
@@ -179,11 +184,11 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     const action = button.dataset.action;
     if (action === 'fill-date') {
       const requestedDate = $('[data-role="date"]').value;
-      if (requestedDate && requestedDate !== state.selectedDate && requestedDate !== state.requestedDate) {
+      if (requestedDate && requestedDate !== state.selectedDate) {
         state.requestedDate = requestedDate;
         state.dateSwitchPending = true;
         send('switch-date', { serviceDate: requestedDate });
-      } else if (!state.dateSwitchPending) {
+      } else {
         send('reconcile');
       }
       return;
@@ -265,10 +270,11 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       }
       const fill = $('[data-action="fill-date"]');
       if (fill) {
-        fill.disabled = state.busy || state.dateSwitchPending;
-        fill.textContent = state.dateSwitchPending ? 'Switching Date...' : 'Fill Date';
+        fill.disabled = state.busy;
+        fill.textContent = state.dateSwitchPending ? 'Retry Date' : 'Fill Date';
       }
       set('version', next.version ? `v${next.version}` : '');
+      set('open-date', state.selectedDate || '--');
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());
       set('staged', next.staged ?? 0);
       set('pending', next.pending ?? 0);
