@@ -73,6 +73,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       <span class="manual" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
     </section>`;
   document.documentElement.appendChild(host);
+  const hostGuard = new MutationObserver(() => {
+    if (!host.isConnected && document.documentElement) document.documentElement.appendChild(host);
+  });
+  hostGuard.observe(document.documentElement, { childList: true });
 
   const $ = selector => shadow.querySelector(selector);
   const state = { busy: false, paused: false, commandSequence: 0, selectedDate: '' };
@@ -206,20 +210,36 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
 
 export async function installWellTransOperatorConsole(page, onCommand) {
   if (!page || page.isClosed()) return;
-  if (!page.__agapeOperatorBindingInstalled) {
-    await page.exposeBinding(COMMAND_BINDING, async (_source, action, payload) =>
+  const context = page.context();
+  if (!context.__agapeOperatorBindingInstalled) {
+    await context.exposeBinding(COMMAND_BINDING, async (_source, action, payload) =>
       onCommand(String(action || ''), payload || {}));
-    page.__agapeOperatorBindingInstalled = true;
+    context.__agapeOperatorBindingInstalled = true;
   }
   const options = {
     consoleId: CONSOLE_ID,
     commandBinding: COMMAND_BINDING,
     positionKey: POSITION_KEY,
   };
-  await page.addInitScript(consoleBootstrap, options);
-  const inject = () => page.evaluate(consoleBootstrap, options).catch(() => {});
-  page.on('domcontentloaded', inject);
-  await inject();
+  if (!context.__agapeOperatorInitInstalled) {
+    await context.addInitScript(consoleBootstrap, options);
+    context.__agapeOperatorInitInstalled = true;
+  }
+  const attach = async (candidatePage) => {
+    if (!candidatePage || candidatePage.isClosed() || candidatePage.__agapeOperatorConsoleAttached) return;
+    candidatePage.__agapeOperatorConsoleAttached = true;
+    const inject = () => candidatePage.evaluate(consoleBootstrap, options).catch(() => {});
+    candidatePage.on('domcontentloaded', inject);
+    candidatePage.on('load', inject);
+    candidatePage.__agapeOperatorWatchdog = setInterval(inject, 1000);
+    candidatePage.on('close', () => clearInterval(candidatePage.__agapeOperatorWatchdog));
+    await inject();
+  };
+  if (!context.__agapeOperatorPageListenerInstalled) {
+    context.on('page', candidatePage => attach(candidatePage).catch(() => {}));
+    context.__agapeOperatorPageListenerInstalled = true;
+  }
+  await Promise.all(context.pages().map(attach));
 }
 
 export async function updateWellTransOperatorConsole(page, state) {

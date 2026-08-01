@@ -50,7 +50,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.8.7';
+const workerVersion = '3.8.8';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let reviewSessionId = '';
@@ -244,7 +244,7 @@ async function handleOperatorCommand(action, payload = {}) {
 async function updateOperatorConsole(page, summary = {}, extra = {}) {
   await updateWellTransOperatorConsole(page, {
     version: workerVersion,
-    selectedDate: activeServiceDate || requestedServiceDate || '',
+    selectedDate: extra.selectedDate || activeServiceDate || requestedServiceDate || '',
     state: extra.state || (operatorControl.autoRun ? 'online' : 'paused'),
     message: extra.message || operatorControl.message,
     autoRun: operatorControl.autoRun,
@@ -314,27 +314,36 @@ async function selectExactRequestedSchedule(page, serviceDate) {
     `${month}/${day}/${year}`,
     `${month}-${day}-${year}`,
     `[${month}-${day}-${year}]`,
+    `${Number(month)}/${Number(day)}/${year}`,
+    `${Number(month)}-${Number(day)}-${year}`,
   ]);
+  const normalizeLabel = value => String(value || '').trim().replace(/\s+/g, ' ');
   const exactMatches = [];
   for (const frame of page.frames()) {
+    const dateInputs = frame.locator('input[type="date"]:visible');
+    for (let index = 0; index < await dateInputs.count().catch(() => 0); index += 1) {
+      const input = dateInputs.nth(index);
+      await input.fill(serviceDate).catch(() => {});
+      await input.dispatchEvent('change').catch(() => {});
+    }
     const candidates = frame.locator(
-      '.GridCell:visible, [role="gridcell"]:visible, option:visible, [role="option"]:visible',
+      '.GridCell:visible, [role="gridcell"]:visible, option:visible, [role="option"]:visible, td:visible, button:visible, a:visible',
     );
-    const count = Math.min(await candidates.count().catch(() => 0), 250);
+    const count = Math.min(await candidates.count().catch(() => 0), 1000);
     for (let index = 0; index < count; index += 1) {
       const candidate = candidates.nth(index);
       const value = await candidate.evaluate(element =>
-        String(element.title || element.textContent || '').trim()).catch(() => '');
-      if (exactLabels.has(value)) exactMatches.push(candidate);
+        String(element.title || element.value || element.textContent || '').trim()).catch(() => '');
+      if (exactLabels.has(normalizeLabel(value))) exactMatches.push(candidate);
     }
   }
-  if (exactMatches.length !== 1) return false;
+  if (!exactMatches.length) return false;
 
-  await exactMatches[0].click({ force: true });
+  await exactMatches[0].click({ force: true }).catch(() => {});
   for (const frame of page.frames()) {
     const proceed = frame.getByRole('button', { name: 'Proceed', exact: true }).last();
     if (await proceed.isVisible().catch(() => false)) {
-      await proceed.click();
+      await proceed.click({ force: true });
       break;
     }
   }
@@ -364,9 +373,18 @@ async function waitForRequestedSchedule(page, selectedDate) {
     const editOpen = await isEditItineraryOpen(page);
     if (!editOpen && Date.now() - lastAutomaticSelectionAttempt >= 3000) {
       lastAutomaticSelectionAttempt = Date.now();
-      const scheduleControl = page.locator('.ChangeSchedule[title="Select Schedule"]:visible').last();
-      if (await scheduleControl.count()) {
-        await scheduleControl.click({ force: true }).catch(() => {});
+      let scheduleOpened = false;
+      for (const frame of page.frames()) {
+        const scheduleControl = frame.locator(
+          '.ChangeSchedule[title="Select Schedule"]:visible, .ChangeSchedule:visible, [title="Select Schedule"]:visible',
+        ).last();
+        if (await scheduleControl.isVisible().catch(() => false)) {
+          await scheduleControl.click({ force: true }).catch(() => {});
+          scheduleOpened = true;
+          break;
+        }
+      }
+      if (scheduleOpened) {
         await page.waitForTimeout(100);
         await selectExactRequestedSchedule(page, requestedServiceDate).catch(() => false);
       }
@@ -381,6 +399,7 @@ async function waitForRequestedSchedule(page, selectedDate) {
     }, { merge: true });
     activeServiceDate = currentDate;
     await updateOperatorConsole(page, {}, {
+      selectedDate: requestedServiceDate,
       state: editOpen ? 'manual_review_required' : 'switching_date',
       message: operatorControl.message,
     });
@@ -1545,6 +1564,17 @@ async function main() {
     keepOpen: true,
     reuseSession: true,
     onWaiting: () => publishHeartbeat('waiting_for_login').catch(() => {}),
+    onBrowserReady: async (page) => {
+      await installWellTransOperatorConsole(page, handleOperatorCommand);
+      const requestedDate = await readEffectiveRequestedServiceDate();
+      await updateOperatorConsole(page, {}, {
+        state: 'waiting_for_login',
+        selectedDate: requestedDate,
+        message: requestedDate
+          ? `Sign in if required. The Agent will open Trips - Assigned, select ${requestedDate}, and fill automatically.`
+          : 'Sign in if required. The Agent will locate Trips - Assigned automatically.',
+      });
+    },
   });
   try {
     await installWellTransOperatorConsole(session.page, handleOperatorCommand);

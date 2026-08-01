@@ -53,9 +53,11 @@ export async function performManualLogin({
   keepOpen = false,
   reuseSession = false,
   onWaiting = null,
+  onBrowserReady = null,
 } = {}) {
   const { browser, context, page } = await openWellTransBrowser({ headed: true, withoutSession: !reuseSession });
   await page.goto(process.env.WELLTRANS_PORTAL_URL, { waitUntil: 'domcontentloaded' });
+  await onBrowserReady?.(page);
 
   const username = process.env.WELLTRANS_USERNAME || '';
   const password = process.env.WELLTRANS_PASSWORD || '';
