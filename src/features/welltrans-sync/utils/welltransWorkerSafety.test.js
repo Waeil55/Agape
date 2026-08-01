@@ -245,6 +245,11 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).toContain('data-role="driver"');
     expect(operatorConsole).toContain("send('switch-driver'");
     expect(operatorConsole).toContain('state.scopeLocked');
+    expect(operatorConsole).toContain("send('switch-date'");
+    expect(operatorConsole).toContain('Switching Date…');
+    expect(worker).toContain('await selectExactRequestedSchedule(page, requestedServiceDate)');
+    expect(worker).toContain('currentDate === requestedServiceDate');
+    expect(worker).toContain('requestedDate: requestedServiceDate');
   });
 
   it('marks a driver batch done only after every scoped trip is live-verified', () => {

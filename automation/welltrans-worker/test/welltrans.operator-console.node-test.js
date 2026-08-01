@@ -98,11 +98,20 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.equal(Math.round(after.width), Math.round(before.width));
   });
 
-  it('uses one fill action for opened and manually selected dates', async () => {
+  it('navigates immediately when the operator chooses a different date and waits for verification', async () => {
     const host = page.locator('#agape-welltrans-operator-console');
     await host.locator('[data-action="fill-date"]').click();
     await host.locator('[data-role="date"]').fill('2026-07-28');
-    await host.locator('[data-action="fill-date"]').click();
+    await host.locator('[data-role="date"]').press('Tab');
+    const switching = await host.evaluate(element => ({
+      label: element.shadowRoot.querySelector('[data-action="fill-date"]').textContent,
+      disabled: element.shadowRoot.querySelector('[data-action="fill-date"]').disabled,
+    }));
+    assert.deepEqual(switching, { label: 'Switching Date…', disabled: true });
+    await updateWellTransOperatorConsole(page, {
+      selectedDate: '2026-07-28',
+      requestedDate: '2026-07-28',
+    });
     await host.locator('[data-action="verify"]').click();
     await host.locator('[data-action="pause"]').click();
     await host.locator('[data-role="driver"]').selectOption('driver-2');

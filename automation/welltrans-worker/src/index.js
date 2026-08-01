@@ -51,7 +51,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '3.9.1';
+const workerVersion = '3.9.2';
 let requestedServiceDate = '';
 let activeServiceDate = '';
 let activeRunScope = { type: 'all', driverId: '', driverName: '' };
@@ -306,6 +306,7 @@ async function updateOperatorConsole(page, summary = {}, extra = {}) {
   await updateWellTransOperatorConsole(page, {
     version: workerVersion,
     selectedDate: extra.selectedDate || activeServiceDate || requestedServiceDate || '',
+    requestedDate: extra.requestedDate ?? requestedServiceDate ?? '',
     state: extra.state || (operatorControl.autoRun ? 'online' : 'paused'),
     message: extra.message || operatorControl.message,
     autoRun: operatorControl.autoRun,
@@ -467,7 +468,8 @@ async function waitForRequestedSchedule(page, selectedDate) {
     }, { merge: true });
     activeServiceDate = currentDate;
     await updateOperatorConsole(page, {}, {
-      selectedDate: requestedServiceDate,
+      selectedDate: currentDate,
+      requestedDate: requestedServiceDate,
       state: editOpen ? 'manual_review_required' : 'switching_date',
       message: operatorControl.message,
     });

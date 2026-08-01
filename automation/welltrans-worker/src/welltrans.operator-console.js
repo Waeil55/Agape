@@ -62,7 +62,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       <button class="drag" data-role="drag" title="Drag toolbar" aria-label="Drag toolbar">&#8942;&#8942;</button>
       <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
       <span class="state" data-role="state">CONNECTING</span>
-      <input data-role="date" type="date" aria-label="Service date">
+      <input data-role="date" type="date" aria-label="Go to WellTrans service date" title="Choose a date; the Agent will navigate WellTrans and verify the exact schedule automatically">
       <select data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
         <option value="all">All drivers</option>
       </select>
@@ -84,7 +84,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   hostGuard.observe(document.documentElement, { childList: true });
 
   const $ = selector => shadow.querySelector(selector);
-  const state = { busy: false, paused: false, commandSequence: 0, selectedDate: '', selectedDriverId: 'all', scopeLocked: false };
+  const state = {
+    busy: false, paused: false, commandSequence: 0, selectedDate: '', requestedDate: '',
+    selectedDriverId: 'all', scopeLocked: false, dateSwitchPending: false,
+  };
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
   try {
@@ -136,6 +139,8 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     if (driver) driver.disabled = busy || state.scopeLocked;
     const date = $('[data-role="date"]');
     if (date) date.disabled = busy || state.scopeLocked;
+    const fill = $('[data-action="fill-date"]');
+    if (fill) fill.disabled = busy || state.dateSwitchPending;
     if (message) {
       $('[data-role="message"]').textContent = message;
       $('[data-role="message"]').title = message;
@@ -173,14 +178,29 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     const action = button.dataset.action;
     if (action === 'fill-date') {
       const requestedDate = $('[data-role="date"]').value;
-      if (requestedDate && requestedDate !== state.selectedDate) {
+      if (requestedDate && requestedDate !== state.selectedDate && requestedDate !== state.requestedDate) {
+        state.requestedDate = requestedDate;
+        state.dateSwitchPending = true;
         send('switch-date', { serviceDate: requestedDate });
-      } else {
+      } else if (!state.dateSwitchPending) {
         send('reconcile');
       }
       return;
     }
     send(action);
+  });
+
+  $('[data-role="date"]').addEventListener('change', event => {
+    const serviceDate = String(event.target.value || '');
+    if (!serviceDate || serviceDate === state.selectedDate || serviceDate === state.requestedDate) return;
+    state.requestedDate = serviceDate;
+    state.dateSwitchPending = true;
+    const fill = $('[data-action="fill-date"]');
+    if (fill) {
+      fill.disabled = true;
+      fill.textContent = 'Switching Date…';
+    }
+    send('switch-date', { serviceDate });
   });
 
   $('[data-role="driver"]').addEventListener('change', event => {
@@ -199,10 +219,15 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         const element = $(`[data-role="${role}"]`);
         if (element && value !== undefined && value !== null) element.textContent = String(value);
       };
-      if (next.selectedDate) {
-        state.selectedDate = next.selectedDate;
-        $('[data-role="date"]').value = next.selectedDate;
+      if (next.selectedDate !== undefined) state.selectedDate = String(next.selectedDate || '');
+      if (next.requestedDate !== undefined) state.requestedDate = String(next.requestedDate || '');
+      const desiredDate = state.requestedDate || state.selectedDate;
+      if (desiredDate) {
+        $('[data-role="date"]').value = desiredDate;
       }
+      state.dateSwitchPending = Boolean(
+        state.requestedDate && state.selectedDate && state.requestedDate !== state.selectedDate,
+      );
       const driver = $('[data-role="driver"]');
       if (driver && Array.isArray(next.driverOptions)) {
         const options = [{ id: 'all', name: `All drivers (${next.allDriverTripCount ?? next.expected ?? 0})` }, ...next.driverOptions];
@@ -236,6 +261,11 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         date.title = state.scopeLocked
           ? 'Finish reviewing or close the current staged batch before changing dates.'
           : 'Service date';
+      }
+      const fill = $('[data-action="fill-date"]');
+      if (fill) {
+        fill.disabled = state.busy || state.dateSwitchPending;
+        fill.textContent = state.dateSwitchPending ? 'Switching Date…' : 'Fill Date';
       }
       set('version', next.version ? `v${next.version}` : '');
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());

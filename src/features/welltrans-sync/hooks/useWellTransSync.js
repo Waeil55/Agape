@@ -14,7 +14,7 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '3.9.1';
+const REQUIRED_WORKER_VERSION = '3.9.2';
 
 export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
