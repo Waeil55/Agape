@@ -15,7 +15,8 @@ import {
   categorizeFailure, FAILURE_CATEGORIES,
 } from '../services/welltransService';
 import {
-  buildWellTransPayload, DEFAULT_WELLTRANS_FIELD_MAPPING, validateTripForWellTrans,
+  buildWellTransPayload, DEFAULT_WELLTRANS_FIELD_MAPPING, hydrateWellTransTrip,
+  validateTripForWellTrans,
 } from '../utils/welltransMapping';
 import { pageWellTransRows, WELLTRANS_TABLE_PAGE_SIZE } from '../utils/welltransScale';
 
@@ -29,15 +30,26 @@ const statusStyle = {
 
 const AUTHORIZED_ROLES = ['admin', 'superadmin', 'dispatcher', 'manager', 'biller', 'owner'];
 const TABLE_PAGE_SIZE = WELLTRANS_TABLE_PAGE_SIZE;
+const statusLabel = {
+  pending: 'Queued',
+  processing: 'Filling',
+  awaiting_review: 'Ready to review',
+  completed: 'Applied & verified',
+  failed: 'Needs correction',
+};
 
-const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
+const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const hydratedTrips = useMemo(
+    () => trips.map(trip => hydrateWellTransTrip(trip, drivers)),
+    [trips, drivers],
+  );
   const {
-    settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, canary, manifest, coverage,
+    settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, canary, coverage,
     workerOnline, workerCalibrated, workerUpgradeRequired,
     requiredWorkerVersion, workerStandby, loading, completedTrips, readyTrips,
     latestByTrip, healthScore, successfulCount,
-  } = useWellTransSync(trips, syncDate);
+  } = useWellTransSync(hydratedTrips, syncDate);
 
   const [selectedIds, setSelectedIds] = useState([]);
   const [tab, setTab] = useState('queue');
@@ -130,7 +142,6 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     Number(operations.staleProcessingCount || 0) > 0
     || Number(operations.blockedDateCount || 0) > 0
     || (liveActiveAgentCount === 0 && Number(operations.activeWorkerCount || 0) === 0)
-    || (operations.canaryPassed === false && !canaryHealthy)
   ));
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const stagedCount = currentLogs.filter(l =>
@@ -138,7 +149,6 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     && (!worker?.reviewSessionId || l.reviewSessionId === worker.reviewSessionId)).length;
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
   const retryableFailed = failedLogs.filter(isWellTransFailureRetryable);
-  const unmatchedCount = failedLogs.length - retryableFailed.length;
 
   const { autoLog } = useWellTransAutoSync({
     settings: effectiveSettings, worker, readyTrips, retryableFailed,
@@ -159,18 +169,22 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       const q = searchQuery.toLowerCase().trim();
       const bid = (trip.bookingId || trip.id || '').toLowerCase();
       const patient = (trip.patient || trip.clientName || '').toLowerCase();
-      const driver = (trip.driverName || '').toLowerCase();
+      const driver = (trip.completedDriverName || trip._payload?.driver || trip.driverName || '').toLowerCase();
       if (q && !bid.includes(q) && !patient.includes(q) && !driver.includes(q)) return false;
       if (statusFilter === 'all') return true;
       const latest = latestByTrip.get(trip.id);
       if (statusFilter === 'ready') return trip._valid && !latest;
       if (statusFilter === 'staged') return latest?.status === 'awaiting_review';
-      if (statusFilter === 'completed') return latest?.status === 'completed';
+      if (statusFilter === 'synced') return latest?.status === 'completed';
       if (statusFilter === 'failed') return latest?.status === 'failed';
       if (statusFilter === 'invalid') return !trip._valid;
       return true;
     });
   }, [enrichedTrips, searchQuery, statusFilter, latestByTrip]);
+  const selectableFilteredTrips = useMemo(
+    () => filteredTrips.filter(trip => trip._valid),
+    [filteredTrips],
+  );
   const queuePageCount = Math.max(1, Math.ceil(filteredTrips.length / TABLE_PAGE_SIZE));
   const displayedTrips = useMemo(
     () => pageWellTransRows(filteredTrips, queuePage),
@@ -198,16 +212,32 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
 
   const runQueue = useCallback(async (ids, mode) => {
     if (!ids.length) return setNotice('No eligible trips selected.');
-    setBusy(mode); setNotice(''); setSyncProgress({ done: 0, total: ids.length });
+    const requestedIds = mode === 'selected'
+      ? ids.filter(id => !latestByTrip.get(id))
+      : ids;
+    const alreadyCovered = mode === 'selected'
+      ? ids.filter(id => ['pending', 'processing', 'awaiting_review', 'completed'].includes(latestByTrip.get(id)?.status)).length
+      : 0;
+    const needsCorrection = mode === 'selected'
+      ? ids.filter(id => latestByTrip.get(id)?.status === 'failed').length
+      : 0;
+    if (!requestedIds.length) {
+      setNotice(`${ids.length} trip(s) selected: ${alreadyCovered} already in progress or verified`
+        + `${needsCorrection ? `, ${needsCorrection} needing correction` : ''}.`);
+      return;
+    }
+    setBusy(mode); setNotice(''); setSyncProgress({ done: 0, total: requestedIds.length });
     try {
-      const result = await queueWellTransSync(ids, mode, syncDate);
-      setNotice(`${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued. ${result.data.rejected || 0} rejected.`);
-      setSyncProgress({ done: result.data.queued + (result.data.rejected || 0), total: ids.length });
+      const result = await queueWellTransSync(requestedIds, mode, syncDate);
+      setNotice(`${result.data.queued} trip${result.data.queued === 1 ? '' : 's'} queued`
+        + `${alreadyCovered ? `, ${alreadyCovered} already covered` : ''}`
+        + `${needsCorrection ? `, ${needsCorrection} needing correction` : ''}.`);
+      setSyncProgress({ done: result.data.queued + (result.data.rejected || 0), total: requestedIds.length });
       setSelectedIds([]);
       setTimeout(() => setSyncProgress(null), 5000);
     } catch (e) { setNotice(e.message || 'Unable to create queue.'); setSyncProgress(null); }
     finally { setBusy(''); }
-  }, [syncDate]);
+  }, [latestByTrip, syncDate]);
 
   const startAndFillDate = useCallback(async () => {
     if (!settings.enabled || busy) return;
@@ -235,12 +265,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
         total: result.data.expected || completedTrips.length,
       });
       setNotice(result.data.orchestrated != null
-        ? `Durable reconciliation dispatched for ${syncDate}: ${result.data.orchestrated} completed trips across ${result.data.shardCount || 0} recoverable task shard(s).`
-        : `Full-date reconciliation requested for ${syncDate}: ${result.data.expected || completedTrips.length} completed, `
+        ? `${result.data.orchestrated} completed trips prepared for ${syncDate}. The Agent will reconcile every trip.`
+        : `${result.data.expected || completedTrips.length} completed trips prepared: `
           + `${result.data.queued} queued, ${result.data.covered || 0} already covered, `
-          + `${result.data.rejected || 0} blocked for correction.`);
+          + `${result.data.rejected || 0} requiring correction.`);
       setSelectedIds([]);
       setTimeout(() => setSyncProgress(null), 5000);
+      setTimeout(() => setNotice(''), 8000);
     } catch (error) {
       setNotice(error.message || 'The agent was requested, but trips could not be queued.');
       setSyncProgress(null);
@@ -279,7 +310,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
-        setSelectedIds(filteredTrips.map(t => t.id));
+        setSelectedIds(filteredTrips.filter(t => t._valid).map(t => t.id));
       }
       if (e.key === 'Escape') {
         setSelectedIds([]);
@@ -328,7 +359,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
     else if (type === 'invalid') setSelectedIds(enrichedTrips.filter(t => !t._valid).map(t => t.id));
     else if (type === 'retryable') setSelectedIds(retryableFailed.map(l => l.tripId).filter(id => enrichedTrips.some(t => t.id === id)));
     else if (type === 'ready') setSelectedIds(readyTrips.map(t => t.id));
-    else if (type === 'invert') setSelectedIds(ids => filteredTrips.map(t => t.id).filter(id => !ids.includes(id)));
+    else if (type === 'invert') setSelectedIds(ids => filteredTrips.filter(t => t._valid).map(t => t.id).filter(id => !ids.includes(id)));
     else if (type === 'none') setSelectedIds([]);
   };
 
@@ -344,13 +375,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
   };
 
   const exportAllTripsCSV = () => {
-    const headers = ['Booking ID', 'Passenger', 'Driver', 'Pickup Time', 'Dropoff Time', 'Mileage', 'Validation', 'Sync Status', 'Error'];
+    const headers = ['Booking ID', 'Passenger', 'Driver', 'Pickup Time', 'Dropoff Time', 'End Odometer', 'Validation', 'Sync Status', 'Error'];
     const rows = enrichedTrips.map(trip => {
       const log = latestByTrip.get(trip.id);
       return [
         `"${trip.bookingId || trip.id || ''}"`,
         `"${(trip.patient || trip.clientName || '').replace(/"/g, '""')}"`,
-        `"${(trip.driverName || '').replace(/"/g, '""')}"`,
+        `"${(trip.completedDriverName || trip._payload?.driver || '').replace(/"/g, '""')}"`,
         `"${trip._payload?.pickup?.arrival || ''}"`,
         `"${trip._payload?.dropoff?.arrival || ''}"`,
         `"${trip._payload?.dropoff?.mileage ?? ''}"`,
@@ -395,13 +426,6 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             >
               Windows install help
             </button>
-            <button
-              onClick={startAndFillDate}
-              disabled={!settings.enabled || Boolean(busy)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 transition"
-            >
-              <Play size={13} className="fill-current" /> Reconcile & Fill {syncDate}
-            </button>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="relative flex h-2.5 w-2.5">
                 <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${workerHealthy ? 'bg-emerald-400 opacity-75' : 'bg-amber-400 opacity-75'}`} />
@@ -434,13 +458,10 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2.5">
         <div className="flex items-center gap-4 overflow-x-auto">
           {[
-            { label: 'Total', value: completedTrips.length, color: 'text-slate-900' },
-            { label: 'Verified', value: coverage.verified, color: 'text-blue-600' },
-            { label: 'Synced', value: successfulCount, color: 'text-emerald-600' },
-            { label: 'Review', value: stagedCount, color: 'text-purple-600' },
-            { label: 'Failed', value: failedLogs.length, color: 'text-rose-600' },
-            { label: 'Missing', value: coverage.missingCount, color: coverage.missingCount ? 'text-rose-600' : 'text-emerald-600' },
-            { label: 'Blocked', value: coverage.blockedCount, color: coverage.blockedCount ? 'text-rose-600' : 'text-emerald-600' },
+            { label: 'Completed trips', value: completedTrips.length, color: 'text-slate-900' },
+            { label: 'Ready for review', value: stagedCount, color: 'text-purple-600' },
+            { label: 'Applied & verified', value: successfulCount, color: 'text-emerald-600' },
+            { label: 'Needs correction', value: failedLogs.length, color: 'text-rose-600' },
             { label: 'Coverage', value: `${healthScore}%`, color: coverage.coverageComplete ? 'text-emerald-600' : 'text-amber-600' },
           ].map(({ label, value, color }) => (
             <div key={label} className="flex items-center gap-1.5 shrink-0">
@@ -456,7 +477,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
         <div className="flex items-center gap-3 overflow-x-auto">
           <div className="flex shrink-0 items-center gap-2 pr-2">
             <Activity size={13} className="text-slate-500" />
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Agent fleet</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Current agents</span>
             <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
               activeWorkers.length ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
             }`}>
@@ -523,17 +544,17 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
           </span>
         </div>
       )}
-      {agentRelease?.signed === false && (
+      {agentRelease?.signed === false && showInstallHelp && (
         <div className="shrink-0 flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-[11px] font-semibold text-amber-800">
           <ShieldCheck size={13} className="shrink-0" />
           The current Agent package is integrity-checked but not Authenticode-signed. Organization-managed Windows computers may require a trusted publisher certificate.
         </div>
       )}
       {notice && (
-        <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs font-medium text-amber-800">
-          <AlertTriangle size={14} className="shrink-0" />
+        <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200 text-xs font-medium text-blue-800">
+          <CheckCircle2 size={14} className="shrink-0" />
           <span className="flex-1">{notice}</span>
-          <button onClick={() => setNotice('')} className="text-amber-500 hover:text-amber-700"><X size={14} /></button>
+          <button onClick={() => setNotice('')} className="text-blue-500 hover:text-blue-700"><X size={14} /></button>
         </div>
       )}
 
@@ -554,12 +575,14 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
             {busy === 'start-fill' ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
             Reconcile & Fill Date ({completedTrips.length})
           </button>
-          <button disabled={!workerBatchReady || !stagedCount || Boolean(busy)}
-            onClick={confirmReviewBatchApplied}
-            className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-40 transition">
-            <CheckCircle2 size={12} className="inline mr-1" />
-            I Applied Current Batch ({stagedCount})
-          </button>
+          {stagedCount > 0 && (
+            <button disabled={!workerBatchReady || Boolean(busy)}
+              onClick={confirmReviewBatchApplied}
+              className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-40 transition">
+              <CheckCircle2 size={12} className="inline mr-1" />
+              Confirm Applied Batch ({stagedCount})
+            </button>
+          )}
           <button disabled={!settings.enabled || !selectedIds.length || Boolean(busy)}
             onClick={() => runQueue(selectedIds, 'selected')}
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition">
@@ -607,7 +630,9 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               )}
             </div>
           )}
-          {worker?.verificationAgent && (
+          {worker?.verificationAgent
+            && (worker.verificationAgent.state !== 'idle'
+              || Number(worker.verificationAgent.checked || 0) > 0) && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-800"
               title="Independent deterministic read-back. AI cannot authorize transportation-record changes.">
               <ShieldCheck size={12} />
@@ -625,7 +650,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
 
       {/* Worker warnings */}
       {(workerUpgradeRequired || workerReviewError || workerNeedsDate
-        || (workerCalibrated && !workerDateMatches) || unmatchedCount > 0
+        || (workerCalibrated && !workerDateMatches)
         || coverage.missingCount > 0 || coverage.invalid > 0) && (
         <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2 space-y-1.5">
           {workerReviewError && (
@@ -654,25 +679,13 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               In the open WellTrans schedule chooser, select {worker?.requestedDate || syncDate}. The agent is paused and will never write to {worker?.selectedDate || 'the currently open date'}.
             </div>
           )}
-          {unmatchedCount > 0 && (
-            <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px] font-medium text-amber-700">
-              <AlertTriangle size={13} /> {unmatchedCount} trip(s) with unmatched Booking IDs
-            </div>
-          )}
           {(coverage.missingCount > 0 || coverage.invalid > 0) && (
             <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
               <span>
-                Date is not complete: {coverage.missingCount} completed trip(s) are not queued or verified
-                and {coverage.invalid} have incomplete Agape source data. Reconcile &amp; Fill will include
-                every completed trip and keep Apply confirmation locked until coverage reaches 100%.
+                {coverage.missingCount + coverage.invalid} completed trip(s) need attention before this date is ready.
+                Reconcile &amp; Fill checks every completed trip automatically.
               </span>
-            </div>
-          )}
-          {manifest?.state === 'blocked' && (
-            <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
-              <ShieldCheck size={13} className="mt-0.5 shrink-0" />
-              <span>Server reconciliation is blocked: {manifest.blockedCount || 0} trip(s) require correction.</span>
             </div>
           )}
         </div>
@@ -682,10 +695,8 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <div className="shrink-0 flex items-center gap-1 border-b border-slate-200 bg-white px-4 py-1.5">
           {[
-            { id: 'queue', label: 'Queue', count: completedTrips.length },
-            { id: 'logs', label: 'Logs', count: logs.length },
-            { id: 'activity', label: 'Activity', icon: Zap },
-            { id: 'retry', label: 'Auto-Retry', icon: RotateCcw },
+            { id: 'queue', label: 'Completed trips', count: completedTrips.length },
+            { id: 'logs', label: 'Run history', count: currentLogs.length },
             { id: 'settings', label: 'Settings' },
           ].map(({ id, label, count, icon: Icon }) => (
             <button key={id} onClick={() => {
@@ -707,12 +718,12 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               </div>
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-700 outline-none">
-                <option value="all">All</option>
-                <option value="ready">Ready</option>
+                <option value="all">All completed trips</option>
+                <option value="ready">Not queued</option>
                 <option value="staged">Review</option>
-                <option value="completed">Synced</option>
-                <option value="failed">Failed</option>
-                <option value="invalid">Invalid</option>
+                <option value="synced">Applied &amp; verified</option>
+                <option value="failed">Needs correction</option>
+                <option value="invalid">Incomplete source data</option>
               </select>
             </div>
           )}
@@ -739,15 +750,17 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                 <tr>
                   <th className="px-3 py-2 font-semibold text-slate-500 w-8">
                     <input type="checkbox" className="rounded border-slate-300"
-                      onChange={() => setSelectedIds(ids => ids.length === filteredTrips.length ? [] : filteredTrips.map(t => t.id))}
-                      checked={selectedIds.length === filteredTrips.length && filteredTrips.length > 0} />
+                      onChange={() => setSelectedIds(ids => selectableFilteredTrips.every(t => ids.includes(t.id))
+                        ? ids.filter(id => !selectableFilteredTrips.some(t => t.id === id))
+                        : [...new Set([...ids, ...selectableFilteredTrips.map(t => t.id)])])}
+                      checked={selectableFilteredTrips.length > 0 && selectableFilteredTrips.every(t => selectedIds.includes(t.id))} />
                   </th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Booking</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Passenger</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Driver</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Pickup</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Dropoff</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Miles</th>
+                  <th className="px-3 py-2 font-semibold text-slate-500">End odometer</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Validation</th>
                   <th className="px-3 py-2 font-semibold text-slate-500">Status</th>
                   <th className="px-3 py-2 font-semibold text-slate-500 text-right">Actions</th>
@@ -758,19 +771,18 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                   <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-slate-400">No trips for this date.</td></tr>
                 ) : displayedTrips.map(trip => {
                   const latest = latestByTrip.get(trip.id);
-                  const locked = ['pending', 'processing', 'completed', 'awaiting_review'].includes(latest?.status);
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
                   return (
                     <tr key={trip.id} className="hover:bg-slate-50/50 cursor-pointer group" onClick={() => setTripDrawer(trip)}>
                       <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
-                        <input type="checkbox" disabled={!trip._valid || locked || unmatched}
+                        <input type="checkbox" disabled={!trip._valid}
                           checked={selectedIds.includes(trip.id)}
                           onChange={() => setSelectedIds(ids => ids.includes(trip.id) ? ids.filter(id => id !== trip.id) : [...ids, trip.id])}
                           className="rounded border-slate-300" />
                       </td>
                       <td className="px-3 py-2 font-mono font-semibold text-blue-600">{trip.bookingId || trip.id}</td>
                       <td className="px-3 py-2 font-medium text-slate-900">{trip.patient || trip.clientName || '—'}</td>
-                      <td className="px-3 py-2 text-slate-600">{trip.driverName || '—'}</td>
+                      <td className="px-3 py-2 text-slate-600">{trip.completedDriverName || trip._payload?.driver || '—'}</td>
                       <td className="px-3 py-2 text-slate-600 font-mono">{trip._payload?.pickup?.arrival || '—'}</td>
                       <td className="px-3 py-2 text-slate-600 font-mono">{trip._payload?.dropoff?.arrival || '—'}</td>
                       <td className="px-3 py-2 font-mono">{trip._payload?.dropoff?.mileage != null ? <span className="text-emerald-600 font-semibold">{trip._payload.dropoff.mileage}</span> : '—'}</td>
@@ -787,7 +799,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
                       </td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${statusStyle[latest?.status] || 'bg-slate-100 text-slate-500'}`}>
-                          {latest?.status || '—'}
+                          {statusLabel[latest?.status] || 'Not queued'}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
@@ -1059,7 +1071,7 @@ const WellTransSyncPage = ({ trips = [], role = 'dispatcher' }) => {
               {/* Trip info */}
               <div className="space-y-2">
                 {[
-                  ['Driver', tripDrawer.driverName || '—'],
+                  ['Driver', tripDrawer.completedDriverName || tripDrawer._payload?.driver || '—'],
                   ['Vehicle', tripDrawer.completedVehicle || tripDrawer.vehicle || '—'],
                   ['Pickup', tripDrawer.pickup || tripDrawer.pickupAddress || '—'],
                   ['Dropoff', tripDrawer.dropoff || tripDrawer.dropoffAddress || '—'],

@@ -18,6 +18,23 @@ const isOperationalAssignment = value => {
     && !normalized.includes('medical transportation inc'));
 };
 
+export const resolveWellTransDriverName = (trip = {}, drivers = []) => {
+  const assignedId = String(firstValue(trip, ['driverId', 'assignedDriverId']) || '').trim();
+  const assignedEmail = String(firstValue(trip, ['driverEmail', 'assignedDriverEmail']) || '').trim().toLowerCase();
+  const authoritativeDriver = drivers.find(driver =>
+    (assignedId && String(driver?.id || '').trim() === assignedId)
+    || (assignedEmail && String(driver?.email || '').trim().toLowerCase() === assignedEmail));
+  const authoritativeName = firstValue(authoritativeDriver, ['name', 'displayName', 'fullName']);
+  if (isOperationalAssignment(authoritativeName)) return String(authoritativeName).trim();
+  const recordedName = firstValue(trip, ['completedDriverName', 'driverName', 'driver']);
+  return isOperationalAssignment(recordedName) ? String(recordedName).trim() : '';
+};
+
+export const hydrateWellTransTrip = (trip = {}, drivers = []) => {
+  const completedDriverName = resolveWellTransDriverName(trip, drivers);
+  return completedDriverName ? { ...trip, completedDriverName } : trip;
+};
+
 export const normalizeServiceDate = (trip = {}) => {
   const value = firstValue(trip, ['dateKey', 'serviceDate', 'tripDate', 'scheduledDate', 'pickupDate', 'date']);
   if (!value) return '';

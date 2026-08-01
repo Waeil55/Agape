@@ -19,7 +19,7 @@ const REQUIRED_WORKER_VERSION = '3.8.3';
 export const useWellTransSync = (trips = [], serviceDate = '') => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [logs, setLogs] = useState([]);
-  const [worker, setWorker] = useState(null);
+  const [primaryWorker, setPrimaryWorker] = useState(null);
   const [workers, setWorkers] = useState([]);
   const [operations, setOperations] = useState(null);
   const [canary, setCanary] = useState(null);
@@ -28,7 +28,7 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => subscribeWellTransSettings(value => { setSettings(value); setLoading(false); }, () => setLoading(false)), []);
   useEffect(() => subscribeWellTransLogs(serviceDate, setLogs, () => setLogs([])), [serviceDate]);
-  useEffect(() => subscribeWellTransWorker(setWorker, () => setWorker(null)), []);
+  useEffect(() => subscribeWellTransWorker(setPrimaryWorker, () => setPrimaryWorker(null)), []);
   useEffect(() => subscribeWellTransWorkers(setWorkers, () => setWorkers([])), []);
   useEffect(() => subscribeWellTransOperations(setOperations, () => setOperations(null)), []);
   useEffect(() => subscribeWellTransCanary(setCanary, () => setCanary(null)), []);
@@ -64,15 +64,54 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
         || isWellTransFailureRetryable(latestByTrip.get(trip.id)))),
   [completedTrips, latestByTrip]);
 
-  const heartbeat = worker?.lastSeenAt?.toDate?.() || (worker?.lastSeenAt ? new Date(worker.lastSeenAt) : null);
+  const workerFleet = useMemo(() => workers.map(item => {
+    const lastSeenMs = item.lastSeenAt?.toMillis?.()
+      || item.lastSeenAt?.toDate?.()?.getTime?.()
+      || (item.lastSeenAt ? new Date(item.lastSeenAt).getTime() : 0)
+      || 0;
+    const ageMs = lastSeenMs ? Math.max(0, now - lastSeenMs) : Number.POSITIVE_INFINITY;
+    return {
+      ...item,
+      lastSeenMs,
+      ageMs,
+      online: ageMs < 45_000,
+      standby: ['standby', 'lease_standby'].includes(item.state),
+    };
+  }), [now, workers]);
+  const visibleWorkers = useMemo(() => {
+    const newestByDevice = new Map();
+    workerFleet.forEach(item => {
+      const device = String(item.workerId || item.deviceId || item.id || '').trim().toLowerCase();
+      const current = newestByDevice.get(device);
+      if (!current || item.lastSeenMs > current.lastSeenMs) newestByDevice.set(device, item);
+    });
+    return [...newestByDevice.values()]
+      .filter(item => item.online)
+      .sort((left, right) => right.lastSeenMs - left.lastSeenMs);
+  }, [workerFleet]);
+  const primaryLastSeenMs = primaryWorker?.lastSeenAt?.toMillis?.()
+    || primaryWorker?.lastSeenAt?.toDate?.()?.getTime?.()
+    || (primaryWorker?.lastSeenAt ? new Date(primaryWorker.lastSeenAt).getTime() : 0)
+    || 0;
+  const freshestDeviceWorker = visibleWorkers[0] || null;
+  const worker = freshestDeviceWorker && freshestDeviceWorker.lastSeenMs >= primaryLastSeenMs
+    ? freshestDeviceWorker
+    : primaryWorker;
+  const heartbeatMs = worker?.lastSeenAt?.toMillis?.()
+    || worker?.lastSeenAt?.toDate?.()?.getTime?.()
+    || (worker?.lastSeenAt ? new Date(worker.lastSeenAt).getTime() : 0)
+    || 0;
 
-  const workerOnline = Boolean(heartbeat && now - heartbeat.getTime() < 45000
+  const workerOnline = Boolean(heartbeatMs && now - heartbeatMs < 45000
     && [
       'online', 'connecting', 'waiting_for_login', 'date_selection_required',
       'processing', 'staging', 'indexing_schedule', 'verifying_applied_records',
-      'running_portal_canary',
+      'verifying_staged_records', 'reconciling_authoritative_trips', 'inspection',
+      'running_portal_canary', 'recovering_clean_session', 'restarting_safe_session',
       'calibrated', 'review_ready', 'review_batch_ready',
-      'batch_apply_confirmed', 'reconciliation_blocked', 'review_error',
+      'review_ready_verified', 'review_batch_verified', 'paused_review_ready',
+      'batch_apply_confirmed', 'reconciliation_blocked',
+      'reconciliation_blocked_do_not_apply', 'review_error',
     ].includes(worker?.state));
   const workerUpgradeRequired = Boolean(workerOnline
     && !isWorkerVersionAtLeast(worker?.version, REQUIRED_WORKER_VERSION));
@@ -81,11 +120,13 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     && [
       'calibrated', 'staging', 'verifying_applied_records',
       'running_portal_canary',
-      'review_ready', 'review_batch_ready',
+      'review_ready', 'review_batch_ready', 'review_ready_verified',
+      'review_batch_verified', 'paused_review_ready',
       'batch_apply_confirmed', 'reconciliation_blocked',
     ].includes(worker?.state)
     && worker?.selectedDate);
-  const workerStandby = Boolean(heartbeat && now - heartbeat.getTime() < 45000 && worker?.state === 'standby');
+  const workerStandby = Boolean(heartbeatMs && now - heartbeatMs < 45000
+    && ['standby', 'lease_standby'].includes(worker?.state));
 
   const currentLogs = useMemo(() => [...latestByTrip.values()], [latestByTrip]);
   const successfulCount = useMemo(() => currentLogs.filter(log => log.status === 'completed').length, [currentLogs]);
@@ -95,24 +136,11 @@ export const useWellTransSync = (trips = [], serviceDate = '') => {
     [completedTrips, latestByTrip],
   );
   const healthScore = coverage.coveragePercent;
-  const workerFleet = useMemo(() => workers.map(item => {
-    const lastSeenMs = item.lastSeenAt?.toMillis?.()
-      || item.lastSeenAt?.toDate?.()?.getTime?.()
-      || 0;
-    const ageMs = lastSeenMs ? Math.max(0, now - lastSeenMs) : Number.POSITIVE_INFINITY;
-    return {
-      ...item,
-      lastSeenMs,
-      ageMs,
-      online: ageMs < 45_000,
-      standby: item.state === 'lease_standby',
-    };
-  }), [now, workers]);
-  const activeWorkers = workerFleet.filter(item => item.online);
+  const activeWorkers = visibleWorkers;
   const standbyWorkers = activeWorkers.filter(item => item.standby);
 
   return {
-    settings, logs: scopedLogs, worker, workers: workerFleet, activeWorkers, standbyWorkers, operations, canary,
+    settings, logs: scopedLogs, worker, workers: visibleWorkers, activeWorkers, standbyWorkers, operations, canary,
     manifest, coverage, workerOnline, workerCalibrated,
     workerUpgradeRequired, requiredWorkerVersion: REQUIRED_WORKER_VERSION,
     workerStandby, loading, dateTrips, completedTrips, readyTrips, latestByTrip,

@@ -1183,7 +1183,7 @@ const DesktopEnterpriseDashboard = ({
       );
       case 'welltrans': return role === 'admin' ? (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-          <WellTransSyncPage trips={trips} role={role} />
+          <WellTransSyncPage trips={trips} drivers={drivers} role={role} />
         </Suspense></ErrorBoundary>
       ) : renderOperationsPage();
       case 'settings': return (

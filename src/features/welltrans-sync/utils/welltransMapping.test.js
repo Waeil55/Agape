@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildWellTransCoverage, buildWellTransPayload, calculateTripMileage,
-  normalizeBookingId, normalizeServiceDate, validateTripForWellTrans,
+  hydrateWellTransTrip, normalizeBookingId, normalizeServiceDate,
+  resolveWellTransDriverName, validateTripForWellTrans,
 } from './welltransMapping';
 
 describe('WellTrans mapping', () => {
@@ -63,6 +64,17 @@ describe('WellTrans mapping', () => {
       pickupOdometer: 263206, dropoffOdometer: 263223, signatureCaptured: true,
     });
     expect(result.valid).toBe(true);
+  });
+  it('replaces an imported company name with the assigned driver identity', () => {
+    const trip = {
+      driverId: 'DRV-1',
+      driverName: 'Agape Care Medical Transportation Inc.',
+    };
+    const drivers = [{ id: 'DRV-1', name: 'Mikhaeil Waeil' }];
+    expect(resolveWellTransDriverName(trip, drivers)).toBe('Mikhaeil Waeil');
+    expect(buildWellTransPayload({
+      ...hydrateWellTransTrip(trip, drivers), bookingId: '100', dateKey: '2026-07-27',
+    }).driver).toBe('Mikhaeil Waeil');
   });
   it('allows an unavailable vehicle so the worker can leave WellTrans blank', () => {
     const result = validateTripForWellTrans({
