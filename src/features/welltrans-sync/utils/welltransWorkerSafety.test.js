@@ -71,6 +71,12 @@ describe('WellTrans staging safety contract', () => {
     expect(launcher).toContain('$env:WELLTRANS_CREDENTIAL_FILE = $wellTransCredentialPath');
     expect(service).toContain('http://127.0.0.1:43127/v1/welltrans-credentials');
     expect(service).toContain('portalPassword: deleteField()');
+    const page = readFileSync(syncPagePath, 'utf8');
+    expect(page).toContain('reauthenticateWithCredential');
+    expect(page).toContain('EmailAuthProvider.credential');
+    expect(page).toContain("const CREDENTIAL_ADMIN_ROLES = ['admin', 'superadmin', 'owner']");
+    expect(page).toContain('Unlocks credential management for five minutes.');
+    expect(page).toContain('The saved WellTrans password is never displayed.');
   });
   it('replaces queued payload snapshots with the authoritative data actually staged', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');

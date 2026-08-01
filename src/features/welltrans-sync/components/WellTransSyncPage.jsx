@@ -4,10 +4,12 @@ import {
   Loader2, Play, RefreshCw, RotateCcw, Save, Search,
   ShieldCheck, Sparkles, X, XCircle, ChevronLeft, ChevronRight, Image, Copy,
   BarChart3, Zap, ListFilter, Activity, Edit2,
-  KeyRound, Trash2,
+  KeyRound, Trash2, Lock,
 } from 'lucide-react';
 import EditTripModal from '../../../components/EditTripModal';
-import { auth } from '../../../config/firebase';
+import {
+  auth, EmailAuthProvider, reauthenticateWithCredential,
+} from '../../../config/firebase';
 import { useWellTransSync } from '../hooks/useWellTransSync';
 import { useWellTransAutoSync } from '../hooks/useWellTransAutoSync';
 import {
@@ -33,6 +35,7 @@ const statusStyle = {
 };
 
 const AUTHORIZED_ROLES = ['admin', 'superadmin', 'dispatcher', 'manager', 'biller', 'owner'];
+const CREDENTIAL_ADMIN_ROLES = ['admin', 'superadmin', 'owner'];
 const TABLE_PAGE_SIZE = WELLTRANS_TABLE_PAGE_SIZE;
 const statusLabel = {
   pending: 'Queued',
@@ -79,6 +82,9 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   const [credentialDraft, setCredentialDraft] = useState({ username: '', password: '' });
   const [credentialBusy, setCredentialBusy] = useState('');
   const [credentialError, setCredentialError] = useState('');
+  const [credentialUnlocked, setCredentialUnlocked] = useState(false);
+  const [credentialUnlockPassword, setCredentialUnlockPassword] = useState('');
+  const [credentialUnlockBusy, setCredentialUnlockBusy] = useState(false);
   const [autoRetry, setAutoRetry] = useState(() => {
     try { return JSON.parse(localStorage.getItem('agape_wt_autoRetry') || '{}'); } catch { return {}; }
   });
@@ -98,7 +104,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   }, []);
 
   useEffect(() => {
-    if (tab !== 'settings') return undefined;
+    if (tab !== 'settings' || !credentialUnlocked) return undefined;
     let active = true;
     setCredentialStatus(current => ({ ...current, loading: true }));
     getLocalWellTransCredentialStatus()
@@ -122,10 +128,31 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
         setCredentialError('Open the local WellTrans Agent on this computer, then retry.');
       });
     return () => { active = false; };
+  }, [tab, credentialUnlocked]);
+
+  useEffect(() => {
+    if (!credentialUnlocked) return undefined;
+    const timer = window.setTimeout(() => {
+      setCredentialUnlocked(false);
+      setCredentialUnlockPassword('');
+      setCredentialDraft({ username: '', password: '' });
+      setCredentialStatus({ loading: false, connected: false, configured: false, username: '' });
+      setCredentialError('');
+    }, 5 * 60 * 1000);
+    return () => window.clearTimeout(timer);
+  }, [credentialUnlocked]);
+
+  useEffect(() => {
+    if (tab === 'settings') return;
+    setCredentialUnlocked(false);
+    setCredentialUnlockPassword('');
+    setCredentialDraft({ username: '', password: '' });
+    setCredentialStatus({ loading: false, connected: false, configured: false, username: '' });
   }, [tab]);
 
   const normalizedRole = String(role || '').toLowerCase().trim();
   const isAuthorized = AUTHORIZED_ROLES.includes(normalizedRole);
+  const canManageWellTransCredentials = CREDENTIAL_ADMIN_ROLES.includes(normalizedRole);
   const effectiveSettings = draftSettings || settings;
   const workerDateMatches = Boolean(workerCalibrated && worker?.selectedDate === syncDate);
   const workerNeedsLogin = worker?.state === 'waiting_for_login';
@@ -1216,7 +1243,9 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold ${
-                  credentialStatus.loading
+                  !credentialUnlocked
+                    ? 'bg-slate-200 text-slate-700'
+                    : credentialStatus.loading
                     ? 'bg-slate-100 text-slate-500'
                     : credentialStatus.connected
                       ? credentialStatus.configured
@@ -1224,13 +1253,70 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                         : 'bg-amber-100 text-amber-700'
                       : 'bg-rose-100 text-rose-700'
                 }`}>
-                  {credentialStatus.loading
+                  {!credentialUnlocked
+                    ? 'Locked'
+                    : credentialStatus.loading
                     ? 'Checking'
                     : credentialStatus.connected
                       ? credentialStatus.configured ? 'Saved locally' : 'Not configured'
                       : 'Agent offline'}
                 </span>
               </div>
+              {!canManageWellTransCredentials ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-3 text-[10px] font-semibold text-slate-600">
+                  An administrator or owner must unlock and manage the local WellTrans credentials.
+                </div>
+              ) : !credentialUnlocked ? (
+                <form
+                  className="rounded-lg border border-emerald-200 bg-white p-3"
+                  onSubmit={async event => {
+                    event.preventDefault();
+                    setCredentialUnlockBusy(true);
+                    setCredentialError('');
+                    try {
+                      const user = auth.currentUser;
+                      if (!user?.email) throw new Error('The signed-in Agape account does not support password verification.');
+                      const credential = EmailAuthProvider.credential(user.email, credentialUnlockPassword);
+                      await reauthenticateWithCredential(user, credential);
+                      setCredentialUnlockPassword('');
+                      setCredentialUnlocked(true);
+                    } catch (error) {
+                      const code = String(error?.code || '');
+                      setCredentialError(
+                        /invalid-credential|wrong-password/i.test(code)
+                          ? 'The Agape account password is incorrect.'
+                          : error?.message || 'Account verification failed.',
+                      );
+                    } finally {
+                      setCredentialUnlockBusy(false);
+                    }
+                  }}
+                >
+                  <label className="text-[10px] font-semibold text-emerald-900">Agape account password</label>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="password"
+                      value={credentialUnlockPassword}
+                      autoComplete="current-password"
+                      onChange={event => setCredentialUnlockPassword(event.target.value)}
+                      placeholder="Verify your identity"
+                      className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={credentialUnlockBusy || !credentialUnlockPassword}
+                      className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-2 text-[10px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                    >
+                      <Lock size={11} /> {credentialUnlockBusy ? 'Verifying…' : 'Unlock'}
+                    </button>
+                  </div>
+                  {credentialError && <p className="mt-2 text-[10px] font-semibold text-rose-700">{credentialError}</p>}
+                  <p className="mt-2 text-[9px] text-slate-500">
+                    Unlocks credential management for five minutes. The saved WellTrans password is never displayed.
+                  </p>
+                </form>
+              ) : (
+                <>
               <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <label className="text-[10px] font-semibold text-emerald-900">Login name</label>
@@ -1305,7 +1391,21 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                     <Trash2 size={11} /> Remove
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCredentialUnlocked(false);
+                    setCredentialDraft({ username: '', password: '' });
+                    setCredentialStatus({ loading: false, connected: false, configured: false, username: '' });
+                    setCredentialError('');
+                  }}
+                  className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  <Lock size={11} /> Lock
+                </button>
               </div>
+                </>
+              )}
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
               <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5"><Activity size={13} /> Self-Control</p>
