@@ -3,8 +3,9 @@ import {
   AlertTriangle, Bot, CheckCircle2, Code, Download, Eye,
   Loader2, Play, RefreshCw, RotateCcw, Save, Search,
   ShieldCheck, Sparkles, X, XCircle, ChevronLeft, ChevronRight, Image, Copy,
-  BarChart3, Zap, ListFilter, Activity,
+  BarChart3, Zap, ListFilter, Activity, Edit2,
 } from 'lucide-react';
+import EditTripModal from '../../../components/EditTripModal';
 import { auth } from '../../../config/firebase';
 import { useWellTransSync } from '../hooks/useWellTransSync';
 import { useWellTransAutoSync } from '../hooks/useWellTransAutoSync';
@@ -38,7 +39,7 @@ const statusLabel = {
   failed: 'Needs correction',
 };
 
-const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) => {
+const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUpdateTrip }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const hydratedTrips = useMemo(
     () => trips.map(trip => hydrateWellTransTrip(trip, drivers)),
@@ -64,6 +65,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) =>
   const [statusFilter, setStatusFilter] = useState('all');
   const [syncProgress, setSyncProgress] = useState(null);
   const [tripDrawer, setTripDrawer] = useState(null);
+  const [editingTrip, setEditingTrip] = useState(null);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [queuePage, setQueuePage] = useState(0);
   const [logsPage, setLogsPage] = useState(0);
@@ -375,16 +377,22 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) =>
   };
 
   const exportAllTripsCSV = () => {
-    const headers = ['Booking ID', 'Passenger', 'Driver', 'Pickup Time', 'Dropoff Time', 'End Odometer', 'Validation', 'Sync Status', 'Error'];
+    const headers = ['Booking ID', 'Passenger', 'Driver', 'Vehicle', 'Pickup Arrival', 'Pickup Departure', 'Start Odometer', 'Dropoff Arrival', 'Dropoff Departure', 'End Odometer', 'Trip Miles', 'Signature Captured', 'Validation', 'Sync Status', 'Error'];
     const rows = enrichedTrips.map(trip => {
       const log = latestByTrip.get(trip.id);
       return [
         `"${trip.bookingId || trip.id || ''}"`,
         `"${(trip.patient || trip.clientName || '').replace(/"/g, '""')}"`,
-        `"${(trip.completedDriverName || trip._payload?.driver || '').replace(/"/g, '""')}"`,
+        `"${(trip._payload?.driver || trip.completedDriverName || '').replace(/"/g, '""')}"`,
+        `"${(trip._payload?.vehicle || '').replace(/"/g, '""')}"`,
         `"${trip._payload?.pickup?.arrival || ''}"`,
+        `"${trip._payload?.pickup?.departure || ''}"`,
+        `"${trip._payload?.pickup?.mileage ?? ''}"`,
         `"${trip._payload?.dropoff?.arrival || ''}"`,
+        `"${trip._payload?.dropoff?.departure || ''}"`,
         `"${trip._payload?.dropoff?.mileage ?? ''}"`,
+        `"${trip._payload?.pickup?.mileage != null && trip._payload?.dropoff?.mileage != null ? Math.max(0, trip._payload.dropoff.mileage - trip._payload.pickup.mileage) : ''}"`,
+        `"${trip._payload?.dropoff?.signatureCaptured ? 'Yes' : 'No'}"`,
         `"${trip._valid ? 'Valid' : (trip._errors || []).join('; ')}"`,
         `"${log?.status || 'Not Queued'}"`,
         `"${(log?.errorMessage || '').replace(/"/g, '""')}"`,
@@ -727,77 +735,103 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) =>
           <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-500" /></div>
         ) : tab === 'queue' ? (
           <div className="flex-1 overflow-auto">
-            <table className="w-full table-fixed text-left text-[11px]">
+            <table className="w-full min-w-[1760px] table-fixed text-left text-[11px]">
               <colgroup>
-                <col className="w-8" />
-                <col className="w-[12%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[8%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[8%]" />
+                <col className="w-[38px]" />
+                <col className="w-[88px]" />
+                <col className="w-[145px]" />
+                <col className="w-[115px]" />
+                <col className="w-[105px]" />
+                <col className="w-[74px]" />
+                <col className="w-[74px]" />
+                <col className="w-[82px]" />
+                <col className="w-[74px]" />
+                <col className="w-[74px]" />
+                <col className="w-[82px]" />
+                <col className="w-[72px]" />
+                <col className="w-[78px]" />
+                <col className="w-[245px]" />
+                <col className="w-[105px]" />
+                <col className="w-[90px]" />
               </colgroup>
-              <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10">
+              <thead className="sticky top-0 z-10 border-b border-blue-700 bg-blue-600 text-white shadow-sm">
                 <tr>
-                  <th className="px-3 py-2 font-semibold text-slate-500 w-8">
-                    <input type="checkbox" className="rounded border-slate-300"
+                  <th className="px-2 py-2 font-semibold">
+                    <input type="checkbox" className="rounded border-blue-300"
                       onChange={() => setSelectedIds(ids => selectableFilteredTrips.every(t => ids.includes(t.id))
                         ? ids.filter(id => !selectableFilteredTrips.some(t => t.id === id))
                         : [...new Set([...ids, ...selectableFilteredTrips.map(t => t.id)])])}
                       checked={selectableFilteredTrips.length > 0 && selectableFilteredTrips.every(t => selectedIds.includes(t.id))} />
                   </th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Booking</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Passenger</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Driver</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Pickup</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Dropoff</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">End odometer</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Validation</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500">Status</th>
-                  <th className="px-3 py-2 font-semibold text-slate-500 text-right">Actions</th>
+                  <th className="px-2 py-2 font-semibold">Booking</th>
+                  <th className="px-2 py-2 font-semibold">Passenger</th>
+                  <th className="px-2 py-2 font-semibold">Driver</th>
+                  <th className="px-2 py-2 font-semibold">Vehicle</th>
+                  <th className="px-2 py-2 font-semibold">PU arrive</th>
+                  <th className="px-2 py-2 font-semibold">PU depart</th>
+                  <th className="px-2 py-2 font-semibold">Start odo</th>
+                  <th className="px-2 py-2 font-semibold">DO arrive</th>
+                  <th className="px-2 py-2 font-semibold">DO depart</th>
+                  <th className="px-2 py-2 font-semibold">End odo</th>
+                  <th className="px-2 py-2 font-semibold">Miles</th>
+                  <th className="px-2 py-2 font-semibold">Signed</th>
+                  <th className="px-2 py-2 font-semibold">Validation</th>
+                  <th className="px-2 py-2 font-semibold">Status</th>
+                  <th className="px-2 py-2 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredTrips.length === 0 ? (
-                  <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-slate-400">No trips for this date.</td></tr>
+                  <tr><td colSpan={16} className="px-3 py-8 text-center text-xs text-slate-400">No trips for this date.</td></tr>
                 ) : displayedTrips.map(trip => {
                   const latest = latestByTrip.get(trip.id);
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
                   return (
                     <tr key={trip.id} className="hover:bg-slate-50/50 cursor-pointer group" onClick={() => setTripDrawer(trip)}>
-                      <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                      <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
                         <input type="checkbox" disabled={!trip._valid}
                           checked={selectedIds.includes(trip.id)}
                           onChange={() => setSelectedIds(ids => ids.includes(trip.id) ? ids.filter(id => id !== trip.id) : [...ids, trip.id])}
                           className="rounded border-slate-300" />
                       </td>
-                      <td className="px-3 py-2 font-mono font-semibold text-blue-600">{trip.bookingId || trip.id}</td>
-                      <td className="px-3 py-2 font-medium text-slate-900">{trip.patient || trip.clientName || '—'}</td>
-                      <td className="px-3 py-2 text-slate-600">{trip.completedDriverName || trip._payload?.driver || '—'}</td>
-                      <td className="px-3 py-2 text-slate-600 font-mono">{trip._payload?.pickup?.arrival || '—'}</td>
-                      <td className="px-3 py-2 text-slate-600 font-mono">{trip._payload?.dropoff?.arrival || '—'}</td>
-                      <td className="px-3 py-2 font-mono">{trip._payload?.dropoff?.mileage != null ? <span className="text-emerald-600 font-semibold">{trip._payload.dropoff.mileage}</span> : '—'}</td>
-                      <td className="px-3 py-2 relative">
+                      <td className="px-2 py-2 font-mono font-semibold text-blue-600">{trip.bookingId || trip.id}</td>
+                      <td className="px-2 py-2 font-medium text-slate-900 truncate" title={trip.patient || trip.clientName}>{trip.patient || trip.clientName || '—'}</td>
+                      <td className="px-2 py-2 text-slate-700 truncate" title={trip._payload?.driver}>{trip._payload?.driver || trip.completedDriverName || '—'}</td>
+                      <td className="px-2 py-2 text-slate-700 truncate" title={trip._payload?.vehicle}>{trip._payload?.vehicle || '—'}</td>
+                      <td className="px-2 py-2 font-mono text-emerald-700">{trip._payload?.pickup?.arrival || '—'}</td>
+                      <td className="px-2 py-2 font-mono text-emerald-700">{trip._payload?.pickup?.departure || '—'}</td>
+                      <td className="px-2 py-2 font-mono text-emerald-700">{trip._payload?.pickup?.mileage ?? '—'}</td>
+                      <td className="px-2 py-2 font-mono text-rose-700">{trip._payload?.dropoff?.arrival || '—'}</td>
+                      <td className="px-2 py-2 font-mono text-rose-700">{trip._payload?.dropoff?.departure || '—'}</td>
+                      <td className="px-2 py-2 font-mono text-rose-700">{trip._payload?.dropoff?.mileage ?? '—'}</td>
+                      <td className="px-2 py-2 font-mono font-semibold text-blue-600">{trip._payload?.pickup?.mileage != null && trip._payload?.dropoff?.mileage != null ? Math.max(0, trip._payload.dropoff.mileage - trip._payload.pickup.mileage) : '—'}</td>
+                      <td className="px-2 py-2 font-semibold text-emerald-700">{trip._payload?.dropoff?.signatureCaptured ? 'Yes' : 'No'}</td>
+                      <td className="px-2 py-2 relative">
                         {unmatched ? (
                           <span className="text-[10px] font-semibold text-amber-600">Not Found</span>
                         ) : trip._valid ? (
                           <span className="text-[10px] font-semibold text-emerald-600">Valid</span>
                         ) : (
-                          <span className="text-[10px] font-semibold text-rose-600" title={trip._errors?.join('; ')}>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setEditingTrip(trip); }}
+                            className="text-left text-[10px] font-semibold text-rose-600 underline decoration-rose-200 underline-offset-2 hover:text-rose-800"
+                            title={`${trip._errors?.join('; ') || 'Invalid'} — click to correct`}>
                             {trip._errors?.[0] || 'Invalid'}
-                          </span>
+                          </button>
                         )}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-2">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${statusStyle[latest?.status] || 'bg-slate-100 text-slate-500'}`}>
                           {statusLabel[latest?.status] || 'Not queued'}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
+                      <td className="px-2 py-2 text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          {onUpdateTrip && (
+                            <button onClick={() => setEditingTrip(trip)}
+                              className={`rounded p-1 transition ${trip._valid ? 'text-slate-400 hover:bg-blue-50 hover:text-blue-600' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`} title="Correct source trip">
+                              <Edit2 size={13} />
+                            </button>
+                          )}
                           {latest?.screenshot && (
                             <a href={latest.screenshot} target="_blank" rel="noopener noreferrer"
                               className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600 transition" title="Screenshot">
@@ -1257,6 +1291,20 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher' }) =>
             </div>
           </div>
         </div>
+      )}
+
+      {editingTrip && onUpdateTrip && (
+        <EditTripModal
+          trip={editingTrip}
+          drivers={drivers}
+          context="welltrans"
+          onClose={() => setEditingTrip(null)}
+          onUpdate={(updatedTrip) => {
+            onUpdateTrip(updatedTrip);
+            setEditingTrip(null);
+            setNotice(`Trip ${updatedTrip.bookingId || updatedTrip.id} updated. WellTrans validation has been recalculated.`);
+          }}
+        />
       )}
     </div>
   );

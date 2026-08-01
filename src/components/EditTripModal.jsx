@@ -40,16 +40,18 @@ const parseOdometerInput = (value) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode }) => {
+const EditTripModal = ({ trip, onClose, onUpdate, drivers = [], onSave, driverMode, context = 'trip' }) => {
   const [editTrip, setEditTrip] = useState(null);
 
   useEffect(() => {
     if (trip) {
       setEditTrip({
         ...trip,
-        _pickupTime: isoToTimeInput(trip.arrivalTime || trip.startTime || trip.pickupArrival || trip.departedPickupTime),
+        _pickupTime: isoToTimeInput(trip.arrivalTime || trip.startTime || trip.pickupArrival),
+        _pickupDeparture: isoToTimeInput(trip.departedPickupTime || trip.pickupDeparture || trip.arrivalTime),
         _pickupOdometer: trip.pickupOdometer || '',
         _dropoffTime: isoToTimeInput(trip.arrivalDropoffTime || trip.dropoffArrival || trip.dropoffTime),
+        _dropoffDeparture: isoToTimeInput(trip.dropoffDeparture || trip.departedDropoffTime || trip.arrivalDropoffTime || trip.completedAt),
         _dropoffOdometer: trip.dropoffOdometer || '',
         _clientSigned: trip.paperSignatureConfirmed || false,
         _markCompleted: false,
@@ -67,7 +69,10 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
     e.preventDefault();
     const serviceDate = editTrip.date || trip?.date;
     const pickupIso = timeToIsoForTripDate(editTrip._pickupTime, serviceDate);
+    const pickupDepartureIso = timeToIsoForTripDate(editTrip._pickupDeparture, serviceDate);
     const dropoffIso = timeToIsoForTripDate(editTrip._dropoffTime, serviceDate);
+    const dropoffDepartureIso = timeToIsoForTripDate(editTrip._dropoffDeparture, serviceDate);
+    const selectedDriver = drivers.find((driver) => driver.id === editTrip.driverId);
     const payload = {
       patient: editTrip.patient || '',
       bookingId: editTrip.bookingId || '',
@@ -84,10 +89,16 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
       arrivalTime: pickupIso || editTrip.arrivalTime || null,
       startTime: pickupIso || editTrip.startTime || null,
       pickupOdometer: parseOdometerInput(editTrip._pickupOdometer),
-      departedPickupTime: pickupIso || editTrip.departedPickupTime || null,
+      departedPickupTime: pickupDepartureIso || pickupIso || editTrip.departedPickupTime || null,
       arrivalDropoffTime: dropoffIso || editTrip.arrivalDropoffTime || null,
+      dropoffDeparture: dropoffDepartureIso || dropoffIso || editTrip.dropoffDeparture || null,
       dropoffOdometer: parseOdometerInput(editTrip._dropoffOdometer),
       paperSignatureConfirmed: editTrip._clientSigned,
+      driverId: editTrip.driverId || null,
+      driverName: selectedDriver?.name || editTrip.driverName || null,
+      driverEmail: selectedDriver?.email || editTrip.driverEmail || null,
+      completedDriverName: selectedDriver?.name || editTrip.completedDriverName || editTrip.driverName || null,
+      completedVehicle: editTrip.completedVehicle || editTrip.vehicle || '',
       notes: editTrip.notes || '',
     };
     if (driverMode && onSave) {
@@ -106,7 +117,7 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl relative z-10 border border-slate-200 max-h-[90vh] overflow-hidden flex flex-col" style={{ fontSize: '97%' }}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
           <h3 className="text-[1em] font-semibold text-slate-900 flex items-center gap-2">
-            <Edit2 size={18} className="text-blue-500" /> Edit Trip
+            <Edit2 size={18} className="text-blue-500" /> {context === 'welltrans' ? 'Correct WellTrans Source Data' : 'Edit Trip'}
           </h3>
           <button onClick={onClose} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={16} /></button>
         </div>
@@ -160,6 +171,12 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
               </div>
               <div>
                 <label className="text-[0.6875em] font-semibold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
+                  <Clock size={11} /> Pickup Departure
+                </label>
+                <input type="time" value={editTrip._pickupDeparture} onChange={(e) => handleField('_pickupDeparture', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-semibold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
                   <Ruler size={11} /> Pickup Odometer
                 </label>
                 <input type="number" min="0" step="1" placeholder="42500" value={editTrip._pickupOdometer} onChange={(e) => handleField('_pickupOdometer', e.target.value)} className={inputClass} />
@@ -169,6 +186,12 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
                   <Clock size={11} /> Dropoff Time
                 </label>
                 <input type="time" value={editTrip._dropoffTime} onChange={(e) => handleField('_dropoffTime', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-semibold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
+                  <Clock size={11} /> Dropoff Departure
+                </label>
+                <input type="time" value={editTrip._dropoffDeparture} onChange={(e) => handleField('_dropoffDeparture', e.target.value)} className={inputClass} />
               </div>
               <div>
                 <label className="text-[0.6875em] font-semibold text-blue-700 uppercase tracking-widest mb-1 block flex items-center gap-1">
@@ -183,6 +206,33 @@ const EditTripModal = ({ trip, onClose, onUpdate, drivers, onSave, driverMode })
               <div className="col-span-2">
                 <label className="text-[0.6875em] font-semibold text-blue-700 uppercase tracking-widest mb-1 block">Dropoff Address</label>
                 <PlacesAutocompleteInput value={editTrip.dropoff || ''} onChange={(v) => handleField('dropoff', v)} placeholder="Dropoff address" className={inputClass} required />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 rounded-xl border border-slate-200 bg-white p-3">
+              <div>
+                <label className="text-[0.6875em] font-semibold text-slate-500 uppercase tracking-widest mb-1 block">Driver</label>
+                <select value={editTrip.driverId || ''} onChange={(e) => {
+                  const selected = drivers.find((driver) => driver.id === e.target.value);
+                  setEditTrip(current => ({
+                    ...current,
+                    driverId: e.target.value,
+                    driverName: selected?.name || '',
+                    driverEmail: selected?.email || '',
+                    completedDriverName: selected?.name || '',
+                    completedVehicle: current.completedVehicle || selected?.vehicle || '',
+                  }));
+                }} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[0.6875em] font-semibold text-slate-500 uppercase tracking-widest mb-1 block">Vehicle name</label>
+                <input value={editTrip.completedVehicle || editTrip.vehicle || ''} onChange={(e) => handleField('completedVehicle', e.target.value)} className={inputClass} placeholder="Example: TOYOTA 002" list="trip-vehicle-options" />
+                <datalist id="trip-vehicle-options">
+                  {[...new Set(drivers.map((driver) => driver.vehicle).filter(Boolean))].map((vehicle) => <option key={vehicle} value={vehicle} />)}
+                </datalist>
               </div>
             </div>
 

@@ -161,17 +161,23 @@ export const exportTripsQueueCSV = (trips = [], logs = [], serviceDate = '') => 
     const current = latestByTrip.get(log.tripId);
     if (!current || timestampMillis(log.updatedAt || log.createdAt) > timestampMillis(current.updatedAt || current.createdAt)) latestByTrip.set(log.tripId, log);
   });
-  const headers = ['Booking ID', 'Passenger', 'Driver', 'Pickup Time', 'Dropoff Time', 'Mileage', 'Validation', 'Sync Status', 'Error'];
+  const headers = ['Booking ID', 'Passenger', 'Driver', 'Vehicle', 'Pickup Arrival', 'Pickup Departure', 'Start Odometer', 'Dropoff Arrival', 'Dropoff Departure', 'End Odometer', 'Trip Miles', 'Signature Captured', 'Validation', 'Sync Status', 'Error'];
   const rows = trips.map(trip => {
     const log = latestByTrip.get(trip.id);
     const payload = trip._payload || {};
     return [
       `"${trip.bookingId || trip.id || ''}"`,
       `"${(trip.patient || trip.clientName || '').replace(/"/g, '""')}"`,
-      `"${(trip.driverName || '').replace(/"/g, '""')}"`,
+      `"${(payload.driver || trip.driverName || '').replace(/"/g, '""')}"`,
+      `"${(payload.vehicle || '').replace(/"/g, '""')}"`,
       `"${payload?.pickup?.arrival || ''}"`,
+      `"${payload?.pickup?.departure || ''}"`,
+      `"${payload?.pickup?.mileage ?? ''}"`,
       `"${payload?.dropoff?.arrival || ''}"`,
+      `"${payload?.dropoff?.departure || ''}"`,
       `"${payload?.dropoff?.mileage ?? ''}"`,
+      `"${payload?.pickup?.mileage != null && payload?.dropoff?.mileage != null ? Math.max(0, payload.dropoff.mileage - payload.pickup.mileage) : ''}"`,
+      `"${payload?.dropoff?.signatureCaptured ? 'Yes' : 'No'}"`,
       `"${trip._valid ? 'Valid' : (trip._errors || []).join('; ')}"`,
       `"${log?.status || 'Not Queued'}"`,
       `"${(log?.errorMessage || '').replace(/"/g, '""')}"`,

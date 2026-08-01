@@ -76,6 +76,13 @@ describe('WellTrans mapping', () => {
       ...hydrateWellTransTrip(trip, drivers), bookingId: '100', dateKey: '2026-07-27',
     }).driver).toBe('Mikhaeil Waeil');
   });
+  it('supplies the assigned vehicle when a completed trip omitted the vehicle label', () => {
+    const hydrated = hydrateWellTransTrip(
+      { driverId: 'DRV-1', bookingId: '100' },
+      [{ id: 'DRV-1', name: 'Mikhaeil Waeil', vehicle: 'TOYOTA 002' }],
+    );
+    expect(buildWellTransPayload(hydrated).vehicle).toBe('TOYOTA 002');
+  });
   it('allows an unavailable vehicle so the worker can leave WellTrans blank', () => {
     const result = validateTripForWellTrans({
       bookingId: '107405172', date: '2026-07-24', status: 'Completed',

@@ -1,4 +1,4 @@
-import { resolveTripDriverName } from '../../../utils/driverIdentity';
+import { resolveTripDriver, resolveTripDriverName } from '../../../utils/driverIdentity';
 
 export const DEFAULT_WELLTRANS_FIELD_MAPPING = Object.freeze({
   tripId: 'Booking Id',
@@ -27,7 +27,15 @@ export const resolveWellTransDriverName = (trip = {}, drivers = []) => {
 
 export const hydrateWellTransTrip = (trip = {}, drivers = []) => {
   const completedDriverName = resolveWellTransDriverName(trip, drivers);
-  return completedDriverName ? { ...trip, completedDriverName } : trip;
+  const authoritativeDriver = resolveTripDriver(trip, drivers);
+  const completedVehicle = firstValue(trip, ['completedVehicle', 'vehicle', 'vehicleName'])
+    || firstValue(authoritativeDriver, ['vehicle', 'vehicleName']);
+  if (!completedDriverName && !completedVehicle) return trip;
+  return {
+    ...trip,
+    ...(completedDriverName ? { completedDriverName } : {}),
+    ...(completedVehicle ? { completedVehicle } : {}),
+  };
 };
 
 export const normalizeServiceDate = (trip = {}) => {
