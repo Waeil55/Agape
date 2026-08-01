@@ -408,8 +408,112 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
 
   return (
     <div ref={pageRef} className="flex flex-col h-full min-h-0 overflow-hidden" tabIndex={-1}>
+      {/* Unified command rail — one operational line, horizontally scrollable on compact screens. */}
+      <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white px-2 py-1.5 shadow-sm">
+        <div className="flex min-w-max items-center gap-1.5 whitespace-nowrap">
+          <div className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-950 px-2.5 text-[11px] font-bold text-white">
+            <Sparkles size={13} className="text-blue-300" /> WELLTRANS
+          </div>
+          <button type="button" onClick={() => setShowInstallHelp(true)} title="Agent setup and download"
+            className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-700">
+            <Download size={12} /> Agent
+          </button>
+          <div className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-bold ${
+            workerHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`} title={workerStatusLabel}>
+            <span className={`h-2 w-2 rounded-full ${workerHealthy ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            {workerStatusLabel}
+          </div>
+          {[
+            ['Trips', completedTrips.length, 'text-slate-900'],
+            ['Review', stagedCount, 'text-purple-700'],
+            ['Verified', successfulCount, 'text-emerald-700'],
+            ['Issues', failedLogs.length + coverage.invalid, 'text-rose-700'],
+            ['Coverage', `${healthScore}%`, coverage.coverageComplete ? 'text-emerald-700' : 'text-amber-700'],
+          ].map(([label, value, tone]) => (
+            <div key={label} className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] text-slate-500">
+              <strong className={`text-[11px] ${tone}`}>{value}</strong>{label}
+            </div>
+          ))}
+          <div className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9px] text-slate-500" title={worker?.workerId || worker?.id || 'No active agent'}>
+            <Activity size={11} /> <strong className={activeWorkers.length ? 'text-emerald-700' : 'text-rose-700'}>{activeWorkers.length}</strong> agent
+          </div>
+          {worker && (
+            <div className="flex h-8 max-w-[170px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9px] text-slate-500" title={`${worker.workerId || worker.id || 'Agent'} · ${String(worker.state || 'unknown').replaceAll('_', ' ')}`}>
+              <strong className="truncate text-slate-700">{worker.workerId || worker.id || 'Agent'}</strong>
+              <span>v{worker.version || '?'}</span>
+            </div>
+          )}
+          <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${canaryHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+            <ShieldCheck size={11} /> Portal {canaryHealthy ? 'verified' : 'check'}
+          </div>
+          <div className="flex h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-1">
+            <button onClick={() => navigateDate(-1)} className="rounded p-1 text-slate-500 hover:bg-white"><ChevronLeft size={13} /></button>
+            <input type="date" value={syncDate} onChange={event => { setSyncDate(event.target.value); setSelectedIds([]); }}
+              className="w-[108px] bg-transparent text-[10px] font-bold text-slate-800 outline-none" />
+            <button onClick={() => navigateDate(1)} className="rounded p-1 text-slate-500 hover:bg-white"><ChevronRight size={13} /></button>
+          </div>
+          <button disabled={!settings.enabled || Boolean(busy)} onClick={startAndFillDate}
+            className="h-8 rounded-lg bg-blue-600 px-3 text-[10px] font-bold text-white hover:bg-blue-700 disabled:opacity-40">
+            {busy === 'start-fill' ? <Loader2 size={11} className="mr-1 inline animate-spin" /> : null}
+            Reconcile &amp; Fill ({completedTrips.length})
+          </button>
+          <button disabled={!selectedIds.length || !settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
+            className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-semibold text-blue-700 disabled:opacity-40">
+            Sync Selected ({selectedIds.length})
+          </button>
+          {stagedCount > 0 && (
+            <button disabled={!workerBatchReady || Boolean(busy)} onClick={confirmReviewBatchApplied}
+              className="h-8 rounded-lg border border-purple-200 bg-purple-50 px-2.5 text-[10px] font-semibold text-purple-700 disabled:opacity-40">
+              Confirm Applied ({stagedCount})
+            </button>
+          )}
+          <select aria-label="Select trips" defaultValue="" onChange={event => { if (event.target.value) handleBulkSelect(event.target.value); event.target.value = ''; }}
+            className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
+            <option value="" disabled>Select…</option>
+            <option value="ready">All ready ({readyTrips.length})</option>
+            <option value="failed">All failed ({failedLogs.length})</option>
+            <option value="invalid">All invalid</option>
+            <option value="none">Clear selection</option>
+          </select>
+          <button disabled={!workerDateMatches || !retryableFailed.length || Boolean(busy)} onClick={() => runQueue(retryableFailed.map(log => log.tripId), 'retry')}
+            className="h-8 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-semibold text-amber-700 disabled:opacity-40">
+            <RefreshCw size={11} className="mr-1 inline" />Retry ({retryableFailed.length})
+          </button>
+          <button onClick={exportAllTripsCSV} className="h-8 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-700">
+            <Download size={11} className="mr-1 inline" />Export
+          </button>
+          {[
+            ['queue', `Trips (${completedTrips.length})`],
+            ['logs', `History (${currentLogs.length})`],
+            ['settings', 'Settings'],
+          ].map(([id, label]) => (
+            <button key={id} onClick={() => {
+              if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
+              setTab(id);
+            }} className={`h-8 rounded-lg px-2.5 text-[10px] font-semibold ${tab === id ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+              {label}
+            </button>
+          ))}
+          {tab === 'queue' && (
+            <>
+              <div className="relative">
+                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="text" placeholder="Search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
+                  className="h-8 w-32 rounded-lg border border-slate-200 bg-white pl-6 pr-2 text-[10px] outline-none focus:border-blue-400" />
+              </div>
+              <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
+                <option value="all">All trips</option><option value="ready">Not queued</option><option value="staged">Review</option>
+                <option value="synced">Verified</option><option value="failed">Failed</option><option value="invalid">Invalid</option>
+              </select>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Header */}
-      <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3">
+      <div className="hidden shrink-0 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -455,7 +559,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
       )}
 
       {/* Stats row */}
-      <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2.5">
+      <div className="hidden shrink-0 border-b border-slate-100 bg-white px-4 py-2.5">
         <div className="flex items-center gap-4 overflow-x-auto">
           {[
             { label: 'Completed trips', value: completedTrips.length, color: 'text-slate-900' },
@@ -473,7 +577,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
       </div>
 
       {/* Multi-agent operations strip */}
-      <div className="shrink-0 border-b border-slate-100 bg-slate-50/80 px-4 py-2">
+      <div className="hidden shrink-0 border-b border-slate-100 bg-slate-50/80 px-4 py-2">
         <div className="flex items-center gap-3 overflow-x-auto">
           <div className="flex shrink-0 items-center gap-2 pr-2">
             <Activity size={13} className="text-slate-500" />
@@ -559,7 +663,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
       )}
 
       {/* Control bar */}
-      <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
+      <div className="hidden shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1">
             <button onClick={() => navigateDate(-1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronLeft size={16} /></button>
@@ -592,7 +696,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
           )}
 
           {/* Bulk select dropdown */}
-          <div className="relative" ref={bulkMenuRef}>
+          <div className="relative">
             <button onClick={() => setBulkMenuOpen(o => !o)}
               className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition flex items-center gap-1">
               <ListFilter size={12} /> Bulk <span className="text-[9px]">▾</span>
@@ -695,7 +799,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
 
       {/* Tabs + content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div className="shrink-0 flex items-center gap-1 border-b border-slate-200 bg-white px-4 py-1.5">
+        <div className="hidden shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-4 py-1.5">
           {[
             { id: 'queue', label: 'Completed trips', count: completedTrips.length },
             { id: 'logs', label: 'Run history', count: currentLogs.length },
