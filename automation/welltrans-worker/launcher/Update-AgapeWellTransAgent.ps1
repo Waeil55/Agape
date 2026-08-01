@@ -6,9 +6,11 @@ $versionPath = Join-Path $installRoot 'VERSION'
 $agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'
 $rollbackRoot = Join-Path $agentDataRoot 'WellTransAgentRollback'
 $pendingPath = Join-Path $agentDataRoot 'welltrans-update-pending.json'
+$activeBackupPath = $null
 
 if (Test-Path -LiteralPath $pendingPath) {
   $pending = Get-Content -LiteralPath $pendingPath -Raw | ConvertFrom-Json
+  $activeBackupPath = [String]$pending.backupPath
   $pendingAge = (Get-Date).ToUniversalTime() - ([DateTime]::Parse($pending.installedAtUtc).ToUniversalTime())
   if ($pendingAge.TotalMinutes -ge 10) {
     if ($pending.backupPath -and (Test-Path -LiteralPath $pending.backupPath)) {
@@ -19,7 +21,25 @@ if (Test-Path -LiteralPath $pendingPath) {
       }
     }
     Remove-Item -LiteralPath $pendingPath -Force
+    $activeBackupPath = $null
   }
+}
+
+# A rollback copy is useful only while a newly installed Agent is inside its
+# startup health window. Remove every older inactive release so each computer
+# has one runnable installation and, at most, one short-lived recovery copy.
+if (Test-Path -LiteralPath $rollbackRoot) {
+  $resolvedRollbackRoot = (Resolve-Path -LiteralPath $rollbackRoot).Path
+  Get-ChildItem -LiteralPath $resolvedRollbackRoot -Directory -ErrorAction SilentlyContinue |
+    ForEach-Object {
+      $resolvedCandidate = (Resolve-Path -LiteralPath $_.FullName).Path
+      $isActiveBackup = $activeBackupPath -and
+        [String]::Equals($resolvedCandidate, $activeBackupPath, [StringComparison]::OrdinalIgnoreCase)
+      if (-not $isActiveBackup -and
+          $resolvedCandidate.StartsWith($resolvedRollbackRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        Remove-Item -LiteralPath $resolvedCandidate -Recurse -Force
+      }
+    }
 }
 
 $installedVersion = if (Test-Path -LiteralPath $versionPath) {

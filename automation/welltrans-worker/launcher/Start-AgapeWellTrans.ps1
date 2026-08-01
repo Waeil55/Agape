@@ -214,6 +214,18 @@ try {
     while (-not $workerProcess.HasExited) {
       if (((Get-Date) - $workerStartedAt).TotalSeconds -ge 60 -and
           (Test-Path -LiteralPath $pendingUpdatePath)) {
+        try {
+          $healthyUpdate = Get-Content -LiteralPath $pendingUpdatePath -Raw | ConvertFrom-Json
+          if ($healthyUpdate.backupPath -and (Test-Path -LiteralPath $healthyUpdate.backupPath)) {
+            $resolvedHealthyBackup = (Resolve-Path -LiteralPath $healthyUpdate.backupPath).Path
+            $resolvedRollbackRoot = (Resolve-Path -LiteralPath $rollbackRoot).Path
+            if ($resolvedHealthyBackup.StartsWith($resolvedRollbackRoot, [StringComparison]::OrdinalIgnoreCase)) {
+              Remove-Item -LiteralPath $resolvedHealthyBackup -Recurse -Force
+            }
+          }
+        } catch {
+          Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Healthy release cleanup deferred: $($_.Exception.Message)"
+        }
         Remove-Item -LiteralPath $pendingUpdatePath -Force
       }
       Start-Sleep -Milliseconds 500
