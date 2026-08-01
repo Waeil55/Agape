@@ -24,6 +24,7 @@ import {
   validateTripForWellTrans,
 } from '../utils/welltransMapping';
 import { pageWellTransRows, WELLTRANS_TABLE_PAGE_SIZE } from '../utils/welltransScale';
+import { isValidWellTransServiceDate } from '../utils/welltransDate';
 import { tripMatchesSearch } from '../../../utils/search';
 
 const statusStyle = {
@@ -72,6 +73,26 @@ const tripOdometerValue = (value) => {
 const tripClockMinutes = (value) => {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
   return match ? (Number(match[1]) * 60) + Number(match[2]) : null;
+};
+
+const displayScalar = (value, fallback = '—') => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value?.toDate === 'function') {
+    const date = value.toDate();
+    return Number.isNaN(date?.getTime?.()) ? fallback : date.toLocaleString();
+  }
+  if (typeof value === 'object') {
+    const candidate = value.name || value.label || value.address || value.value || value.id;
+    return candidate === undefined || candidate === null ? fallback : String(candidate);
+  }
+  return String(value);
+};
+
+const displayTimestamp = value => {
+  const parsed = value?.toDate?.() || (value ? new Date(value) : null);
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString() : '—';
 };
 
 const createWellTransEditDraft = (trip) => ({
@@ -133,6 +154,26 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   });
   const bulkMenuRef = useRef(null);
   const pageRef = useRef(null);
+
+  const changeSyncDate = useCallback((nextDate) => {
+    const normalized = String(nextDate || '').trim();
+    // Native date controls can emit an empty intermediate value. Publishing
+    // that value used to tear down the valid subscriptions and crash the page.
+    if (!isValidWellTransServiceDate(normalized)) return false;
+    setSelectedIds([]);
+    setDriverScopeId('all');
+    setQueuePage(0);
+    setLogsPage(0);
+    setTripDrawer(null);
+    setEditingTrip(null);
+    setSelectedFailure(null);
+    setInspectPayloadTrip(null);
+    setBulkMenuOpen(false);
+    setNotice('');
+    setSyncProgress(null);
+    setSyncDate(normalized);
+    return true;
+  }, []);
 
   const beginTripEdit = useCallback((trip) => {
     setEditingTrip(createWellTransEditDraft(trip));
@@ -588,10 +629,12 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
   };
 
   const navigateDate = (offset) => {
-    const d = new Date(syncDate + 'T12:00:00');
+    const baseDate = isValidWellTransServiceDate(syncDate)
+      ? syncDate
+      : new Date().toLocaleDateString('en-CA');
+    const d = new Date(`${baseDate}T12:00:00`);
     d.setDate(d.getDate() + offset);
-    setSyncDate(d.toISOString().slice(0, 10));
-    setSelectedIds([]);
+    changeSyncDate(d.toISOString().slice(0, 10));
   };
 
   const toggleAutoRetry = (category) => {
@@ -678,7 +721,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
           </div>
           <div className="flex h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-1">
             <button onClick={() => navigateDate(-1)} className="rounded p-1 text-slate-500 hover:bg-white"><ChevronLeft size={13} /></button>
-            <input type="date" value={syncDate} onChange={event => { setSyncDate(event.target.value); setSelectedIds([]); }}
+            <input type="date" value={syncDate} disabled={Boolean(busy)} onChange={event => changeSyncDate(event.target.value)}
               className="w-[108px] bg-transparent text-[10px] font-bold text-slate-800 outline-none" />
             <button onClick={() => navigateDate(1)} className="rounded p-1 text-slate-500 hover:bg-white"><ChevronRight size={13} /></button>
           </div>
@@ -911,7 +954,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
           <div className="flex items-center gap-1">
             <button onClick={() => navigateDate(-1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronLeft size={16} /></button>
             <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
-              <input type="date" value={syncDate} onChange={e => { setSyncDate(e.target.value); setSelectedIds([]); }}
+              <input type="date" value={syncDate} disabled={Boolean(busy)} onChange={event => changeSyncDate(event.target.value)}
                 className="bg-transparent text-[11px] font-semibold text-slate-900 outline-none w-[110px]" />
             </label>
             <button onClick={() => navigateDate(1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronRight size={16} /></button>
@@ -1149,10 +1192,10 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                           className="rounded border-slate-300" />
                       </td>
                       <td className="px-2 py-2 font-mono font-semibold text-blue-600" onClick={event => event.stopPropagation()}>
-                        {isEditing ? <input value={draft.bookingId || ''} onChange={event => setEditingTrip(current => ({ ...current, bookingId: event.target.value }))} className={inlineInputClass} aria-label="Booking ID" /> : (trip.bookingId || trip.id)}
+                        {isEditing ? <input value={draft.bookingId || ''} onChange={event => setEditingTrip(current => ({ ...current, bookingId: event.target.value }))} className={inlineInputClass} aria-label="Booking ID" /> : displayScalar(trip.bookingId || trip.id)}
                       </td>
                       <td className="px-2 py-2 font-medium text-slate-900" title={trip.patient || trip.clientName} onClick={event => event.stopPropagation()}>
-                        {isEditing ? <input value={draft.patient || ''} onChange={event => setEditingTrip(current => ({ ...current, patient: event.target.value }))} className={inlineInputClass} aria-label="Passenger" /> : <span className="block truncate">{trip.patient || trip.clientName || '—'}</span>}
+                        {isEditing ? <input value={draft.patient || ''} onChange={event => setEditingTrip(current => ({ ...current, patient: event.target.value }))} className={inlineInputClass} aria-label="Passenger" /> : <span className="block truncate">{displayScalar(trip.patient || trip.clientName)}</span>}
                       </td>
                       <td className="px-2 py-2 text-slate-700" title={trip._payload?.driver} onClick={event => event.stopPropagation()}>
                         {isEditing ? (
@@ -1163,10 +1206,10 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                             <option value="">Unassigned</option>
                             {drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name || driver.email}</option>)}
                           </select>
-                        ) : <span className="block truncate">{trip._payload?.driver || trip.completedDriverName || '—'}</span>}
+                        ) : <span className="block truncate">{displayScalar(trip._payload?.driver || trip.completedDriverName)}</span>}
                       </td>
                       <td className="px-2 py-2 text-slate-700" title={trip._payload?.vehicle} onClick={event => event.stopPropagation()}>
-                        {isEditing ? <input value={draft.completedVehicle || ''} onChange={event => setEditingTrip(current => ({ ...current, completedVehicle: event.target.value }))} className={inlineInputClass} aria-label="Vehicle" /> : <span className="block truncate">{trip._payload?.vehicle || '—'}</span>}
+                        {isEditing ? <input value={draft.completedVehicle || ''} onChange={event => setEditingTrip(current => ({ ...current, completedVehicle: event.target.value }))} className={inlineInputClass} aria-label="Vehicle" /> : <span className="block truncate">{displayScalar(trip._payload?.vehicle)}</span>}
                       </td>
                       {[
                         ['_pickupArrival', trip._payload?.pickup?.arrival, 'text-emerald-700', 'Pickup arrival'],
@@ -1287,12 +1330,12 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                   <div key={log.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer group"
                     onClick={() => log.screenshot ? window.open(log.screenshot, '_blank') : null}>
                     <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase shrink-0 ${statusStyle[log.status] || 'bg-slate-100 text-slate-500'}`}>
-                      {log.status}
+                      {displayScalar(log.status, 'unknown')}
                     </span>
-                    <span className="font-mono text-[11px] font-semibold text-blue-600 shrink-0">{log.bookingId || log.tripId}</span>
-                    <span className="flex-1 text-[11px] text-slate-500 truncate">{log.errorMessage || log.stage || 'Completed'}</span>
+                    <span className="font-mono text-[11px] font-semibold text-blue-600 shrink-0">{displayScalar(log.bookingId || log.tripId)}</span>
+                    <span className="flex-1 text-[11px] text-slate-500 truncate">{displayScalar(log.errorMessage || log.stage, 'Completed')}</span>
                     {log.screenshot && <Image size={12} className="text-slate-300 group-hover:text-blue-500 shrink-0 transition" />}
-                    <span className="text-[10px] text-slate-400 shrink-0">{new Date(log.completedAt || log.stagedAt || log.createdAt).toLocaleString()}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0">{displayTimestamp(log.completedAt || log.stagedAt || log.createdAt)}</span>
                   </div>
                 ))}
                 {logs.length > TABLE_PAGE_SIZE && (
@@ -1322,11 +1365,11 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
               <div key={log.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
                 <div className={`w-2 h-2 rounded-full shrink-0 ${log.status === 'processing' ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-semibold text-slate-900">{log.bookingId || log.tripId}</p>
-                  <p className="text-[10px] text-slate-500 truncate">{log.stage || 'Queued'} · {log.status}</p>
+                  <p className="text-[11px] font-semibold text-slate-900">{displayScalar(log.bookingId || log.tripId)}</p>
+                  <p className="text-[10px] text-slate-500 truncate">{displayScalar(log.stage, 'Queued')} · {displayScalar(log.status, 'unknown')}</p>
                 </div>
                 <span className="text-[10px] text-slate-400 shrink-0">
-                  {new Date(log.updatedAt || log.createdAt).toLocaleTimeString()}
+                  {displayTimestamp(log.updatedAt || log.createdAt)}
                 </span>
               </div>
             ))}
