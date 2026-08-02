@@ -5,13 +5,14 @@ import {
   Shield, Timer, User, Navigation, Edit2, Trash2, Plus, X, Save,
   Briefcase, Check, Lock
 } from 'lucide-react';
-import { buildTimeEvents, generatePayrollOutput, POLICY_MODES } from '../utils/timeTracking';
+import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, validateTimeEventSequence } from '../utils/timeTracking';
 import { localCalendarYmd } from '../utils/tripDate';
 import { db, doc, setDoc } from '../config/firebase';
 
 const formatMinutes = (minutes) => {
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
+  const rounded = Math.max(0, Math.round(Number(minutes) || 0));
+  const h = Math.floor(rounded / 60);
+  const m = rounded % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
@@ -27,6 +28,11 @@ const formatDate = (isoString) => {
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+};
+
+const timeInputValue = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toTimeString().slice(0, 5);
 };
 
 const getGapClassificationColor = (classification) => {
@@ -47,6 +53,11 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
   const [editingRate, setEditingRate] = useState(null);
   const [rateValue, setRateValue] = useState('');
   const [approvalMsg, setApprovalMsg] = useState(null);
+  const [timesheetSaving, setTimesheetSaving] = useState(false);
+  const editValidation = useMemo(
+    () => editTimesheet ? validateTimeEventSequence(editTimesheet.events, { now: new Date() }) : null,
+    [editTimesheet]
+  );
 
   const filteredDrivers = useMemo(() => {
     if (selectedDriver === 'ALL') return drivers;
@@ -120,7 +131,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       });
 
       Object.entries(byDate).forEach(([date, day]) => {
-        const model = buildTimeEvents(day.trips, driver, day.clockEvents, timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.SMART_MODE, { date, breadcrumbs: driver.breadcrumbs || [] });
+        const model = buildTimeEvents(day.trips, driver, day.clockEvents, timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME, { date, breadcrumbs: driver.breadcrumbs || [] });
         const externalGaps = day.gaps.filter(gap => !model.gapLog.some(mg => mg.startTime === gap.startTime && mg.endTime === gap.endTime));
         day.trips = model.trips;
         day.clockEvents = model.clockEvents;
@@ -128,6 +139,8 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         day.sessions = model.sessions;
         day.gaps = [...model.gapLog, ...externalGaps];
         day.teleports = [...model.teleports, ...day.teleports];
+        day.anomalies = model.anomalies || [];
+        day.approvalEligible = model.approvalEligible;
         day.payroll = generatePayrollOutput(model, Number(driver.hourlyRate || 0));
       });
       sessions[driverId] = byDate;
@@ -145,7 +158,9 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
     };
   }, [driverSessions]);
 
-  const getDayBillable = (day) => day.payroll?.payTime?.billableMinutes ?? day.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0) ?? day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+  const getDayBillable = (day) => day.payroll?.payTime?.billableMilliseconds != null
+    ? day.payroll.payTime.billableMilliseconds / 60000
+    : day.payroll?.payTime?.billableMinutes ?? day.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0) ?? day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
 
   const getDayEarnings = (day, hourlyRate) => {
     const billable = getDayBillable(day);
@@ -372,7 +387,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                                 {breaks > 0 && <span className="flex items-center gap-1 text-yellow-600"><Pause className="w-3 h-3" />{formatMinutes(breaks)}</span>}
                                 <span className="flex items-center gap-1"><Navigation className="w-3 h-3" />{day.trips.length}</span>
                                 {rate > 0 && <span className="font-semibold text-green-700">{formatCurrency(earnings)}</span>}
-                                <button onClick={() => setEditTimesheet({ driverId, date, events: [...day.clockEvents] })} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit Timesheet">
+                                <button onClick={() => setEditTimesheet({ driverId, date, events: [...day.clockEvents].sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)), correctionReason: '' })} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit Timesheet">
                                   <Edit2 size={14} />
                                 </button>
                               </div>
@@ -494,7 +509,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                 const rate = Number(driver?.hourlyRate || 0);
                 const dates = Object.keys(byDate).sort();
                 const totalBillable = dates.reduce((sum, d) => sum + getDayBillable(byDate[d]), 0);
-                const totalBreaks = dates.reduce((sum, d) => sum + byDate[d].gaps.filter(g => g.gapType === 'BREAK').reduce((s, g) => s + g.durationMinutes, 0), 0);
+                const totalBreaks = dates.reduce((sum, date) => sum + byDate[date].sessions.reduce((sessionSum, session) => sessionSum + Number(session.breakMinutes || 0), 0), 0);
                 const totalTrips = dates.reduce((sum, d) => sum + byDate[d].trips.length, 0);
                 const billableHours = Math.round((totalBillable / 60) * 100) / 100;
 
@@ -507,17 +522,17 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   const monday = new Date(d);
                   monday.setDate(monday.getDate() + mondayOffset);
                   const weekKey = localCalendarYmd(monday);
-                  if (!weekMap[weekKey]) weekMap[weekKey] = { days: [], hours: 0 };
-                  const dayHours = Math.round((getDayBillable(byDate[date]) / 60) * 100) / 100;
+                  if (!weekMap[weekKey]) weekMap[weekKey] = { days: [], minutes: 0 };
+                  const dayMinutes = getDayBillable(byDate[date]);
                   weekMap[weekKey].days.push(date);
-                  weekMap[weekKey].hours += dayHours;
+                  weekMap[weekKey].minutes += dayMinutes;
                 });
 
                 let totalRegular = 0;
                 let totalOvertime = 0;
                 Object.values(weekMap).forEach(week => {
-                  const weekRegular = Math.min(week.hours, 40);
-                  const weekOvertime = Math.max(0, week.hours - 40);
+                  const weekRegular = Math.min(week.minutes, 2400) / 60;
+                  const weekOvertime = Math.max(0, week.minutes - 2400) / 60;
                   totalRegular += weekRegular;
                   totalOvertime += weekOvertime;
                 });
@@ -537,6 +552,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
 
               const grandTotalEarnings = personPayroll.reduce((sum, p) => sum + p.totalEarnings, 0);
               const grandTotalHours = personPayroll.reduce((sum, p) => sum + p.billableHours, 0);
+              const unresolvedTimesheets = Object.values(driverSessions).flatMap((byDate) => Object.values(byDate)).filter((day) => !day.approvalEligible);
 
               const allDates = Array.from(new Set(personPayroll.flatMap(p => p.dailyBreakdown.map(d => d.date)))).sort();
               const periodStart = allDates[0];
@@ -623,7 +639,9 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                       {approvalMsg && (
                         <span className={`text-sm font-semibold ${approvalMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>{approvalMsg.text}</span>
                       )}
+                      {unresolvedTimesheets.length > 0 && <span className="text-sm font-semibold text-amber-700">{unresolvedTimesheets.length} timesheet(s) require a closed, valid event ledger.</span>}
                       <button
+                        disabled={unresolvedTimesheets.length > 0}
                         onClick={() => {
                           const period = { startDate: periodStart, endDate: periodEnd, approvedAt: new Date().toISOString(), approvedBy: 'admin', totalHours: grandTotalHours, totalEarnings: grandTotalEarnings, people: personPayroll.map(p => ({ id: p.driverId, name: p.driver?.name, hours: p.billableHours, earnings: p.totalEarnings, rate: p.rate })) };
                           setDoc(doc(db, 'payrollRecords', `${periodStart}_${periodEnd}`), period, { merge: true }).then(() => {
@@ -633,7 +651,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                             setApprovalMsg({ type: 'error', text: 'Payroll approval failed.' });
                           });
                         }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-green-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
                       >
                         <Lock size={14} /> Approve Payroll
                       </button>
@@ -655,32 +673,50 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               <button onClick={() => setEditTimesheet(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
-              {editTimesheet.events.sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)).map((event, index) => (
+              {editTimesheet.events.map((event, index) => (
                 <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl">
                   <select autoFocus={index === 0} value={event.type} onChange={(e) => { const n = [...editTimesheet.events]; n[index].type = e.target.value; setEditTimesheet({ ...editTimesheet, events: n }); }}
                     className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
-                    <option value="IN">Clock In</option>
-                    <option value="OUT">Clock Out</option>
+                    <option value="CLOCK_IN">Clock In</option>
+                    <option value="CLOCK_OUT">Clock Out</option>
                     <option value="BREAK_START">Break Start</option>
                     <option value="BREAK_END">Break End</option>
                   </select>
-                  <input type="time" value={new Date(event.timestamp || event.at).toTimeString().slice(0, 5)}
+                  <input type="time" value={timeInputValue(event.timestamp || event.at)}
                     onChange={(e) => { const [h, m] = e.target.value.split(':'); const d = new Date(editTimesheet.date + 'T00:00:00'); d.setHours(parseInt(h), parseInt(m)); const n = [...editTimesheet.events]; n[index].timestamp = d.toISOString(); setEditTimesheet({ ...editTimesheet, events: n }); }}
                     className="flex-1 p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
                   <button onClick={() => setEditTimesheet({ ...editTimesheet, events: editTimesheet.events.filter((_, i) => i !== index) })}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 size={16} /></button>
                 </div>
               ))}
-              <button onClick={() => { const d = new Date(editTimesheet.date + 'T09:00:00'); setEditTimesheet({ ...editTimesheet, events: [...editTimesheet.events, { type: 'IN', at: d.toISOString(), timestamp: d.toISOString() }] }); }}
+              <button onClick={() => { const d = new Date(editTimesheet.date + 'T09:00:00'); setEditTimesheet({ ...editTimesheet, events: [...editTimesheet.events, { type: 'CLOCK_IN', at: d.toISOString(), timestamp: d.toISOString() }] }); }}
                 className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors font-bold text-sm">
                 <Plus size={16} /> Add Event
               </button>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Correction reason</label>
+                <input value={editTimesheet.correctionReason || ''} onChange={(event) => setEditTimesheet({ ...editTimesheet, correctionReason: event.target.value })}
+                  placeholder="Required for the audit trail" className="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+              </div>
+              {editValidation && !editValidation.valid && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {editValidation.anomalies.map((issue, index) => <p key={`${issue.code}-${index}`}>{issue.message}</p>)}
+                </div>
+              )}
             </div>
             <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50">
               <button onClick={() => setEditTimesheet(null)} className="flex-1 p-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition">Cancel</button>
-              <button onClick={() => { if (onUpdateClockEvents) onUpdateClockEvents(editTimesheet.driverId, editTimesheet.date, editTimesheet.events); setEditTimesheet(null); }}
-                className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                <Save size={16} /> Save
+              <button disabled={timesheetSaving || !editValidation?.valid || !editTimesheet.correctionReason?.trim()} onClick={async () => {
+                try {
+                  setTimesheetSaving(true);
+                  await onUpdateClockEvents?.(editTimesheet.driverId, editTimesheet.date, editValidation.normalizedEvents, editTimesheet.correctionReason.trim());
+                  setEditTimesheet(null);
+                } catch (error) {
+                  setApprovalMsg({ type: 'error', text: error.message || 'Timesheet correction could not be saved.' });
+                } finally { setTimesheetSaving(false); }
+              }}
+                className="flex-1 p-3 bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                <Save size={16} /> {timesheetSaving ? 'Saving…' : 'Save correction'}
               </button>
             </div>
           </div>

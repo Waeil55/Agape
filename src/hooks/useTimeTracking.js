@@ -26,7 +26,7 @@ const safeSetDoc = async (col, id, data) => {
   catch (err) { console.error('[useTimeTracking] setDoc failed:', col, id, err.code); }
 };
 
-export function useTimeTracking({ driver, trips = [], position, policyMode = POLICY_MODES.SMART_MODE, enabled = true, onClockIn, onClockOut, onBreakStart, onBreakEnd } = {}) {
+export function useTimeTracking({ driver, trips = [], position, policyMode = POLICY_MODES.PAY_FROM_HOME, enabled = true, onClockIn, onClockOut, onBreakStart, onBreakEnd } = {}) {
   const [ttState, setTtState] = useState(() => {
     if (!driver?.clockedIn) return TT.OFF_SHIFT;
     if (driver?.timeTrackingState === TT.ON_BREAK) return TT.ON_BREAK;
@@ -43,6 +43,7 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
   const stateRef = useRef(ttState);
   const eventsRef = useRef([]);
   const breakStartRef = useRef(null);
+  const accumulatedBreakMsRef = useRef(0);
   const clockInTimeRef = useRef(null);
   const lastTripEventRef = useRef(null);
   const tickRef = useRef(null);
@@ -93,12 +94,24 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
 
   const startTick = useCallback(() => {
     if (tickRef.current) clearInterval(tickRef.current);
-    tickRef.current = setInterval(() => { if (stateRef.current === TT.ON_SHIFT_ACTIVE) setBillableMinutes(p => p + 1); }, 60000);
+    const recalculate = () => {
+      if (!clockInTimeRef.current) return;
+      const nowMs = Date.now();
+      const clockInMs = new Date(clockInTimeRef.current).getTime();
+      const activeBreakMs = stateRef.current === TT.ON_BREAK && breakStartRef.current
+        ? Math.max(0, nowMs - new Date(breakStartRef.current).getTime())
+        : 0;
+      const breakMs = accumulatedBreakMsRef.current + activeBreakMs;
+      setBillableMinutes(Math.floor(Math.max(0, nowMs - clockInMs - breakMs) / 60000));
+      setBreakMinutes(Math.floor(breakMs / 60000));
+    };
+    recalculate();
+    tickRef.current = setInterval(recalculate, 15000);
   }, []);
   const stopTick = useCallback(() => { if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; } }, []);
 
   const persistSession = useCallback(async (clockOutEvt) => {
-    const events = clockOutEvt ? [...eventsRef.current, clockOutEvt] : [...eventsRef.current];
+    const events = [...eventsRef.current];
     const d = driverRef.current;
     const allClock = events
       .filter(e => ['CLOCK_IN','AUTO_CLOCK_IN','CLOCK_OUT','BREAK_START','BREAK_END'].includes(e.type))
@@ -153,8 +166,8 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
     if (stateRef.current !== TT.ON_BREAK) return;
     const now = nowIso(); const loc = getPos(); const d = driverRef.current;
     if (breakStartRef.current) {
-      const bMin = Math.max(0, Math.round((new Date(now) - new Date(breakStartRef.current)) / 60000));
-      setBreakMinutes(p => p + bMin);
+      accumulatedBreakMsRef.current += Math.max(0, new Date(now) - new Date(breakStartRef.current));
+      setBreakMinutes(Math.floor(accumulatedBreakMsRef.current / 60000));
     }
     let resumePayload = {};
     if (nextPickup?.location && d?.homeLat && d?.homeLng) {
@@ -179,7 +192,7 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
     pushEvent(event); transition(TT.OFF_SHIFT);
     const payroll = await persistSession(event);
     setBillableMinutes(0); setBreakMinutes(0);
-    eventsRef.current = []; clockInTimeRef.current = null; lastTripEventRef.current = null; breakStartRef.current = null;
+    eventsRef.current = []; clockInTimeRef.current = null; lastTripEventRef.current = null; breakStartRef.current = null; accumulatedBreakMsRef.current = 0;
     onClockOut?.({ payroll, timestamp: now }); return payroll;
   }, [stopTick, clearPending, getPos, pushEvent, transition, persistSession, onClockOut]);
 
@@ -208,12 +221,6 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
     if (prev) {
       const gap = classifyGap(prev.timestamp, now, prev.location, loc);
       pushGap({ ...gap.auditRecord, tripId, sessionId: 'live' });
-      if (gap.classification === GAP_CLASSIFICATIONS.LONG && stateRef.current === TT.ON_SHIFT_ACTIVE) {
-        pushEvent({ type: 'BREAK_START', timestamp: prev.timestamp, location: prev.location, reason: 'LONG_GAP_AUTO' });
-        pushEvent({ type: 'BREAK_END', timestamp: now, location: loc, reason: 'LONG_GAP_RESUME' });
-        const bMin = Math.max(0, Math.round((new Date(now) - new Date(prev.timestamp)) / 60000));
-        setBreakMinutes(p => p + bMin);
-      }
     }
     const evt = pushEvent({ type: 'TRIP_EVENT', eventType, timestamp: now, tripId, location: loc });
     lastTripEventRef.current = evt;
@@ -237,10 +244,9 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
       if (recent[i-1].lat && recent[i].lat) dist += haversineDistanceMiles(recent[i-1].lat, recent[i-1].lng, recent[i].lat, recent[i].lng);
     }
     if (dist < 0.01 && stateRef.current === TT.ON_SHIFT_ACTIVE) {
-      pushEvent({ type: 'AUTO_BREAK_SUSPECTED', timestamp: nowIso(), reason: 'GPS_INACTIVITY' });
-      transition(TT.ON_BREAK); breakStartRef.current = oldest.toISOString();
+      pushGap({ type: 'GPS_INACTIVITY_REVIEW', timestamp: nowIso(), reason: 'GPS_INACTIVITY', payrollEffect: 'REVIEW' });
     }
-  }, [pushEvent, transition]);
+  }, [pushGap]);
 
   // Sync with driver profile
   useEffect(() => {
@@ -249,16 +255,17 @@ export function useTimeTracking({ driver, trips = [], position, policyMode = POL
     const isOnBreak = driver.timeTrackingState === TT.ON_BREAK || Boolean(driver.lastBreakStart);
     if (isClockedIn && stateRef.current === TT.OFF_SHIFT) {
       const t = driver.clockedInAt ? new Date(driver.clockedInAt) : new Date();
-      const elapsed = Math.max(0, Math.round((Date.now() - t.getTime()) / 60000));
-      const savedBreak = driver.totalBreakMinutes || 0;
-      const addlBreak = isOnBreak && driver.lastBreakStart ? Math.round((Date.now() - new Date(driver.lastBreakStart)) / 60000) : 0;
-      const total = savedBreak + addlBreak;
+      const elapsedMs = Math.max(0, Date.now() - t.getTime());
+      const savedBreakMs = Number(driver.totalBreakMilliseconds) || Number(driver.totalBreakMinutes || 0) * 60000;
+      const addlBreakMs = isOnBreak && driver.lastBreakStart ? Math.max(0, Date.now() - new Date(driver.lastBreakStart)) : 0;
+      const totalBreakMs = savedBreakMs + addlBreakMs;
       clockInTimeRef.current = t.toISOString();
       breakStartRef.current = isOnBreak ? driver.lastBreakStart : null;
       eventsRef.current = [{ type: driver.clockedInAt ? 'AUTO_CLOCK_IN' : 'CLOCK_IN', timestamp: t.toISOString(), location: getPos(), driverId }];
-      setBillableMinutes(Math.max(0, elapsed - total)); setBreakMinutes(total);
+      accumulatedBreakMsRef.current = savedBreakMs;
+      setBillableMinutes(Math.floor(Math.max(0, elapsedMs - totalBreakMs) / 60000)); setBreakMinutes(Math.floor(totalBreakMs / 60000));
       transition(isOnBreak ? TT.ON_BREAK : TT.ON_SHIFT_ACTIVE);
-      if (!isOnBreak) startTick();
+      startTick();
     } else if (!isClockedIn && stateRef.current !== TT.OFF_SHIFT) {
       stopTick(); transition(TT.OFF_SHIFT); setBillableMinutes(0); setBreakMinutes(0);
     }

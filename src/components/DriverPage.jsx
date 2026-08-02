@@ -33,6 +33,7 @@ import {
   generatePendingClockOut,
   buildTimeEvents,
   generatePayrollOutput,
+  stitchSessions,
 } from '../utils/timeTracking';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
@@ -1384,7 +1385,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const isClockedIn = me?.clockedIn || false;
   const TT = TIME_TRACKING_STATES;
-  const timeTrackingPolicyMode = appSettings?.timeTrackingPolicy || POLICY_MODES.SMART_MODE;
+  const timeTrackingPolicyMode = me?.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME;
   const [ttState, setTtState] = useState(TT.OFF_SHIFT);
   const ttStateRef = useRef(TT.OFF_SHIFT);
   const [ttBillableMin, setTtBillableMin] = useState(0);
@@ -1394,6 +1395,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const ttLastTripEventRef = useRef(null);
   const ttEventsLogRef = useRef([]);
   const ttTickRef = useRef(null);
+  const ttAccumulatedBreakMsRef = useRef(0);
   const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
   const idlePromptedRef = useRef(false);
   const [showClockOutOffer, setShowClockOutOffer] = useState(false);
@@ -1439,61 +1441,36 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     });
     const today = new Date();
     const days = [];
-    let weeklyTotal = 0;
-    const isInType = (e) => e.type === 'in' || e.type === 'auto_in';
-    const isOutType = (e) => e.type === 'out';
+    let weeklyMilliseconds = 0;
+    const weekStart = new Date(today);
+    weekStart.setHours(0, 0, 0, 0);
+    const currentDay = weekStart.getDay();
+    weekStart.setDate(weekStart.getDate() + (currentDay === 0 ? -6 : 1 - currentDay));
     for (let i = 13; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateKey = localCalendarYmd(d);
-      const dayEvents = (byDate[dateKey] || []).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-      let sessionHours = 0;
-      let breakMin = 0;
-      let firstClockIn = null;
-      let lastClockOut = null;
-      let pendingIn = null;
-      let pendingBreakStart = null;
-      const breakStarts = dayEvents.filter(e => e.type === 'break_start');
-      const breakEnds = dayEvents.filter(e => e.type === 'break_end');
-      breakStarts.forEach((bs, idx) => {
-        const be = breakEnds[idx];
-        if (bs.timestamp && be?.timestamp) {
-          breakMin += Math.round((new Date(be.timestamp) - new Date(bs.timestamp)) / 60000);
-        } else if (bs.timestamp && !be) {
-          breakMin += Math.round((new Date() - new Date(bs.timestamp)) / 60000);
-        }
-      });
-      dayEvents.forEach(e => {
-        if (isInType(e)) {
-          pendingIn = e;
-          if (!firstClockIn) firstClockIn = e;
-        } else if (isOutType(e) && pendingIn) {
-          const diff = new Date(e.timestamp) - new Date(pendingIn.timestamp);
-          if (diff > 0) sessionHours += diff / 3600000;
-          lastClockOut = e;
-          pendingIn = null;
-        }
-      });
-      let hours = null;
-      if (firstClockIn && !lastClockOut && pendingIn) {
-        const diff = new Date() - new Date(pendingIn.timestamp);
-        if (diff > 0) hours = parseFloat(((Math.max(0, Math.round(diff / 60000) - breakMin) / 60)).toFixed(1));
-      } else if (sessionHours > 0) {
-        const billableMin = Math.max(0, Math.round(sessionHours * 60) - breakMin);
-        hours = parseFloat((billableMin / 60).toFixed(1));
-      }
+      const dayEvents = [...(byDate[dateKey] || [])].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+      const ledger = stitchSessions(dayEvents, { now: new Date() });
+      const firstSession = ledger.sessions[0];
+      const lastSession = ledger.sessions[ledger.sessions.length - 1];
+      const billableMs = ledger.totalBillableMilliseconds || 0;
+      const breakMs = ledger.sessions.reduce((sum, session) => sum + (session.breakMilliseconds || 0), 0);
+      const hours = dayEvents.length ? billableMs / 3600000 : null;
       days.push({
         dateKey,
         hasEvents: dayEvents.length > 0,
-        clockIn: firstClockIn?.timestamp || null,
-        clockOut: lastClockOut?.timestamp || null,
+        clockIn: firstSession?.clockInTime || null,
+        clockOut: lastSession?.clockOutTime || null,
         hours,
-        breakMin,
+        breakMin: Math.round(breakMs / 60000),
+        anomalies: ledger.anomalies,
       });
-      if (hours) weeklyTotal += hours;
+      if (d >= weekStart) weeklyMilliseconds += billableMs;
     }
+    const weeklyTotal = weeklyMilliseconds / 3600000;
     const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
-    return { days, weeklyTotal: Math.round(weeklyTotal * 10) / 10, weeklyOvertime: Math.round(weeklyOvertime * 10) / 10 };
+    return { days, weeklyTotal, weeklyOvertime };
   }, [me?.clockEvents]);
 
   const handleClockToggle = useCallback(() => {
@@ -1641,22 +1618,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const now = new Date();
       const clockedInAt = me?.clockedInAt;
       const clockInTime = clockedInAt ? new Date(clockedInAt) : now;
-      const elapsedMin = Math.max(0, Math.round((now - clockInTime) / 60000));
-      const savedBreakMin = me?.totalBreakMinutes || 0;
+      const elapsedMs = Math.max(0, now - clockInTime);
+      const savedBreakMs = Number(me?.totalBreakMilliseconds)
+        || Math.max(0, Number(me?.totalBreakMinutes || 0) * 60000);
       const isOnBreak = me?.timeTrackingState === 'ON_BREAK' || me?.lastBreakStart;
       const breakStart = me?.lastBreakStart;
-      let additionalBreakMin = 0;
+      let additionalBreakMs = 0;
       if (isOnBreak && breakStart) {
-        additionalBreakMin = Math.round((now - new Date(breakStart)) / 60000);
+        additionalBreakMs = Math.max(0, now - new Date(breakStart));
       }
-      const totalBreak = savedBreakMin + additionalBreakMin;
-      const billable = Math.max(0, elapsedMin - totalBreak);
+      const totalBreakMs = savedBreakMs + additionalBreakMs;
+      const billableMs = Math.max(0, elapsedMs - totalBreakMs);
       setTtState(isOnBreak ? TT.ON_BREAK : TT.ON_SHIFT_ACTIVE);
       ttStateRef.current = isOnBreak ? TT.ON_BREAK : TT.ON_SHIFT_ACTIVE;
       ttClockInTimeRef.current = clockInTime.toISOString();
       ttEventsLogRef.current = [{ type: clockedInAt ? 'AUTO_CLOCK_IN' : 'CLOCK_IN', timestamp: clockInTime.toISOString(), location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null }];
-      setTtBillableMin(billable);
-      setTtBreakMin(totalBreak);
+      ttAccumulatedBreakMsRef.current = savedBreakMs;
+      setTtBillableMin(Math.floor(billableMs / 60000));
+      setTtBreakMin(Math.floor(totalBreakMs / 60000));
       ttBreakStartRef.current = isOnBreak ? breakStart : null;
       ttLastTripEventRef.current = null;
     } else if (!isClockedIn && ttStateRef.current !== TT.OFF_SHIFT) {
@@ -1669,20 +1648,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       setTtState(TT.OFF_SHIFT);
       ttStateRef.current = TT.OFF_SHIFT;
       ttClockInTimeRef.current = null;
+      ttAccumulatedBreakMsRef.current = 0;
       setTtBillableMin(0);
       setTtBreakMin(0);
     }
-  }, [isClockedIn, driverPosition?.lat, driverPosition?.lng]);
+  }, [isClockedIn, driverPosition?.lat, driverPosition?.lng, me?.clockedInAt, me?.lastBreakStart, me?.timeTrackingState, me?.totalBreakMilliseconds, me?.totalBreakMinutes]);
 
   // ─── TIME TRACKING: tick billable minutes every 60s while ON_SHIFT_ACTIVE ───
   useEffect(() => {
-    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE) {
+    if (ttStateRef.current !== TT.OFF_SHIFT && ttClockInTimeRef.current) {
       if (ttTickRef.current) clearInterval(ttTickRef.current);
-      ttTickRef.current = setInterval(() => {
-        if (ttStateRef.current === TT.ON_SHIFT_ACTIVE) {
-          setTtBillableMin(prev => prev + 1);
-        }
-      }, 60000);
+      const recalculate = () => {
+        const nowMs = Date.now();
+        const clockInMs = new Date(ttClockInTimeRef.current).getTime();
+        const activeBreakMs = ttStateRef.current === TT.ON_BREAK && ttBreakStartRef.current
+          ? Math.max(0, nowMs - new Date(ttBreakStartRef.current).getTime())
+          : 0;
+        const totalBreakMs = ttAccumulatedBreakMsRef.current + activeBreakMs;
+        setTtBreakMin(Math.floor(totalBreakMs / 60000));
+        setTtBillableMin(Math.floor(Math.max(0, nowMs - clockInMs - totalBreakMs) / 60000));
+      };
+      recalculate();
+      ttTickRef.current = setInterval(recalculate, 15000);
     }
     return () => { if (ttTickRef.current) { clearInterval(ttTickRef.current); ttTickRef.current = null; } };
   }, [ttState]);
@@ -1710,10 +1697,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const now = new Date().toISOString();
     if (ttBreakStartRef.current) {
       const breakMs = new Date(now) - new Date(ttBreakStartRef.current);
-      const breakMin = Math.round(breakMs / 60000);
-      setTtBreakMin(prev => prev + breakMin);
+      ttAccumulatedBreakMsRef.current += Math.max(0, breakMs);
+      setTtBreakMin(Math.floor(ttAccumulatedBreakMsRef.current / 60000));
     }
-    ttEventsLogRef.current.push({ type: 'BREAK_END', timestamp: now, breakDurationMin: ttBreakStartRef.current ? Math.round((new Date(now) - new Date(ttBreakStartRef.current)) / 60000) : 0 });
+    ttEventsLogRef.current.push({ type: 'BREAK_END', timestamp: now, breakDurationMilliseconds: ttBreakStartRef.current ? Math.max(0, new Date(now) - new Date(ttBreakStartRef.current)) : 0 });
     ttBreakStartRef.current = null;
     setTtState(TT.ON_SHIFT_ACTIVE);
     ttStateRef.current = TT.ON_SHIFT_ACTIVE;
@@ -1826,16 +1813,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       clockOutOfferedRef.current = false;
       setShowClockOutOffer(false);
       ttResume();
-      const resumeLocation = getDriverClockLocation();
-      onDriverStatusUpdate?.(driverId, true, {
-        clockTimestamp: new Date().toISOString(),
-        clockEventType: 'break_end',
-        timeTrackingState: TT.ON_SHIFT_ACTIVE,
-        ...(resumeLocation ? { clockLocation: resumeLocation } : {}),
-      });
       setShowToast({ type: 'success', message: 'New trip assigned — break ended, session resumed.' });
     }
-  }, [activeTrips.length, driverId, getDriverClockLocation, onDriverStatusUpdate, ttResume]);
+  }, [activeTrips.length, ttResume]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -3087,14 +3067,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             targetTime: '',
             label: travelMin > 0 ? `${travelMin} min travel home` : 'Clock out at dropoff',
           });
-          const waitMs = Math.max(pending.estimatedClockOutTime.getTime() - Date.now(), 0);
-          pendingClockOutRef.current = setTimeout(() => {
-            if (ttStateRef.current !== TT.OFF_SHIFT) {
-              handleClockToggle();
-              setShowToast({ type: 'info', message: travelMin > 0 ? `Auto clock-out - ${travelMin} min travel home completed.` : 'Auto clock-out - final trip completed.' });
-            }
-            pendingClockOutRef.current = null;
-          }, waitMs);
+          setShowToast({ type: 'info', message: travelMin > 0 ? `Final trip complete. Return home, then clock out. Estimated travel: ${travelMin} min.` : 'Final trip complete. Clock out when the shift is finished.' });
         } else {
           estimateClockOutFromHome();
         }

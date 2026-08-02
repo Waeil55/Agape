@@ -149,6 +149,7 @@ const DEFAULT_APP_SETTINGS = {
   readability: 'normal',
   navigationApp: 'google',
   routePlanNavApp: 'google',
+  timeTrackingPolicy: 'PAY_FROM_HOME',
 };
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
@@ -1938,14 +1939,21 @@ const App = () => {
       clockEvents = [...clockEvents, event];
     }
     let extraPersist = { ...persistableExtraFields };
+    if (clockChanged && clockedIn) {
+      extraPersist.totalBreakMilliseconds = 0;
+      extraPersist.totalBreakMinutes = 0;
+      extraPersist.lastBreakStart = null;
+    }
     if (clockEventType === 'break_start') {
       extraPersist.lastBreakStart = eventTimestamp;
     } else if (clockEventType === 'break_end') {
       const prevBreakStart = prevDriverState.lastBreakStart;
       const breakMs = prevBreakStart ? new Date(eventTimestamp) - new Date(prevBreakStart) : 0;
-      const breakMin = Math.round(breakMs / 60000);
+      const priorBreakMs = Number(prevDriverState.totalBreakMilliseconds)
+        || Math.max(0, Number(prevDriverState.totalBreakMinutes || 0) * 60000);
       extraPersist.lastBreakStart = null;
-      extraPersist.totalBreakMinutes = (prevDriverState.totalBreakMinutes || 0) + breakMin;
+      extraPersist.totalBreakMilliseconds = priorBreakMs + Math.max(0, breakMs);
+      extraPersist.totalBreakMinutes = Math.round(extraPersist.totalBreakMilliseconds / 60000);
     }
     const merged = {
       ...extraPersist,
@@ -1976,7 +1984,7 @@ const App = () => {
     }
   };
 
-  const handleUpdateClockEvents = (userId, date, events) => {
+  const handleUpdateClockEvents = async (userId, date, events, correctionReason = '') => {
     const isDriver = drivers.some(d => d.id === userId);
     if (isDriver) {
       const driver = drivers.find(d => d.id === userId);
@@ -1987,8 +1995,13 @@ const App = () => {
       });
       const newEvents = events.map(e => ({ ...e, timestamp: e.timestamp || e.at }));
       const newClockEvents = [...filteredEvents, ...newEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-      upsertDriverProfile(userId, { clockEvents: newClockEvents });
-      addAuditLog('Timesheet Updated', `${currentUser} updated timesheet for driver ${driver.name || userId}.`, 'blue');
+      const saved = await upsertDriverProfile(userId, { clockEvents: newClockEvents });
+      if (saved === false) throw new Error('Firestore did not confirm the timesheet correction.');
+      addAuditLog('Timesheet Updated', `${currentUser} updated timesheet for driver ${driver.name || userId}.${correctionReason ? ` Reason: ${correctionReason}` : ''}`, 'blue', {
+        entity: 'driver', id: userId, date, correctionReason,
+        diffs: [{ field: 'clockEvents', before: driver.clockEvents || [], after: newClockEvents }],
+      });
+      return true;
     } else {
       const dispatcher = dispatchers.find(d => d.id === userId);
       if (!dispatcher) return;

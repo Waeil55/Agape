@@ -3,6 +3,8 @@ import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, 
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiAnalyzeDriver } from '../config/ai';
+import { geocodeAddress } from '../config/maps';
+import { POLICY_MODES } from '../utils/timeTracking';
 
 const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled }) => {
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
@@ -24,7 +26,9 @@ const [form, setForm] = useState({
   name: '', email: '', phone: '', vehicle: '', status: 'Available',
   currentZone: '', vin: '', insuranceExpiry: '', capacity: '1',
   licenseNumber: '', cdlStatus: 'Active', assignedDispatcher: '', assignedTo: '',
-  hourlyRate: ''
+  hourlyRate: '', homeAddress: '', address2: '', city: '', state: 'IN', zip: '',
+  homeLat: '', homeLng: '', emergencyContactName: '', emergencyContactPhone: '',
+  hireDate: '', employmentType: 'employee', timeTrackingPolicy: POLICY_MODES.PAY_FROM_HOME
 });
   const [assignDriver, setAssignDriver] = useState(null);
   const [selectedTrips, setSelectedTrips] = useState([]);
@@ -182,7 +186,7 @@ const [form, setForm] = useState({
     setFleetSummaryLoading(false);
   }, [filteredDrivers, trips]);
 
-  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', assignedTo: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active', hourlyRate: '' });
+  const resetForm = () => setForm({ name: '', email: '', phone: '', vehicle: '', status: 'Available', currentZone: '', assignedDispatcher: '', assignedTo: '', vin: '', insuranceExpiry: '', capacity: '1', licenseNumber: '', cdlStatus: 'Active', hourlyRate: '', homeAddress: '', address2: '', city: '', state: 'IN', zip: '', homeLat: '', homeLng: '', emergencyContactName: '', emergencyContactPhone: '', hireDate: '', employmentType: 'employee', timeTrackingPolicy: POLICY_MODES.PAY_FROM_HOME });
 
   const openAdd = () => { setEditing(null); resetForm(); setShowForm(true); };
 
@@ -195,7 +199,10 @@ const [form, setForm] = useState({
       vin: d.vin || '', insuranceExpiry: d.insuranceExpiry || '',
       capacity: d.capacity || '1', licenseNumber: d.licenseNumber || '',
       cdlStatus: d.cdlStatus || 'Active', assignedDispatcher: d.assignedDispatcher || '',
-      assignedTo: d.assignedTo || '', hourlyRate: d.hourlyRate || ''
+      assignedTo: d.assignedTo || '', hourlyRate: d.hourlyRate || '',
+      homeAddress: d.homeAddress || d.address || '', address2: d.address2 || '', city: d.city || '', state: d.state || 'IN', zip: d.zip || '',
+      homeLat: d.homeLat ?? '', homeLng: d.homeLng ?? '', emergencyContactName: d.emergencyContactName || '', emergencyContactPhone: d.emergencyContactPhone || '',
+      hireDate: d.hireDate || '', employmentType: d.employmentType || 'employee', timeTrackingPolicy: d.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME
     });
     setShowForm(true);
   };
@@ -207,6 +214,20 @@ const [form, setForm] = useState({
       const selectedVehicle = form.vehicle || '';
       const profileFields = { ...form };
       delete profileFields.vehicle;
+      profileFields.timeTrackingPolicy = profileFields.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME;
+      const fullHomeAddress = [form.homeAddress, form.address2, form.city, form.state, form.zip].filter(Boolean).join(', ');
+      if (profileFields.timeTrackingPolicy === POLICY_MODES.PAY_FROM_HOME && !form.homeAddress.trim()) {
+        throw new Error('A home street address is required for home-to-home timekeeping.');
+      }
+      if (fullHomeAddress && (!Number.isFinite(Number(form.homeLat)) || !Number.isFinite(Number(form.homeLng)))) {
+        const coordinates = await geocodeAddress(fullHomeAddress);
+        if (!coordinates) throw new Error('Home address could not be located. Check the street, city, state, and ZIP code.');
+        profileFields.homeLat = coordinates.lat;
+        profileFields.homeLng = coordinates.lng;
+      } else {
+        profileFields.homeLat = form.homeLat === '' ? null : Number(form.homeLat);
+        profileFields.homeLng = form.homeLng === '' ? null : Number(form.homeLng);
+      }
       if (editing) {
         const saved = upsertDriverProfile
           ? await upsertDriverProfile(editing, profileFields)
@@ -231,7 +252,10 @@ const [form, setForm] = useState({
           vin: form.vin || '', insuranceExpiry: form.insuranceExpiry || '',
           capacity: form.capacity || '1', licenseNumber: form.licenseNumber || '',
           cdlStatus: form.cdlStatus || 'Active', assignedDispatcher: currentDispatcher?.id || form.assignedDispatcher || '',
-          hourlyRate: form.hourlyRate || '',
+          hourlyRate: form.hourlyRate || '', homeAddress: profileFields.homeAddress, address2: profileFields.address2,
+          city: profileFields.city, state: profileFields.state, zip: profileFields.zip, homeLat: profileFields.homeLat, homeLng: profileFields.homeLng,
+          emergencyContactName: profileFields.emergencyContactName, emergencyContactPhone: profileFields.emergencyContactPhone,
+          hireDate: profileFields.hireDate, employmentType: profileFields.employmentType, timeTrackingPolicy: profileFields.timeTrackingPolicy,
         }]);
         if (saved === false) throw new Error('Firestore did not confirm the new driver.');
         if (selectedVehicle) {
@@ -946,6 +970,48 @@ const [form, setForm] = useState({
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
                   <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="(555) 123-4567" />
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Home-to-home timekeeping</p>
+                    <p className="text-xs text-slate-500">Home is the default paid shift anchor. Coordinates are resolved when this profile is saved.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Home street address</label>
+                    <input type="text" value={form.homeAddress} onChange={(e) => setForm({ ...form, homeAddress: e.target.value, homeLat: '', homeLng: '' })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" placeholder="Street address" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <input aria-label="Apartment or suite" value={form.address2} onChange={(e) => setForm({ ...form, address2: e.target.value, homeLat: '', homeLng: '' })} className="px-3 py-2 border border-slate-200 rounded-xl" placeholder="Apt / suite" />
+                    <input aria-label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value, homeLat: '', homeLng: '' })} className="px-3 py-2 border border-slate-200 rounded-xl" placeholder="City" />
+                    <input aria-label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value, homeLat: '', homeLng: '' })} className="px-3 py-2 border border-slate-200 rounded-xl" placeholder="State" />
+                    <input aria-label="ZIP code" value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value, homeLat: '', homeLng: '' })} className="px-3 py-2 border border-slate-200 rounded-xl" placeholder="ZIP" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Time calculation policy</label>
+                    <select value={form.timeTrackingPolicy} onChange={(e) => setForm({ ...form, timeTrackingPolicy: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-white">
+                      <option value={POLICY_MODES.PAY_FROM_HOME}>Home to home (default)</option>
+                      <option value={POLICY_MODES.PAY_FROM_FIRST_PICKUP}>First pickup to last dropoff</option>
+                      <option value={POLICY_MODES.SMART_MODE}>Smart anchor</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Employment type</label>
+                    <select value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-white"><option value="employee">Employee</option><option value="contractor">Contractor</option></select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Hire date</label>
+                    <input type="date" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Emergency contact</label>
+                    <input value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" placeholder="Full name" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Emergency phone</label>
+                    <input value={form.emergencyContactPhone} onChange={(e) => setForm({ ...form, emergencyContactPhone: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" placeholder="(555) 123-4567" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Hourly Rate ($)</label>

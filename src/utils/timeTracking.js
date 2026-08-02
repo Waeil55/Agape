@@ -299,32 +299,121 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
  * @param {Array} events - Sorted array of time events
  * @returns {{ sessions: Array, totalBillableMinutes: number, gapLog: Array }}
  */
-export const stitchSessions = (events) => {
+const CLOCK_EVENT_TYPES = new Set(['CLOCK_IN', 'AUTO_CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END', 'TRIP_EVENT']);
+
+const canonicalEventType = (type) => {
+  const normalized = String(type || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if (normalized === 'IN' || normalized === 'CLOCKIN') return 'CLOCK_IN';
+  if (normalized === 'AUTO_IN' || normalized === 'AUTOCLOCKIN') return 'AUTO_CLOCK_IN';
+  if (normalized === 'OUT' || normalized === 'CLOCKOUT') return 'CLOCK_OUT';
+  if (normalized === 'PAUSE' || normalized === 'START_BREAK') return 'BREAK_START';
+  if (normalized === 'RESUME' || normalized === 'END_BREAK') return 'BREAK_END';
+  return normalized;
+};
+
+const eventMillis = (event) => {
+  const value = event?.timestamp || event?.at || event?.time || event?.createdAt;
+  const date = value?.toDate ? value.toDate() : value?.seconds ? new Date(value.seconds * 1000) : new Date(value);
+  return Number.isFinite(date.getTime()) ? date.getTime() : null;
+};
+
+export const validateTimeEventSequence = (events, options = {}) => {
+  const nowMs = eventMillis({ timestamp: options.now || new Date() });
+  const anomalies = [];
+  let onShift = false;
+  let onBreak = false;
+
+  const normalizedEvents = (events || [])
+    .map((event, sourceIndex) => ({ ...event, type: canonicalEventType(event.type), _sourceIndex: sourceIndex, _ms: eventMillis(event) }))
+    .filter((event) => {
+      if (event._ms == null) {
+        anomalies.push({ code: 'INVALID_TIMESTAMP', sourceIndex: event._sourceIndex, message: 'Event has an invalid timestamp.' });
+        return false;
+      }
+      if (!CLOCK_EVENT_TYPES.has(event.type)) {
+        anomalies.push({ code: 'UNKNOWN_EVENT', sourceIndex: event._sourceIndex, message: `Unsupported event type: ${event.type || 'empty'}.` });
+        return false;
+      }
+      if (nowMs != null && event._ms > nowMs + 60000) {
+        anomalies.push({ code: 'FUTURE_EVENT', sourceIndex: event._sourceIndex, message: 'Event is in the future.' });
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => a._ms - b._ms || a._sourceIndex - b._sourceIndex);
+
+  normalizedEvents.forEach((event) => {
+    if (event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN') {
+      if (onShift) anomalies.push({ code: 'DUPLICATE_CLOCK_IN', sourceIndex: event._sourceIndex, message: 'Clock in occurred while a shift was already open.' });
+      else { onShift = true; onBreak = false; }
+    } else if (event.type === 'CLOCK_OUT') {
+      if (!onShift) anomalies.push({ code: 'ORPHAN_CLOCK_OUT', sourceIndex: event._sourceIndex, message: 'Clock out has no matching clock in.' });
+      else { onShift = false; onBreak = false; }
+    } else if (event.type === 'BREAK_START') {
+      if (!onShift) anomalies.push({ code: 'BREAK_OUTSIDE_SHIFT', sourceIndex: event._sourceIndex, message: 'Break started outside a shift.' });
+      else if (onBreak) anomalies.push({ code: 'DUPLICATE_BREAK_START', sourceIndex: event._sourceIndex, message: 'Break was already active.' });
+      else onBreak = true;
+    } else if (event.type === 'BREAK_END') {
+      if (!onShift || !onBreak) anomalies.push({ code: 'ORPHAN_BREAK_END', sourceIndex: event._sourceIndex, message: 'Resume has no matching pause.' });
+      else onBreak = false;
+    }
+  });
+
+  return {
+    valid: anomalies.length === 0,
+    anomalies,
+    normalizedEvents: normalizedEvents.map(({ _sourceIndex, _ms, ...event }) => event),
+    hasOpenShift: onShift,
+    hasOpenBreak: onShift && onBreak,
+  };
+};
+
+export const stitchSessions = (events, options = {}) => {
   if (!events || events.length === 0) {
-    return { sessions: [], totalBillableMinutes: 0, gapLog: [] };
+    return { sessions: [], totalBillableMinutes: 0, totalBillableMilliseconds: 0, gapLog: [], anomalies: [] };
   }
 
-  const sorted = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const validation = validateTimeEventSequence(events, options);
+  const sorted = validation.normalizedEvents.map((event, index) => ({ ...event, _ms: eventMillis(event), _index: index }));
   const sessions = [];
   const gapLog = [];
+  const anomalies = [...validation.anomalies];
   let currentSession = null;
+
+  const finalizeSession = (session, endMs, event = null, isOpen = false) => {
+    if (session.breakStartMs != null) {
+      session.breakMilliseconds += Math.max(0, endMs - session.breakStartMs);
+      session.breakStartMs = null;
+    }
+    if (event) session.events.push(event);
+    session.clockOutTime = isOpen ? null : new Date(endMs).toISOString();
+    session.clockOutLocation = isOpen ? null : (event?.location || null);
+    session.totalMilliseconds = Math.max(0, endMs - session.clockInMs);
+    session.billableMilliseconds = Math.max(0, session.totalMilliseconds - session.breakMilliseconds - session.excludedGapMilliseconds);
+    session.totalMinutes = session.totalMilliseconds / 60000;
+    session.breakMinutes = session.breakMilliseconds / 60000;
+    session.excludedGapMinutes = session.excludedGapMilliseconds / 60000;
+    session.billableMinutes = session.billableMilliseconds / 60000;
+    session.isOpen = isOpen;
+  };
 
   for (let i = 0; i < sorted.length; i++) {
     const event = sorted[i];
 
     if (event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN') {
-      // Start a new session
+      if (currentSession) continue;
       currentSession = {
-        sessionId: `session_${Date.now()}_${i}`,
+        sessionId: `session_${event._ms}_${i}`,
         clockInTime: event.timestamp,
+        clockInMs: event._ms,
         clockInLocation: event.location || null,
         clockInType: event.type,
         events: [event],
-        billableMinutes: 0,
-        breakMinutes: 0,
+        billableMilliseconds: 0,
+        breakMilliseconds: 0,
+        excludedGapMilliseconds: 0,
         gapMinutes: 0,
         personalGapMinutes: 0,
-        excludedGapMinutes: 0,
       };
       sessions.push(currentSession);
       continue;
@@ -332,33 +421,27 @@ export const stitchSessions = (events) => {
 
     if (event.type === 'CLOCK_OUT') {
       if (currentSession) {
-        currentSession.clockOutTime = event.timestamp;
-        currentSession.clockOutLocation = event.location || null;
-        currentSession.events.push(event);
-        // Calculate session duration
-        const durationMs = new Date(event.timestamp) - new Date(currentSession.clockInTime);
-        currentSession.totalMinutes = Math.max(0, durationMs / (1000 * 60));
-        currentSession.billableMinutes = Math.max(0, currentSession.totalMinutes - currentSession.breakMinutes - currentSession.excludedGapMinutes);
+        finalizeSession(currentSession, event._ms, event, false);
         currentSession = null;
       }
       continue;
     }
 
     if (event.type === 'BREAK_START') {
-      if (currentSession) {
+      if (currentSession && currentSession.breakStartMs == null) {
         currentSession.breakStartTime = event.timestamp;
+        currentSession.breakStartMs = event._ms;
         currentSession.events.push(event);
       }
       continue;
     }
 
     if (event.type === 'BREAK_END') {
-      if (currentSession && currentSession.breakStartTime) {
-        const breakDurationMs = new Date(event.timestamp) - new Date(currentSession.breakStartTime);
-        const breakMinutes = Math.max(0, breakDurationMs / (1000 * 60));
-        currentSession.breakMinutes += breakMinutes;
+      if (currentSession && currentSession.breakStartMs != null) {
+        currentSession.breakMilliseconds += Math.max(0, event._ms - currentSession.breakStartMs);
         currentSession.events.push(event);
         currentSession.breakStartTime = null;
+        currentSession.breakStartMs = null;
       }
       continue;
     }
@@ -400,16 +483,22 @@ export const stitchSessions = (events) => {
 
   // If session is still open (driver hasn't clocked out yet)
   if (currentSession) {
-    const now = new Date();
-    const durationMs = now - new Date(currentSession.clockInTime);
-    currentSession.totalMinutes = Math.max(0, durationMs / (1000 * 60));
-    currentSession.billableMinutes = Math.max(0, currentSession.totalMinutes - currentSession.breakMinutes - currentSession.excludedGapMinutes);
-    currentSession.isOpen = true;
+    const requestedNow = eventMillis({ timestamp: options.now || new Date() });
+    finalizeSession(currentSession, Math.max(currentSession.clockInMs, requestedNow || Date.now()), null, true);
+    if (options.requireClosed) {
+      anomalies.push({ code: 'OPEN_SHIFT', message: 'Shift has no clock-out event and cannot be approved for payroll.' });
+    }
   }
 
-  const totalBillableMinutes = sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0);
+  sessions.forEach((session) => {
+    delete session.clockInMs;
+    delete session.breakStartMs;
+    session.events = session.events.map(({ _ms, _index, ...event }) => event);
+  });
+  const totalBillableMilliseconds = sessions.reduce((sum, s) => sum + (s.billableMilliseconds || 0), 0);
+  const totalBillableMinutes = totalBillableMilliseconds / 60000;
 
-  return { sessions, totalBillableMinutes, gapLog };
+  return { sessions, totalBillableMinutes, totalBillableMilliseconds, gapLog, anomalies };
 };
 
 // ─── END OF DAY AUTO CLOCK-OUT ───────────────────────────────────
@@ -547,7 +636,7 @@ export const detectAbuse = ({ breadcrumbs, clockInLocation, clockOutLocation, du
  * @param {string} policyMode
  * @returns {{ events: Array, sessions: Object, gapLog: Array, billableMinutes: number }}
  */
-export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_MODES.SMART_MODE, options = {}) => {
+export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_MODES.PAY_FROM_HOME, options = {}) => {
   const events = [];
   const dateFilter = options.date || todayLocal();
   const driverId = driver?.id || driver?.email || options.driverId || '';
@@ -711,7 +800,11 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
 
   events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  const { sessions, totalBillableMinutes, gapLog } = stitchSessions(events);
+  const calculationNow = options.now || new Date();
+  const { sessions, totalBillableMinutes, totalBillableMilliseconds, gapLog, anomalies } = stitchSessions(events, {
+    now: calculationNow,
+    requireClosed: dateFilter < todayLocal(calculationNow),
+  });
   const gapLogWithMeta = gapLog.map((gap) => ({
     ...gap,
     driverId: gap.driverId || driverId,
@@ -746,6 +839,9 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     teleports,
     abuse,
     billableMinutes: totalBillableMinutes,
+    billableMilliseconds: totalBillableMilliseconds,
+    anomalies,
+    approvalEligible: anomalies.length === 0 && sessions.every((session) => !session.isOpen),
     policyMode,
   };
 };
@@ -759,9 +855,13 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
  * @returns {{ payTime: Object, sessionBreakdown: Array, gapLogs: Array, adminNotes: Array }}
  */
 export const generatePayrollOutput = (timeData, hourlyRate = 0) => {
-  const { sessions = [], gapLog = [], billableMinutes = 0, policyMode, date } = timeData || {};
-
-  const billableHours = billableMinutes / 60;
+  const { sessions = [], gapLog = [], policyMode, date } = timeData || {};
+  const billableMilliseconds = Number.isFinite(timeData?.billableMilliseconds ?? timeData?.totalBillableMilliseconds)
+    ? (timeData.billableMilliseconds ?? timeData.totalBillableMilliseconds)
+    : Number(timeData?.billableMinutes || 0) * 60000;
+  const billableMinutesExact = billableMilliseconds / 60000;
+  const billableMinutes = Math.round(billableMinutesExact);
+  const billableHours = billableMilliseconds / 3600000;
   const regularHours = Math.min(billableHours, 8);
   const overtimeHours = Math.max(0, billableHours - 8);
   const overtimeMultiplier = 1.5;
@@ -799,9 +899,10 @@ export const generatePayrollOutput = (timeData, hourlyRate = 0) => {
     payTime: {
       date: date || todayLocal(),
       billableMinutes: Math.round(billableMinutes),
-      billableHours: Math.round(billableHours * 10) / 10,
-      regularHours: Math.round(regularHours * 10) / 10,
-      overtimeHours: Math.round(overtimeHours * 10) / 10,
+      billableMilliseconds,
+      billableHours: Math.round(billableHours * 100) / 100,
+      regularHours: Math.round(regularHours * 100) / 100,
+      overtimeHours: Math.round(overtimeHours * 100) / 100,
       hourlyRate,
       regularPay: Math.round(regularPay * 100) / 100,
       overtimePay: Math.round(overtimePay * 100) / 100,
@@ -831,6 +932,7 @@ export default {
   calculateAnchor,
   classifyGap,
   stitchSessions,
+  validateTimeEventSequence,
   generatePendingClockOut,
   detectAbuse,
   buildTimeEvents,
