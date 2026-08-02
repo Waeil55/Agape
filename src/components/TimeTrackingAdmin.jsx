@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Clock, AlertTriangle, Play, Pause, CheckCircle, XCircle,
-  DollarSign, FileText, Download, ChevronDown, ChevronUp,
+  Clock, AlertTriangle, Pause, CheckCircle,
+  DollarSign, Download, ChevronDown, ChevronUp,
   Shield, Timer, User, Navigation, Edit2, Trash2, Plus, X, Save,
-  Briefcase, Check, Lock
+  Briefcase, Check, Lock, Activity
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, validateTimeEventSequence } from '../utils/timeTracking';
 import { localCalendarYmd } from '../utils/tripDate';
@@ -134,6 +134,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
         const model = buildTimeEvents(day.trips, driver, day.clockEvents, timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME, { date, breadcrumbs: driver.breadcrumbs || [] });
         const externalGaps = day.gaps.filter(gap => !model.gapLog.some(mg => mg.startTime === gap.startTime && mg.endTime === gap.endTime));
         day.trips = model.trips;
+        day.date = date;
         day.clockEvents = model.clockEvents;
         day.events = model.events;
         day.sessions = model.sessions;
@@ -152,18 +153,20 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
     const allSessions = Object.values(driverSessions).flatMap(byDate => Object.values(byDate));
     return {
       totalTrips: allSessions.reduce((sum, s) => sum + s.trips.length, 0),
-      totalGaps: allSessions.reduce((sum, s) => sum + s.gaps.length, 0),
-      totalTeleports: allSessions.reduce((sum, s) => sum + s.teleports.length, 0),
-      excludedMinutes: allSessions.reduce((sum, s) => sum + s.gaps.filter(g => g.payrollEffect === 'EXCLUDED').reduce((s2, g) => s2 + g.durationMinutes, 0), 0),
+      billableMinutes: allSessions.filter((day) => day.approvalEligible).reduce((sum, day) => sum + (day.payroll?.payTime?.billableMilliseconds || 0) / 60000, 0),
+      breakMinutes: allSessions.reduce((sum, day) => sum + day.sessions.reduce((sessionSum, session) => sessionSum + Number(session.breakMilliseconds || 0) / 60000, 0), 0),
+      unresolved: allSessions.filter((day) => !day.approvalEligible).length,
+      active: allSessions.filter((day) => day.sessions.some((session) => session.isOpen) && day.date === localCalendarYmd()).length,
     };
   }, [driverSessions]);
 
   const getDayBillable = (day) => day.payroll?.payTime?.billableMilliseconds != null
     ? day.payroll.payTime.billableMilliseconds / 60000
     : day.payroll?.payTime?.billableMinutes ?? day.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0) ?? day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+  const getPayableDayBillable = (day) => day.approvalEligible ? getDayBillable(day) : 0;
 
   const getDayEarnings = (day, hourlyRate) => {
-    const billable = getDayBillable(day);
+    const billable = getPayableDayBillable(day);
     const hours = billable / 60;
     const regular = Math.min(hours, 8);
     const overtime = Math.max(0, hours - 8);
@@ -180,17 +183,17 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
   };
 
   const exportCSV = () => {
-    const rows = [['Name', 'Role', 'Date', 'Clock In', 'Clock Out', 'Billable Min', 'Break Min', 'Rate', 'Earnings', 'Trips']];
+    const rows = [['Name', 'Role', 'Date', 'Clock In', 'Clock Out', 'Status', 'Billable Min', 'Break Min', 'Rate', 'Earnings', 'Trips', 'Issues']];
     Object.entries(driverSessions).forEach(([driverId, byDate]) => {
       const driver = drivers.find(d => d.id === driverId);
       const rate = Number(driver?.hourlyRate || 0);
       Object.entries(byDate).forEach(([date, session]) => {
         const clockIn = session.clockEvents.find(e => e.type === 'IN' || e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
         const clockOut = session.clockEvents.find(e => e.type === 'OUT' || e.type === 'CLOCK_OUT');
-        const billable = getDayBillable(session);
-        const breaks = session.gaps.filter(g => g.gapType === 'BREAK').reduce((sum, g) => sum + g.durationMinutes, 0);
+        const billable = getPayableDayBillable(session);
+        const breaks = session.sessions.reduce((sum, item) => sum + Number(item.breakMilliseconds || 0) / 60000, 0);
         const earnings = getDayEarnings(session, rate);
-        rows.push([driver?.name || driverId, driver?.role || 'driver', date, clockIn?.timestamp ? formatTime(clockIn.timestamp) : '', clockOut?.timestamp ? formatTime(clockOut.timestamp) : '', Math.round(billable), Math.round(breaks), rate.toFixed(2), earnings.toFixed(2), session.trips.length]);
+        rows.push([driver?.name || driverId, driver?.role || 'driver', date, clockIn?.timestamp ? formatTime(clockIn.timestamp) : '', clockOut?.timestamp ? formatTime(clockOut.timestamp) : '', session.approvalEligible ? 'Verified' : 'Needs correction', session.approvalEligible ? Math.round(billable) : '', Math.round(breaks), rate.toFixed(2), session.approvalEligible ? earnings.toFixed(2) : '', session.trips.length, (session.anomalies || []).map((issue) => issue.message).join('; ')]);
       });
     });
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
@@ -238,91 +241,102 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
 
   return (
     <div className="min-h-0 flex-1 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 pb-24">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 bg-white border-b border-slate-200 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4 -mt-6 mb-6">
-          <div className="flex items-center gap-3">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-5 py-5 pb-24">
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 sm:p-7 mb-5 text-white shadow-xl shadow-slate-900/10">
+          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div className="flex items-center gap-4">
             {onBack && (
-              <button onClick={onBack} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition">
+              <button onClick={onBack} className="p-2.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition">
                 <X size={20} />
               </button>
             )}
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-950/40"><Timer size={24} /></div>
             <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-300">Workforce Operations</p>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Time & Payroll Control Center</h1>
+              <p className="mt-1 text-sm text-slate-300">Exact event-ledger calculations, correction controls, and payroll readiness.</p>
             </div>
           </div>
-          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50">
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
-        </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${summaryStats.unresolved ? 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/20' : 'bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-300/20'}`}>
+                {summaryStats.unresolved ? <AlertTriangle size={15} /> : <CheckCircle size={15} />}{summaryStats.unresolved ? `${summaryStats.unresolved} need correction` : 'Payroll ledger healthy'}
+              </span>
+              <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-900 rounded-xl text-sm font-bold hover:bg-blue-50 shadow-sm transition">
+                <Download className="w-4 h-4" /> Export audit CSV
+              </button>
+            </div>
+          </div>
+        </section>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Person</label>
-              <select value={selectedDriver} onChange={(e) => setSelectedDriver(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 mb-5 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_180px_180px] gap-3 items-end">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">Team member</label>
+              <select value={selectedDriver} onChange={(e) => setSelectedDriver(e.target.value)} className="w-full h-11 px-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
                 <option value="ALL">Everyone</option>
                 {drivers.map(d => (
                   <option key={d.id} value={d.id}>{d.name || d.id} ({d.role === 'dispatcher' ? 'Dispatcher' : 'Driver'})</option>
                 ))}
               </select>
             </div>
-            <div className="min-w-[150px]">
-              <label className="block text-sm font-medium text-slate-700 mb-1">From</label>
-              <input type="date" value={dateRange.from} onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">From</label>
+              <input type="date" value={dateRange.from} onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))} className="w-full h-11 px-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none" />
             </div>
-            <div className="min-w-[150px]">
-              <label className="block text-sm font-medium text-slate-700 mb-1">To</label>
-              <input type="date" value={dateRange.to} onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">To</label>
+              <input type="date" value={dateRange.to} onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))} className="w-full h-11 px-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none" />
             </div>
           </div>
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 rounded-lg"><Navigation className="w-5 h-5 text-blue-600" /></div>
               <div>
-                <p className="text-sm text-slate-500">Total Trips</p>
+                <p className="text-xs font-semibold text-slate-500">Trips in range</p>
                 <p className="text-xl font-semibold text-slate-900">{summaryStats.totalTrips}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-50 rounded-lg"><Clock className="w-5 h-5 text-yellow-600" /></div>
               <div>
-                <p className="text-sm text-slate-500">Total Gaps</p>
-                <p className="text-xl font-semibold text-slate-900">{summaryStats.totalGaps}</p>
+                <p className="text-xs font-semibold text-slate-500">Verified hours</p>
+                <p className="text-xl font-semibold text-slate-900">{(summaryStats.billableMinutes / 60).toFixed(2)}h</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-50 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-600" /></div>
               <div>
-                <p className="text-sm text-slate-500">Teleport Flags</p>
-                <p className="text-xl font-semibold text-slate-900">{summaryStats.totalTeleports}</p>
+                <p className="text-xs font-semibold text-slate-500">Needs correction</p>
+                <p className="text-xl font-semibold text-slate-900">{summaryStats.unresolved}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-50 rounded-lg"><DollarSign className="w-5 h-5 text-green-600" /></div>
               <div>
-                <p className="text-sm text-slate-500">Excluded Min</p>
-                <p className="text-xl font-semibold text-slate-900">{formatMinutes(summaryStats.excludedMinutes)}</p>
+                <p className="text-xs font-semibold text-slate-500">Recorded breaks</p>
+                <p className="text-xl font-semibold text-slate-900">{formatMinutes(summaryStats.breakMinutes)}</p>
               </div>
             </div>
+          </div>
+          <div className="col-span-2 lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <div className="flex items-center gap-3"><div className="p-2 bg-emerald-50 rounded-lg"><Activity className="w-5 h-5 text-emerald-600" /></div><div><p className="text-xs font-semibold text-slate-500">Active shifts</p><p className="text-xl font-semibold text-slate-900">{summaryStats.active}</p></div></div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-lg w-fit">
-          {[{ id: 'sessions', label: 'Sessions' }, { id: 'gaps', label: 'Gap Log' }, { id: 'abuse', label: 'Abuse' }, { id: 'payroll', label: 'Payroll' }].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+        <div className="flex gap-1 mb-5 bg-slate-200/60 p-1.5 rounded-2xl overflow-x-auto w-fit max-w-full">
+          {[{ id: 'sessions', label: 'Timesheets' }, { id: 'gaps', label: 'Activity audit' }, { id: 'abuse', label: 'Integrity signals' }, { id: 'payroll', label: 'Payroll review' }].map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap px-4 py-2.5 text-sm font-semibold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
               {tab.label}
             </button>
           ))}
@@ -336,13 +350,14 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               const isExpanded = expandedDriver === driverId;
               const dates = Object.keys(byDate).sort().reverse();
               const totalTrips = dates.reduce((sum, d) => sum + byDate[d].trips.length, 0);
-              const totalBillable = dates.reduce((sum, d) => sum + getDayBillable(byDate[d]), 0);
+              const totalBillable = dates.reduce((sum, d) => sum + getPayableDayBillable(byDate[d]), 0);
+              const correctionCount = dates.filter((date) => !byDate[date].approvalEligible).length;
               const rate = Number(driver?.hourlyRate || 0);
               const isDispatcher = driver?.role === 'dispatcher';
 
               return (
-                <div key={driverId} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                  <button onClick={() => setExpandedDriver(isExpanded ? null : driverId)} className="w-full flex items-center justify-between p-4 hover:bg-slate-50">
+                <div key={driverId} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <button onClick={() => setExpandedDriver(isExpanded ? null : driverId)} className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-slate-50/80 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDispatcher ? 'bg-purple-100' : 'bg-blue-100'}`}>
                         {isDispatcher ? <Briefcase className="w-5 h-5 text-purple-600" /> : <User className="w-5 h-5 text-blue-600" />}
@@ -354,11 +369,12 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                             {isDispatcher ? 'Dispatcher' : 'Driver'}
                           </span>
                         </div>
-                        <p className="text-sm text-slate-500">{dates.length} days · {totalTrips} trips · {formatMinutes(totalBillable)} worked</p>
+                        <p className="text-sm text-slate-500">{dates.length} days · {totalTrips} trips · {formatMinutes(totalBillable)} verified</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <RateInput driver={driver} />
+                      {correctionCount > 0 && <span className="hidden sm:inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">{correctionCount} correction{correctionCount === 1 ? '' : 's'}</span>}
                       {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                     </div>
                   </button>
@@ -370,20 +386,22 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                         const clockIn = day.clockEvents.find(e => e.type === 'IN' || e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
                         const clockOut = day.clockEvents.find(e => e.type === 'OUT' || e.type === 'CLOCK_OUT');
                         const billable = getDayBillable(day);
-                        const breaks = day.gaps.filter(g => g.gapType === 'BREAK').reduce((sum, g) => sum + g.durationMinutes, 0);
+                        const breaks = day.sessions.reduce((sum, session) => sum + Number(session.breakMilliseconds || 0) / 60000, 0);
                         const earnings = getDayEarnings(day, rate);
+                        const isVerified = day.approvalEligible;
 
                         return (
-                          <div key={date} className="px-4 py-3 border-t border-slate-50">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-3">
+                          <div key={date} className={`px-4 sm:px-5 py-4 border-t ${isVerified ? 'border-slate-100' : 'border-amber-100 bg-amber-50/40'}`}>
+                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-2">
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                                 <span className="text-sm font-medium text-slate-900">{formatDate(date + 'T12:00:00')}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${isVerified ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-amber-100 text-amber-800 ring-1 ring-amber-200'}`}>{isVerified ? 'Verified' : 'Needs correction'}</span>
                                 <span className="text-sm text-slate-500">
                                   {formatTime(clockIn?.timestamp || clockIn?.at)} → {formatTime(clockOut?.timestamp || clockOut?.at)}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-3 text-sm text-slate-600">
-                                <span className="flex items-center gap-1"><Timer className="w-3 h-3" />{formatMinutes(billable)}</span>
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm text-slate-600">
+                                <span className={`flex items-center gap-1 ${isVerified ? '' : 'text-amber-700'}`}><Timer className="w-3 h-3" />{isVerified ? formatMinutes(billable) : 'Not payable'}</span>
                                 {breaks > 0 && <span className="flex items-center gap-1 text-yellow-600"><Pause className="w-3 h-3" />{formatMinutes(breaks)}</span>}
                                 <span className="flex items-center gap-1"><Navigation className="w-3 h-3" />{day.trips.length}</span>
                                 {rate > 0 && <span className="font-semibold text-green-700">{formatCurrency(earnings)}</span>}
@@ -392,6 +410,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                                 </button>
                               </div>
                             </div>
+                            {!isVerified && day.anomalies?.length > 0 && <div className="mb-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-xs text-amber-800">{day.anomalies.map((issue) => issue.message).join(' ')}</div>}
                             {day.trips.length > 0 && (
                               <div className="ml-4 space-y-1">
                                 {day.trips.map((trip, i) => (
@@ -508,7 +527,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                 const driver = drivers.find(d => d.id === driverId);
                 const rate = Number(driver?.hourlyRate || 0);
                 const dates = Object.keys(byDate).sort();
-                const totalBillable = dates.reduce((sum, d) => sum + getDayBillable(byDate[d]), 0);
+                const totalBillable = dates.reduce((sum, d) => sum + getPayableDayBillable(byDate[d]), 0);
                 const totalBreaks = dates.reduce((sum, date) => sum + byDate[date].sessions.reduce((sessionSum, session) => sessionSum + Number(session.breakMinutes || 0), 0), 0);
                 const totalTrips = dates.reduce((sum, d) => sum + byDate[d].trips.length, 0);
                 const billableHours = Math.round((totalBillable / 60) * 100) / 100;
@@ -523,7 +542,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                   monday.setDate(monday.getDate() + mondayOffset);
                   const weekKey = localCalendarYmd(monday);
                   if (!weekMap[weekKey]) weekMap[weekKey] = { days: [], minutes: 0 };
-                  const dayMinutes = getDayBillable(byDate[date]);
+                  const dayMinutes = getPayableDayBillable(byDate[date]);
                   weekMap[weekKey].days.push(date);
                   weekMap[weekKey].minutes += dayMinutes;
                 });
@@ -541,10 +560,10 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
 
                 const dailyBreakdown = dates.map(date => {
                   const day = byDate[date];
-                  const dayBillable = getDayBillable(day);
+                  const dayBillable = getPayableDayBillable(day);
                   const dayHours = Math.round((dayBillable / 60) * 100) / 100;
                   const dayEarnings = getDayEarnings(day, rate);
-                  return { date, hours: dayHours, earnings: dayEarnings, trips: day.trips.length };
+                  return { date, hours: dayHours, earnings: dayEarnings, trips: day.trips.length, approvalEligible: day.approvalEligible, anomalies: day.anomalies || [] };
                 });
 
                 return { driver, driverId, rate, dates: dates.length, totalTrips, totalBillable, totalBreaks, billableHours, regularHours: totalRegular, overtimeHours: totalOvertime, totalEarnings, dailyBreakdown };
@@ -562,7 +581,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
 
               return (
                 <div className="divide-y divide-slate-100">
-                  {personPayroll.map(({ driver, driverId, rate, dates: numDays, totalTrips, totalBillable, totalBreaks, billableHours, regularHours, overtimeHours, totalEarnings, dailyBreakdown }) => {
+                  {personPayroll.map(({ driver, driverId, rate, dates: numDays, totalTrips, totalBillable, billableHours, overtimeHours, totalEarnings, dailyBreakdown }) => {
                     const isExpanded = expandedDriver === `payroll-${driverId}`;
                     const isDispatcher = driver?.role === 'dispatcher';
                     return (
@@ -609,10 +628,10 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
                                 {dailyBreakdown.map(day => (
                                   <div key={day.date} className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-slate-100 text-sm">
                                     <div className="text-slate-700">{formatDate(day.date + 'T12:00:00')}</div>
-                                    <div className="text-center text-slate-700">{day.hours.toFixed(1)}h</div>
+                                    <div className={`text-center ${day.approvalEligible ? 'text-slate-700' : 'font-semibold text-amber-700'}`}>{day.approvalEligible ? `${day.hours.toFixed(2)}h` : 'Correction required'}</div>
                                     <div className="text-center text-slate-700">{day.trips}</div>
                                     <div className="text-center text-slate-500">${rate.toFixed(2)}</div>
-                                    <div className="text-right font-medium text-slate-900">{formatCurrency(day.earnings)}</div>
+                                    <div className={`text-right font-medium ${day.approvalEligible ? 'text-slate-900' : 'text-amber-700'}`}>{day.approvalEligible ? formatCurrency(day.earnings) : 'Excluded'}</div>
                                   </div>
                                 ))}
                                 <div className="grid grid-cols-5 gap-2 px-4 py-2 border-t border-slate-200 bg-slate-100 text-sm font-semibold">

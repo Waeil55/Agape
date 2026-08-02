@@ -1451,12 +1451,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       d.setDate(d.getDate() - i);
       const dateKey = localCalendarYmd(d);
       const dayEvents = [...(byDate[dateKey] || [])].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
-      const ledger = stitchSessions(dayEvents, { now: new Date() });
+      const ledger = stitchSessions(dayEvents, { now: new Date(), requireClosed: dateKey < localCalendarYmd() });
       const firstSession = ledger.sessions[0];
       const lastSession = ledger.sessions[ledger.sessions.length - 1];
       const billableMs = ledger.totalBillableMilliseconds || 0;
       const breakMs = ledger.sessions.reduce((sum, session) => sum + (session.breakMilliseconds || 0), 0);
-      const hours = dayEvents.length ? billableMs / 3600000 : null;
+      const historicalOpenShift = dateKey < localCalendarYmd() && ledger.sessions.some((session) => session.isOpen);
+      const hours = dayEvents.length && !historicalOpenShift ? billableMs / 3600000 : null;
       days.push({
         dateKey,
         hasEvents: dayEvents.length > 0,
@@ -1465,8 +1466,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
         hours,
         breakMin: Math.round(breakMs / 60000),
         anomalies: ledger.anomalies,
+        needsCorrection: historicalOpenShift || ledger.anomalies.length > 0,
       });
-      if (d >= weekStart) weeklyMilliseconds += billableMs;
+      if (d >= weekStart && !historicalOpenShift && ledger.anomalies.length === 0) weeklyMilliseconds += billableMs;
     }
     const weeklyTotal = weeklyMilliseconds / 3600000;
     const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
@@ -5522,20 +5524,22 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
             {/* Time Tracking Controls */}
             {!isClockedIn ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center shadow-sm">
-                <div className="w-12 h-12 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-950 to-slate-900 p-5 text-white shadow-xl">
+                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-500/20 blur-2xl" />
+                <div className="relative w-12 h-12 bg-white/10 text-blue-300 rounded-2xl flex items-center justify-center mb-4 ring-1 ring-white/10">
                   <Clock size={24} />
                 </div>
-                <h3 className="text-base font-semibold text-slate-900 mb-1">Shift Ready</h3>
-                <p className="text-xs font-medium text-slate-500 mb-0">Your shift will automatically start based on your company policy (home departure or first trip start).</p>
+                <h3 className="relative text-lg font-semibold mb-1">Ready to start your shift</h3>
+                <p className="relative text-xs text-slate-300 mb-4">Home-to-home is active. Start when leaving home and end only after returning home.</p>
+                <button type="button" onClick={handleClockToggle} className="relative w-full h-11 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-sm font-bold transition-colors shadow-lg shadow-blue-950/30 flex items-center justify-center gap-2"><Play size={16} /> Start shift</button>
               </div>
             ) : (
-              <div className={`rounded-xl border p-4 shadow-sm ${
+              <div className={`rounded-2xl border p-4 shadow-sm ${
                 ttState === TT.ON_BREAK
                   ? 'bg-amber-50 border-amber-200'
                   : 'bg-emerald-50 border-emerald-200'
               }`}>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
                   <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${ttState === TT.ON_BREAK ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
                   <span className={`text-sm font-semibold uppercase tracking-wide ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
                     {ttState === TT.ON_BREAK ? 'On Break' : 'Active'}
@@ -5554,11 +5558,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 </div>
                 <div className="flex gap-2">
                   {ttState === TT.ON_SHIFT_ACTIVE ? (
-                    <button type="button" onClick={ttStartBreak} disabled={driverScopedTrips.length === 0} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${driverScopedTrips.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 cursor-pointer'}`}>Take Break</button>
+                    <button type="button" onClick={ttStartBreak} className="flex-1 h-11 rounded-xl text-sm font-bold transition-colors bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer">Pause time</button>
                   ) : (
-                    <button type="button" onClick={ttResume} disabled={driverScopedTrips.length === 0} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${driverScopedTrips.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer'}`}>Resume</button>
+                    <button type="button" onClick={ttResume} className="flex-1 h-11 rounded-xl text-sm font-bold transition-colors bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer">Continue shift</button>
                   )}
-                  <button type="button" onClick={ttEndShift} disabled={driverScopedTrips.length === 0} className={`flex-1 h-11 rounded-xl text-sm font-bold transition-colors ${driverScopedTrips.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-rose-100 text-rose-700 hover:bg-rose-200 cursor-pointer'}`}>End Shift</button>
+                  <button type="button" onClick={ttEndShift} className="flex-1 h-11 rounded-xl text-sm font-bold transition-colors bg-rose-100 text-rose-800 hover:bg-rose-200 cursor-pointer">End shift</button>
                 </div>
               </div>
             )}
@@ -5736,20 +5740,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <button
                     type="button"
                     onClick={() => {
-                      const rows = [['Date', 'Clock In', 'Clock Out', 'Hours', 'In Location', 'Out Location']];
+                      const rows = [['Date', 'Clock In', 'Clock Out', 'Verified Hours', 'Break Minutes', 'Status', 'Issues', 'In Location', 'Out Location']];
                       clockHistory.days.filter(d => d.hasEvents).forEach(d => {
                         rows.push([
                           d.dateKey,
                           d.clockIn ? formatClockTime(d.clockIn) : '',
                           d.clockOut ? formatClockTime(d.clockOut) : '',
-                          d.hours ? d.hours.toFixed(1) : '',
+                          d.hours != null ? d.hours.toFixed(2) : '',
+                          d.breakMin || 0,
+                          d.needsCorrection ? 'Needs correction' : 'Verified',
+                          (d.anomalies || []).map((issue) => issue.message).join('; '),
                           d.inLocation || '',
                           d.outLocation || '',
                         ]);
                       });
-                      rows.push(['', '', '', '', '', '']);
-                      rows.push(['Total', '', '', clockHistory.weeklyTotal.toFixed(1), '', '']);
-                      if (clockHistory.weeklyOvertime > 0) rows.push(['Overtime', '', '', clockHistory.weeklyOvertime.toFixed(1), '', '']);
+                      rows.push(['', '', '', '', '', '', '', '', '']);
+                      rows.push(['Current Week Verified Total', '', '', clockHistory.weeklyTotal.toFixed(2), '', '', '', '', '']);
+                      if (clockHistory.weeklyOvertime > 0) rows.push(['Current Week Overtime', '', '', clockHistory.weeklyOvertime.toFixed(2), '', '', '', '', '']);
                       const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
                       const blob = new Blob([csv], { type: 'text/csv' });
                       const url = URL.createObjectURL(blob);
@@ -5772,18 +5779,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       const todayKey = localCalendarYmd();
                       const isToday = day.dateKey === todayKey;
                       return (
-                        <div key={day.dateKey} className={`rounded-xl border p-3 ${isToday ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
+                        <div key={day.dateKey} className={`rounded-2xl border p-3.5 ${day.needsCorrection ? 'bg-amber-50 border-amber-200' : isToday ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
                           <div className="flex items-center justify-between mb-1.5">
                             <span className={`text-sm font-semibold ${isToday ? 'text-emerald-700' : 'text-slate-800'}`}>
                               {formatHistoryCompactDayLabel(day.dateKey)}
                               {isToday && <span className="ml-1.5 text-[10px] font-semibold uppercase bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full">Today</span>}
+                              {day.needsCorrection && <span className="ml-1.5 text-[10px] font-bold uppercase bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded-full">Needs correction</span>}
                             </span>
-                            {day.hours ? (
+                            {day.hours != null ? (
                               <span className={`text-sm font-semibold ${day.hours >= 8 ? 'text-emerald-600' : day.hours >= 4 ? 'text-amber-600' : 'text-slate-600'}`}>
-                                {day.hours.toFixed(1)}h
+                                {day.hours.toFixed(2)}h
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-400">—</span>
+                              <span className="text-xs font-semibold text-amber-700">Not payable</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 text-xs">
@@ -5806,16 +5814,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                               <span className="text-slate-400 text-xs">No activity</span>
                             )}
                           </div>
+                          {day.breakMin > 0 && <p className="mt-2 text-xs font-medium text-amber-700">Paused {day.breakMin} minutes</p>}
+                          {day.needsCorrection && day.anomalies?.length > 0 && <p className="mt-2 rounded-lg bg-white/70 px-2.5 py-2 text-xs text-amber-800">{day.anomalies.map((issue) => issue.message).join(' ')}</p>}
                         </div>
                       );
                     })}
                   </div>
                   <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-600">14-Day Total</span>
+                    <span className="text-sm font-semibold text-slate-600">Current Week Verified</span>
                     <span className={`text-sm font-semibold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                      {clockHistory.weeklyTotal.toFixed(1)}h
+                      {clockHistory.weeklyTotal.toFixed(2)}h
                       {clockHistory.weeklyOvertime > 0 && (
-                        <span className="ml-2 text-xs text-rose-500">({clockHistory.weeklyOvertime.toFixed(1)}h OT)</span>
+                        <span className="ml-2 text-xs text-rose-500">({clockHistory.weeklyOvertime.toFixed(2)}h OT)</span>
                       )}
                     </span>
                   </div>

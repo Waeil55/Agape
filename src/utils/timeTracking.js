@@ -484,7 +484,11 @@ export const stitchSessions = (events, options = {}) => {
   // If session is still open (driver hasn't clocked out yet)
   if (currentSession) {
     const requestedNow = eventMillis({ timestamp: options.now || new Date() });
-    finalizeSession(currentSession, Math.max(currentSession.clockInMs, requestedNow || Date.now()), null, true);
+    const lastKnownEventMs = currentSession.events.reduce((latest, event) => Math.max(latest, eventMillis(event) || latest), currentSession.clockInMs);
+    const openSessionEndMs = options.requireClosed
+      ? lastKnownEventMs
+      : Math.max(currentSession.clockInMs, requestedNow || Date.now());
+    finalizeSession(currentSession, openSessionEndMs, null, true);
     if (options.requireClosed) {
       anomalies.push({ code: 'OPEN_SHIFT', message: 'Shift has no clock-out event and cannot be approved for payroll.' });
     }
@@ -494,6 +498,14 @@ export const stitchSessions = (events, options = {}) => {
     delete session.clockInMs;
     delete session.breakStartMs;
     session.events = session.events.map(({ _ms, _index, ...event }) => event);
+    const maxShiftMilliseconds = Number(options.maxShiftHours || 18) * 3600000;
+    const maxBreakMilliseconds = Number(options.maxBreakHours || 4) * 3600000;
+    if (session.totalMilliseconds > maxShiftMilliseconds) {
+      anomalies.push({ code: 'EXCESSIVE_SHIFT', sessionId: session.sessionId, message: `Shift exceeds ${options.maxShiftHours || 18} hours and requires correction.` });
+    }
+    if (session.breakMilliseconds > maxBreakMilliseconds) {
+      anomalies.push({ code: 'EXCESSIVE_BREAK', sessionId: session.sessionId, message: `Recorded break exceeds ${options.maxBreakHours || 4} hours and requires correction.` });
+    }
   });
   const totalBillableMilliseconds = sessions.reduce((sum, s) => sum + (s.billableMilliseconds || 0), 0);
   const totalBillableMinutes = totalBillableMilliseconds / 60000;

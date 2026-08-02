@@ -49,6 +49,26 @@ describe('payroll time ledger', () => {
     expect(ledger.sessions[0].isOpen).toBe(true);
   });
 
+  it('never expands a historical missing clock-out through the export date', () => {
+    const ledger = stitchSessions([
+      event('IN', '2026-07-21T05:02:00.000-04:00'),
+    ], { now: '2026-08-02T12:00:00.000-04:00', requireClosed: true });
+
+    expect(ledger.totalBillableMinutes).toBe(0);
+    expect(ledger.anomalies.map((item) => item.code)).toContain('OPEN_SHIFT');
+  });
+
+  it('blocks implausibly long shifts and breaks from payroll approval', () => {
+    const ledger = stitchSessions([
+      event('IN', '2026-07-20T04:18:00.000-04:00'),
+      event('BREAK_START', '2026-07-20T05:00:00.000-04:00'),
+      event('BREAK_END', '2026-07-20T18:00:00.000-04:00'),
+      event('OUT', '2026-07-20T18:20:00.000-04:00'),
+    ]);
+
+    expect(ledger.anomalies.map((item) => item.code)).toContain('EXCESSIVE_BREAK');
+  });
+
   it('does not double-deduct duplicate pause or resume events', () => {
     const events = [
       event('IN', '2026-07-27T08:00:00.000Z'),
