@@ -648,7 +648,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return ['trips', 'tools', 'history', 'settings', 'active-trip', 'chat'].includes(savedNav) ? savedNav : 'trips';
   });
   const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState(() => localStorage.getItem(`agape_drvHistFilter_${userKey}`) || 'all');
+  const [historyFilter, setHistoryFilter] = useState(() => {
+    const savedFilter = localStorage.getItem(`agape_drvHistFilter_${userKey}`);
+    // History is a completed-work view. Do not reopen the broad legacy "all"
+    // selection on every login; drivers can still choose it for the current session.
+    return savedFilter && savedFilter !== 'all' ? savedFilter : 'completed';
+  });
   const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
 
@@ -5262,7 +5267,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </button>
 
               {[
-                { id: 'all', label: 'All', Icon: Clock },
+                { id: 'all', label: 'All outcomes', Icon: Clock },
                 { id: 'completed', label: 'Completed', Icon: CheckCircle2 },
                 { id: 'cancelled', label: 'Cancelled', Icon: XCircle },
                 { id: 'noshow', label: 'No Show', Icon: AlertTriangle },
