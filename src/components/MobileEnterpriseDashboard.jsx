@@ -376,7 +376,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (subView === 'welltrans') {
       return (
         <SubViewWrapper title="WellTrans Sync" fullHeight>
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><WellTransSyncPage trips={trips} drivers={drivers} role={role} onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><WellTransSyncPage trips={trips} drivers={drivers} vehicles={props.vehicles || []} role={role} onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }

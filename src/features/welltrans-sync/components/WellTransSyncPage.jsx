@@ -106,7 +106,7 @@ const createWellTransEditDraft = (trip) => ({
   _signed: Boolean(trip.paperSignatureConfirmed),
 });
 
-const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUpdateTrip }) => {
+const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'dispatcher', onUpdateTrip }) => {
   const [syncDate, setSyncDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [driverScopeId, setDriverScopeId] = useState('all');
   const hydratedTrips = useMemo(
@@ -119,6 +119,19 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
     }, []),
     [trips, drivers],
   );
+  const vehicleOptions = useMemo(() => {
+    const unique = new Map();
+    vehicles.forEach((vehicle) => {
+      const name = String(vehicle?.name || vehicle?.vehicleName || '').trim();
+      if (!name || vehicle?.archived === true || vehicle?.active === false) return;
+      const key = name.toLowerCase();
+      if (!unique.has(key)) unique.set(key, {
+        name,
+        plate: String(vehicle?.plate || vehicle?.licensePlate || '').trim(),
+      });
+    });
+    return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }, [vehicles]);
   const {
     settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, canary, coverage,
     workerOnline, workerCalibrated, workerUpgradeRequired,
@@ -1217,7 +1230,21 @@ const WellTransSyncPage = ({ trips = [], drivers = [], role = 'dispatcher', onUp
                         ) : <span className="block truncate">{displayScalar(trip._payload?.driver || trip.completedDriverName)}</span>}
                       </td>
                       <td className="px-2 py-2 text-slate-700" title={trip._payload?.vehicle} onClick={event => event.stopPropagation()}>
-                        {isEditing ? <input value={draft.completedVehicle || ''} onChange={event => setEditingTrip(current => ({ ...current, completedVehicle: event.target.value }))} className={inlineInputClass} aria-label="Vehicle" /> : <span className="block truncate">{displayScalar(trip._payload?.vehicle)}</span>}
+                        {isEditing ? (
+                          <select value={draft.completedVehicle || ''}
+                            onChange={event => setEditingTrip(current => ({ ...current, completedVehicle: event.target.value }))}
+                            className={inlineInputClass} aria-label="Vehicle">
+                            <option value="">Leave WellTrans vehicle blank</option>
+                            {draft.completedVehicle && !vehicleOptions.some(option => option.name === draft.completedVehicle) && (
+                              <option value={draft.completedVehicle}>{draft.completedVehicle} (current)</option>
+                            )}
+                            {vehicleOptions.map(option => (
+                              <option key={option.name} value={option.name}>
+                                {option.name}{option.plate ? ` (${option.plate})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        ) : <span className="block truncate">{displayScalar(trip._payload?.vehicle)}</span>}
                       </td>
                       {[
                         ['_pickupArrival', trip._payload?.pickup?.arrival, 'text-emerald-700', 'Pickup arrival'],
