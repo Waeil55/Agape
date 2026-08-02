@@ -177,24 +177,16 @@ public static class AgapeWindowFocus {
       ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId=$_" -ErrorAction SilentlyContinue } |
       Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'src\\index\.js' } |
       Select-Object -First 1
-    $ownerAgeSeconds = ((Get-Date) - $ownerProcess.StartTime).TotalSeconds
-    # A newly launched worker may need a few seconds before Chromium owns a
-    # top-level window. Once that grace period expires, a worker whose entire
-    # Chromium tree has no window is stale: the operator has already lost the
-    # review surface, so keeping the orphaned Node supervisor prevents every
-    # later Fill request from reopening WellTrans. Replace only this validated
-    # Agape process tree. A visible review window is always focused above and
-    # is never terminated, preserving all unapplied edits.
+    # MainWindowHandle is not a reliable browser-health signal. Chromium can
+    # temporarily report no top-level handle while navigating, authenticating,
+    # switching desktops, or while Windows is restoring the window. Never kill
+    # a healthy Agent solely because that handle is unavailable; doing so can
+    # discard an operator's unapplied WellTrans review session.
     if ($workerNode -and -not $replacementRequired) {
-      if ($ownerAgeSeconds -lt 30) { exit 0 }
-      Add-Content -LiteralPath $logPath -Value (
-        "[$([DateTime]::Now.ToString('o'))] Replacing stale Agent session: " +
-        "$($browserProcesses.Count) Chromium process(es), no operator window."
-      )
-      $replacementRequired = $true
+      exit 0
     }
 
-    if (-not $replacementRequired -and $ownerAgeSeconds -lt 60) { exit 0 }
+    if (-not $replacementRequired) { exit 0 }
 
     # Replace only this validated Agape process tree when no review browser is
     # visible. An update never discards unsaved human-review edits and never

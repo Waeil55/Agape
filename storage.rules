@@ -2,7 +2,16 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('disabled', false) != true
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('active', true) != false
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('accessStatus', firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('employmentStatus', 'active')) != 'disabled'
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('accessStatus', firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('employmentStatus', 'active')) != 'inactive'
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('accessStatus', firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('employmentStatus', 'active')) != 'suspended'
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('accessStatus', firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('employmentStatus', 'active')) != 'terminated'
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('accessStatus', firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('employmentStatus', 'active')) != 'revoked'
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('accessStatus', firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('employmentStatus', 'active')) != 'separated';
     }
 
     function isAdmin() {

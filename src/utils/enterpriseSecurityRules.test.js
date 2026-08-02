@@ -8,8 +8,8 @@ describe('enterprise evidence controls', () => {
   it('keeps audit records immutable from every client role', () => {
     const rules = readFileSync(firestoreRulesPath, 'utf8');
     const auditRule = rules.match(/match \/audit_logs\/\{auditId\} \{([\s\S]*?)\n    \}/)?.[1] || '';
-    expect(auditRule).toContain('allow read: if request.auth != null && isDispatcher();');
+    expect(auditRule).toContain('allow read: if signedIn() && isDispatcher();');
     expect(auditRule).toContain('allow create, update, delete: if false;');
-    expect(auditRule).not.toContain('allow create: if request.auth != null');
+    expect(auditRule).not.toContain('allow create: if signedIn()');
   });
 });

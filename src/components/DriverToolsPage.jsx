@@ -9,6 +9,7 @@ import { openMapLink } from '../utils/nativeActions';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { generateAiText } from '../services/secureAi';
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -369,16 +370,9 @@ const RoutePlanSection = ({
         setRouteSummary(summary);
       } catch {
         try {
-          const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-          if (!geminiKey) { setRouteSummary({ duration: 'Unavailable', distance: '--', legs: [] }); return; }
           const prompt = `Calculate driving time from "${origin}" to "${destination}"${waypoints.length ? ` with stops at "${waypoints.join(', ')}"` : ''}. Reply only with the time like '45 min'.`;
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-          });
-          if (!res.ok) throw new Error();
-          const data = await res.json();
-          setRouteSummary({ duration: data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Unavailable', distance: '--', legs: [] });
+          const duration = await generateAiText(prompt, { temperature: 0, maxOutputTokens: 64 });
+          setRouteSummary({ duration: duration || 'Unavailable', distance: '--', legs: [] });
         } catch {
           setRouteSummary({ duration: 'Unavailable', distance: '--', legs: [] });
         }

@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -36,6 +36,7 @@ import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useRealtimeReliability } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
 import { useDriverAssignments } from './hooks/useDriverAssignments';
+import useEnterpriseSessionSecurity, { beginSecuritySession, clearSecuritySession, isEmploymentAccessActive } from './hooks/useEnterpriseSessionSecurity';
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
 import { hydrateTripDriverIdentity } from './utils/driverIdentity';
@@ -130,6 +131,7 @@ const Badge = ({ children, variant = 'info' }) => {
 
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted']);
+const DRIVER_ACTIVE_WORK_STATUSES = new Set(['in progress', 'at pickup', 'navigating pickup', 'en route', 'navigating dropoff', 'in transit']);
 const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
 const getTripHistoryDateKey = (trip) => {
   const dateKey = tripCalendarDateKey(trip?.date);
@@ -784,6 +786,7 @@ const App = () => {
 
   const handleDriverSessionInvalidated = useCallback((session = {}) => {
     if (roleRef.current !== 'driver') return;
+    clearSecuritySession(auth.currentUser?.uid);
     skipNextSignedOutResetRef.current = true;
     clearRoleCache();
     signOut(auth).catch(() => {});
@@ -793,6 +796,28 @@ const App = () => {
         : 'Your driver session expired. Please sign in again.',
     });
   }, [resetSessionState]);
+
+  const handleSecurityTermination = useCallback(({ message }) => {
+    const uid = auth.currentUser?.uid;
+    skipNextSignedOutResetRef.current = true;
+    clearRoleCache();
+    clearSecuritySession(uid);
+    signOut(auth).catch(() => {});
+    resetSessionState({
+      loginErrorMessage: message || 'Your secure session ended. Please sign in again.',
+    });
+  }, [resetSessionState]);
+
+  const driverHasActiveWork = role === 'driver' && Boolean(
+    currentUserDriverProfile?.clockedIn
+    || currentUserDriverTrips.some((trip) => DRIVER_ACTIVE_WORK_STATUSES.has(normalizeTripStatus(trip.status)))
+  );
+  const enterpriseSessionSecurity = useEnterpriseSessionSecurity({
+    enabled: isAuthenticated,
+    role,
+    driverWorking: driverHasActiveWork,
+    onTerminate: handleSecurityTermination,
+  });
 
   useDriverLiveState({
     enabled: isAuthenticated && role === 'driver' && Boolean(currentUserDriverProfile?.id),
@@ -1011,7 +1036,11 @@ const App = () => {
 
           // Then verify role from Firestore in the background (non-blocking)
           getDoc(doc(db, 'users', user.uid)).then((freshDoc) => {
-            if (cancelled || !freshDoc.exists()) return;
+            if (cancelled) return;
+            if (!freshDoc.exists() || !isEmploymentAccessActive(freshDoc.data())) {
+              handleSecurityTermination({ message: 'Your Agape Care access has been disabled.' });
+              return;
+            }
             const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
             const freshTenantId = tenantIdFromProfile(freshDoc.data());
             if (freshRole && freshRole !== cached.role) {
@@ -1042,7 +1071,7 @@ const App = () => {
         if (cancelled) return;
 
         let userDoc = userDocResult.ok ? userDocResult.value : null;
-        let userRole = userDoc?.exists?.() ? String(userDoc.data()?.role || '').toLowerCase() : '';
+        let userRole = userDoc?.exists?.() && isEmploymentAccessActive(userDoc.data()) ? String(userDoc.data()?.role || '').toLowerCase() : '';
 
         // If Firestore timed out, try one more time quickly then proceed
         if (!userDocResult.ok || (!userRole && userDoc)) {
@@ -1050,7 +1079,7 @@ const App = () => {
           if (cancelled) return;
           if (retryResult.ok && retryResult.value?.exists?.()) {
             userDoc = retryResult.value;
-            userRole = String(userDoc.data()?.role || '').toLowerCase();
+            userRole = isEmploymentAccessActive(userDoc.data()) ? String(userDoc.data()?.role || '').toLowerCase() : '';
           }
         }
 
@@ -1075,6 +1104,9 @@ const App = () => {
                 loginType: isInternalAuthEmail(normalizedAuthEmail) ? 'username' : 'email',
                 profileId: null,
                 tenantId: DEFAULT_TENANT_ID,
+                accessStatus: 'active',
+                employmentStatus: 'active',
+                disabled: false,
                 bootstrappedAt: new Date().toISOString(),
               },
               { merge: true }
@@ -1237,7 +1269,7 @@ const App = () => {
       if (unsubData) unsubData();
       if (typeof unsubFcm === 'function') unsubFcm();
     };
-  }, [resetSessionState, setDrivers, setDispatchers]);
+  }, [handleSecurityTermination, resetSessionState, setDrivers, setDispatchers]);
 
   useEffect(() => {
     const metaTags = [
@@ -1311,7 +1343,7 @@ const App = () => {
       const userCred = await createUserWithEmailAndPassword(auth, authEmail, password);
       await setDoc(
         doc(db, 'users', userCred.user.uid),
-        { role: pendingRole, email: authEmail, username, name: username, profileId: buildStableProfileId(pendingRole, userCred.user.uid), loginType: 'username' },
+        { role: pendingRole, email: authEmail, username, name: username, profileId: buildStableProfileId(pendingRole, userCred.user.uid), loginType: 'username', accessStatus: 'active', employmentStatus: 'active', disabled: false },
         { merge: true }
       );
       await initializeAppData();
@@ -1362,9 +1394,13 @@ const App = () => {
     loginInProgressRef.current = true;
     loginAttemptRef.current = 0;
     try {
-      // Re-apply persistence before each sign-in attempt for robustness.
-      // Try IndexedDB first, fall back to session storage.
-      await setPersistence(auth, browserLocalPersistence).catch(() =>
+      // Privileged portals end when the browser session closes. Drivers retain
+      // local persistence so navigation/reloads do not interrupt active field work;
+      // their live employment and device session are still continuously verified.
+      const requestedPersistence = requestedRole === 'driver'
+        ? browserLocalPersistence
+        : browserSessionPersistence;
+      await setPersistence(auth, requestedPersistence).catch(() =>
         setPersistence(auth, browserSessionPersistence).catch(() => {})
       );
       const { authEmail, username } = resolveAuthIdentifier(email);
@@ -1374,7 +1410,8 @@ const App = () => {
         loginInProgressRef.current = false;
         return;
       }
-      await signInWithEmailAndPassword(auth, authEmail, password);
+      const credential = await signInWithEmailAndPassword(auth, authEmail, password);
+      beginSecuritySession(credential.user.uid);
     } catch (err) {
       loginInProgressRef.current = false;
       loginPortalRoleRef.current = requestedRole;
@@ -1395,6 +1432,7 @@ const App = () => {
   const handleLogout = async () => {
     try {
       if (role === 'dispatcher') addAuditLog('Dispatcher Logged Out', `Dispatcher ${currentUser} left the system.`, 'slate');
+      clearSecuritySession(auth.currentUser?.uid);
       clearRoleCache();
       loginInProgressRef.current = false;
       skipNextSignedOutResetRef.current = true;
@@ -2822,6 +2860,19 @@ const App = () => {
         <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 min-w-0"><AlertCircle size={16} className="shrink-0" /> <span className="truncate">{startupIssue}</span></span>
           <button onClick={() => setStartupIssue('')} className="text-amber-700 hover:text-amber-900 font-bold shrink-0">Dismiss</button>
+        </div>
+      )}
+      {isAuthenticated && enterpriseSessionSecurity.warning && (
+        <div className="bg-slate-950 border-b border-amber-400/40 px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold text-white flex items-center justify-between gap-3 shadow-lg z-[100]">
+          <span className="flex items-center gap-2 min-w-0">
+            <ShieldCheck size={17} className="shrink-0 text-amber-300" />
+            <span className="truncate">
+              Secure session expires in {Math.max(1, Math.ceil(enterpriseSessionSecurity.warning.remainingMs / 60000))} minute(s).
+            </span>
+          </span>
+          <button onClick={enterpriseSessionSecurity.recordActivity} className="h-8 px-3 rounded-lg bg-amber-400 text-slate-950 font-black hover:bg-amber-300 active:scale-95 transition shrink-0">
+            Stay signed in
+          </button>
         </div>
       )}
       {isAuthenticated && (

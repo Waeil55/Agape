@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle, Edit2, Check, BrainCircuit, Activity } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle, Edit2, BrainCircuit, Activity, UserCheck, UserX } from 'lucide-react';
 import { db, firebaseConfig, collection, getDocs, setDoc, doc, deleteDoc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut, functions, httpsCallable } from '../config/firebase';
 import { analyzeActivityLogs } from '../config/ai';
 
@@ -91,7 +91,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       
       const userCred = await createUserWithEmailAndPassword(secondaryAuth, authEmail, form.password);
       const profileId = buildStableProfileId(form.role, userCred.user.uid);
-      await setDoc(doc(db, 'users', userCred.user.uid), { email: authEmail, username, name: username, role: form.role, phone: form.phone, profileId, loginType: 'username' }, { merge: true });
+      await setDoc(doc(db, 'users', userCred.user.uid), { email: authEmail, username, name: username, role: form.role, phone: form.phone, profileId, loginType: 'username', accessStatus: 'active', employmentStatus: 'active', disabled: false }, { merge: true });
       
       // Cleanup: sign out and delete secondary app
       await authSignOut(secondaryAuth);
@@ -117,6 +117,28 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
     } catch (err) {
       if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
       setFormError(err.message.replace('Firebase: ', ''));
+    }
+  };
+
+  const setUserAccess = async (user, enabled) => {
+    if (role !== 'admin' || !user?.uid || user.email === currentUser) return;
+    try {
+      setFormError('');
+      const updateAccess = httpsCallable(functions, 'setUserAccess');
+      await updateAccess({
+        uid: user.uid,
+        enabled,
+        reason: enabled ? 'Administrator restored employment access' : 'Administrator disabled employment access',
+      });
+      addAuditLog(
+        enabled ? 'User Access Restored' : 'User Access Disabled',
+        `${currentUser} ${enabled ? 'restored' : 'disabled'} access for ${user.username || authEmailToUsername(user.email)}`,
+        enabled ? 'emerald' : 'amber',
+        { entity: 'user', id: user.uid, diffs: [{ field: 'accessStatus', before: user.accessStatus || 'active', after: enabled ? 'active' : 'suspended' }] }
+      );
+      await loadUsers();
+    } catch (error) {
+      setFormError(error?.message?.replace('Firebase: ', '') || 'Could not update user access.');
     }
   };
 
@@ -298,6 +320,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             {users.map(user => {
               const roleStyle = user.role === 'admin' ? 'bg-blue-100 text-blue-700' : user.role === 'dispatcher' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700';
               const RoleIcon = user.role === 'admin' ? ShieldCheck : user.role === 'dispatcher' ? Briefcase : Truck;
+              const accessEnabled = user.disabled !== true && !['disabled', 'inactive', 'revoked', 'suspended', 'terminated', 'separated'].includes(String(user.accessStatus || user.employmentStatus || 'active').toLowerCase());
               return (
                 <div key={user.uid} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
@@ -311,6 +334,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-black ${accessEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                      {accessEnabled ? 'ACCESS ACTIVE' : 'ACCESS DISABLED'}
+                    </span>
                     {user.role === 'dispatcher' && role === 'admin' && (() => {
                       const disp = dispatchers.find(d => d.email === user.email);
                       if (!disp) return null;
@@ -320,6 +346,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         </button>
                       );
                     })()}
+                    {role === 'admin' && user.email !== currentUser && (
+                      <button onClick={() => requestAuthAction ? requestAuthAction(accessEnabled ? 'Disable User Access' : 'Restore User Access', () => setUserAccess(user, !accessEnabled)) : setUserAccess(user, !accessEnabled)} className={`rounded-lg p-2 ${accessEnabled ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`} title={accessEnabled ? 'Disable access immediately' : 'Restore access'} aria-label={accessEnabled ? 'Disable access' : 'Restore access'}>
+                        {accessEnabled ? <UserX size={14} /> : <UserCheck size={14} />}
+                      </button>
+                    )}
                     {role === 'admin' && user.email !== currentUser && (
                       <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" title="Remove user" aria-label="Remove user">
                         <Trash2 size={14} />
@@ -343,6 +374,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 {users.map(user => {
                   const roleStyle = user.role === 'admin' ? 'bg-blue-100 text-blue-700' : user.role === 'dispatcher' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700';
                   const RoleIcon = user.role === 'admin' ? ShieldCheck : user.role === 'dispatcher' ? Briefcase : Truck;
+                  const accessEnabled = user.disabled !== true && !['disabled', 'inactive', 'revoked', 'suspended', 'terminated', 'separated'].includes(String(user.accessStatus || user.employmentStatus || 'active').toLowerCase());
                   return (
                     <tr key={user.uid} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-none">
@@ -353,6 +385,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                         <span className={`flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-xs font-bold w-fit ${roleStyle}`}>
                           <RoleIcon size={10} /> {String(user?.role || '').charAt(0).toUpperCase() + String(user?.role || '').slice(1)}
                         </span>
+                        <p className={`mt-1 text-[10px] font-black ${accessEnabled ? 'text-emerald-600' : 'text-rose-600'}`}>{accessEnabled ? 'Access active' : 'Access disabled'}</p>
                         {user.phone && <p className="text-xs text-slate-500 font-mono mt-1">{user.phone}</p>}
                       </td>
                       <td className="px-3 sm:px-6 py-1.5">
@@ -366,6 +399,11 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                               </button>
                             );
                           })()}
+                          {role === 'admin' && user.email !== currentUser && (
+                            <button onClick={() => requestAuthAction ? requestAuthAction(accessEnabled ? 'Disable User Access' : 'Restore User Access', () => setUserAccess(user, !accessEnabled)) : setUserAccess(user, !accessEnabled)} className={`p-1.5 sm:p-2 rounded-lg transition ${accessEnabled ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`} title={accessEnabled ? 'Disable access immediately' : 'Restore access'} aria-label={accessEnabled ? 'Disable access' : 'Restore access'}>
+                              {accessEnabled ? <UserX size={14} /> : <UserCheck size={14} />}
+                            </button>
+                          )}
                           {role === 'admin' && user.email !== currentUser && (
                             <button onClick={() => requestAuthAction ? requestAuthAction('Delete User', () => deleteUserAccount(user)) : deleteUserAccount(user)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Remove user" aria-label="Remove user">
                               <Trash2 size={14} />

@@ -149,11 +149,40 @@ async function requireRole(context, allowedRoles) {
   if (!userDoc.exists) {
     throw new functions.https.HttpsError("permission-denied", "User profile not found.");
   }
-  const role = userDoc.data().role;
+  const profile = userDoc.data();
+  const accessStatus = String(profile.accessStatus || profile.employmentStatus || "active").toLowerCase();
+  if (profile.disabled === true || profile.active === false || ["disabled", "inactive", "revoked", "suspended", "terminated", "separated"].includes(accessStatus)) {
+    throw new functions.https.HttpsError("permission-denied", "This account is not active.");
+  }
+  const role = profile.role;
   if (!allowedRoles.includes(role)) {
     throw new functions.https.HttpsError("permission-denied", `This action requires one of these roles: ${allowedRoles.join(", ")}.`);
   }
   return { id: userDoc.id, ...userDoc.data(), tenantId: userDoc.data().tenantId || "agape-care" };
+}
+
+async function invalidateUserSessions(uid, reason, actorUid) {
+  const sessions = await admin.firestore().collection("sessions").where("userId", "==", uid).get();
+  if (sessions.empty) return 0;
+  const batches = [];
+  let batch = admin.firestore().batch();
+  let operations = 0;
+  sessions.docs.forEach((sessionDoc) => {
+    batch.set(sessionDoc.ref, {
+      status: "revoked",
+      invalidatedReason: reason,
+      invalidatedBy: actorUid,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    operations += 1;
+    if (operations % 450 === 0) {
+      batches.push(batch.commit());
+      batch = admin.firestore().batch();
+    }
+  });
+  if (operations % 450 !== 0) batches.push(batch.commit());
+  await Promise.all(batches);
+  return operations;
 }
 
 async function requireAdmin(context) {
@@ -165,18 +194,147 @@ async function requireAdminOrDispatcher(context) {
 }
 
 exports.deleteUser = functions.https.onCall(async (data, context) => {
-  await requireAdmin(context);
+  const actor = await requireAdmin(context);
   const { uid } = data;
   if (!uid) {
     throw new functions.https.HttpsError("invalid-argument", "The function must be called with a valid 'uid' property.");
   }
+  if (uid === context.auth.uid) {
+    throw new functions.https.HttpsError("failed-precondition", "Administrators cannot remove their own active account.");
+  }
   try {
+    const targetRef = admin.firestore().doc(`users/${uid}`);
+    const targetSnapshot = await targetRef.get();
+    if (!targetSnapshot.exists || (targetSnapshot.data().tenantId || "agape-care") !== actor.tenantId) {
+      throw new functions.https.HttpsError("not-found", "User was not found in this organization.");
+    }
+    await targetRef.set({
+      accessStatus: "revoked",
+      disabled: true,
+      accessRevokedAt: admin.firestore.FieldValue.serverTimestamp(),
+      accessRevokedBy: context.auth.uid,
+    }, { merge: true });
+    await admin.auth().updateUser(uid, { disabled: true });
+    await admin.auth().revokeRefreshTokens(uid);
+    await invalidateUserSessions(uid, "account_removed", context.auth.uid);
+    await admin.firestore().collection("audit_logs").add({
+      action: "security.user_removed",
+      entityType: "user",
+      entityId: uid,
+      actorId: context.auth.uid,
+      tenantId: actor.tenantId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
     await admin.auth().deleteUser(uid);
     return { success: true, message: "User deleted successfully." };
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError("internal", error.message || "Failed to delete user.");
   }
 });
+
+exports.setUserAccess = functions.https.onCall(async (data, context) => {
+  const actor = await requireAdmin(context);
+  const uid = String(data?.uid || "").trim();
+  const enabled = data?.enabled === true;
+  const reason = String(data?.reason || (enabled ? "access_restored" : "employment_access_disabled")).slice(0, 300);
+  if (!uid) throw new functions.https.HttpsError("invalid-argument", "A user uid is required.");
+  if (uid === context.auth.uid && !enabled) {
+    throw new functions.https.HttpsError("failed-precondition", "Administrators cannot disable their own active account.");
+  }
+
+  const targetRef = admin.firestore().doc(`users/${uid}`);
+  const targetSnapshot = await targetRef.get();
+  if (!targetSnapshot.exists || (targetSnapshot.data().tenantId || "agape-care") !== actor.tenantId) {
+    throw new functions.https.HttpsError("not-found", "User was not found in this organization.");
+  }
+
+  await admin.auth().updateUser(uid, { disabled: !enabled });
+  await admin.auth().revokeRefreshTokens(uid);
+  await targetRef.set({
+    accessStatus: enabled ? "active" : "suspended",
+    disabled: !enabled,
+    accessChangedAt: admin.firestore.FieldValue.serverTimestamp(),
+    accessChangedBy: context.auth.uid,
+    accessChangeReason: reason,
+  }, { merge: true });
+  const invalidatedSessions = await invalidateUserSessions(uid, enabled ? "access_reset" : "access_disabled", context.auth.uid);
+  await admin.firestore().collection("audit_logs").add({
+    action: enabled ? "security.user_access_restored" : "security.user_access_disabled",
+    entityType: "user",
+    entityId: uid,
+    actorId: context.auth.uid,
+    tenantId: actor.tenantId,
+    reason,
+    invalidatedSessions,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { success: true, enabled, invalidatedSessions };
+});
+
+exports.enterpriseAiGenerate = functions
+  .runWith({ secrets: [runtimeConfigSecret], timeoutSeconds: 120, memory: "512MB" })
+  .https.onCall(async (data, context) => {
+    const actor = await requireRole(context, ["admin", "dispatcher", "driver"]);
+    const prompt = String(data?.prompt || "").trim();
+    if (!prompt || prompt.length > 30000) {
+      throw new functions.https.HttpsError("invalid-argument", "AI input must contain between 1 and 30,000 characters.");
+    }
+
+    const now = Date.now();
+    const rateRef = admin.firestore().doc(`security_rate_limits/ai_${context.auth.uid}`);
+    const rateLimit = actor.role === "driver" ? 10 : 30;
+    await admin.firestore().runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(rateRef);
+      const current = snapshot.exists ? snapshot.data() : {};
+      const windowStartedAt = Number(current.windowStartedAt || 0);
+      const sameWindow = now - windowStartedAt < 60000;
+      const count = sameWindow ? Number(current.count || 0) : 0;
+      if (count >= rateLimit) {
+        throw new functions.https.HttpsError("resource-exhausted", "AI request limit reached. Wait one minute and retry.");
+      }
+      transaction.set(rateRef, {
+        userId: context.auth.uid,
+        tenantId: actor.tenantId,
+        windowStartedAt: sameWindow ? windowStartedAt : now,
+        count: count + 1,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    const gemini = getRuntimeConfig().gemini || {};
+    if (!gemini.api_key || gemini.enabled !== true) {
+      throw new functions.https.HttpsError("failed-precondition", "The secure AI service is not configured.");
+    }
+    const model = String(gemini.model || "gemini-2.5-flash").replace(/[^A-Za-z0-9._-]/g, "");
+    const temperature = Math.max(0, Math.min(1, Number(data?.temperature ?? 0.1)));
+    const maxOutputTokens = Math.max(64, Math.min(8192, Number(data?.maxOutputTokens || 4096)));
+    try {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature, maxOutputTokens },
+        },
+        {
+          params: { key: gemini.api_key },
+          timeout: 90000,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      const text = String(response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      if (!text) throw new Error("AI provider returned no content.");
+      return { text, model, serverProcessed: true };
+    } catch (error) {
+      functions.logger.warn("Secure enterprise AI request failed.", {
+        uid: context.auth.uid,
+        role: actor.role,
+        status: error?.response?.status || null,
+        message: error.message,
+      });
+      throw new functions.https.HttpsError("unavailable", "The secure AI service is temporarily unavailable.");
+    }
+  });
 
 exports.sendSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
@@ -1562,6 +1720,9 @@ exports.createUser = functions.https.onCall(async (data, context) => {
     username: String(data?.username || "").trim(),
     role,
     tenantId: actor.tenantId,
+    accessStatus: "active",
+    employmentStatus: "active",
+    disabled: false,
     createdBy: context.auth.uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });

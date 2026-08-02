@@ -6,16 +6,7 @@
  * - Predictive analytics
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { GEMINI_API_CONFIG } from "./firebase";
-
-const geminiApiKey = GEMINI_API_CONFIG().apiKey || import.meta.env.VITE_GOOGLE_AI_API_KEY || "";
-const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
-const model = genAI?.getGenerativeModel({ model: "gemini-2.0-flash" }) || {
-  generateContent: async () => {
-    throw new Error("Gemini API key is not configured.");
-  },
-};
+import { secureGenerativeModel as model } from "../services/secureAi";
 
 /**
  * TRIP OPTIMIZATION & ANALYTICS

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Loader2, Sparkles } from 'lucide-react';
-import { GEMINI_API_CONFIG } from '../config/firebase';
+import { generateAiText } from '../services/secureAi';
 
 const AIAssistantFloating = () => {
   const [open, setOpen] = useState(false);
@@ -20,30 +20,11 @@ const AIAssistantFloating = () => {
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setLoading(true);
     try {
-      const { apiKey } = GEMINI_API_CONFIG();
-      if (!apiKey) {
-        setMessages(prev => [...prev, { role: 'assistant', text: 'AI is not configured yet. Add the Gemini API key in the app environment and redeploy.' }]);
-        setLoading(false);
-        return;
-      }
-
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `You are an expert NEMT fleet operations AI assistant. Answer concisely and helpfully.
+      const answer = await generateAiText(`You are an expert NEMT fleet operations AI assistant. Answer concisely and helpfully.
 
 User: ${userMsg}
 
-Answer in 2-3 sentences maximum. Be specific and actionable.` }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
-          }),
-        }
-      );
-      const data = await resp.json();
-      const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'I could not process that request.';
+Answer in 2-3 sentences maximum. Be specific and actionable.`, { temperature: 0.3, maxOutputTokens: 512 });
       setMessages(prev => [...prev, { role: 'assistant', text: answer }]);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', text: 'Service temporarily unavailable.' }]);

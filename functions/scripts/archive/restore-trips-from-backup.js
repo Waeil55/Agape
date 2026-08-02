@@ -10,7 +10,7 @@ const SOURCE_BACKUP_ID = sourceArg ? sourceArg.split('=').slice(1).join('=') : '
 
 function refreshToken() {
   return new Promise((resolve, reject) => {
-    const postData = `client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&client_secret=j9iVZfS8kkCEFUPaAeJV0sAi&refresh_token=${account.tokens.refresh_token}&grant_type=refresh_token`;
+    const postData = `client_id=${encodeURIComponent(process.env.GOOGLE_OAUTH_CLIENT_ID || "")}&client_secret=${encodeURIComponent(process.env.GOOGLE_OAUTH_CLIENT_SECRET || "")}&refresh_token=${account.tokens.refresh_token}&grant_type=refresh_token`;
     const req = https.request({
       hostname: 'oauth2.googleapis.com',
       path: '/token',

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X, Calendar, FileSpreadsheet } from 'lucide-react';
-import { GEMINI_API_CONFIG } from '../config/firebase';
+import { generateAiText } from '../services/secureAi';
 import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 import { normalizeDateValue } from '../utils/normalizeDate';
@@ -477,29 +477,19 @@ const AI_FETCH_TIMEOUT_MS = 25000;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-let _aiAbortController = null;
 let _aiSkipRequested = false;
 
 export function requestAiSkip() {
   _aiSkipRequested = true;
-  if (_aiAbortController) {
-    _aiAbortController.abort();
-    _aiAbortController = null;
-  }
 }
 
 function resetAiSkip() {
   _aiSkipRequested = false;
-  _aiAbortController = null;
 }
 
 async function aiValidate(rows, onProgress) {
   const results = [];
   resetAiSkip();
-  const geminiConfig = GEMINI_API_CONFIG();
-  if (!geminiConfig.apiKey) {
-    return rows.map(() => ({ issues: [], confidence: 100 }));
-  }
 
   for (let i = 0; i < rows.length; i += AI_BATCH_SIZE) {
     if (_aiSkipRequested) {
@@ -528,37 +518,13 @@ ${JSON.stringify(batch.map((r, idx) => ({ idx: i + idx, patient: r.patient, pick
 Return ONLY valid JSON array. No markdown. No explanation.`;
 
       try {
-        _aiAbortController = new AbortController();
-        const timeoutId = setTimeout(() => _aiAbortController?.abort(), AI_FETCH_TIMEOUT_MS);
-        const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiConfig.apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
-            }),
-            signal: _aiAbortController.signal,
-          }
-        );
-        clearTimeout(timeoutId);
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Secure AI validation timed out.')), AI_FETCH_TIMEOUT_MS));
+        let aiOutput = await Promise.race([
+          generateAiText(prompt, { temperature: 0.1, maxOutputTokens: 4096 }),
+          timeout,
+        ]);
+        if (_aiSkipRequested) break;
 
-        if (resp.status === 429) {
-          const delay = AI_429_BASE_DELAY_MS * Math.pow(2, attempt);
-          console.warn(`[aiValidate] Rate limited (429) on batch ${batchNum}, waiting ${delay}ms...`);
-          onProgress(`Rate limited — waiting ${Math.round(delay / 1000)}s before retry...`, Math.round((i / rows.length) * 70) + 15, true);
-          await sleep(delay);
-          continue;
-        }
-
-        if (!resp.ok) {
-          const errText = await resp.text().catch(() => '');
-          throw new Error(`HTTP ${resp.status}: ${errText.slice(0, 100)}`);
-        }
-
-        const data = await resp.json();
-        let aiOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
         aiOutput = aiOutput.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
         const parsed = JSON.parse(aiOutput);
         if (Array.isArray(parsed)) {
@@ -572,10 +538,12 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
         succeeded = true;
         break;
       } catch (err) {
-        if (err.name === 'AbortError' && _aiSkipRequested) break;
+        if (_aiSkipRequested) break;
         if (attempt < AI_MAX_RETRIES) {
-          const delay = AI_BASE_DELAY_MS * Math.pow(2, attempt);
+          const rateLimited = /resource-exhausted|rate limit|request limit/i.test(String(err?.message || ''));
+          const delay = (rateLimited ? AI_429_BASE_DELAY_MS : AI_BASE_DELAY_MS) * Math.pow(2, attempt);
           console.warn(`[aiValidate] Batch ${batchNum} attempt ${attempt + 1} failed: ${err.message}. Retrying in ${delay}ms...`);
+          onProgress(`${rateLimited ? 'AI rate limit' : 'Secure AI unavailable'} — retrying in ${Math.round(delay / 1000)}s...`, Math.round((i / rows.length) * 70) + 15, true);
           await sleep(delay);
         }
       }
@@ -588,7 +556,6 @@ Return ONLY valid JSON array. No markdown. No explanation.`;
       }
     }
   }
-  _aiAbortController = null;
   return results;
 }
 
@@ -636,7 +603,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (_aiAbortController) { _aiAbortController.abort(); _aiAbortController = null; }
+      requestAiSkip();
     };
   }, []);
 
@@ -1205,9 +1172,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       // Default to 'file' mode if dates found, else 'manual'
       setDateMode(datesInFile.length > 0 ? 'file' : 'manual');
 
-      const geminiConfig = GEMINI_API_CONFIG();
-
-      if (aiEnabled && geminiConfig.apiKey) {
+      if (aiEnabled) {
         const aiResults = await aiValidate(pairedMapped, (msg, pct, canSkip) => {
           if (!mountedRef.current) return;
           setProgressMsg(msg);

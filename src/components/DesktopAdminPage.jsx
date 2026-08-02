@@ -590,6 +590,9 @@ const DesktopAdminPage = ({
         phone: createForm.phone,
         profileId,
         loginType: 'username',
+        accessStatus: 'active',
+        employmentStatus: 'active',
+        disabled: false,
       }, { merge: true });
 
       await authSignOut(secondaryAuth);

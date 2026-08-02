@@ -109,7 +109,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
             <Download size={13} /> Export CSV
           </button>
         </div>
-        <p className="text-xs text-slate-500 ml-10">Event-driven · GPS-verified · Audit-logged</p>
+        <p className="text-xs text-slate-500 ml-10">Event-driven Â· GPS-verified Â· Audit-logged</p>
       </div>
 
       {/* Filters */}
@@ -177,7 +177,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                       <span className="flex items-center gap-1"><Clock size={10} />{fmt(pt?.billableMinutes)}</span>
-                      <span>·</span>
+                      <span>Â·</span>
                       <span className="flex items-center gap-1 text-emerald-600"><DollarSign size={10} />{fmtCurrency(pt?.totalPay)}</span>
                       {driver.hourlyRate && <span className="text-slate-500">@ ${Number(driver.hourlyRate).toFixed(2)}/hr</span>}
                     </div>
@@ -243,7 +243,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
                   {gaps.length > 0 && (
                     <div>
                       <button onClick={() => toggleSect(driver.id, 'gaps')} className="w-full flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
-                        <span className="flex items-center gap-1"><TrendingUp size={11} /> Gap Log ({gaps.length}) · {fmt(excludedMin)} excluded</span>
+                        <span className="flex items-center gap-1"><TrendingUp size={11} /> Gap Log ({gaps.length}) Â· {fmt(excludedMin)} excluded</span>
                         {expandedSection[`${driver.id}_gaps`] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                       </button>
                       {expandedSection[`${driver.id}_gaps`] && gaps.map((g, i) => (

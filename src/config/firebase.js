@@ -5,6 +5,7 @@ import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { buildOperationalTripRecord } from '../utils/tripLifecycle';
 import { buildLocationFraudSignals } from '../utils/locationFraud';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
@@ -23,6 +24,19 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const appCheck = (() => {
+  const siteKey = String(env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY || '').trim();
+  if (!siteKey || typeof window === 'undefined') return null;
+  try {
+    return initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (error) {
+    console.warn('Firebase App Check initialization was skipped:', error?.message || error);
+    return null;
+  }
+})();
 let db;
 try {
   db = initializeFirestore(app, {
@@ -48,14 +62,16 @@ try {
 }
 const analytics = (() => { try { return getAnalytics(app); } catch { return null; } })();
 
-let messaging;
-try { messaging = getMessaging(app); } catch { /* FCM not available in all environments */ }
+// Messaging is initialized lazily by the notification service after browser
+// capability/permission checks. Eager initialization rejects in unsupported
+// browsers and server-side test environments.
+const messaging = null;
 
 const functions = getFunctions(app);
 const storage = getStorage(app);
 
 export default app;
-export { app, db, auth, analytics, messaging, storage, storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, deleteApp, initializeApp, firebaseConfig,
+export { app, appCheck, db, auth, analytics, messaging, storage, storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, deleteApp, initializeApp, firebaseConfig,
   getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp, increment,
   writeBatch, setDoc, getDoc, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -63,10 +79,7 @@ export { app, db, auth, analytics, messaging, storage, storageRef, uploadBytes, 
   browserLocalPersistence, browserSessionPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
 
 const _agapeApiKey = env.VITE_GOOGLE_MAPS_API_KEY || "";
-const _agapeGeminiProject = env.VITE_GEMINI_PROJECT_ID || "";
-const _agapeGeminiKey = env.VITE_GEMINI_API_KEY || "";
 export function GOOGLE_MAPS_API_KEY() { return _agapeApiKey; }
-export function GEMINI_API_CONFIG() { return { projectId: _agapeGeminiProject, apiKey: _agapeGeminiKey }; }
 
 export function APP_CONFIG() {
   return {

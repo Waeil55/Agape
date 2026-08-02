@@ -1,24 +1,16 @@
-/* Agape Care PWA Service Worker - static assets only.
+/* Agape Care PWA Service Worker v21
+   App shell + static assets. Network-first for navigation.
    Firestore onSnapshot listeners own all realtime data delivery.
-   Do not cache, poll, or background-sync trips, drivers, assignments, or APIs here.
 */
 
-const CACHE_VERSION = 'agape-v9-static';
-const STATIC_CACHE = `${CACHE_VERSION}-shell`;
-const RUNTIME_CACHE = `${CACHE_VERSION}-assets`;
-
-const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-];
+const CACHE_VERSION = 'agape-v26';
+const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch(() => undefined)
+    caches.open(RUNTIME_CACHE).then((cache) => cache.add('/index.html'))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -26,7 +18,7 @@ self.addEventListener('activate', (event) => {
     Promise.all([
       caches.keys().then((cacheNames) => Promise.all(
         cacheNames
-          .filter((name) => name.startsWith('agape-') && name !== STATIC_CACHE && name !== RUNTIME_CACHE)
+          .filter((name) => /^agape-|^workbox-/i.test(name))
           .map((name) => caches.delete(name))
       )),
       self.clients.claim(),
@@ -37,6 +29,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING' || event.data?.action === 'skipWaiting') {
     self.skipWaiting();
+    return;
+  }
+
+  if (event.data?.type === 'FORCE_REFRESH') {
+    self.clients.matchAll().then((clients) => {
+      clients.forEach((client) => client.postMessage({ type: 'FORCE_REFRESH' }));
+    });
     return;
   }
 
@@ -55,24 +54,28 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
+  // Navigation: Network-First with background cache update and offline fallback
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request, { cache: 'reload' })
+      fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put('/index.html', clone));
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put('/index.html', clone));
+          }
           return response;
         })
-        .catch(() => caches.match('/index.html').then((cached) => cached || Response.error()))
+        .catch(() => caches.match('/index.html').then((cached) => cached || new Response('Offline', { status: 503 })))
     );
     return;
   }
 
+  // Static assets with content hashes: cache-first (safe because filenames change on deploy)
   if (url.pathname.startsWith('/assets/') || /\.(png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(request, { cache: 'reload' }).then((response) => {
+        return fetch(request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));
@@ -84,5 +87,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Everything else: network only
   event.respondWith(fetch(request));
 });

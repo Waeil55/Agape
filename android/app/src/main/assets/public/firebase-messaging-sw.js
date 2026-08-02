@@ -19,19 +19,25 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification?.title || 'Agape Care';
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'Agape Care';
   const notificationOptions = {
-    body: payload.notification?.body || '',
+    body: payload.notification?.body || payload.data?.body || '',
     icon: '/agape.png',
     badge: '/agape.png',
     vibrate: [200, 100, 200],
     requireInteraction: true,
     silent: false,
+    data: {
+      type: payload.data?.type || '',
+      channelId: payload.data?.channelId || payload.data?.chatChannelId || '',
+    },
   };
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('/'));
+  const channelId = event.notification?.data?.channelId || '';
+  const targetUrl = channelId ? `/?chatChannel=${encodeURIComponent(channelId)}` : '/';
+  event.waitUntil(clients.openWindow(targetUrl));
 });

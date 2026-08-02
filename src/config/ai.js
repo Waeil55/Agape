@@ -2,28 +2,12 @@
  * ENTERPRISE AI ENGINE — Powered by Gemini 2.0 Flash
  * Central intelligence hub for the entire NEMT fleet platform.
  */
-import { GEMINI_API_CONFIG } from './firebase';
 import { getDistanceMiles } from './maps';
-
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_CONFIG().apiKey}`;
+import { generateAiText } from '../services/secureAi';
 
 async function callGemini(prompt) {
   try {
-    const resp = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
-      }),
-    });
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => '');
-      console.error(`[AI] Gemini API error: ${resp.status} ${resp.statusText}`, errText.slice(0, 500));
-      return null;
-    }
-    const data = await resp.json();
-    let text = data?.candidates?.[0]?.parts?.[0]?.text || '';
+    let text = await generateAiText(prompt, { temperature: 0.1, maxOutputTokens: 8192 });
     text = text.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
     return text;
   } catch (err) {

@@ -1,56 +1,75 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function accountExists() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function currentProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function signedIn() {
+      return accountExists()
+        && currentProfile().get('disabled', false) != true
+        && currentProfile().get('active', true) != false
+        && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'disabled'
+        && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'inactive'
+        && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'revoked'
+        && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'suspended'
+        && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'terminated'
+        && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'separated';
+    }
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return signedIn() && currentProfile().role == 'admin';
     }
     function isDispatcher() {
-      let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      return role == 'admin' || role == 'dispatcher';
+      let role = currentProfile().role;
+      return signedIn() && (role == 'admin' || role == 'dispatcher');
     }
     function isOwner(userId) {
       return request.auth.uid == userId;
-    }
-    function signedIn() {
-      return request.auth != null;
     }
     function userEmail() {
       return request.auth.token.email;
     }
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && (isAdmin() || request.resource.data.role == 'driver');
-      allow update: if request.auth != null && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (signedIn() && isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'settings', 'profileId', 'email', 'fcmToken', 'lastSeenAt', 'updatedAt'
+        ])
+        && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
     }
     match /routeData/{document} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if signedIn();
+      allow write: if signedIn();
     }
     match /appData/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if signedIn();
+      allow write: if signedIn();
     }
     match /logs/{logId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && isAdmin();
     }
     match /trips/{tripId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if signedIn() && isAdmin();
     }
     match /assignments/{assignmentId} {
-      allow read: if request.auth != null && (
+      allow read: if signedIn() && (
         isDispatcher()
         || resource.data.driverEmail == request.auth.token.email
         || resource.data.userId == request.auth.uid
         || resource.data.driverId == request.auth.uid
       );
-      allow create: if request.auth != null && isDispatcher();
-      allow update: if request.auth != null && (
+      allow create: if signedIn() && isDispatcher();
+      allow update: if signedIn() && (
         isDispatcher()
         || resource.data.driverEmail == request.auth.token.email
         || request.resource.data.driverEmail == request.auth.token.email
@@ -59,67 +78,67 @@ service cloud.firestore {
         || resource.data.driverId == request.auth.uid
         || request.resource.data.driverId == request.auth.uid
       );
-      allow delete: if request.auth != null && isDispatcher();
+      allow delete: if signedIn() && isDispatcher();
     }
     match /sessions/{sessionId} {
-      allow read: if request.auth != null && (isDispatcher() || resource.data.userId == request.auth.uid);
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && (isDispatcher() || resource.data.userId == request.auth.uid);
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (isDispatcher() || resource.data.userId == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if signedIn() && (isDispatcher() || resource.data.userId == request.auth.uid);
+      allow delete: if signedIn() && isAdmin();
     }
     match /heartbeat/{driverId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if signedIn() && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow update: if signedIn() && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow delete: if signedIn() && isAdmin();
     }
     match /driver_locations/{driverId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if signedIn() && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow update: if signedIn() && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow delete: if signedIn() && isAdmin();
     }
     match /system_events/{eventId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && isAdmin();
     }
 
     match /audit_logs/{auditId} {
-      allow read: if request.auth != null && isDispatcher();
+      allow read: if signedIn() && isDispatcher();
       // Immutable server-authored evidence. Cloud Functions/Admin SDK bypass
       // client rules; browsers must never forge, rewrite, or erase audit data.
       allow create, update, delete: if false;
     }
     match /tripLedger/{tripId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if signedIn();
+      allow write: if signedIn();
     }
     match /driverTripProgress/{tripId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if signedIn();
+      allow write: if signedIn();
     }
     match /driverProfiles/{driverId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if signedIn() && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow update: if signedIn() && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow delete: if signedIn() && isAdmin();
     }
     match /dispatcherProfiles/{dispatcherId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && (isAdmin() || isOwner(dispatcherId));
+      allow read: if signedIn();
+      allow write: if signedIn() && (isAdmin() || isOwner(dispatcherId));
     }
     match /fleetVehicles/{vehicleId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isDispatcher();
+      allow read: if signedIn();
+      allow write: if signedIn() && isDispatcher();
     }
     match /systemConfig/{document} {
-      allow read: if request.auth != null && (isDispatcher() || document == 'phoneNumbers');
-      allow write: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (isDispatcher() || document == 'phoneNumbers');
+      allow write: if signedIn() && isAdmin();
     }
     match /welltrans_settings/{document} {
-      allow read: if request.auth != null && isAdmin();
-      allow create, update: if request.auth != null && isAdmin()
+      allow read: if signedIn() && isAdmin();
+      allow create, update: if signedIn() && isAdmin()
         && !request.resource.data.keys().hasAny([
           'portalUsername',
           'portalPassword',
@@ -132,66 +151,66 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /welltrans_sync_logs/{logId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_sync_events/{eventId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_verification_runs/{runId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_correction_commands/{commandId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_sync_manifests/{serviceDate} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_driver_sync_status/{driverRunId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_sync_shards/{shardId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_sync_outbox/{outboxId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_sync_leases/{serviceDate} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_worker_status/{workerId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_workers/{workerInstanceId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_operations/{document} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_canary/{document} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_canary_history/{document} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /drivers/{driverId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow update: if request.auth != null && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn();
+      allow create: if signedIn() && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow update: if signedIn() && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow delete: if signedIn() && isAdmin();
     }
 
     match /presence/{email} {
@@ -206,68 +225,68 @@ service cloud.firestore {
     }
 
     match /driverTelemetry/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if signedIn();
+      allow write: if signedIn();
     }
 
     match /analyticsLogs/{logId} {
-      allow read: if request.auth != null && isDispatcher();
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && isDispatcher();
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && isAdmin();
     }
     // AI Dispatch + Time Tracking System — Section 10: real-time shift event log
     match /shiftEvents/{eventId} {
-      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && isAdmin();
     }
     // Section 10: GAP audit log — every gap generates a mandatory record
     match /gapAuditLog/{gapId} {
-      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && isAdmin();
     }
     // Section 18: Finalized time tracking sessions with payroll output
     match /timeTrackingSessions/{sessionId} {
-      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (isAdmin() || resource.data.driverId == request.auth.uid);
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if signedIn();
+      allow update: if signedIn() && (isAdmin() || resource.data.driverId == request.auth.uid);
+      allow delete: if signedIn() && isAdmin();
     }
     // Approved payroll records (admin/dispatcher finalize, driver can read own)
     match /payrollRecords/{recordId} {
-      allow read: if request.auth != null && (isDispatcher() || resource.data.driverId == request.auth.uid);
-      allow create: if request.auth != null && isDispatcher();
-      allow update: if request.auth != null && isAdmin();
-      allow delete: if request.auth != null && isAdmin();
+      allow read: if signedIn() && (isDispatcher() || resource.data.driverId == request.auth.uid);
+      allow create: if signedIn() && isDispatcher();
+      allow update: if signedIn() && isAdmin();
+      allow delete: if signedIn() && isAdmin();
     }
 
     // Real-time Chat System Rules (Facebook Messenger Backend)
     match /chat_channels/{channelId} {
-      allow read: if request.auth != null && (resource == null || request.auth.uid in resource.data.participants);
-      allow update: if request.auth != null && request.auth.uid in resource.data.participants &&
+      allow read: if signedIn() && (resource == null || request.auth.uid in resource.data.participants);
+      allow update: if signedIn() && request.auth.uid in resource.data.participants &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'updatedAt', 'readBy', 'unreadCounts', 'typing', 'mutedBy']);
-      allow create: if request.auth != null &&
+      allow create: if signedIn() &&
         request.auth.uid in request.resource.data.participants &&
         request.resource.data.participants.size() >= 2 &&
         request.resource.data.participants.size() <= 50 &&
         request.resource.data.ownerId == request.auth.uid &&
         request.resource.data.type in ['direct', 'group'];
-      allow delete: if request.auth != null && isAdmin();
+      allow delete: if signedIn() && isAdmin();
 
       match /messages/{messageId} {
-        allow read: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants;
-        allow create: if request.auth != null &&
+        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants;
+        allow create: if signedIn() &&
           request.auth.uid in getAfter(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants &&
           request.resource.data.senderId == request.auth.uid &&
           request.resource.data.text is string && request.resource.data.text.size() <= 10000 &&
           (!request.resource.data.keys().hasAny(['forwardedFrom']) ||
             request.resource.data.forwardedFrom.channelId is string);
-        allow update: if request.auth != null &&
+        allow update: if signedIn() &&
           request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt', 'deletedAt', 'deletedBy', 'reactions', 'pinned', 'pinnedBy', 'pinnedAt']) &&
           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'pinned', 'pinnedBy', 'pinnedAt']) || request.auth.uid == resource.data.senderId);
-        allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+        allow delete: if signedIn() && request.auth.uid == resource.data.senderId;
       }
     }
   }
