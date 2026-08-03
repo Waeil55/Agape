@@ -348,7 +348,21 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain('async function verifyClosedReviewBatch(page, serviceDate)');
     expect(worker).toContain("stage: 'manual_apply_live_verified'");
     expect(worker).toContain("stage: 'requeued_after_manual_dialog_close'");
+    expect(worker).toContain("stage: 'requeued_after_review_interruption'");
+    expect(worker).toContain("type: 'review_browser_interrupted'");
+    expect(worker).toContain('portalUnavailable() || isPortalClosedError(error)');
     expect(worker).toContain('if (!await isEditItineraryOpen(session.page))');
+  });
+
+  it('does not oscillate an already-selected schedule back through connecting', () => {
+    const worker = readFileSync(workerSourcePath, 'utf8');
+    const selectedBranch = worker.slice(
+      worker.indexOf('if (currentDate === requestedServiceDate)'),
+      worker.indexOf('const editOpen = await isEditItineraryOpen(page)'),
+    );
+    expect(selectedBranch).toContain('return currentDate;');
+    expect(selectedBranch).not.toContain("state: 'connecting'");
+    expect(worker).toContain('publishInstanceHeartbeat(stateForReviewSummary(summary))');
   });
 
   it('records append-only synchronization transitions and per-agent schedule heartbeats', () => {

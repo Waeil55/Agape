@@ -26,7 +26,7 @@ import {
   validateWellTransTrip,
 } from './welltrans.trip.js';
 import { normalizeServiceDate, validateTripForWellTrans } from './welltrans.mapping.js';
-import { recoveryDecision } from './welltrans.recovery.js';
+import { isPortalClosedError, recoveryDecision } from './welltrans.recovery.js';
 import {
   buildVerificationDecision,
   validateCorrectionCommand,
@@ -55,7 +55,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '4.0.4';
+const workerVersion = '4.0.5';
 const capabilityKernel = createCapabilityKernel(workerInstanceId);
 const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
 const supervisor = createAgentSupervisor([
@@ -144,6 +144,23 @@ const publishHeartbeat = (state = 'online') => Promise.all([
   db.doc('welltrans_worker_status/primary').set(heartbeatPayload(state), { merge: true }),
   db.doc(`welltrans_workers/${workerInstanceId}`).set(heartbeatPayload(state), { merge: true }),
 ]);
+const publishInstanceHeartbeat = state => db.doc(`welltrans_workers/${workerInstanceId}`)
+  .set(heartbeatPayload(state), { merge: true });
+const stateForReviewSummary = summary => (
+  summary.failed || summary.blocked || summary.missing
+    ? 'reconciliation_blocked_do_not_apply'
+    : summary.staged
+      ? (summary.pending ? 'review_batch_verified' : 'review_ready_verified')
+      : summary.processing
+        ? 'staging'
+        : 'calibrated'
+);
+let lastConsoleStatusKey = '';
+const writeConsoleStatusOnce = (key, message) => {
+  if (key === lastConsoleStatusKey) return;
+  lastConsoleStatusKey = key;
+  process.stdout.write(message);
+};
 
 async function commitSyncTransition(ref, update, event = {}) {
   const batch = db.batch();
@@ -478,10 +495,6 @@ async function waitForRequestedSchedule(page, selectedDate) {
       return currentDate;
     }
     if (currentDate === requestedServiceDate) {
-      await db.doc('welltrans_worker_status/primary').set({
-        state: 'connecting', selectedDate: currentDate, requestedDate: requestedServiceDate,
-        lastSeenAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
       return currentDate;
     }
     const editOpen = await isEditItineraryOpen(page);
@@ -1372,7 +1385,40 @@ async function verifyClosedReviewBatch(page, serviceDate) {
     return data.status === 'awaiting_review' && data.reviewSessionId === reviewSessionId;
   });
   const result = { verified: 0, requeued: 0, failed: 0 };
-  for (const document of staged) {
+  const portalUnavailable = () => page.isClosed()
+    || !page.context().browser()?.isConnected();
+  const requeueInterrupted = async (interruptedDocuments, reason) => {
+    for (const interrupted of interruptedDocuments) {
+      const interruptedData = interrupted.data();
+      await commitSyncTransition(interrupted.ref, {
+        status: 'pending',
+        stage: 'requeued_after_review_interruption',
+        errorMessage: '',
+        completedAt: FieldValue.delete(),
+        portalVerification: FieldValue.delete(),
+        leaseExpiresAt: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+        workerVersion,
+      }, {
+        tripId: interruptedData.tripId,
+        bookingId: interruptedData.bookingId,
+        serviceDate,
+        type: 'review_browser_interrupted',
+        status: 'pending',
+        stage: 'requeued_after_review_interruption',
+        sourceFingerprint: interruptedData.stagedSourceFingerprint || null,
+      });
+      result.requeued += 1;
+    }
+    result.interrupted = true;
+    result.interruptionReason = reason;
+  };
+  if (portalUnavailable()) {
+    await requeueInterrupted(staged, 'The browser closed before live Apply verification.');
+    return result;
+  }
+  for (let index = 0; index < staged.length; index += 1) {
+    const document = staged[index];
     const data = document.data();
     try {
       const current = await buildCurrentPortalPayload(data.tripId);
@@ -1428,6 +1474,10 @@ async function verifyClosedReviewBatch(page, serviceDate) {
         result.verified += 1;
       }
     } catch (error) {
+      if (portalUnavailable() || isPortalClosedError(error)) {
+        await requeueInterrupted(staged.slice(index), String(error?.message || error));
+        break;
+      }
       await commitSyncTransition(document.ref, {
         status: 'failed',
         stage: 'manual_apply_verification_failed',
@@ -1887,7 +1937,7 @@ async function main() {
       ? await auditCompletedPortalTrips(session.page, selectedDate)
       : { requeued: 0, verified: 0, failed: 0, deferred: initialSummary.unverifiedCompleted };
     lastCompletedPortalAuditAt = Date.now();
-    await publishHeartbeat('calibrated');
+    await publishInstanceHeartbeat(stateForReviewSummary(initialSummary));
     await db.doc('welltrans_worker_status/primary').set({
       selectedDate, calibratedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
@@ -1935,7 +1985,6 @@ async function main() {
         }, { merge: true });
       }
       await waitForDateLease(selectedDate);
-      await publishHeartbeat('calibrated');
       if (operatorControl.forceReindex) {
         operatorControl.forceReindex = false;
         finalReviewAuditValid = false;
@@ -1968,6 +2017,7 @@ async function main() {
         lastAuthoritativeReconcileAt = Date.now();
       }
       let summary = await publishDateReviewSummary(selectedDate);
+      await publishInstanceHeartbeat(stateForReviewSummary(summary));
       await updateOperatorConsole(session.page, summary, {
         state: operatorControl.autoRun ? 'calibrated' : 'paused',
         message: operatorControl.message,
@@ -2003,7 +2053,8 @@ async function main() {
           lastCompletedPortalAuditAt = Date.now();
           process.stdout.write(
             `Manual dialog completion detected: ${verification.verified} applied and verified, `
-            + `${verification.requeued} not persisted and requeued, ${verification.failed} failed.\n`,
+            + `${verification.requeued} not persisted and requeued, ${verification.failed} failed`
+            + `${verification.interrupted ? ' (browser interruption recovered safely)' : ''}.\n`,
           );
           finalReviewAuditValid = false;
           if (operatorControl.pendingDateSwitch) {
@@ -2056,11 +2107,14 @@ async function main() {
           reviewBatchRemaining: summary.pending,
           lastSeenAt: FieldValue.serverTimestamp(),
         }, { merge: true });
-        process.stdout.write(hasCoverageBlockers
-          ? `Reconciliation blocked for ${selectedDate}: ${summary.failed} failed, `
-            + `${summary.blocked} blocked and ${summary.missing} missing. Do not Apply yet.\n`
-          : `Verified review batch ready for ${selectedDate}: ${summary.staged} staged, `
-            + `${summary.pending} remaining. The Agent never clicks Apply; review and click it yourself.\n`);
+        const blockerCount = Math.max(summary.failed, summary.blocked) + summary.missing;
+        writeConsoleStatusOnce(
+          `${state}|${selectedDate}|${summary.staged}|${summary.pending}|${blockerCount}`,
+          hasCoverageBlockers
+            ? `Reconciliation blocked for ${selectedDate}: ${blockerCount} unique trip(s) need correction. Do not Apply yet.\n`
+            : `Verified review batch ready for ${selectedDate}: ${summary.staged} staged, `
+              + `${summary.pending} remaining. The Agent never clicks Apply; review and click it yourself.\n`,
+        );
         await updateOperatorConsole(session.page, summary, {
           state,
           message: operatorControl.message,
@@ -2107,7 +2161,6 @@ async function main() {
               finalReviewAuditValid = false;
               reviewGridSortedForSession = false;
             }
-            await publishHeartbeat('calibrated');
             const recovery = recoveryDecision(outcome, {
               completedAttempts: Number(job.attempt || 0) + 1,
               maxAttempts: 2,
@@ -2138,6 +2191,7 @@ async function main() {
               return;
             }
             const currentSummary = await publishDateReviewSummary(selectedDate);
+            await publishInstanceHeartbeat(stateForReviewSummary(currentSummary));
             await updateOperatorConsole(session.page, currentSummary, {
               state: 'staging',
               message: `Filled and verified Booking ${job.bookingId || job.tripId}. Continuing automatically.`,
@@ -2146,7 +2200,10 @@ async function main() {
           }
         }
       } else {
-        process.stdout.write(`Review summary for ${selectedDate}: ${summary.staged} staged, ${summary.failed} failed, ${summary.pending} pending.\n`);
+        writeConsoleStatusOnce(
+          `summary|${selectedDate}|${summary.staged}|${summary.failed}|${summary.pending}`,
+          `Review summary for ${selectedDate}: ${summary.staged} staged, ${summary.failed} failed, ${summary.pending} pending.\n`,
+        );
         if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
       }
     } while (!once);

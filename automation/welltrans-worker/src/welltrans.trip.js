@@ -534,7 +534,21 @@ async function openListDropdown(page) {
   // "Dropdown was empty" failure.
   const openDialog = page.locator('.DropDownDialog:visible').last();
   if (await openDialog.count()) {
-    await waitForListDropdownOptions(page);
+    const existing = await waitForListDropdownOptions(page);
+    if (existing.length) return true;
+    // A visible but empty shell is not an open option list. TripSpark leaves
+    // this shell mounted after many edits, so explicitly toggle the editor's
+    // own button and verify that semantic options appear.
+    const mountedListbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+    const mountedButton = mountedListbox.locator('.dropdlgbutton');
+    if (await mountedButton.count()) {
+      await mountedButton.click({ force: true }).catch(() => {});
+      if ((await waitForListDropdownOptions(page)).length) return true;
+      if (!await page.locator('.DropDownDialog:visible').count()) {
+        await mountedButton.click({ force: true }).catch(() => {});
+        await waitForListDropdownOptions(page);
+      }
+    }
     return true;
   }
   const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
@@ -572,6 +586,31 @@ async function waitForEditorSurface(page, timeoutMs = 1500) {
   const surface = page.locator(selector).last();
   await surface.waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => {});
   return surface.count();
+}
+
+async function nearestVisibleEditor(page, selector, targetBox) {
+  const candidates = page.locator(selector);
+  const count = Math.min(await candidates.count().catch(() => 0), 50);
+  if (!count) return candidates.last();
+  if (!targetBox) return candidates.last();
+  const targetX = targetBox.x + (targetBox.width / 2);
+  const targetY = targetBox.y + (targetBox.height / 2);
+  let bestIndex = -1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < count; index += 1) {
+    const candidate = candidates.nth(index);
+    if (!await candidate.isVisible().catch(() => false)) continue;
+    const box = await candidate.boundingBox().catch(() => null);
+    if (!box) continue;
+    const x = box.x + (box.width / 2);
+    const y = box.y + (box.height / 2);
+    const distance = ((x - targetX) ** 2) + ((y - targetY) ** 2);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex >= 0 ? candidates.nth(bestIndex) : candidates.last();
 }
 
 async function getListDropdownOptions(page, { strict = false } = {}) {
@@ -664,10 +703,17 @@ async function clickListOption(page, optionText) {
   for (let index = 0; index < textMatchCount; index += 1) {
     const candidate = textMatches.nth(index);
     if (!await candidate.isVisible().catch(() => false)) continue;
-    const belongsToActiveDropdown = await candidate.evaluate(element =>
-      Boolean(element.closest(
-        '.EditorWidgets, .DropDownDialog, [class*="DropDown"], [class*="dropdown"]',
-      ))).catch(() => false);
+    const belongsToActiveDropdown = await candidate.evaluate(element => {
+      let current = element;
+      while (current) {
+        if (current.matches?.(
+          '.EditorWidgets, .DropDownDialog, [class*="DropDown"], [class*="dropdown"]',
+        )) return true;
+        const root = current.getRootNode?.();
+        current = current.parentElement || root?.host || null;
+      }
+      return false;
+    }).catch(() => false);
     if (!belongsToActiveDropdown) continue;
     // Click the semantic option container. Clicking only its nested text span
     // can highlight a row without notifying TripSpark's list controller.
@@ -756,6 +802,29 @@ async function clickListOption(page, optionText) {
   return clicked;
 }
 
+async function hasUniqueVisibleExactListOption(page, optionText) {
+  const matches = page.getByText(String(optionText).trim(), { exact: true });
+  let exactCount = 0;
+  const count = Math.min(await matches.count().catch(() => 0), 100);
+  for (let index = 0; index < count; index += 1) {
+    const candidate = matches.nth(index);
+    if (!await candidate.isVisible().catch(() => false)) continue;
+    const belongsToActiveDropdown = await candidate.evaluate(element => {
+      let current = element;
+      while (current) {
+        if (current.matches?.(
+          '.EditorWidgets, .DropDownDialog, [class*="DropDown"], [class*="dropdown"]',
+        )) return true;
+        const root = current.getRootNode?.();
+        current = current.parentElement || root?.host || null;
+      }
+      return false;
+    }).catch(() => false);
+    if (belongsToActiveDropdown) exactCount += 1;
+  }
+  return exactCount === 1;
+}
+
 async function selectListOption(page, option, column) {
   const optionStr = String(option).trim();
   if (!optionStr) return;
@@ -813,6 +882,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await dismissActiveEditor(page);
     const cell = await boundCellHandle(grid, row, column);
+    const targetBox = await cell.boundingBox().catch(() => null);
     try {
       await cell.dblclick({ force: true });
     } finally {
@@ -820,8 +890,16 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
     }
     await waitForEditorSurface(page);
 
-    const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
-    const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+    const editor = await nearestVisibleEditor(
+      page,
+      '.EditorWidgets input:not([style*="z-index: -1"]):visible',
+      targetBox,
+    );
+    const listbox = await nearestVisibleEditor(
+      page,
+      '.EditorWidgets core\\:listbox:visible',
+      targetBox,
+    );
 
     const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
     if (await editor.count()) {
@@ -837,7 +915,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
         const typedTarget = attempt >= 2 && ['Arrival Time', 'Departure Time'].includes(column)
           ? target.replace(/[^\d]/g, '')
           : target;
-        await page.keyboard.type(typedTarget, { delay: attempt === 2 ? 35 : 15 });
+        await editor.pressSequentially(typedTarget, { delay: attempt === 2 ? 45 : 20 });
       }
       await settleUi(page, 150);
       if (attempt >= 2) await page.keyboard.press('Enter').catch(() => {});
@@ -894,6 +972,7 @@ async function setListCell(page, grid, row, column, option) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await dismissActiveEditor(page);
     const cell = await boundCellHandle(grid, row, column);
+    const targetBox = await cell.boundingBox().catch(() => null);
     try {
       if (attempt >= 3) {
         await cell.click({ force: true });
@@ -905,7 +984,11 @@ async function setListCell(page, grid, row, column, option) {
     }
     await waitForEditorSurface(page, 2500);
 
-    const listbox = page.locator('.EditorWidgets core\\:listbox:visible');
+    const listbox = await nearestVisibleEditor(
+      page,
+      '.EditorWidgets core\\:listbox:visible',
+      targetBox,
+    );
     const directDialog = page.locator(
       '.DropDownDialog:visible core\\:listitem:visible, '
       + '.DropDownDialog:visible [role="option"]:visible, '
@@ -922,6 +1005,16 @@ async function setListCell(page, grid, row, column, option) {
 
     await openListDropdown(page);
     let availableOptions = await waitForListDropdownOptions(page);
+    if (!availableOptions.length && await hasUniqueVisibleExactListOption(page, option)) {
+      if (await clickListOption(page, option)) {
+        await settleUi(page, 250, 80);
+        selected = await readCellValue(grid, row, column);
+        if (equalCellValue(column, selected, option)) {
+          await dismissActiveEditor(page);
+          return;
+        }
+      }
+    }
     if (!availableOptions.length) {
       // This opens a lazy list but never selects by keyboard position. The
       // subsequent selection still requires one normalized-exact option.
@@ -1040,14 +1133,23 @@ async function preflightCell(page, grid, row, column, value, {
   const cell = await boundCellHandle(grid, row, column).catch(error => {
     throw safePreflightError(error);
   });
+  const targetBox = await cell.boundingBox().catch(() => null);
   try {
     await cell.dblclick({ force: true });
   } finally {
     await cell.dispose().catch(() => {});
   }
   await waitForEditorSurface(page);
-  const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
-  const listbox = page.locator('.EditorWidgets core\\:listbox:visible').last();
+  const editor = await nearestVisibleEditor(
+    page,
+    '.EditorWidgets input:not([style*="z-index: -1"]):visible',
+    targetBox,
+  );
+  const listbox = await nearestVisibleEditor(
+    page,
+    '.EditorWidgets core\\:listbox:visible',
+    targetBox,
+  );
 
   const directDialog = page.locator('.DropDownDialog:visible core\\:listitem:visible');
   if (expectedKind === 'text' && await editor.count()) {
@@ -1067,6 +1169,9 @@ async function preflightCell(page, grid, row, column, value, {
     // value or editor container must never be mistaken for a real option.
     let options = await waitForListDropdownOptions(page, { strict: optionalExactList });
     let exactMatch = findUniqueExactOption(options, value);
+    if (!exactMatch && await hasUniqueVisibleExactListOption(page, value)) {
+      exactMatch = String(value).trim();
+    }
     if (!exactMatch && !optionalExactList) {
       const filteredOptions = await filterListDropdown(page, value);
       options = [...new Set([...options, ...filteredOptions])];

@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  isPortalClosedError,
   REVIEW_SESSION_RESTART_EXIT_CODE,
   recoveryDecision,
 } from '../src/welltrans.recovery.js';
+
+test('browser closure is an interruption instead of a trip failure', () => {
+  assert.equal(
+    isPortalClosedError(new Error('locator.count: Target page, context or browser has been closed')),
+    true,
+  );
+  assert.equal(isPortalClosedError(new Error('Arrival Time did not commit')), false);
+});
 
 test('verified work continues in the current review session', () => {
   assert.equal(recoveryDecision({ success: true }).action, 'continue');
