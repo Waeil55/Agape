@@ -810,7 +810,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
   if (equalCellValue(column, current, value)) return true;
 
   let lastObserved = current;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     await dismissActiveEditor(page);
     const cell = await boundCellHandle(grid, row, column);
     try {
@@ -827,20 +827,29 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
     if (await editor.count()) {
       await editor.click();
       const target = String(value);
-      if (attempt === 0) {
+      if (attempt === 0 || attempt === 3) {
         await editor.fill('');
         await settleUi(page, 50, 15);
         await editor.fill(target);
       } else {
         await page.keyboard.press('Control+A');
         await page.keyboard.press('Backspace');
-        const typedTarget = attempt === 2 && ['Arrival Time', 'Departure Time'].includes(column)
+        const typedTarget = attempt >= 2 && ['Arrival Time', 'Departure Time'].includes(column)
           ? target.replace(/[^\d]/g, '')
           : target;
         await page.keyboard.type(typedTarget, { delay: attempt === 2 ? 35 : 15 });
       }
       await settleUi(page, 150);
-      if (attempt === 2) await page.keyboard.press('Enter').catch(() => {});
+      if (attempt >= 2) await page.keyboard.press('Enter').catch(() => {});
+      if (attempt === 4) {
+        // Some TripSpark time masks accept the characters but commit only
+        // after native input/change/blur signals.
+        await editor.evaluate(element => {
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          element.blur();
+        }).catch(() => {});
+      }
       await page.keyboard.press('Tab').catch(() => {});
       await settleUi(page, 200);
       await dismissActiveEditor(page);
@@ -882,10 +891,14 @@ async function setListCell(page, grid, row, column, option) {
   if (equalCellValue(column, current, option)) return;
 
   let selected = '';
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     await dismissActiveEditor(page);
     const cell = await boundCellHandle(grid, row, column);
     try {
+      if (attempt >= 3) {
+        await cell.click({ force: true });
+        await settleUi(page, 100, 30);
+      }
       await cell.dblclick({ force: true });
     } finally {
       await cell.dispose().catch(() => {});
@@ -900,7 +913,7 @@ async function setListCell(page, grid, row, column, option) {
     );
     if (!await listbox.count() && !await directDialog.count()) {
       await page.keyboard.press('Escape').catch(() => {});
-      if (attempt < 2) {
+      if (attempt < 4) {
         await settleUi(page, 250, 80);
         continue;
       }
@@ -908,12 +921,25 @@ async function setListCell(page, grid, row, column, option) {
     }
 
     await openListDropdown(page);
+    let availableOptions = await waitForListDropdownOptions(page);
+    if (!availableOptions.length) {
+      // This opens a lazy list but never selects by keyboard position. The
+      // subsequent selection still requires one normalized-exact option.
+      await page.keyboard.press('Alt+ArrowDown').catch(() => {});
+      availableOptions = await waitForListDropdownOptions(page);
+    }
+    if (!availableOptions.length) {
+      await page.keyboard.press('Escape').catch(() => {});
+      await settleUi(page, 220 + (attempt * 100), 70);
+      if (attempt < 4) continue;
+      throw new Error(`${column} option list remained empty after 5 clean editor openings for ${row.activity}`);
+    }
     try {
       await selectListOption(page, option, column);
     } catch (error) {
       await page.keyboard.press('Escape').catch(() => {});
       await settleUi(page, 180 + (attempt * 80), 60);
-      if (attempt < 2) continue;
+      if (attempt < 4) continue;
       throw error;
     }
     await settleUi(page, 250, 80);
@@ -934,7 +960,7 @@ async function setListCell(page, grid, row, column, option) {
     await settleUi(page, 180, 60);
   }
   throw new Error(
-    `${column} selection not confirmed after 3 exact-option attempts: `
+    `${column} selection not confirmed after 5 exact-option attempts: `
     + `expected "${option}", found "${selected}"`,
   );
 }

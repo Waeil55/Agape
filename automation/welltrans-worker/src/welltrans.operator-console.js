@@ -276,14 +276,26 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       set('state', String(next.state || 'online').replaceAll('_', ' ').toUpperCase());
       set('staged', next.staged ?? 0);
       set('pending', next.pending ?? 0);
-      set('failed', (next.failed ?? 0) + (next.blocked ?? 0) + (next.missing ?? 0));
-      const verifierState = String(next.verifierState || 'idle').toLowerCase();
+      const failed = Number(next.failed || 0);
+      const blocked = Number(next.blocked || 0);
+      const missing = Number(next.missing || 0);
+      // Manifest blockers normally describe the same failed log records. Use
+      // the larger set instead of reporting every failure twice.
+      const blockedTotal = Math.max(failed, blocked) + missing;
+      const expected = Number(next.expected || 0);
+      const reviewed = Number(next.reviewed ?? ((next.staged || 0) + (next.completed || 0)));
+      set('failed', blockedTotal);
+      const coverageComplete = expected > 0 && reviewed === expected && blockedTotal === 0
+        && Number(next.pending || 0) === 0;
+      const verifierState = blockedTotal > 0
+        ? 'blocked'
+        : String(coverageComplete ? (next.verifierState || 'verified') : (next.verifierState || 'idle')).toLowerCase();
       const verifier = $('[data-role="verifier"]');
       if (verifier) {
         verifier.dataset.state = verifierState;
         verifier.hidden = false;
       }
-      set('verified', `${next.verifierVerified ?? 0}/${next.verifierChecked ?? 0}`);
+      set('verified', `${reviewed}/${expected}`);
       const message = next.message || '';
       set('message', message);
       $('[data-role="message"]').title = message;

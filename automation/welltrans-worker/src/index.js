@@ -55,7 +55,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '4.0.3';
+const workerVersion = '4.0.4';
 const capabilityKernel = createCapabilityKernel(workerInstanceId);
 const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
 const supervisor = createAgentSupervisor([
@@ -103,6 +103,10 @@ const firestorePageSize = Math.min(
 const reviewBatchSize = Math.min(
   500,
   Math.max(25, Number(process.env.WELLTRANS_REVIEW_BATCH_SIZE) || 250),
+);
+const safeAutomaticRetryLimit = Math.min(
+  10,
+  Math.max(3, Number(process.env.WELLTRANS_SAFE_RETRY_LIMIT) || 5),
 );
 const heartbeatPayload = state => ({
   workerId, state, writesEnabled: process.env.WELLTRANS_ENABLE_WRITES === 'true',
@@ -342,7 +346,8 @@ async function updateOperatorConsole(page, summary = {}, extra = {}) {
     state: extra.state || (operatorControl.autoRun ? 'online' : 'paused'),
     message: extra.message || operatorControl.message,
     autoRun: operatorControl.autoRun,
-    expected: summary.expected ?? summary.authoritativeCompleted ?? 0,
+    expected: summary.total ?? summary.expected ?? summary.authoritativeCompleted ?? 0,
+    reviewed: Number(summary.staged || 0) + Number(summary.completed || 0),
     completed: summary.completed ?? 0,
     staged: summary.staged ?? 0,
     pending: summary.pending ?? 0,
@@ -1036,7 +1041,7 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
       const retryCount = latest.data.retryWorkerVersion === workerVersion
         ? Number(latest.data.automaticRetryCount || 0)
         : 0;
-      if (!safeRetry || retryCount >= 1) {
+      if (!safeRetry || retryCount >= safeAutomaticRetryLimit) {
         blockedTrips.push({
           tripId: String(trip.id),
           bookingId: current.validation.payload.bookingId,
@@ -1044,7 +1049,7 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
             !safeRetry
               ? (latest.data.errorMessage
                 || 'Prior WellTrans mutation could not be safely rolled back')
-              : `Automatic retry limit reached: ${latest.data.errorMessage || 'unresolved portal failure'}`,
+              : `Automatic retry limit reached after ${safeAutomaticRetryLimit} clean attempts: ${latest.data.errorMessage || 'unresolved portal failure'}`,
           ],
         });
         continue;
@@ -1597,6 +1602,17 @@ async function processJob(job, existingSession = null) {
     if (existingSession && page) {
       await page.keyboard.press('Escape').catch(() => {});
       await page.waitForTimeout(100).catch(() => {});
+      if (safeToContinue && rollbackVerified) {
+        // A failed TripSpark editor can leave virtual rows or capability probes
+        // stale even after every value was restored. Re-index immediately so
+        // the bounded retry never reuses that stale semantic binding.
+        resetWellTransSessionCaches();
+        portalGridIndex = await buildWellTransGridIndex(
+          page,
+          job.serviceDate || job.payload?.serviceDate || activeServiceDate,
+        ).catch(() => portalGridIndex);
+        lastAuthoritativeReconcileAt = 0;
+      }
     }
     return { success: false, safeToContinue };
   }

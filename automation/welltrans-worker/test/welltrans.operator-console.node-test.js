@@ -26,6 +26,9 @@ describe('WellTrans one-line operator toolbar', () => {
       staged: 4,
       pending: 3,
       failed: 1,
+      blocked: 1,
+      expected: 8,
+      reviewed: 4,
       verifierState: 'verified',
       verifierChecked: 4,
       verifierVerified: 4,
@@ -92,7 +95,26 @@ describe('WellTrans one-line operator toolbar', () => {
       state: host.shadowRoot.querySelector('[data-role="verifier"]').dataset.state,
       count: host.shadowRoot.querySelector('[data-role="verified"]').textContent,
     }));
-    assert.deepEqual(result, { state: 'verified', count: '4/4' });
+    assert.deepEqual(result, { state: 'blocked', count: '4/8' });
+  });
+
+  it('reports date coverage without double-counting manifest blockers', async () => {
+    await updateWellTransOperatorConsole(page, {
+      expected: 15,
+      reviewed: 13,
+      staged: 13,
+      pending: 0,
+      failed: 2,
+      blocked: 2,
+      missing: 0,
+      verifierState: 'verified',
+    });
+    const result = await page.locator('#agape-welltrans-operator-console').evaluate(host => ({
+      state: host.shadowRoot.querySelector('[data-role="verifier"]').dataset.state,
+      reviewed: host.shadowRoot.querySelector('[data-role="verified"]').textContent,
+      blocked: host.shadowRoot.querySelector('[data-role="failed"]').textContent,
+    }));
+    assert.deepEqual(result, { state: 'blocked', reviewed: '13/15', blocked: '2' });
   });
 
   it('stays pinned when live status and message lengths change', async () => {
