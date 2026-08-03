@@ -90,6 +90,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [allDates, setAllDates] = useState(false);
+  const [expandedTripId, setExpandedTripId] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [savingTripId, setSavingTripId] = useState(null);
@@ -142,6 +143,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   }, [editingTripId, sortKeyOverrides]);
 
   const shiftDate = (days) => {
+    setExpandedTripId(null);
     const d = new Date(dateStr + 'T12:00:00');
     d.setDate(d.getDate() + days);
     setDateStr(localCalendarYmd(d));
@@ -159,6 +161,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   };
 
   const startInlineEdit = (trip) => {
+    setExpandedTripId(trip.id);
     setEditingTripId(trip.id);
     setEditingTripData({
       patient: trip.patient || '',
@@ -260,7 +263,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
           </button>
 
           <label className="flex min-h-[40px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600">
-            <input type="checkbox" checked={allDates} onChange={event => setAllDates(event.target.checked)} /> All dates
+            <input type="checkbox" checked={allDates} onChange={event => { setAllDates(event.target.checked); setExpandedTripId(null); }} /> All dates
           </label>
 
           {[
@@ -285,7 +288,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
               <button
                 key={f.id}
                 type="button"
-                onClick={() => setStatusFilter(f.id)}
+                onClick={() => { setStatusFilter(f.id); setExpandedTripId(null); }}
                 className={`agape-mobile-icon-btn relative ${active ? `${activeClass} agape-mobile-icon-active` : ''}`}
                 title={f.label}
                 aria-label={`${f.label} filter`}
@@ -311,13 +314,13 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
               type="text" 
               placeholder="Patient, trip, phone..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setExpandedTripId(null); }}
               className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
           <select
             value={driverFilter}
-            onChange={(e) => setDriverFilter(e.target.value)}
+            onChange={(e) => { setDriverFilter(e.target.value); setExpandedTripId(null); }}
             className="bg-white rounded-xl shadow-sm px-3 py-2 outline-none text-slate-600 text-[13px] font-semibold max-w-[130px] border border-slate-200"
           >
             {uniqueDrivers.map(driver => (
@@ -351,8 +354,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         <div className="agape-mobile-list">
           {filteredTrips.map(trip => {
             const driver = getDriverRecord(trip.driverId);
-            const isExpanded = true;
             const isEditing = editingTripId === trip.id;
+            const isExpanded = expandedTripId === trip.id || isEditing;
             const ie = isEditing ? editingTripData : null;
             const tone = getReportTripTone(trip);
             const StatusIcon = getReportStatusIcon(tone);
@@ -360,7 +363,21 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             
             return (
               <div key={trip.id} className={`agape-trip-list-card agape-trip-${tone}`}>
-                <div className="agape-trip-card-summary">
+                <div
+                  className="agape-trip-card-summary"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  onClick={() => {
+                    if (!isEditing) setExpandedTripId(current => current === trip.id ? null : trip.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!isEditing && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      setExpandedTripId(current => current === trip.id ? null : trip.id);
+                    }
+                  }}
+                >
                   <div className="min-w-0 flex-1">
                     <h2 className="agape-trip-title">{isEditing ? ie.patient : (trip.patient || 'UNKNOWN')}</h2>
                     <p className="agape-trip-id">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</p>
@@ -378,10 +395,11 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                       <StatusIcon className="w-4 h-4" />
                     </span>
                     {!isEditing && (
-                      <button type="button" onClick={() => startInlineEdit(trip)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); startInlineEdit(trip); }} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
                         <Edit2 className="h-4 w-4" />
                       </button>
                     )}
+                    {!isEditing && (isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />)}
                   </div>
                 </div>
 

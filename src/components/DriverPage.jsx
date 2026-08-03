@@ -1190,6 +1190,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (historyDate !== selectedHistoryDate) setHistoryDate(selectedHistoryDate);
   }, [historyDate, selectedHistoryDate]);
   const goToHistoryDay = (days) => {
+    setHistoryExpandedId(null);
     const next = addDaysToDateKey(selectedHistoryDate, days);
     if (next < historyWindowStart) setHistoryDate(historyWindowStart);
     else if (next > historyWindowEnd) setHistoryDate(historyWindowEnd);
@@ -2675,6 +2676,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const handleStartInlineEdit = (trip) => {
     const original = trips.find(t => t.id === trip.id) || trip;
+    setHistoryExpandedId(original.id);
     setEditingTripId(original.id);
     setInlineEditError('');
     setEditingTripData({
@@ -5263,7 +5265,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <button
                     key={f.id}
                     type="button"
-                    onClick={() => setHistoryFilter(f.id)}
+                    onClick={() => { setHistoryFilter(f.id); setHistoryExpandedId(null); }}
                     className={`agape-mobile-icon-btn relative ${active ? `${activeClass} agape-mobile-icon-active` : ''}`}
                     title={`${f.label} (${historyStatusCounts[f.id] || 0})`}
                     aria-label={`${f.label} filter, ${historyStatusCounts[f.id] || 0} trips`}
@@ -5290,9 +5292,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
           <div className="agape-mobile-search-section">
             <div className="agape-mobile-search">
               <Search size={16} className="text-slate-400 shrink-0" />
-            <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
+            <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => { setHistorySearch(e.target.value); setHistoryExpandedId(null); }}
               className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400" />
-            {historySearch && <button onClick={() => setHistorySearch('')} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>}
+            {historySearch && <button onClick={() => { setHistorySearch(''); setHistoryExpandedId(null); }} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>}
             </div>
           </div>
 
@@ -5319,17 +5321,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                       : normalizedHistoryStatus === 'rerouted'
                         ? 'info'
                         : 'pending';
-                // History is intentionally always visible so editing replaces the
-                // displayed values in this card instead of opening a second view.
-                const isExpanded = true;
                 const isEditing = editingTripId === trip.id;
+                const isExpanded = historyExpandedId === trip.id || isEditing;
                 if (isExpanded) {
                   const ie = isEditing ? editingTripData : null;
                   const inputCls = "w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs focus:border-blue-500 focus:bg-white outline-none transition-all";
                   return (
                     <div key={trip.id} className="space-y-3">
                       <div className={`agape-trip-list-card agape-trip-${historyTone}`}>
-                        <div className="agape-trip-card-summary border-b border-slate-100">
+                        <div
+                          className="agape-trip-card-summary border-b border-slate-100"
+                          role={!isEditing ? 'button' : undefined}
+                          tabIndex={!isEditing ? 0 : undefined}
+                          aria-expanded={isExpanded}
+                          onClick={() => {
+                            if (!isEditing) setHistoryExpandedId(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (!isEditing && (event.key === 'Enter' || event.key === ' ')) {
+                              event.preventDefault();
+                              setHistoryExpandedId(null);
+                            }
+                          }}
+                        >
                           <div className="min-w-0 flex-1">
                             <h3 className="agape-trip-title">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
                             <p className="agape-trip-id">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
@@ -5341,7 +5355,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                             <span className={`agape-trip-status-dot agape-trip-status-${historyTone}`} title={statusMeta.label} aria-label={statusMeta.label}>
                               <StatusIcon size={15} />
                             </span>
-                            {!isEditing && <Edit2 size={16} className="text-slate-400" />}
+                            {!isEditing && <ChevronDown size={17} className="text-slate-400" />}
                           </div>
                         </div>
                         {isEditing ? (
@@ -5472,7 +5486,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                 }
                 return (
                   <div key={trip.id} className={`agape-trip-list-card agape-trip-${historyTone}`}>
-                    <div onClick={() => setHistoryExpandedId(prev => prev === trip.id ? null : trip.id)} className="agape-trip-card-summary">
+                    <div
+                      onClick={() => setHistoryExpandedId(trip.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setHistoryExpandedId(trip.id);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={false}
+                      className="agape-trip-card-summary"
+                    >
                       <div className="min-w-0 flex-1">
                         <h3 className="agape-trip-title">{trip.patient || 'Trip'}</h3>
                         <p className="agape-trip-id">#{trip.bookingId || trip.id}</p>
