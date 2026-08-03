@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
+import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
@@ -128,11 +129,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         return name === driverFilter;
       });
     }
-    return filtered.sort((a, b) => {
-      const aKey = sortKeyOverrides[a.id] ?? (a.time || '');
-      const bKey = sortKeyOverrides[b.id] ?? (b.time || '');
-      return aKey.localeCompare(bKey);
-    });
+    return filtered.sort((a, b) => compareTripsByCompletionAscending(a, b, sortKeyOverrides));
   }, [trips, dateStr, allDates, searchQuery, statusFilter, driverFilter, drivers, sortKeyOverrides]);
 
   useEffect(() => {
@@ -184,7 +181,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     });
     setSortKeyOverrides(() => {
       const next = {};
-      next[trip.id] = trip.time || '';
+      next[trip.id] = getTripCompletionSortValue(trip);
       return next;
     });
   };
@@ -230,7 +227,10 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       if (saved === false) throw new Error('The trip update was rejected.');
       setEditingTripId(null);
       setEditingTripData(null);
-      setSortKeyOverrides(prev => ({ ...prev, [editingTripId]: d.time || prev[editingTripId] || '' }));
+      setSortKeyOverrides(prev => ({
+        ...prev,
+        [editingTripId]: prev[editingTripId] ?? getTripCompletionSortValue({ ...original, ...payload }),
+      }));
       setEditMessage(`Trip ${d.bookingId || editingTripId} saved.`);
     } catch (error) {
       setEditMessage(`Trip was not saved: ${error?.message || 'unknown error'}`);

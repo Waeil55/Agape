@@ -45,6 +45,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
+import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -271,33 +272,7 @@ const getFirstTripOdometer = (trip, keys) => {
   }
   return '--';
 };
-const getSortTimestampMs = (value) => {
-  if (!value) return 0;
-  if (typeof value === 'object' && typeof value.toDate === 'function') {
-    const d = value.toDate();
-    return Number.isNaN(d.getTime()) ? 0 : d.getTime();
-  }
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? 0 : value.getTime();
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  const ms = new Date(value).getTime();
-  return Number.isNaN(ms) ? 0 : ms;
-};
-const getHistoryFinishedSortMs = (trip) => {
-  const candidates = [
-    trip?.completedAt,
-    trip?.arrivalDropoffTime,
-    trip?.cancelledAt,
-    trip?.exceptionAt,
-    trip?.workflowUpdatedAt,
-    trip?.updatedAt,
-    trip?.createdAt,
-  ];
-  const best = Math.max(...candidates.map(getSortTimestampMs));
-  if (best > 0) return best;
-  const dateKey = getTripHistoryDateKey(trip) || trip?.date;
-  const scheduled = dateKey && trip?.time ? getSortTimestampMs(`${dateKey} ${trip.time}`) : 0;
-  return scheduled || timeToMinutes(trip?.time || '') * 60000;
-};
+const getHistoryFinishedSortMs = getTripCompletionSortValue;
 
 const isoToTimeInput = (iso) => {
   if (!iso) return '';
@@ -1947,13 +1922,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return tripMatchesSearch(t, historySearch);
   }), [selectedHistoryDayTrips, historyFilter, historySearch]);
 
-  const sortedFilteredHistory = useMemo(() => [...filteredHistory].sort((a, b) => {
-    const aKey = historySortKeyOverrides[a.id] ?? getHistoryFinishedSortMs(a);
-    const bKey = historySortKeyOverrides[b.id] ?? getHistoryFinishedSortMs(b);
-    const finishedTime = aKey - bKey;
-    if (finishedTime !== 0) return finishedTime;
-    return timeToMinutes(a.time) - timeToMinutes(b.time);
-  }), [filteredHistory, historySortKeyOverrides]);
+  const sortedFilteredHistory = useMemo(
+    () => [...filteredHistory].sort((a, b) => compareTripsByCompletionAscending(a, b, historySortKeyOverrides)),
+    [filteredHistory, historySortKeyOverrides],
+  );
 
   const toggleTripSelect = (tripId) => {
     setSelectedTrips(prev =>
