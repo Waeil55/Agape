@@ -865,7 +865,7 @@ const buildWellTransJobPayload = (trip = {}) => {
     trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
   ].map((value) => String(value || "").trim().toLowerCase()).join(" ");
   if (/cancell?ed/.test(lifecycle)) errors.push("Trip is cancelled");
-  else if (!["completed", "complete"].includes(String(trip.status || "").toLowerCase()) && !trip.completedAt) errors.push("Trip is not completed");
+  else if (!isWellTransCompletedTrip(trip)) errors.push("Trip is not completed");
   if (!payload.pickup.arrival) errors.push("Pickup arrival is missing");
   if (!payload.serviceDate) errors.push("Service date is missing");
   const assignmentValid = (value) => {
@@ -885,15 +885,15 @@ const buildWellTransJobPayload = (trip = {}) => {
 };
 
 const isWellTransCompletedTrip = (trip = {}) => {
-  const lifecycle = [
+  const states = [
     trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
-  ].map((value) => String(value || "").trim().toLowerCase()).join(" ");
-  if (/cancell?ed/.test(lifecycle)) return false;
-  const status = String(trip.status || "").trim().toLowerCase();
-  return ["completed", "complete", "done"].includes(status)
-    || status.includes("completed")
-    || status.includes("complete")
-    || Boolean(trip.completedAt);
+  ].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean);
+  const disallowed = new Set([
+    "cancelled", "canceled", "no show", "no-show", "noshow", "rerouted",
+    "assigned", "accepted", "en route", "at pickup", "at dropoff", "arrived", "pending",
+  ]);
+  if (states.some((state) => disallowed.has(state))) return false;
+  return states.some((state) => ["completed", "complete", "done"].includes(state));
 };
 
 const loadCompletedWellTransTrips = async (serviceDate) => {

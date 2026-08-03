@@ -89,7 +89,19 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isAnotherExpanded = expandedId !== null && expandedId !== undefined && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -227,8 +239,13 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           </div>
 
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-[15px] font-semibold text-slate-800 truncate min-w-0 flex items-center gap-0.5">
-              {task.patient || task.patientName}
+            <h3 className="text-[15px] font-semibold text-slate-800 truncate min-w-0 flex items-center gap-1.5">
+              <span>{task.patient || task.patientName}</span>
+              {(task.bookingId || task.id) && (
+                <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 text-[11px] font-mono font-semibold text-slate-600 border border-slate-200">
+                  #{task.bookingId || task.id}
+                </span>
+              )}
               {task.activeTrip && (
                 <span className="inline-flex items-center gap-0.5 shrink-0 ml-0.5">
                   <Truck size={14} className="text-blue-600" strokeWidth={2.5} />

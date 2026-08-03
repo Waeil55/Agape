@@ -34,6 +34,18 @@ export const normalizeBookingId = (trip = {}) => {
   return value.replace(/^TRIP-/i, '');
 };
 
+export const isWellTransCompletedTrip = (trip = {}) => {
+  const states = [
+    trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
+  ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+  const disallowed = new Set([
+    'cancelled', 'canceled', 'no show', 'no-show', 'noshow', 'rerouted',
+    'assigned', 'accepted', 'en route', 'at pickup', 'at dropoff', 'arrived', 'pending',
+  ]);
+  if (states.some(state => disallowed.has(state))) return false;
+  return states.some(state => ['completed', 'complete', 'done'].includes(state));
+};
+
 export const toClockTime = value => {
   if (!value) return '';
   if (/^\d{1,2}:\d{2}$/.test(String(value).trim())) return String(value).trim().padStart(5, '0');
@@ -99,6 +111,25 @@ export const buildWellTransPayload = (trip = {}) => {
     trip,
     ['signatureCaptured', 'paperSignatureConfirmed', 'signatureUrl', 'signature'],
   ));
+
+  const rawPickupOdo = firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage', 'pickupMileage', 'startOdo']);
+  const rawDropoffOdo = firstValue(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'odometer', 'dropoffMileage', 'endOdo']);
+  const pickupMileage = Number.isFinite(Number(rawPickupOdo)) && Number(rawPickupOdo) > 0
+    ? Number(rawPickupOdo)
+    : null;
+  const dropoffMileage = Number.isFinite(Number(rawDropoffOdo)) && Number(rawDropoffOdo) > 0
+    ? Number(rawDropoffOdo)
+    : mileage;
+
+  // Deterministic evidence only: scheduled values are never substituted for
+  // missing actual events or odometer readings.
+  const pickupArrivalValue = firstValue(trip, [
+    'pickupArrival', 'arrivalTime', 'arrivedPickupTime', 'pickupArrivalTime', 'actualPickupTime',
+  ]);
+  const pickupDepartureValue = firstValue(trip, [
+    'pickupDeparture', 'departedPickupTime', 'departureTime', 'pickupDepartureTime', 'departedTime',
+  ]);
+
   return {
     bookingId,
     tripId: String(trip.id || bookingId),
@@ -106,11 +137,9 @@ export const buildWellTransPayload = (trip = {}) => {
     driver: firstValue(trip, ['completedDriverName', 'driverName', 'driver']) || '',
     vehicle: firstValue(trip, ['completedVehicle', 'vehicle', 'vehicleName']) || '',
     pickup: {
-      arrival: toClockTime(firstValue(trip, ['pickupArrival', 'arrivalTime', 'arrivedPickupTime'])),
-      departure: toClockTime(firstValue(trip, ['pickupDeparture', 'departedPickupTime', 'departureTime'])),
-      mileage: Number.isFinite(Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage'])))
-        ? Number(firstValue(trip, ['pickupOdometer', 'startOdometer', 'startMileage']))
-        : null,
+      arrival: toClockTime(pickupArrivalValue),
+      departure: toClockTime(pickupDepartureValue),
+      mileage: pickupMileage,
       signatureCaptured: false,
     },
     dropoff: {
@@ -119,12 +148,7 @@ export const buildWellTransPayload = (trip = {}) => {
         trip,
         ['dropoffDeparture', 'departedDropoffTime', 'dropoffArrival', 'arrivalDropoffTime', 'completedAt'],
       )),
-      mileage: Number.isFinite(Number(firstValue(
-        trip,
-        ['dropoffOdometer', 'endOdometer', 'endMileage', 'odometer'],
-      )))
-        ? Number(firstValue(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'odometer']))
-        : mileage,
+      mileage: dropoffMileage,
       signatureCaptured,
     },
   };
@@ -145,7 +169,7 @@ export const validateTripForWellTrans = (trip = {}) => {
   })();
   if (/cancell?ed/.test(lifecycle)) {
     errors.push('Trip is cancelled');
-  } else if (!['completed', 'complete'].includes(String(trip.status || '').trim().toLowerCase()) && !trip.completedAt) {
+  } else if (!isWellTransCompletedTrip(trip)) {
     errors.push('Trip is not completed');
   }
   if (payload && !payload.pickup.arrival) errors.push('Pickup arrival is missing');

@@ -63,6 +63,14 @@ describe('WellTrans mapping', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Trip is cancelled');
   });
+  it.each(['No Show', 'At Dropoff'])('never counts %s as completed because an audit timestamp exists', status => {
+    const result = validateTripForWellTrans({
+      bookingId: '107485529', dateKey: '2026-08-03', status,
+      completedAt: '2026-08-03T08:48:43.170Z',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Trip is not completed');
+  });
   it('allows the server to resolve an authoritative driver ID', () => {
     const result = validateTripForWellTrans({
       bookingId: '107413428', dateKey: '2026-07-25', status: 'Completed',
@@ -149,5 +157,21 @@ describe('WellTrans mapping', () => {
     expect(coverage.coveragePercent).toBe(100);
     expect(coverage.coverageComplete).toBe(true);
     expect(coverage.reviewReady).toBe(true);
+  });
+
+  it('never substitutes scheduled time or inferred mileage for missing actual evidence', () => {
+    const validation = validateTripForWellTrans({
+      bookingId: '107485529', dateKey: '2026-08-03', status: 'Completed',
+      driverName: 'Mikhaeil Waeil', vehicle: 'TOYOTA 0025',
+      time: '04:33', arrivalDropoffTime: '2026-08-03T04:48:00Z',
+      dropoffOdometer: 265072, distance: 2, paperSignatureConfirmed: true,
+    });
+    expect(validation.valid).toBe(false);
+    expect(validation.payload.pickup.arrival).toBe('');
+    expect(validation.payload.pickup.departure).toBe('');
+    expect(validation.payload.pickup.mileage).toBeNull();
+    expect(validation.errors).toContain('Pickup arrival is missing');
+    expect(validation.errors).toContain('Pickup departure is missing');
+    expect(validation.errors).toContain('Pickup odometer is missing');
   });
 });

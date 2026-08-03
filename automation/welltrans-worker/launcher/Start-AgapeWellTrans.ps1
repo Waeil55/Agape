@@ -282,9 +282,10 @@ try {
     $nodeExecutable = (Get-Command node.exe -ErrorAction Stop).Source
   }
   $workerEntry = Join-Path $workerDirectory 'src\index.js'
+  $unexpectedBrowserRestartCount = 0
   do {
     $workerStartedAt = Get-Date
-    $workerProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$workerEntry`"" -NoNewWindow -PassThru
+    $workerProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$workerEntry`"" -WindowStyle Hidden -PassThru
     # Materialize the native process handle immediately. Windows PowerShell
     # 5.1 can lose the exit-code handle when a short-lived worker exits before
     # it is first observed, producing a null ExitCode and preventing the
@@ -317,16 +318,27 @@ try {
     $workerProcess.WaitForExit()
     $workerProcess.Refresh()
     $workerExitCode = $workerProcess.ExitCode
-    if ($workerExitCode -eq 42) {
-      Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Clean review session restart requested."
+    if ($workerExitCode -eq 42 -or $workerExitCode -eq 43) {
+      if ($workerExitCode -eq 43) {
+        $unexpectedBrowserRestartCount++
+        Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Browser interruption detected; opening a clean headed session ($unexpectedBrowserRestartCount/3)."
+        if ($unexpectedBrowserRestartCount -ge 3) {
+          $workerError = 'The browser stopped three times. Automatic restart paused to prevent an unstable loop; start Fill Date again after checking Windows security software.'
+          break
+        }
+        Start-Sleep -Seconds 2
+      } else {
+        $unexpectedBrowserRestartCount = 0
+        Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Clean review session restart requested."
+      }
       $updater = Join-Path $PSScriptRoot 'Update-AgapeWellTransAgent.ps1'
       if (Test-Path -LiteralPath $updater) {
         & $updater
       }
       $workerProcess = $null
     }
-  } while ($workerExitCode -eq 42)
-  if ($workerProcess.ExitCode -ne 0) {
+  } while ($workerExitCode -eq 42 -or $workerExitCode -eq 43)
+  if (-not $workerError -and $workerProcess -and $workerProcess.ExitCode -ne 0) {
     $workerError = "Agent exited with code $($workerProcess.ExitCode)."
     $workerRuntimeSeconds = ((Get-Date) - $workerStartedAt).TotalSeconds
     if ($workerRuntimeSeconds -lt 180 -and (Test-Path -LiteralPath $pendingUpdatePath)) {

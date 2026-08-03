@@ -569,3 +569,107 @@ Respond in JSON:
   };
   return { optimizeRoute };
 };
+
+// ==================== FLEET COMMAND INTELLIGENCE ====================
+
+/**
+ * Analyzes the full operational state of the fleet and returns structured
+ * intelligence: narrative, decision queue, risks, and recommendations.
+ * Falls back to deterministic heuristics immediately if Gemini is unavailable.
+ */
+export async function analyzeFleetCommand(context) {
+  const {
+    todayTrips = [], activeTrips = [], lateTrips = [],
+    unassignedTrips = [], completedTrips = [],
+    drivers = [], vehicles = [],
+    unsyncedBillingCount = 0, oldestUnsyncedDate = null,
+  } = context;
+
+  const fallback = buildDeterministicFleetInsights(context);
+
+  const prompt = `You are the AI command center for Agape Care, a NEMT fleet operator.
+
+Current fleet state (${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}):
+- Total trips today: ${todayTrips.length}
+- Active (not completed/cancelled): ${activeTrips.length}
+- Late trips: ${lateTrips.length}
+- Unassigned trips: ${unassignedTrips.length}
+- Completed today: ${completedTrips.length}
+- Available drivers: ${drivers.filter(d => d.status === 'Available').length} / ${drivers.length}
+- Vehicles: ${vehicles.length}
+- WellTrans billing unsynced: ${unsyncedBillingCount}${oldestUnsyncedDate ? ` (oldest: ${oldestUnsyncedDate})` : ''}
+
+Late pickup times: ${lateTrips.slice(0, 5).map(t => t.time).join(', ') || 'none'}
+Unassigned times: ${unassignedTrips.slice(0, 5).map(t => t.time || 'Will Call').join(', ') || 'none'}
+
+Respond ONLY with this JSON (no markdown):
+{"narrative":"<1 sentence operational status>","decisions":[{"id":"d1","type":"urgent|warning|info","title":"<short>","description":"<1 sentence>","count":0}],"risks":[{"id":"r1","severity":"high|medium|low","title":"<short>","description":"<1 sentence>"}],"recommendations":[{"id":"rec1","title":"<short>","description":"<1 sentence>"}]}
+Max: 5 decisions, 3 risks, 3 recommendations.`;
+
+  try {
+    const text = await callGemini(prompt);
+    if (!text) return fallback;
+    const parsed = JSON.parse(text);
+    if (!parsed?.narrative) return fallback;
+    return {
+      narrative: parsed.narrative,
+      decisions: Array.isArray(parsed.decisions) ? parsed.decisions : fallback.decisions,
+      risks: Array.isArray(parsed.risks) ? parsed.risks : fallback.risks,
+      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : fallback.recommendations,
+      aiEnhanced: true,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildDeterministicFleetInsights(context) {
+  const {
+    todayTrips = [], activeTrips = [], lateTrips = [],
+    unassignedTrips = [], completedTrips = [],
+    drivers = [], unsyncedBillingCount = 0, oldestUnsyncedDate = null,
+  } = context;
+
+  const available = drivers.filter(d => d.status === 'Available').length;
+  const decisions = [];
+  const risks = [];
+  const recommendations = [];
+
+  if (lateTrips.length > 0) {
+    decisions.push({ id: 'd-late', type: 'urgent', title: 'Late Trips', description: `${lateTrips.length} trip${lateTrips.length > 1 ? 's are' : ' is'} past scheduled pickup time.`, count: lateTrips.length });
+  }
+  if (unassignedTrips.length > 0) {
+    decisions.push({ id: 'd-unassigned', type: unassignedTrips.length > 3 ? 'urgent' : 'warning', title: 'Unassigned Trips', description: `${unassignedTrips.length} trip${unassignedTrips.length > 1 ? 's need' : ' needs'} a driver assigned.`, count: unassignedTrips.length });
+  }
+  if (unsyncedBillingCount > 0) {
+    decisions.push({ id: 'd-billing', type: unsyncedBillingCount > 10 ? 'urgent' : 'warning', title: 'WellTrans Billing', description: `${unsyncedBillingCount} trip${unsyncedBillingCount > 1 ? 's' : ''} unsubmitted to WellTrans${oldestUnsyncedDate ? ` since ${oldestUnsyncedDate}` : ''}.`, count: unsyncedBillingCount });
+  }
+  if (available === 0 && activeTrips.length > 0) {
+    risks.push({ id: 'r-no-drivers', severity: 'high', title: 'No Available Drivers', description: 'All drivers are occupied. New or Will Call trips cannot be assigned.' });
+  }
+  if (lateTrips.length > 0 && activeTrips.length > 0 && lateTrips.length > activeTrips.length * 0.3) {
+    risks.push({ id: 'r-late-rate', severity: 'high', title: 'High Lateness Rate', description: `${Math.round((lateTrips.length / activeTrips.length) * 100)}% of active trips are late.` });
+  }
+  if (unsyncedBillingCount > 20) {
+    risks.push({ id: 'r-billing-backlog', severity: 'high', title: 'Billing Backlog', description: `${unsyncedBillingCount} unsubmitted trips — revenue is at risk.` });
+  }
+  if (completedTrips.length > 0 && unassignedTrips.length === 0 && lateTrips.length === 0) {
+    recommendations.push({ id: 'rec-good', title: 'Operations On Track', description: 'All trips assigned, none late. Review tomorrow\'s schedule.' });
+  }
+  if (available > 0 && unassignedTrips.length > 0) {
+    recommendations.push({ id: 'rec-assign', title: 'Use Available Drivers', description: `${available} driver${available > 1 ? 's' : ''} available — bulk assign to ${unassignedTrips.length} unassigned trip${unassignedTrips.length > 1 ? 's' : ''}.` });
+  }
+  if (unsyncedBillingCount > 0) {
+    recommendations.push({ id: 'rec-billing', title: 'Sync WellTrans Now', description: 'Open WellTrans Sync to capture completed trip revenue.' });
+  }
+
+  const total = todayTrips.length;
+  const pct = total > 0 ? Math.round((completedTrips.length / total) * 100) : 0;
+  let narrative = `Fleet: ${completedTrips.length}/${total} trips done (${pct}%)`;
+  if (lateTrips.length > 0) narrative += `, ${lateTrips.length} late`;
+  if (unassignedTrips.length > 0) narrative += `, ${unassignedTrips.length} unassigned`;
+  if (unsyncedBillingCount > 0) narrative += `, ${unsyncedBillingCount} billing pending`;
+  narrative += '.';
+
+  return { narrative, decisions, risks, recommendations, aiEnhanced: false };
+}

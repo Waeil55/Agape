@@ -32,6 +32,7 @@ const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const WellTransSyncPage = lazy(() => import('../features/welltrans-sync/components/WellTransSyncPage'));
+const AgapeCommandCenter = lazy(() => import('./AgapeCommandCenter'));
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -950,59 +951,21 @@ const DesktopEnterpriseDashboard = ({
         )}
 
         {rightPanelTab === 'ai' && (
-          <div className="p-2">
-            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl mb-2">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-md bg-indigo-100 flex items-center justify-center">
-                  <BrainCircuit size={13} className="text-indigo-700" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-indigo-700">AI Dispatch</p>
-                  <p className="text-xs text-indigo-500/60">Powered by smart routing</p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {unassignedTrips.length > 0
-                  ? `${unassignedTrips.length} trip${unassignedTrips.length > 1 ? 's' : ''} waiting for assignment. Run optimization to auto-assign.`
-                  : 'All trips are assigned. System running optimally.'}
-              </p>
-              {unassignedTrips.length > 0 && (
-                <button
-                  onClick={() => setShowOptimizeModal(true)}
-                  className="mt-2.5 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
-                >
-                  <Wand2 size={16} /> Run Optimization
-                </button>
-              )}
-            </div>
-
-            {/* Quick stats */}
-            <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2.5">Fleet Insights</p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600">Completion</span>
-                  <span className="text-emerald-700 font-medium tabular-nums">{todayTrips.length > 0 ? Math.round((completedToday / todayTrips.length) * 100) : 0}%</span>
-                </div>
-                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${todayTrips.length > 0 ? Math.round((completedToday / todayTrips.length) * 100) : 0}%` }} />
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600">On-time rate</span>
-                  <span className="text-blue-700 font-medium tabular-nums">{activeTrips.length > 0 ? Math.round(((activeTrips.length - lateTrips.length) / activeTrips.length) * 100) : 100}%</span>
-                </div>
-                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${activeTrips.length > 0 ? Math.round(((activeTrips.length - lateTrips.length) / activeTrips.length) * 100) : 100}%` }} />
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600">Utilization</span>
-                  <span className="text-amber-700 font-medium tabular-nums">{drivers.length > 0 ? Math.round(((drivers.length - availableDrivers) / drivers.length) * 100) : 0}%</span>
-                </div>
-                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${drivers.length > 0 ? Math.round(((drivers.length - availableDrivers) / drivers.length) * 100) : 0}%` }} />
-                </div>
-              </div>
-            </div>
+          <div className="h-full -mx-3 -my-3 overflow-hidden flex flex-col">
+            <ErrorBoundary>
+              <Suspense fallback={<LazyFallback />}>
+                <AgapeCommandCenter
+                  trips={trips}
+                  drivers={drivers}
+                  vehicles={vehicles}
+                  dispatchers={dispatchers}
+                  onOpenWellTrans={() => setActivePanel('welltrans')}
+                  onAssignTrips={() => setShowOptimizeModal(true)}
+                  onFilterLate={() => handleSmartNavigate('late')}
+                  onClose={() => setShowRightPanel(false)}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         )}
       </div>

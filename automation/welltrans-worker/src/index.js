@@ -25,7 +25,7 @@ import {
   syncWellTransTrip,
   validateWellTransTrip,
 } from './welltrans.trip.js';
-import { normalizeServiceDate, validateTripForWellTrans } from './welltrans.mapping.js';
+import { isWellTransCompletedTrip, normalizeServiceDate, validateTripForWellTrans } from './welltrans.mapping.js';
 import { isPortalClosedError, recoveryDecision } from './welltrans.recovery.js';
 import {
   buildVerificationDecision,
@@ -55,7 +55,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '4.0.5';
+const workerVersion = '5.0.2';
 const capabilityKernel = createCapabilityKernel(workerInstanceId);
 const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
 const supervisor = createAgentSupervisor([
@@ -124,7 +124,7 @@ const heartbeatPayload = state => ({
   canaryFingerprint: latestPortalCanary?.contractFingerprint || null,
   canaryCheckedAtMs: latestPortalCanary?.checkedAtMs || null,
   credentialMode: process.env.AGAPE_WORKER_CREDENTIAL_MODE || 'application_default',
-  agentV4: {
+  agentV5: {
     ...supervisor.snapshot(),
     capabilityPolicy: capabilityManifest(),
     activeTransport: brokerTransport,
@@ -854,16 +854,7 @@ async function buildCurrentPortalPayload(tripId) {
   };
 }
 
-const isAuthoritativeCompletedTrip = trip => {
-  const lifecycle = [
-    trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
-  ].map(value => String(value || '').trim().toLowerCase()).join(' ');
-  if (/cancell?ed/.test(lifecycle)) return false;
-  return lifecycle.includes('completed')
-    || lifecycle.includes('complete')
-    || lifecycle.includes('done')
-    || Boolean(trip.completedAt);
-};
+const isAuthoritativeCompletedTrip = isWellTransCompletedTrip;
 
 async function loadAuthoritativeTripsForDate(serviceDate) {
   const outboxSnapshot = await db.collection('welltrans_sync_outbox')
@@ -2236,6 +2227,12 @@ async function main() {
       }
       reviewWasOpen = reviewWasOpen || reviewIsOpen;
       await sleep(1000);
+    }
+    // A Chromium crash or externally terminated page must be recoverable by
+    // the launcher. Exit 43 asks the supervisor to reopen a clean headed
+    // browser without treating the interruption as a completed review.
+    if (isPortalClosedError(error) || !session.browser.isConnected()) {
+      process.exitCode = 43;
     }
   }
 }

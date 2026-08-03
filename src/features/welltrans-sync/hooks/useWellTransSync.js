@@ -5,7 +5,7 @@ import {
   subscribeWellTransCanary, subscribeWellTransOperations, subscribeWellTransWorkers,
 } from '../services/welltransService';
 import {
-  buildWellTransCoverage, normalizeServiceDate, validateTripForWellTrans,
+  buildWellTransCoverage, isWellTransCompletedTrip, normalizeServiceDate, validateTripForWellTrans,
 } from '../utils/welltransMapping';
 import { isWorkerVersionAtLeast } from '../utils/welltransVersion';
 
@@ -14,7 +14,7 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '4.0.5';
+const REQUIRED_WORKER_VERSION = '5.0.2';
 const isTripRecord = trip => Boolean(trip && typeof trip === 'object' && !Array.isArray(trip));
 const safely = (operation, fallback) => {
   try { return operation(); } catch { return fallback; }
@@ -48,14 +48,10 @@ export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '
     isTripRecord(trip)
       && serviceDate
       && safely(() => normalizeServiceDate(trip) === serviceDate, false)), [trips, serviceDate]);
-  const allCompletedTrips = useMemo(() => dateTrips.filter(trip => {
-    const lifecycle = [
-      trip.status, trip.operationalStatus, trip.lifecycleStatus, trip.lifecycleStep,
-    ].map(value => String(value || '').toLowerCase().trim()).join(' ');
-    if (/cancell?ed/.test(lifecycle)) return false;
-    const s = String(trip.status || '').toLowerCase().trim();
-    return s === 'completed' || s === 'complete' || s === 'done' || s.includes('completed') || s.includes('complete') || trip.completedAt;
-  }), [dateTrips]);
+  const allCompletedTrips = useMemo(
+    () => dateTrips.filter(isWellTransCompletedTrip),
+    [dateTrips],
+  );
   const completedTrips = useMemo(() => driverScopeId
     ? allCompletedTrips.filter(trip => String(trip.driverId || '') === String(driverScopeId))
     : allCompletedTrips,

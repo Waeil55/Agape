@@ -89,6 +89,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   const state = {
     busy: false, paused: false, commandSequence: 0, selectedDate: '', requestedDate: '',
     selectedDriverId: 'all', scopeLocked: false, dateSwitchPending: false,
+    // Tracks whether the user currently has the date input focused.
+    // When true, heartbeat updates must NOT overwrite the input value — that
+    // would silently discard a date the user is typing or selecting.
+    dateUserEditing: false,
   };
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -195,7 +199,26 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     send(action);
   });
 
-  $('[data-role="date"]').addEventListener('change', event => {
+  const dateInput = $('[data-role="date"]');
+
+  // Mark the field as user-controlled while it is focused so that heartbeat
+  // ticks (which call update()) do not clobber what the user is typing.
+  dateInput.addEventListener('focus', () => { state.dateUserEditing = true; });
+
+  dateInput.addEventListener('blur', () => {
+    state.dateUserEditing = false;
+    // Fire switch-date on blur so the user does not have to click Fill Date.
+    const serviceDate = String(dateInput.value || '');
+    if (serviceDate && /^\d{4}-\d{2}-\d{2}$/.test(serviceDate) && serviceDate !== state.requestedDate) {
+      state.requestedDate = serviceDate;
+      state.dateSwitchPending = true;
+      send('switch-date', { serviceDate });
+    }
+  });
+
+  // Also handle the native 'change' event (fired when the user picks from the
+  // calendar picker or presses Enter/Tab while the field is focused).
+  dateInput.addEventListener('change', event => {
     const serviceDate = String(event.target.value || '');
     if (!serviceDate || serviceDate === state.requestedDate) return;
     state.requestedDate = serviceDate;
@@ -227,7 +250,10 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       if (next.selectedDate !== undefined) state.selectedDate = String(next.selectedDate || '');
       if (next.requestedDate !== undefined) state.requestedDate = String(next.requestedDate || '');
       const desiredDate = state.requestedDate || state.selectedDate;
-      if (desiredDate) {
+      // Only sync the date field from the server if the user is not actively
+      // editing it. Overwriting a focused input would silently discard any
+      // date they are typing or selecting from the calendar picker.
+      if (desiredDate && !state.dateUserEditing) {
         $('[data-role="date"]').value = desiredDate;
       }
       state.dateSwitchPending = Boolean(

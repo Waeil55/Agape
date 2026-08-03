@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday, isoToLocalDateKey } from '../utils/tripDate';
+import { minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
 import { auth, db, doc, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, collection, addDoc, serverTimestamp } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
@@ -705,6 +706,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     });
   }, [userKey]);
   const [workNotesOpen, setWorkNotesOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const [showTripDetails, setShowTripDetails] = useState(() => {
     if (initialShowDetailsId) {
       return trips.find(t => t.id === initialShowDetailsId) || null;
@@ -2947,8 +2959,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const nowLocal = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const defaultTime = `${pad(nowLocal.getHours())}:${pad(nowLocal.getMinutes())}`;
-    setDepartedTime(trip.departedPickupTime ? formatTimeInput(trip.departedPickupTime) : defaultTime);
-    setArrivalDropoffTime(trip.arrivalDropoffTime ? formatTimeInput(trip.arrivalDropoffTime) : defaultTime);
+    const normalizedClocks = normalizeCompletionClocks({
+      pickupArrival: formatTimeInput(trip.arrivalTime || trip.startTime),
+      pickupDeparture: formatTimeInput(trip.departedPickupTime),
+      dropoffArrival: formatTimeInput(trip.arrivalDropoffTime),
+      now: defaultTime,
+    });
+    setDepartedTime(normalizedClocks.pickupDeparture);
+    setArrivalDropoffTime(normalizedClocks.dropoffArrival);
   };
 
   const submitComplete = () => {
@@ -2971,9 +2989,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       || timeToIsoForTripDate(arrivalDropoffTime, serviceDate)
       || now;
     const pickupArrivalIso = showCompleteModal.arrivalTime || showCompleteModal.startTime;
-    const pickupArrivalMs = pickupArrivalIso ? new Date(pickupArrivalIso).getTime() : NaN;
-    const pickupDepartureMs = new Date(departedPickupIso).getTime();
-    const dropoffArrivalMs = new Date(dropoffArrivalIso).getTime();
+    // The form intentionally captures minute precision. Compare the stored
+    // workflow timestamps at that same precision so 10:35 is not rejected
+    // merely because the arrival event contains seconds (for example 10:35:38).
+    const pickupArrivalMs = pickupArrivalIso ? minuteEpoch(pickupArrivalIso) : NaN;
+    const pickupDepartureMs = minuteEpoch(departedPickupIso);
+    const dropoffArrivalMs = minuteEpoch(dropoffArrivalIso);
     if (Number.isFinite(pickupArrivalMs) && pickupDepartureMs < pickupArrivalMs) {
       setCompleteError(`Pickup departure cannot be before pickup arrival (${formatTimeInput(pickupArrivalIso)}).`);
       return;
@@ -3227,7 +3248,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
                   <p className="text-xs font-medium uppercase tracking-normal text-blue-200">Scheduled Time</p>
                   <p className="mt-1 text-lg font-semibold tracking-tight leading-none text-white">{scheduledTime}</p>
                 </div>
-                  <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-xs font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
+                <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-xs font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
                   {trip.status || 'Assigned'}
                 </span>
               </div>
@@ -3490,6 +3511,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
               <div className="mt-1 flex items-center gap-1.5">
                 <p className="text-xs font-medium text-slate-500 truncate">{me?.name || currentUser}</p>
+                {!isOnline && (
+                  <span className="shrink-0 px-1.5 py-0.5 rounded bg-rose-100 text-[10px] font-bold uppercase tracking-wider text-rose-700 border border-rose-200">
+                    Offline
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowDebugPanel(prev => !prev)}

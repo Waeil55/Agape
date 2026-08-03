@@ -694,67 +694,149 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
+  // Derive weekday label and relative day hint for the date navigation display.
+  const syncDateObj = (() => { try { return new Date(`${syncDate}T12:00:00`); } catch { return null; } })();
+  const syncDateWeekday = syncDateObj ? syncDateObj.toLocaleDateString('en-US', { weekday: 'short' }) : '';
+  const syncDateMonthDay = syncDateObj ? syncDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : syncDate;
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const dayDiff = syncDateObj ? Math.round((syncDateObj - new Date(`${todayStr}T12:00:00`)) / 86_400_000) : null;
+  const dayHint = dayDiff === 0 ? 'Today' : dayDiff === -1 ? 'Yesterday' : dayDiff === 1 ? 'Tomorrow' : dayDiff != null ? `${Math.abs(dayDiff)}d ${dayDiff < 0 ? 'ago' : 'ahead'}` : '';
+
+  const coveragePct = Math.min(100, healthScore);
+  const coverageBarColor = coverage.coverageComplete ? 'bg-emerald-500' : coveragePct >= 75 ? 'bg-amber-400' : 'bg-rose-500';
+
   return (
     <div ref={pageRef} className="flex flex-col h-full min-h-0 overflow-hidden" tabIndex={-1}>
-      {/* Unified command rail — one operational line, horizontally scrollable on compact screens. */}
-      <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white px-2 py-1.5 shadow-sm">
-        <div className="flex min-w-max items-center gap-1.5 whitespace-nowrap">
-          <div className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-950 px-2.5 text-[11px] font-bold text-white">
-            <Sparkles size={13} className="text-blue-300" /> WELLTRANS
+
+      {/* ═══ ROW 1 — Brand + Date Navigation + Live Stats + Agent Status ═══ */}
+      <div className="shrink-0 border-b border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center gap-0 px-3 py-2 min-w-0">
+
+          {/* Brand pill */}
+          <div className="flex shrink-0 h-8 items-center gap-1.5 rounded-lg bg-slate-950 px-3 text-[11px] font-black text-white mr-3">
+            <Sparkles size={12} className="text-blue-300" />
+            <span className="tracking-wider">WELLTRANS</span>
           </div>
-          <button type="button" onClick={() => setShowInstallHelp(true)} title="Agent setup and download"
-            className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-700">
-            <Download size={12} /> Agent
-          </button>
-          <div className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-bold ${
-            workerHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'
-          }`} title={workerStatusLabel}>
-            <span className={`h-2 w-2 rounded-full ${workerHealthy ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            {workerStatusLabel}
-          </div>
-          {[
-            ['Trips', completedTrips.length, 'text-slate-900'],
-            ['Review', stagedCount, 'text-purple-700'],
-            ['Verified', successfulCount, 'text-emerald-700'],
-            ['Issues', failedLogs.length + coverage.invalid, 'text-rose-700'],
-            ['Coverage', `${healthScore}%`, coverage.coverageComplete ? 'text-emerald-700' : 'text-amber-700'],
-          ].map(([label, value, tone]) => (
-            <div key={label} className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] text-slate-500">
-              <strong className={`text-[11px] ${tone}`}>{value}</strong>{label}
+
+          {/* Date navigator */}
+          <div className="flex shrink-0 items-center gap-1 mr-3">
+            <button
+              onClick={() => navigateDate(-1)}
+              title="Previous day (←)"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <div className="flex flex-col items-center rounded-lg border border-slate-300 bg-slate-50 px-2 py-0.5 min-w-[120px]">
+              <input
+                type="date"
+                value={syncDate}
+                disabled={Boolean(busy)}
+                onChange={event => changeSyncDate(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'ArrowLeft') { event.preventDefault(); navigateDate(-1); }
+                  if (event.key === 'ArrowRight') { event.preventDefault(); navigateDate(1); }
+                }}
+                aria-label="Service date"
+                className="w-[105px] bg-transparent text-[11px] font-bold text-slate-900 outline-none cursor-pointer disabled:cursor-not-allowed"
+              />
+              <span className="text-[9px] font-semibold text-slate-500 leading-none">
+                {syncDateWeekday && `${syncDateWeekday}, ${syncDateMonthDay}`}
+              </span>
             </div>
-          ))}
-          <div className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9px] text-slate-500" title={worker?.workerId || worker?.id || 'No active agent'}>
-            <Activity size={11} /> <strong className={activeWorkers.length ? 'text-emerald-700' : 'text-rose-700'}>{activeWorkers.length}</strong> agent
+            <button
+              onClick={() => navigateDate(1)}
+              title="Next day (→)"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition"
+            >
+              <ChevronRight size={14} />
+            </button>
+            {syncDate !== todayStr && (
+              <button
+                onClick={() => changeSyncDate(todayStr)}
+                title="Go to today"
+                className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition"
+              >
+                Today
+              </button>
+            )}
+            {dayHint && dayHint !== 'Today' && (
+              <span className="text-[9px] font-semibold text-slate-400 ml-0.5">{dayHint}</span>
+            )}
           </div>
-          {worker && (
-            <div className="flex h-8 max-w-[170px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9px] text-slate-500" title={`${worker.workerId || worker.id || 'Agent'} · ${String(worker.state || 'unknown').replaceAll('_', ' ')}`}>
-              <strong className="truncate text-slate-700">{worker.workerId || worker.id || 'Agent'}</strong>
-              <span>v{worker.version || '?'}</span>
+
+          {/* Coverage progress */}
+          <div className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 mr-3 min-w-[130px]">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Coverage</span>
+                <span className={`text-[10px] font-black ${coverage.coverageComplete ? 'text-emerald-600' : coveragePct >= 75 ? 'text-amber-600' : 'text-rose-600'}`}>
+                  {coveragePct}%
+                </span>
+              </div>
+              <div className="h-1 w-full rounded-full bg-slate-200 overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-500 ${coverageBarColor}`} style={{ width: `${coveragePct}%` }} />
+              </div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[8px] text-slate-400">{successfulCount} verified</span>
+                <span className="text-[8px] text-slate-400">{completedTrips.length} total</span>
+              </div>
             </div>
-          )}
-          {worker?.agentV4 && (
-            <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${
-              worker.agentV4.healthy ? 'border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-rose-200 bg-rose-50 text-rose-800'
-            }`} title={`${worker.agentV4.components?.length || 0} capability-isolated internal components · one exclusive portal writer · local diagnostics`}>
-              <Bot size={11} /> V4 {worker.agentV4.healthy ? 'secured' : 'degraded'} · {worker.agentV4.components?.length || 0} roles
+          </div>
+
+          {/* Live stats chips */}
+          <div className="flex shrink-0 items-center gap-1.5 mr-3">
+            {[
+              { label: 'Trips', value: completedTrips.length, tone: 'text-slate-900', bg: 'bg-slate-50 border-slate-200' },
+              { label: 'Review', value: stagedCount, tone: 'text-purple-700', bg: stagedCount > 0 ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200' },
+              { label: 'Verified', value: successfulCount, tone: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+              { label: 'Issues', value: failedLogs.length + coverage.invalid, tone: 'text-rose-700', bg: failedLogs.length + coverage.invalid > 0 ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200' },
+            ].map(({ label, value, tone, bg }) => (
+              <div key={label} className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] text-slate-400 ${bg}`}>
+                <strong className={`text-[12px] font-black ${tone}`}>{value}</strong>
+                <span className="font-medium">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Agent status */}
+          <div className="flex shrink-0 items-center gap-1.5 ml-auto">
+            {(worker?.agentV5 || worker?.agentV4) && (
+              <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${
+                (worker.agentV5 || worker.agentV4).healthy ? 'border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-rose-200 bg-rose-50 text-rose-800'
+              }`} title={`${(worker.agentV5 || worker.agentV4).components?.length || 0} components`}>
+                <Bot size={10} /> V5 {(worker.agentV5 || worker.agentV4).healthy ? 'ok' : '!'}
+              </div>
+            )}
+            <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${canaryHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+              <ShieldCheck size={10} /> {canaryHealthy ? 'Portal ✓' : 'Portal?'}
             </div>
-          )}
-          <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${canaryHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-            <ShieldCheck size={11} /> Portal {canaryHealthy ? 'verified' : 'check'}
+            <div className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-bold ${
+              workerHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'
+            }`} title={workerStatusLabel}>
+              <span className={`h-1.5 w-1.5 rounded-full ${workerHealthy ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+              <span className="max-w-[130px] truncate">{workerStatusLabel}</span>
+            </div>
+            <button type="button" onClick={() => setShowInstallHelp(true)} title="Agent setup and download"
+              className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-500 hover:border-blue-300 hover:text-blue-700 transition">
+              <Download size={11} />
+            </button>
           </div>
-          <div className="flex h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-1">
-            <button onClick={() => navigateDate(-1)} className="rounded p-1 text-slate-500 hover:bg-white"><ChevronLeft size={13} /></button>
-            <input type="date" value={syncDate} disabled={Boolean(busy)} onChange={event => changeSyncDate(event.target.value)}
-              className="w-[108px] bg-transparent text-[10px] font-bold text-slate-800 outline-none" />
-            <button onClick={() => navigateDate(1)} className="rounded p-1 text-slate-500 hover:bg-white"><ChevronRight size={13} /></button>
-          </div>
+        </div>
+      </div>
+
+      {/* ═══ ROW 2 — Action Bar ═══ */}
+      <div className="shrink-0 overflow-x-auto border-b border-slate-100 bg-slate-50/80">
+        <div className="flex min-w-max items-center gap-1.5 px-3 py-1.5 whitespace-nowrap">
+
+          {/* Driver scope */}
           <select value={driverScopeId} disabled={stagedCount > 0 || Boolean(busy)} onChange={event => {
             setDriverScopeId(event.target.value);
             setSelectedIds([]);
             setQueuePage(0);
           }} aria-label="Choose drivers to fill"
             title="Fill every driver or isolate one authoritative driver batch"
-            className="h-8 max-w-[235px] rounded-lg border border-indigo-200 bg-indigo-50 px-2 text-[10px] font-bold text-indigo-800 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">
+            className="h-7 max-w-[220px] rounded-md border border-indigo-200 bg-indigo-50 px-2 text-[10px] font-bold text-indigo-800 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">
             <option value="all">All drivers ({allCompletedTrips.length})</option>
             {driverScopes.map(item => (
               <option key={item.id} value={item.id}>
@@ -762,36 +844,54 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
               </option>
             ))}
           </select>
+
+          {/* Primary: Fill */}
           <button disabled={!settings.enabled || Boolean(busy)} onClick={startAndFillDate}
-            className="h-8 rounded-lg bg-blue-600 px-3 text-[10px] font-bold text-white hover:bg-blue-700 disabled:opacity-40">
-            {busy === 'start-fill' ? <Loader2 size={11} className="mr-1 inline animate-spin" /> : null}
-            Fill {selectedDriverScope ? selectedDriverScope.name : 'All Drivers'} ({completedTrips.length})
+            className="h-7 rounded-md bg-blue-600 px-3 text-[10px] font-bold text-white hover:bg-blue-700 disabled:opacity-40 transition flex items-center gap-1">
+            {busy === 'start-fill' ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
+            Fill {selectedDriverScope ? selectedDriverScope.name : 'All'} ({completedTrips.length})
           </button>
-          <button disabled={!selectedIds.length || !settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
-            className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-semibold text-blue-700 disabled:opacity-40">
-            Sync Selected ({selectedIds.length})
-          </button>
+
+          {/* Confirm Applied */}
           {stagedCount > 0 && (
             <button disabled={!workerBatchReady || Boolean(busy)} onClick={confirmReviewBatchApplied}
-              className="h-8 rounded-lg border border-purple-200 bg-purple-50 px-2.5 text-[10px] font-semibold text-purple-700 disabled:opacity-40">
-              Confirm Applied ({stagedCount})
+              className="h-7 rounded-md border border-purple-300 bg-purple-600 px-2.5 text-[10px] font-bold text-white hover:bg-purple-700 disabled:opacity-40 transition flex items-center gap-1">
+              <CheckCircle2 size={10} /> Confirm Applied ({stagedCount})
             </button>
           )}
+
+          {/* Sync selected */}
+          <button disabled={!selectedIds.length || !settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
+            className="h-7 rounded-md border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-semibold text-blue-700 disabled:opacity-40 transition">
+            Sync Selected ({selectedIds.length})
+          </button>
+
+          <div className="h-5 w-px bg-slate-300 mx-0.5" />
+
+          {/* Bulk select */}
           <select aria-label="Select trips" defaultValue="" onChange={event => { if (event.target.value) handleBulkSelect(event.target.value); event.target.value = ''; }}
-            className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
+            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
             <option value="" disabled>Select…</option>
             <option value="ready">All ready ({readyTrips.length})</option>
             <option value="failed">All failed ({failedLogs.length})</option>
             <option value="invalid">All invalid</option>
             <option value="none">Clear selection</option>
           </select>
+
+          {/* Retry */}
           <button disabled={!workerDateMatches || !retryableFailed.length || Boolean(busy)} onClick={() => runQueue(retryableFailed.map(log => log.tripId), 'retry')}
-            className="h-8 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-semibold text-amber-700 disabled:opacity-40">
-            <RefreshCw size={11} className="mr-1 inline" />Retry ({retryableFailed.length})
+            className="h-7 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-semibold text-amber-700 disabled:opacity-40 transition flex items-center gap-1">
+            <RefreshCw size={10} /> Retry ({retryableFailed.length})
           </button>
-          <button onClick={exportAllTripsCSV} className="h-8 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-700">
-            <Download size={11} className="mr-1 inline" />Export
+
+          {/* Export */}
+          <button onClick={exportAllTripsCSV} className="h-7 rounded-md border border-emerald-200 bg-white px-2.5 text-[10px] font-semibold text-slate-600 hover:bg-emerald-50 transition flex items-center gap-1">
+            <Download size={10} /> Export
           </button>
+
+          <div className="h-5 w-px bg-slate-300 mx-0.5" />
+
+          {/* Tab switcher */}
           {[
             ['queue', `Trips (${completedTrips.length})`],
             ['logs', `History (${currentLogs.length})`],
@@ -800,21 +900,28 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             <button key={id} onClick={() => {
               if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
               setTab(id);
-            }} className={`h-8 rounded-lg px-2.5 text-[10px] font-semibold ${tab === id ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+            }} className={`h-7 rounded-md px-2.5 text-[10px] font-semibold transition ${tab === id ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>
               {label}
             </button>
           ))}
+
+          {/* Search + filter — only on queue tab */}
           {tab === 'queue' && (
             <>
+              <div className="h-5 w-px bg-slate-300 mx-0.5" />
               <div className="relative">
-                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" placeholder="Search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
-                  className="h-8 w-32 rounded-lg border border-slate-200 bg-white pl-6 pr-2 text-[10px] outline-none focus:border-blue-400" />
+                <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="text" placeholder="Search trips…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
+                  className="h-7 w-36 rounded-md border border-slate-200 bg-white pl-6 pr-2 text-[10px] outline-none focus:border-blue-400" />
               </div>
               <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
-                <option value="all">All trips</option><option value="ready">Not queued</option><option value="staged">Review</option>
-                <option value="synced">Verified</option><option value="failed">Failed</option><option value="invalid">Invalid</option>
+                className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
+                <option value="all">All trips</option>
+                <option value="ready">Not queued</option>
+                <option value="staged">Review</option>
+                <option value="synced">Verified</option>
+                <option value="failed">Failed</option>
+                <option value="invalid">Invalid</option>
               </select>
             </>
           )}

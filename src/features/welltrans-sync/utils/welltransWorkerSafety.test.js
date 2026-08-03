@@ -11,6 +11,10 @@ const workerSourcePath = fileURLToPath(new URL(
   '../../../../automation/welltrans-worker/src/index.js',
   import.meta.url,
 ));
+const workerMappingPath = fileURLToPath(new URL(
+  '../../../../automation/welltrans-worker/src/welltrans.mapping.js',
+  import.meta.url,
+));
 const operatorConsolePath = fileURLToPath(new URL(
   '../../../../automation/welltrans-worker/src/welltrans.operator-console.js',
   import.meta.url,
@@ -320,7 +324,8 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain('async function reconcileAuthoritativeCompletedTrips(serviceDate)');
     expect(worker).toContain("db.collection('trips').get()");
     expect(worker).toContain("source: 'authoritative_worker_completed_trip_scan'");
-    expect(worker).toContain('if (/cancell?ed/.test(lifecycle)) return false');
+    expect(worker).toContain('const isAuthoritativeCompletedTrip = isWellTransCompletedTrip');
+    expect(readFileSync(workerMappingPath, 'utf8')).toContain("'no show', 'no-show', 'noshow'");
     expect(worker).toContain('await reconcileAuthoritativeCompletedTrips(selectedDate)');
   });
 

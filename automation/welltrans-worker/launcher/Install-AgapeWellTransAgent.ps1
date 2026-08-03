@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $ConfirmPreference = 'None'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Security
-$agentVersion = '4.0.5'
+$agentVersion = '5.0.2'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'
@@ -18,12 +18,46 @@ $installLog = Join-Path $secretRoot 'welltrans-agent-install.log'
 $runtimeRoot = Join-Path $installRoot 'runtime'
 $nodeRoot = Join-Path $runtimeRoot 'node'
 $nodeExecutable = Join-Path $nodeRoot 'node.exe'
+$workerLockPath = Join-Path $secretRoot 'welltrans-worker.pid'
 
 New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $secretRoot -Force | Out-Null
 Start-Transcript -Path $installLog -Append | Out-Null
 
 try {
+  # Never replace dependencies underneath a live Playwright review. If only a
+  # stale supervisor remains, retire that exact process tree before installing
+  # so one clean version owns the machine and stale locks cannot suppress Fill.
+  if (Test-Path -LiteralPath $workerLockPath) {
+    $ownerPid = 0
+    [void][int]::TryParse((Get-Content -LiteralPath $workerLockPath -Raw).Trim(), [ref]$ownerPid)
+    $owner = if ($ownerPid -gt 0) { Get-Process -Id $ownerPid -ErrorAction SilentlyContinue } else { $null }
+    if ($owner) {
+      $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
+      $descendantIds = New-Object 'System.Collections.Generic.HashSet[int]'
+      [void]$descendantIds.Add([int]$ownerPid)
+      $changed = $true
+      while ($changed) {
+        $changed = $false
+        foreach ($process in $processes) {
+          if ($descendantIds.Contains([int]$process.ParentProcessId) -and -not $descendantIds.Contains([int]$process.ProcessId)) {
+            [void]$descendantIds.Add([int]$process.ProcessId)
+            $changed = $true
+          }
+        }
+      }
+      $visibleBrowser = $descendantIds | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue } |
+        Where-Object { $_.ProcessName -match '^(chrome|chromium)$' -and $_.MainWindowHandle -ne 0 } |
+        Select-Object -First 1
+      if ($visibleBrowser) {
+        throw 'A WellTrans review window is open. Review and Apply or Close it before upgrading; the installer will never discard unapplied rows.'
+      }
+      $descendantIds | Where-Object { $_ -ne $ownerPid } | Sort-Object -Descending |
+        ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+      Stop-Process -Id $ownerPid -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -LiteralPath $workerLockPath -Force -ErrorAction SilentlyContinue
+  }
   [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
   foreach ($directory in @('src', 'launcher')) {
     $source = Join-Path $sourceRoot $directory

@@ -37,11 +37,11 @@ const OfflineIndicator = () => {
     };
   }, [wasOffline]);
 
-  if (!showBanner) return null;
+  return null;
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-[9997] transition-all duration-300 ${
+      className={`sticky top-0 left-0 right-0 z-[9997] transition-all duration-300 ${
         isOnline ? 'translate-y-0' : 'translate-y-0'
       }`}
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
@@ -50,18 +50,18 @@ const OfflineIndicator = () => {
         className={`mx-2 mt-2 sm:mx-4 sm:mt-3 rounded-xl shadow-lg border px-4 py-3 flex items-center gap-3 ${
           isOnline
             ? 'bg-green-50 border-green-200 text-green-800'
-            : 'bg-amber-50 border-amber-200 text-amber-800'
+            : 'bg-rose-50 border-rose-200 text-rose-800'
         }`}
       >
         <div
           className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-            isOnline ? 'bg-green-100' : 'bg-amber-100'
+            isOnline ? 'bg-green-100' : 'bg-rose-100'
           }`}
         >
           {isOnline ? (
             <Check size={16} className="text-green-600" />
           ) : (
-            <WifiOff size={16} className="text-amber-600" />
+            <WifiOff size={16} className="text-rose-600" />
           )}
         </div>
         <div className="flex-1 min-w-0">

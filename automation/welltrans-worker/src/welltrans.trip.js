@@ -457,6 +457,37 @@ export async function boundCellHandle(grid, row, columnTitle) {
   );
 }
 
+async function activateBoundCell(page, grid, row, columnTitle, { clickFirst = false } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const cell = await boundCellHandle(grid, row, columnTitle);
+    const targetBox = await cell.boundingBox().catch(() => null);
+    try {
+      if (clickFirst || attempt >= 3) {
+        await cell.click({ force: true });
+        await settleUi(page, 70, 20);
+      }
+      await cell.dblclick({ force: true });
+      return targetBox;
+    } catch (error) {
+      lastError = error;
+      const recycled = /not attached|detached|stale|execution context was destroyed/i
+        .test(String(error?.message || error));
+      if (!recycled || attempt === 4) throw error;
+    } finally {
+      await cell.dispose().catch(() => {});
+    }
+    // TripSpark replaced the virtual cell between semantic binding and the
+    // pointer action. Re-index the row and reacquire the exact cell; never
+    // reuse the detached ElementHandle or advance to a neighboring row.
+    await ensureLiveRow(grid, row);
+    await settleUi(page, 90 + (attempt * 50), 30);
+  }
+  throw lastError || new Error(
+    `Could not activate Booking ${row.bookingRaw} ${row.activity} ${columnTitle}`,
+  );
+}
+
 const normalized = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 export const findUniqueExactOption = (options, target) => {
   const matches = [...new Set((options || []).map(option => String(option).trim()).filter(Boolean))]
@@ -881,13 +912,7 @@ async function setTextCell(page, grid, row, column, value, required = false, { a
   let lastObserved = current;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await dismissActiveEditor(page);
-    const cell = await boundCellHandle(grid, row, column);
-    const targetBox = await cell.boundingBox().catch(() => null);
-    try {
-      await cell.dblclick({ force: true });
-    } finally {
-      await cell.dispose().catch(() => {});
-    }
+    const targetBox = await activateBoundCell(page, grid, row, column);
     await waitForEditorSurface(page);
 
     const editor = await nearestVisibleEditor(
@@ -971,17 +996,9 @@ async function setListCell(page, grid, row, column, option) {
   let selected = '';
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await dismissActiveEditor(page);
-    const cell = await boundCellHandle(grid, row, column);
-    const targetBox = await cell.boundingBox().catch(() => null);
-    try {
-      if (attempt >= 3) {
-        await cell.click({ force: true });
-        await settleUi(page, 100, 30);
-      }
-      await cell.dblclick({ force: true });
-    } finally {
-      await cell.dispose().catch(() => {});
-    }
+    const targetBox = await activateBoundCell(page, grid, row, column, {
+      clickFirst: attempt >= 3,
+    });
     await waitForEditorSurface(page, 2500);
 
     const listbox = await nearestVisibleEditor(
@@ -1130,14 +1147,11 @@ async function preflightCell(page, grid, row, column, value, {
   }
 
   await dismissActiveEditor(page);
-  const cell = await boundCellHandle(grid, row, column).catch(error => {
-    throw safePreflightError(error);
-  });
-  const targetBox = await cell.boundingBox().catch(() => null);
+  let targetBox;
   try {
-    await cell.dblclick({ force: true });
-  } finally {
-    await cell.dispose().catch(() => {});
+    targetBox = await activateBoundCell(page, grid, row, column);
+  } catch (error) {
+    throw safePreflightError(error);
   }
   await waitForEditorSurface(page);
   const editor = await nearestVisibleEditor(
@@ -1254,12 +1268,7 @@ async function restorePlanEntry(page, grid, entry) {
       await setListCell(page, grid, entry.row, entry.column, entry.original);
     } else {
       await dismissActiveEditor(page);
-      const cell = await boundCellHandle(grid, entry.row, entry.column);
-      try {
-        await cell.dblclick({ force: true });
-      } finally {
-        await cell.dispose().catch(() => {});
-      }
+      await activateBoundCell(page, grid, entry.row, entry.column);
       await page.waitForTimeout(250);
       const editor = page.locator('.EditorWidgets input:not([style*="z-index: -1"]):visible').last();
       if (await editor.count()) {
