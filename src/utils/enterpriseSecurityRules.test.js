@@ -31,4 +31,15 @@ describe('enterprise evidence controls', () => {
     expect(declarationRule).toContain('request.resource.data.createdAt == request.time');
     expect(declarationRule).toContain('allow update, delete: if false;');
   });
+
+  it('preserves driver correction requests while restricting disposition to reviewers', () => {
+    const rules = readFileSync(firestoreRulesPath, 'utf8');
+    const requestRule = rules.match(/match \/timeTrackingCorrectionRequests\/\{requestId\} \{([\s\S]*?)\n    \}/)?.[1] || '';
+    expect(requestRule).toContain('request.resource.data.driverEmail == request.auth.token.email');
+    expect(requestRule).toContain("request.resource.data.status == 'pending'");
+    expect(requestRule).toContain('request.resource.data.originalSnapshot is map');
+    expect(requestRule).toContain('allow update: if signedIn() && isDispatcher()');
+    expect(requestRule).toContain("'status', 'reviewerNote', 'reviewedBy', 'reviewedAt'");
+    expect(requestRule).toContain('allow delete: if false;');
+  });
 });

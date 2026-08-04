@@ -280,6 +280,33 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
     }
+    // Driver-submitted notes and correction requests preserve the original
+    // time snapshot. Only authorized reviewers may add a disposition.
+    match /timeTrackingCorrectionRequests/{requestId} {
+      allow read: if signedIn() && (isDispatcher() || resource.data.driverEmail == request.auth.token.email);
+      allow create: if signedIn()
+        && request.resource.data.driverEmail == request.auth.token.email
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.driverId is string
+        && request.resource.data.date is string
+        && request.resource.data.requestType in ['INCORRECT_TIME', 'MISSING_START', 'MISSING_END', 'SHIFT_NOTE']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 3
+        && request.resource.data.status == 'pending'
+        && request.resource.data.source == 'driver_same_view_request'
+        && request.resource.data.originalSnapshot is map
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && isDispatcher()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'reviewerNote', 'reviewedBy', 'reviewedAt'
+        ])
+        && request.resource.data.status in ['resolved', 'rejected']
+        && request.resource.data.reviewerNote is string
+        && request.resource.data.reviewerNote.size() >= 3
+        && request.resource.data.reviewedBy == request.auth.token.email
+        && request.resource.data.reviewedAt == request.time;
+      allow delete: if false;
+    }
     // Approved payroll records (admin/dispatcher finalize, driver can read own)
     match /payrollRecords/{recordId} {
       allow read: if signedIn() && (isDispatcher() || resource.data.driverId == request.auth.uid);

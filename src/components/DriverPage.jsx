@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
-import { auth, db, doc, setDoc, collection, addDoc, serverTimestamp, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
+import { auth, db, doc, setDoc, collection, addDoc, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -1385,6 +1385,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
   const ttAccumulatedBreakMsRef = useRef(0);
   const clockOutOfferedRef = useRef(false);
   const [editHomeAddress, setEditHomeAddress] = useState(me?.homeAddress || '');
+  const [selectedWorkDate, setSelectedWorkDate] = useState(localCalendarYmd());
+  const [timeCorrectionRequests, setTimeCorrectionRequests] = useState([]);
+  const [correctionDraft, setCorrectionDraft] = useState(null);
+  const [correctionSaving, setCorrectionSaving] = useState(false);
 
   const driverId = me?.id || (() => {
     const normalizedEmail = String(currentUser || '').trim().toLowerCase();
@@ -1396,6 +1400,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     return (timeTrackingDeclarations || []).filter((event) => [event?.driverId, event?.driverEmail, event?.email, event?.userId]
       .filter(Boolean).map((value) => String(value).trim().toLowerCase()).some((value) => keys.has(value)));
   }, [currentUser, driverId, me?.driverId, me?.email, me?.uid, timeTrackingDeclarations]);
+
+  useEffect(() => {
+    const driverEmail = auth.currentUser?.email || me?.email || currentUser;
+    if (!driverEmail) return undefined;
+    const source = query(collection(db, 'timeTrackingCorrectionRequests'), where('driverEmail', '==', driverEmail));
+    return onSnapshot(source, (snapshot) => {
+      setTimeCorrectionRequests(snapshot.docs
+        .map((itemDoc) => ({ id: itemDoc.id, ...itemDoc.data() }))
+        .sort((a, b) => String(b.createdAt?.toDate?.()?.toISOString?.() || b.clientCreatedAt || '').localeCompare(String(a.createdAt?.toDate?.()?.toISOString?.() || a.clientCreatedAt || ''))));
+    }, (error) => console.error('Time correction request listener failed:', error));
+  }, [currentUser, me?.email]);
 
   const getTripPickupLocation = useCallback((trip) => {
     const lat = Number(trip?.pickupLat ?? trip?.pickupLatitude);
@@ -1424,9 +1439,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     weekStart.setHours(0, 0, 0, 0);
     const currentDay = weekStart.getDay();
     weekStart.setDate(weekStart.getDate() + (currentDay === 0 ? -6 : 1 - currentDay));
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
+    const buildDay = (d) => {
       const dateKey = localCalendarYmd(d);
       const telemetryBreadcrumbs = getDriverTelemetryBreadcrumbs(driverTelemetry, me, dateKey);
       const model = buildTimeEvents(driverScopedTrips, me, events, timeTrackingPolicyMode, {
@@ -1442,21 +1455,45 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       const hasEvidence = model.events.length > 0;
       const historicalOpenShift = dateKey < localCalendarYmd() && model.sessions.some((session) => session.isOpen);
       const hours = hasEvidence && model.approvalEligible ? billableMs / 3600000 : null;
-      days.push({
+      const needsCorrection = historicalOpenShift || model.anomalies.length > 0 || model.reviewRequiredGaps?.length > 0;
+      const isFuture = dateKey > localCalendarYmd();
+      const status = needsCorrection
+        ? 'Review required'
+        : dateKey === localCalendarYmd() && model.sessions.some((session) => session.isOpen)
+          ? 'Active'
+          : hasEvidence && model.approvalEligible
+            ? 'Completed'
+            : isFuture && model.trips.length > 0 ? 'Scheduled' : 'No activity';
+      return {
         dateKey,
         hasEvents: hasEvidence,
+        tripCount: model.trips.length,
         clockIn: firstSession?.clockInTime || null,
         clockOut: lastSession?.clockOutTime || null,
         hours,
         breakMin: Math.round(breakMs / 60000),
         anomalies: model.anomalies,
-        needsCorrection: historicalOpenShift || model.anomalies.length > 0,
-      });
-      if (d >= weekStart && model.approvalEligible) weeklyMilliseconds += billableMs;
+        reviewRequiredGaps: model.reviewRequiredGaps || [],
+        reconciliation: model.reconciliation,
+        needsCorrection,
+        status,
+      };
+    };
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const day = buildDay(d);
+      days.push(day);
+      if (d >= weekStart && day.hours != null) weeklyMilliseconds += day.hours * 3600000;
     }
+    const weekDays = Array.from({ length: 7 }, (_, index) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + index);
+      return buildDay(d);
+    });
     const weeklyTotal = weeklyMilliseconds / 3600000;
     const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
-    return { days, weeklyTotal, weeklyOvertime };
+    return { days, weekDays, weeklyTotal, weeklyOvertime };
   }, [driverScopedTrips, driverTelemetry, immutableTimeDeclarations, me, timeTrackingPolicyMode]);
 
   // Cleanup timekeeping interval on unmount.
@@ -1544,6 +1581,48 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       createdAt: serverTimestamp(),
     });
   }, [currentUser, driverId, me?.email]);
+
+  const submitTimeCorrectionRequest = useCallback(async () => {
+    const reason = String(correctionDraft?.reason || '').trim();
+    if (reason.length < 3) {
+      setShowToast({ type: 'error', message: 'Explain the correction so it can be reviewed.' });
+      return;
+    }
+    const selectedDay = clockHistory.weekDays.find((day) => day.dateKey === selectedWorkDate)
+      || clockHistory.days.find((day) => day.dateKey === selectedWorkDate);
+    const driverEmail = auth.currentUser?.email || me?.email || currentUser || '';
+    try {
+      setCorrectionSaving(true);
+      await addDoc(collection(db, 'timeTrackingCorrectionRequests'), {
+        driverId,
+        driverEmail,
+        userId: auth.currentUser?.uid || '',
+        driverName: me?.name || '',
+        date: selectedWorkDate,
+        requestType: correctionDraft?.requestType || 'INCORRECT_TIME',
+        proposedTime: correctionDraft?.requestType === 'SHIFT_NOTE' ? null : (correctionDraft?.proposedTime || null),
+        reason,
+        status: 'pending',
+        originalSnapshot: {
+          clockIn: selectedDay?.clockIn || null,
+          clockOut: selectedDay?.clockOut || null,
+          hours: selectedDay?.hours ?? null,
+          status: selectedDay?.status || 'No activity',
+          tripCount: selectedDay?.tripCount || 0,
+        },
+        source: 'driver_same_view_request',
+        clientCreatedAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+      });
+      setCorrectionDraft(null);
+      setShowToast({ type: 'success', message: 'Your request was recorded for payroll review. The original time remains unchanged.' });
+    } catch (error) {
+      console.error('Time correction request failed:', error);
+      setShowToast({ type: 'error', message: 'The request could not be securely saved. Check the connection and try again.' });
+    } finally {
+      setCorrectionSaving(false);
+    }
+  }, [clockHistory.days, clockHistory.weekDays, correctionDraft, currentUser, driverId, me?.email, me?.name, selectedWorkDate]);
 
   // A legacy or personal break is closed automatically when new assigned work arrives.
   const ttResume = useCallback(async () => {
@@ -5695,6 +5774,78 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                   </button>
                 )}
               </div>
+              <div className="grid grid-cols-7 gap-1.5" aria-label="Current work week">
+                {clockHistory.weekDays.map((day) => {
+                  const selected = day.dateKey === selectedWorkDate;
+                  const date = new Date(`${day.dateKey}T12:00:00`);
+                  const tone = day.status === 'Completed' ? 'bg-emerald-500' : day.status === 'Active' ? 'bg-blue-500' : day.status === 'Review required' ? 'bg-amber-500' : day.status === 'Scheduled' ? 'bg-indigo-400' : 'bg-slate-300';
+                  return (
+                    <button key={day.dateKey} type="button" onClick={() => { setSelectedWorkDate(day.dateKey); setCorrectionDraft(null); }} className={`min-w-0 rounded-xl border px-1 py-2 text-center transition ${selected ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-300'}`}>
+                      <span className="block text-[9px] font-bold uppercase">{date.toLocaleDateString([], { weekday: 'short' })}</span>
+                      <span className="mt-0.5 block text-xs font-bold">{date.getDate()}</span>
+                      <span className={`mx-auto mt-1 block h-1.5 w-1.5 rounded-full ${selected ? 'bg-white' : tone}`} />
+                    </button>
+                  );
+                })}
+              </div>
+              {(() => {
+                const selectedDay = clockHistory.weekDays.find((day) => day.dateKey === selectedWorkDate)
+                  || clockHistory.days.find((day) => day.dateKey === selectedWorkDate);
+                if (!selectedDay) return null;
+                const selectedRequests = timeCorrectionRequests.filter((request) => request.date === selectedWorkDate);
+                const statusClass = selectedDay.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : selectedDay.status === 'Active' ? 'bg-blue-100 text-blue-800' : selectedDay.status === 'Review required' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700';
+                return (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-900">{new Date(`${selectedDay.dateKey}T12:00:00`).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${statusClass}`}>{selectedDay.status}</span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 rounded-xl border border-slate-200 bg-white p-3 text-center">
+                      <div><p className="text-[9px] font-bold uppercase text-slate-400">Verified start</p><p className="mt-1 text-xs font-bold text-slate-800">{selectedDay.clockIn ? formatClockTime(selectedDay.clockIn) : '—'}</p></div>
+                      <div className="border-x border-slate-100"><p className="text-[9px] font-bold uppercase text-slate-400">Verified end</p><p className="mt-1 text-xs font-bold text-slate-800">{selectedDay.clockOut ? formatClockTime(selectedDay.clockOut) : '—'}</p></div>
+                      <div><p className="text-[9px] font-bold uppercase text-slate-400">Approved time</p><p className="mt-1 text-xs font-bold text-blue-700">{selectedDay.hours != null ? `${selectedDay.hours.toFixed(2)}h` : 'Pending'}</p></div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-600">
+                      <span>{selectedDay.tripCount} trip{selectedDay.tripCount === 1 ? '' : 's'}</span>
+                      <span>·</span><span>{selectedDay.breakMin || 0} personal minutes</span>
+                      <span>·</span><span>{selectedDay.reconciliation?.estimatedBoundaryCount || 0} estimated boundaries</span>
+                    </div>
+                    {selectedDay.needsCorrection && (
+                      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        Payroll remains unapproved until the evidence issue is reviewed. No automatic deduction is made.
+                      </div>
+                    )}
+                    {selectedRequests.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {selectedRequests.map((request) => (
+                          <div key={request.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                            <div className="min-w-0"><p className="text-xs font-semibold text-slate-800">{String(request.requestType || '').replaceAll('_', ' ')}</p><p className="truncate text-[10px] text-slate-500">{request.reason}</p></div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${request.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : request.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{request.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {role === 'driver' && !correctionDraft && (
+                      <button type="button" onClick={() => setCorrectionDraft({ requestType: selectedDay.needsCorrection ? 'INCORRECT_TIME' : 'SHIFT_NOTE', proposedTime: '', reason: '' })} className="mt-3 w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-50">
+                        Add note or request a correction
+                      </button>
+                    )}
+                    {role === 'driver' && correctionDraft && (
+                      <div className="mt-3 space-y-2 rounded-xl border border-blue-200 bg-white p-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <select value={correctionDraft.requestType} onChange={(event) => setCorrectionDraft({ ...correctionDraft, requestType: event.target.value })} className="rounded-lg border border-slate-300 px-2 py-2 text-xs outline-none focus:border-blue-500">
+                            <option value="INCORRECT_TIME">Incorrect time</option><option value="MISSING_START">Missing start</option><option value="MISSING_END">Missing end</option><option value="SHIFT_NOTE">Shift note</option>
+                          </select>
+                          {correctionDraft.requestType !== 'SHIFT_NOTE' && <input type="time" value={correctionDraft.proposedTime} onChange={(event) => setCorrectionDraft({ ...correctionDraft, proposedTime: event.target.value })} className="rounded-lg border border-slate-300 px-2 py-2 text-xs outline-none focus:border-blue-500" aria-label="Proposed corrected time" />}
+                        </div>
+                        <textarea rows="3" value={correctionDraft.reason} onChange={(event) => setCorrectionDraft({ ...correctionDraft, reason: event.target.value })} placeholder="Explain what happened. The original record will remain preserved." className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-blue-500" />
+                        <div className="flex gap-2"><button type="button" onClick={() => setCorrectionDraft(null)} className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">Cancel</button><button type="button" disabled={correctionSaving || correctionDraft.reason.trim().length < 3} onClick={submitTimeCorrectionRequest} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">{correctionSaving ? 'Submitting…' : 'Submit for review'}</button></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              <p className="mb-2 mt-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">Recent verified records</p>
               {clockHistory.days.length === 0 || clockHistory.days.every(d => !d.hasEvents) ? (
                 <p className="text-xs text-slate-500 text-center py-4">No clock in/out history yet.</p>
               ) : (

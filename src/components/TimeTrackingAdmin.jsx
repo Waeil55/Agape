@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Clock, AlertTriangle, Pause, CheckCircle,
   DollarSign, Download, ChevronDown, ChevronUp,
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, validateTimeEventSequence } from '../utils/timeTracking';
 import { localCalendarYmd } from '../utils/tripDate';
-import { auth, db, doc, setDoc, runTransaction } from '../config/firebase';
+import { auth, db, doc, setDoc, updateDoc, collection, onSnapshot, serverTimestamp, runTransaction } from '../config/firebase';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 
 const formatMinutes = (minutes) => {
@@ -57,10 +57,19 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
   const [timesheetSaving, setTimesheetSaving] = useState(false);
   const [gapReviewDraft, setGapReviewDraft] = useState(null);
   const [gapReviewSaving, setGapReviewSaving] = useState(false);
+  const [correctionRequests, setCorrectionRequests] = useState([]);
+  const [correctionReview, setCorrectionReview] = useState(null);
+  const [activeCorrectionRequestId, setActiveCorrectionRequestId] = useState(null);
   const editValidation = useMemo(
     () => editTimesheet ? validateTimeEventSequence(editTimesheet.events, { now: new Date() }) : null,
     [editTimesheet]
   );
+
+  useEffect(() => onSnapshot(collection(db, 'timeTrackingCorrectionRequests'), (snapshot) => {
+    setCorrectionRequests(snapshot.docs
+      .map((itemDoc) => ({ id: itemDoc.id, ...itemDoc.data() }))
+      .sort((a, b) => String(b.clientCreatedAt || '').localeCompare(String(a.clientCreatedAt || ''))));
+  }, (error) => console.error('Time correction review listener failed:', error)), []);
 
   const filteredDrivers = useMemo(() => {
     if (selectedDriver === 'ALL') return drivers;
@@ -208,6 +217,16 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
         previousClassification: gap.classification,
         previousPayrollEffect: gap.payrollEffect,
       });
+    });
+  };
+  const updateCorrectionRequest = async (request, status, reviewerNote) => {
+    const note = String(reviewerNote || '').trim();
+    if (note.length < 3) throw new Error('A reviewer note is required.');
+    await updateDoc(doc(db, 'timeTrackingCorrectionRequests', request.id), {
+      status,
+      reviewerNote: note,
+      reviewedBy: auth.currentUser?.email || auth.currentUser?.uid || 'authorized-reviewer',
+      reviewedAt: serverTimestamp(),
     });
   };
   const getPayableDayBillable = (day) => day.approvalEligible ? getDayBillable(day) : 0;
@@ -382,12 +401,51 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
 
         {/* Tabs */}
         <div className="flex gap-1 mb-5 bg-slate-200/60 p-1.5 rounded-2xl overflow-x-auto w-fit max-w-full">
-          {[{ id: 'sessions', label: 'Timesheets' }, { id: 'gaps', label: 'Activity audit' }, { id: 'abuse', label: 'Integrity signals' }, { id: 'payroll', label: 'Payroll review' }].map(tab => (
+          {[{ id: 'sessions', label: 'Timesheets' }, { id: 'requests', label: `Driver requests (${correctionRequests.filter((request) => request.status === 'pending').length})` }, { id: 'gaps', label: 'Activity audit' }, { id: 'abuse', label: 'Integrity signals' }, { id: 'payroll', label: 'Payroll review' }].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap px-4 py-2.5 text-sm font-semibold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
               {tab.label}
             </button>
           ))}
         </div>
+
+        {activeTab === 'requests' && (
+          <div className="space-y-3">
+            {correctionRequests.length === 0 && <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">No driver notes or correction requests.</div>}
+            {correctionRequests.map((request) => {
+              const reviewing = correctionReview?.id === request.id;
+              const requestKeys = new Set([request.driverId, request.driverEmail, request.userId].filter(Boolean).map((value) => String(value).toLowerCase()));
+              const driver = drivers.find((item) => [item.id, item.driverId, item.uid, item.email].filter(Boolean).some((value) => requestKeys.has(String(value).toLowerCase())));
+              const day = driverSessions[driver?.id]?.[request.date];
+              return (
+                <div key={request.id} className={`rounded-2xl border bg-white p-4 shadow-sm ${request.status === 'pending' ? 'border-amber-200' : 'border-slate-200'}`}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2"><p className="font-bold text-slate-900">{request.driverName || driver?.name || request.driverEmail}</p><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">{String(request.requestType || '').replaceAll('_', ' ')}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${request.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : request.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{request.status}</span></div>
+                      <p className="mt-1 text-xs text-slate-500">{request.date}{request.proposedTime ? ` · proposed ${request.proposedTime}` : ''}</p>
+                      <p className="mt-2 text-sm text-slate-700">{request.reason}</p>
+                      <p className="mt-2 text-[11px] text-slate-500">Original preserved: {request.originalSnapshot?.clockIn ? formatTime(request.originalSnapshot.clockIn) : 'no start'} – {request.originalSnapshot?.clockOut ? formatTime(request.originalSnapshot.clockOut) : 'no end'} · {request.originalSnapshot?.tripCount || 0} trips</p>
+                      {request.reviewerNote && <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">Review: {request.reviewerNote}</p>}
+                    </div>
+                    {request.status === 'pending' && <button type="button" onClick={() => setCorrectionReview(reviewing ? null : { id: request.id, note: '' })} className="rounded-xl border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700">{reviewing ? 'Cancel review' : 'Review'}</button>}
+                  </div>
+                  {reviewing && (
+                    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/40 p-3">
+                      <textarea rows="2" value={correctionReview.note} onChange={(event) => setCorrectionReview({ ...correctionReview, note: event.target.value })} placeholder="Required reviewer note" className="w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        {request.requestType === 'SHIFT_NOTE' ? (
+                          <button disabled={correctionReview.note.trim().length < 3} type="button" onClick={async () => { try { await updateCorrectionRequest(request, 'resolved', correctionReview.note); setCorrectionReview(null); } catch (error) { setApprovalMsg({ type: 'error', text: error.message }); } }} className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">Acknowledge note</button>
+                        ) : (
+                          <button disabled={!day || correctionReview.note.trim().length < 3} type="button" onClick={() => { setEditTimesheet({ driverId: driver.id, date: request.date, events: [...(day.sourceClockEvents || [])].sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)), correctionReason: `${request.reason} — Reviewer: ${correctionReview.note}` }); setActiveCorrectionRequestId(request.id); setCorrectionReview(null); }} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">Review source timesheet</button>
+                        )}
+                        <button disabled={correctionReview.note.trim().length < 3} type="button" onClick={async () => { try { await updateCorrectionRequest(request, 'rejected', correctionReview.note); setCorrectionReview(null); } catch (error) { setApprovalMsg({ type: 'error', text: error.message }); } }} className="flex-1 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">Reject request</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Sessions Tab */}
         {activeTab === 'sessions' && (
@@ -767,7 +825,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 w-full">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-lg font-semibold text-slate-900">Edit Timesheet — {formatDate(editTimesheet.date + 'T12:00:00')}</h3>
-              <button onClick={() => setEditTimesheet(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"><X size={18} /></button>
+              <button onClick={() => { setEditTimesheet(null); setActiveCorrectionRequestId(null); }} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
               {editTimesheet.events.map((event, index) => (
@@ -803,11 +861,16 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
               )}
             </div>
             <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50">
-              <button onClick={() => setEditTimesheet(null)} className="flex-1 p-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition">Cancel</button>
+              <button onClick={() => { setEditTimesheet(null); setActiveCorrectionRequestId(null); }} className="flex-1 p-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition">Cancel</button>
               <button disabled={timesheetSaving || !editValidation?.valid || !editTimesheet.correctionReason?.trim()} onClick={async () => {
                 try {
                   setTimesheetSaving(true);
                   await onUpdateClockEvents?.(editTimesheet.driverId, editTimesheet.date, editValidation.normalizedEvents, editTimesheet.correctionReason.trim());
+                  if (activeCorrectionRequestId) {
+                    const request = correctionRequests.find((item) => item.id === activeCorrectionRequestId);
+                    if (request) await updateCorrectionRequest(request, 'resolved', editTimesheet.correctionReason.trim());
+                    setActiveCorrectionRequestId(null);
+                  }
                   setEditTimesheet(null);
                 } catch (error) {
                   setApprovalMsg({ type: 'error', text: error.message || 'Timesheet correction could not be saved.' });
