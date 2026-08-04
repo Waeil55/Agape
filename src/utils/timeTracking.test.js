@@ -114,4 +114,91 @@ describe('payroll time ledger', () => {
     expect(clockIn.anchorType).toBe('HOME');
     expect(new Date(clockIn.timestamp).getTime()).toBeLessThan(new Date('2026-07-27T12:00:00.000Z').getTime());
   });
+
+  it('replaces duplicate driver punches with one trip-authoritative shift', () => {
+    const model = buildTimeEvents([
+      {
+        id: 'trip-1',
+        date: '2026-08-03',
+        status: 'Completed',
+        arrivalTime: '2026-08-03T08:00:00.000-04:00',
+        departedPickupTime: '2026-08-03T08:05:00.000-04:00',
+        arrivalDropoffTime: '2026-08-03T09:00:00.000-04:00',
+        completedAt: '2026-08-03T09:02:00.000-04:00',
+      },
+    ], { id: 'driver-1' }, [
+      event('IN', '2026-08-03T07:40:00.000-04:00'),
+      event('AUTO_IN', '2026-08-03T07:41:00.000-04:00'),
+      event('IN', '2026-08-03T07:42:00.000-04:00'),
+    ], POLICY_MODES.PAY_FROM_FIRST_PICKUP, {
+      date: '2026-08-03',
+      now: '2026-08-04T12:00:00.000-04:00',
+    });
+
+    expect(model.events.filter((item) => item.type === 'AUTO_CLOCK_IN')).toHaveLength(1);
+    expect(model.events.filter((item) => item.type === 'CLOCK_IN')).toHaveLength(0);
+    expect(model.events.filter((item) => item.type === 'CLOCK_OUT')).toHaveLength(1);
+    expect(model.anomalies).toEqual([]);
+    expect(model.approvalEligible).toBe(true);
+    expect(model.billableMinutes).toBe(60);
+  });
+
+  it('uses GPS home departure and return as the home-to-home payroll boundary', () => {
+    const model = buildTimeEvents([
+      {
+        id: 'trip-1',
+        date: '2026-08-03',
+        status: 'Completed',
+        arrivalTime: '2026-08-03T08:00:00.000-04:00',
+        arrivalDropoffTime: '2026-08-03T09:00:00.000-04:00',
+        completedAt: '2026-08-03T09:01:00.000-04:00',
+        pickupLat: 39.8,
+        pickupLng: -86.1,
+        dropoffLat: 39.82,
+        dropoffLng: -86.12,
+      },
+    ], { id: 'driver-1', homeLat: 39.7, homeLng: -86.2 }, [], POLICY_MODES.PAY_FROM_HOME, {
+      date: '2026-08-03',
+      now: '2026-08-04T12:00:00.000-04:00',
+      breadcrumbs: [
+        { capturedAt: '2026-08-03T07:15:00.000-04:00', lat: 39.7, lng: -86.2, accuracy: 8 },
+        { capturedAt: '2026-08-03T09:35:00.000-04:00', lat: 39.7002, lng: -86.2001, accuracy: 7 },
+      ],
+    });
+
+    const clockIn = model.events.find((item) => item.type === 'AUTO_CLOCK_IN');
+    const clockOut = model.events.find((item) => item.type === 'CLOCK_OUT');
+    expect(clockIn.timestamp).toBe('2026-08-03T11:15:00.000Z');
+    expect(clockOut.timestamp).toBe('2026-08-03T13:35:00.000Z');
+    expect(clockIn.confidence).toBe('gps_verified');
+    expect(clockOut.confidence).toBe('gps_verified');
+    expect(model.billableMinutes).toBe(140);
+  });
+
+  it('rejects stale or inaccurate home GPS samples and labels the fallback as an estimate', () => {
+    const model = buildTimeEvents([{
+      id: 'trip-1',
+      date: '2026-08-03',
+      status: 'Completed',
+      arrivalTime: '2026-08-03T12:00:00.000Z',
+      arrivalDropoffTime: '2026-08-03T13:00:00.000Z',
+      completedAt: '2026-08-03T13:01:00.000Z',
+      pickupLat: 39.8,
+      pickupLng: -86.1,
+      dropoffLat: 39.82,
+      dropoffLng: -86.12,
+    }], { id: 'driver-1', homeLat: 39.7, homeLng: -86.2 }, [], POLICY_MODES.PAY_FROM_HOME, {
+      date: '2026-08-03',
+      now: '2026-08-04T12:00:00.000Z',
+      breadcrumbs: [
+        { capturedAt: '2026-08-03T02:00:00.000Z', lat: 39.7, lng: -86.2, accuracy: 8 },
+        { capturedAt: '2026-08-03T11:30:00.000Z', lat: 39.7, lng: -86.2, accuracy: 400 },
+      ],
+    });
+
+    const clockIn = model.events.find((item) => item.type === 'AUTO_CLOCK_IN');
+    expect(clockIn.anchorType).toBe('HOME');
+    expect(clockIn.confidence).toBe('route_estimate');
+    expect(clockIn.reason).toBe('FIRST_WORK_EVENT');
+  });
 });

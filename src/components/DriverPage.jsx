@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday, isoToLocalDateKey } from '../utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
-import { auth, db, doc, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, collection, addDoc, serverTimestamp } from '../config/firebase';
+import { auth, db, doc, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -33,8 +33,6 @@ import {
   classifyGap,
   generatePendingClockOut,
   buildTimeEvents,
-  generatePayrollOutput,
-  stitchSessions,
 } from '../utils/timeTracking';
 import { impact } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
@@ -47,6 +45,7 @@ import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
+import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -519,7 +518,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemetry = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
@@ -1384,12 +1383,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
   const ttEventsLogRef = useRef([]);
   const ttTickRef = useRef(null);
   const ttAccumulatedBreakMsRef = useRef(0);
-  const [showIdleLogoutPrompt, setShowIdleLogoutPrompt] = useState(false);
-  const idlePromptedRef = useRef(false);
-  const [showClockOutOffer, setShowClockOutOffer] = useState(false);
-  const [delayedClockOutTarget, setDelayedClockOutTarget] = useState('');
-  const [clockOutEstimate, setClockOutEstimate] = useState(null);
-  const pendingClockOutRef = useRef(null);
   const clockOutOfferedRef = useRef(false);
   const [editHomeAddress, setEditHomeAddress] = useState(me?.homeAddress || '');
 
@@ -1419,14 +1412,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
 
   const clockHistory = useMemo(() => {
     const events = me?.clockEvents || [];
-    if (events.length === 0) return { days: [], weeklyTotal: 0, weeklyOvertime: 0 };
-    const byDate = {};
-    events.forEach(e => {
-      const dateKey = isoToLocalDateKey(e.timestamp);
-      if (!dateKey) return;
-      if (!byDate[dateKey]) byDate[dateKey] = [];
-      byDate[dateKey].push(e);
-    });
     const today = new Date();
     const days = [];
     let weeklyMilliseconds = 0;
@@ -1438,166 +1423,40 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateKey = localCalendarYmd(d);
-      const dayEvents = [...(byDate[dateKey] || [])].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
-      const ledger = stitchSessions(dayEvents, { now: new Date(), requireClosed: dateKey < localCalendarYmd() });
-      const firstSession = ledger.sessions[0];
-      const lastSession = ledger.sessions[ledger.sessions.length - 1];
-      const billableMs = ledger.totalBillableMilliseconds || 0;
-      const breakMs = ledger.sessions.reduce((sum, session) => sum + (session.breakMilliseconds || 0), 0);
-      const historicalOpenShift = dateKey < localCalendarYmd() && ledger.sessions.some((session) => session.isOpen);
-      const hours = dayEvents.length && !historicalOpenShift ? billableMs / 3600000 : null;
+      const telemetryBreadcrumbs = getDriverTelemetryBreadcrumbs(driverTelemetry, me, dateKey);
+      const model = buildTimeEvents(driverScopedTrips, me, events, timeTrackingPolicyMode, {
+        date: dateKey,
+        now: new Date(),
+        breadcrumbs: telemetryBreadcrumbs,
+        automaticShift: true,
+      });
+      const firstSession = model.sessions[0];
+      const lastSession = model.sessions[model.sessions.length - 1];
+      const billableMs = model.billableMilliseconds || 0;
+      const breakMs = model.sessions.reduce((sum, session) => sum + (session.breakMilliseconds || 0), 0);
+      const hasEvidence = model.events.length > 0;
+      const historicalOpenShift = dateKey < localCalendarYmd() && model.sessions.some((session) => session.isOpen);
+      const hours = hasEvidence && model.approvalEligible ? billableMs / 3600000 : null;
       days.push({
         dateKey,
-        hasEvents: dayEvents.length > 0,
+        hasEvents: hasEvidence,
         clockIn: firstSession?.clockInTime || null,
         clockOut: lastSession?.clockOutTime || null,
         hours,
         breakMin: Math.round(breakMs / 60000),
-        anomalies: ledger.anomalies,
-        needsCorrection: historicalOpenShift || ledger.anomalies.length > 0,
+        anomalies: model.anomalies,
+        needsCorrection: historicalOpenShift || model.anomalies.length > 0,
       });
-      if (d >= weekStart && !historicalOpenShift && ledger.anomalies.length === 0) weeklyMilliseconds += billableMs;
+      if (d >= weekStart && model.approvalEligible) weeklyMilliseconds += billableMs;
     }
     const weeklyTotal = weeklyMilliseconds / 3600000;
     const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
     return { days, weeklyTotal, weeklyOvertime };
-  }, [me?.clockEvents]);
+  }, [driverScopedTrips, driverTelemetry, me, timeTrackingPolicyMode]);
 
-  const handleClockToggle = useCallback(() => {
-    const newStatus = !isClockedIn;
-    const nowIso = new Date().toISOString();
-    const clockLocation = getDriverClockLocation();
-    const extra = {
-      clockTimestamp: nowIso,
-      ...(clockLocation ? { clockLocation } : {}),
-    };
-    onDriverStatusUpdate?.(driverId, newStatus, extra);
-    if (newStatus) {
-      setShowToast({ type: 'success', message: 'Clocked in — you\'re online for trips.' });
-    } else {
-      if (pendingClockOutRef.current) {
-        clearTimeout(pendingClockOutRef.current);
-        pendingClockOutRef.current = null;
-      }
-      setDelayedClockOutTarget('');
-      setShowClockOutOffer(false);
-      clockOutOfferedRef.current = false;
-      // Persist time tracking session to Firestore
-      if (ttEventsLogRef.current.length > 0) {
-        const lastEvent = ttEventsLogRef.current[ttEventsLogRef.current.length - 1];
-        if (lastEvent?.type !== 'CLOCK_OUT') {
-          ttEventsLogRef.current.push({ type: 'CLOCK_OUT', timestamp: nowIso, location: clockLocation });
-        }
-        const events = [...ttEventsLogRef.current];
-        const clockIn = events.find(e => e.type === 'CLOCK_IN' || e.type === 'AUTO_CLOCK_IN');
-        const clockOutEv = [...events].reverse().find(e => e.type === 'CLOCK_OUT');
-        const dailyTimeData = buildTimeEvents(
-          driverScopedTrips,
-          me,
-          [
-            ...(me?.clockEvents || []),
-            { type: 'out', timestamp: nowIso, ...(clockLocation ? { lat: clockLocation.lat, lng: clockLocation.lng } : {}) },
-          ],
-          timeTrackingPolicyMode,
-          { date: localCalendarYmd(), breadcrumbs: me?.breadcrumbs || [] }
-        );
-        const payrollOutput = generatePayrollOutput(dailyTimeData, Number(me?.hourlyRate || 0));
-        addDoc(collection(db, 'timeTrackingSessions'), {
-          driverId,
-          driverEmail: currentUser || '',
-          driverName: me?.name || '',
-          date: localCalendarYmd(),
-          clockIn: clockIn?.timestamp || null,
-          clockInLocation: clockIn?.location || null,
-          clockOut: clockOutEv?.timestamp || null,
-          clockOutLocation: clockOutEv?.location || null,
-          billableMinutes: payrollOutput.payTime.billableMinutes || ttBillableMin,
-          breakMinutes: ttBreakMin,
-          gapLog: dailyTimeData.gapLog,
-          sessions: dailyTimeData.sessions,
-          payrollOutput,
-          policyMode: timeTrackingPolicyMode,
-          events,
-          createdAt: serverTimestamp(),
-        }).catch(() => {});
-      }
-      setShowToast({ type: 'info', message: 'Clocked out — trips are now read-only.' });
-    }
-  }, [isClockedIn, getDriverClockLocation, onDriverStatusUpdate, driverId, driverScopedTrips, me, timeTrackingPolicyMode, currentUser, ttBillableMin, ttBreakMin]);
-
-  const estimateClockOutFromHome = useCallback(async () => {
-    if (!driverPosition?.lat || !driverPosition?.lng || !me?.homeLat || !me?.homeLng) {
-      setClockOutEstimate(null);
-      return;
-    }
-    try {
-      const duration = await getTravelDuration(
-        { lat: driverPosition.lat, lng: driverPosition.lng },
-        { lat: me.homeLat, lng: me.homeLng }
-      );
-      if (duration) {
-        const minutes = Math.max(Math.ceil(duration.durationSeconds / 60), 2);
-        const now = new Date();
-        now.setMinutes(now.getMinutes() + minutes);
-        setClockOutEstimate({
-          minutes,
-          targetTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-          label: `${duration.durationText} (${duration.distanceText}) via Google Maps`,
-        });
-        return;
-      }
-    } catch (_) {}
-    // Fallback: Haversine estimate
-    const R = 6371;
-    const dLat = (me.homeLat - driverPosition.lat) * Math.PI / 180;
-    const dLon = (me.homeLng - driverPosition.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(driverPosition.lat*Math.PI/180)*Math.cos(me.homeLat*Math.PI/180)*Math.sin(dLon/2)**2;
-    const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const minutes = Math.max(Math.ceil(km / 40 * 60), 5);
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + minutes);
-    setClockOutEstimate({
-      minutes,
-      targetTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-      label: `~${minutes} min est. (${km.toFixed(1)} km)`,
-    });
-  }, [driverPosition, me?.homeLat, me?.homeLng]);
-
-  const scheduleDelayedClockOut = useCallback((targetTime24) => {
-    if (pendingClockOutRef.current) {
-      clearTimeout(pendingClockOutRef.current);
-      pendingClockOutRef.current = null;
-    }
-    setDelayedClockOutTarget(targetTime24);
-    const now = new Date();
-    const [h, m] = targetTime24.split(':').map(Number);
-    const target = new Date(now);
-    target.setHours(h, m, 0, 0);
-    let ms = target.getTime() - now.getTime();
-    if (ms <= 0) {
-      // Target time already passed today — schedule for next day or clock out now
-      setShowToast({ type: 'info', message: 'Time already passed — clocking out now.' });
-      handleClockToggle();
-      return;
-    }
-    pendingClockOutRef.current = setTimeout(() => {
-      if (isClockedIn) {
-        onDriverStatusUpdate?.(driverId, false);
-        setShowToast({ type: 'info', message: `Auto clock-out at ${targetTime24} — shift ended.` });
-      }
-      pendingClockOutRef.current = null;
-      setDelayedClockOutTarget('');
-      setShowClockOutOffer(false);
-      clockOutOfferedRef.current = false;
-    }, ms);
-    setShowToast({ type: 'success', message: `Clock-out set for ${targetTime24}.` });
-    setShowClockOutOffer(false);
-  }, [driverId, isClockedIn, onDriverStatusUpdate, handleClockToggle]);
-
-  // Cleanup delayed clock-out timer on unmount
+  // Cleanup timekeeping interval on unmount.
   useEffect(() => {
     return () => {
-      if (pendingClockOutRef.current) clearTimeout(pendingClockOutRef.current);
       if (ttTickRef.current) clearInterval(ttTickRef.current);
     };
   }, []);
@@ -1664,24 +1523,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     return () => { if (ttTickRef.current) { clearInterval(ttTickRef.current); ttTickRef.current = null; } };
   }, [ttState]);
 
-  // ─── TIME TRACKING: break, resume, end shift handlers ───
-  const ttStartBreak = useCallback(() => {
-    if (ttStateRef.current !== TT.ON_SHIFT_ACTIVE) return;
-    const now = new Date().toISOString();
-    setTtState(TT.ON_BREAK);
-    ttStateRef.current = TT.ON_BREAK;
-    ttBreakStartRef.current = now;
-    ttEventsLogRef.current.push({ type: 'BREAK_START', timestamp: now });
-    const breakLocation = getDriverClockLocation();
-    onDriverStatusUpdate?.(driverId, true, {
-      clockTimestamp: now,
-      clockEventType: 'break_start',
-      timeTrackingState: TT.ON_BREAK,
-      ...(breakLocation ? { clockLocation: breakLocation } : {}),
-    });
-    setShowToast({ type: 'info', message: 'Break started — time paused.' });
-  }, [driverId, getDriverClockLocation, onDriverStatusUpdate]);
-
+  // A legacy break is closed automatically when new assigned work arrives.
   const ttResume = useCallback(() => {
     if (ttStateRef.current !== TT.ON_BREAK) return;
     const now = new Date().toISOString();
@@ -1704,10 +1546,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     setShowToast({ type: 'success', message: 'Break ended — back on shift.' });
   }, [driverId, getDriverClockLocation, onDriverStatusUpdate]);
 
-  const ttEndShift = useCallback(() => {
-    handleClockToggle();
-  }, [handleClockToggle]);
-
   const ttLogTripEvent = useCallback((eventType, tripId, location) => {
     const now = new Date().toISOString();
     const prev = ttLastTripEventRef.current;
@@ -1719,27 +1557,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     ttEventsLogRef.current.push(evt);
     ttLastTripEventRef.current = evt;
   }, []);
-
-  // Idle logout prompt — when no trips for 30s while clocked in
-  useEffect(() => {
-    if (!isClockedIn || idlePromptedRef.current) return;
-    const activeTripsCount = (orderedTrips || []).length;
-    if (activeTripsCount > 0) {
-      idlePromptedRef.current = false;
-      setShowIdleLogoutPrompt(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      if (!isClockedIn) return;
-      setShowIdleLogoutPrompt(true);
-      idlePromptedRef.current = true;
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [isClockedIn, orderedTrips?.length]);
-
-
-
-
 
   const handleStreamLocationUpdate = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
     if (!driverId) return;
@@ -1767,7 +1584,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     }
   }, [trips, driverPosition?.lat, driverPosition?.lng, selectedTrips]);
 
-  // Geofence auto-suggest: near home + clocked in + no active trips → offer clock-out
+  // The home geofence is the authoritative automatic end of a home-to-home shift.
   const geofencePromptedRef = useRef(false);
   useEffect(() => {
     if (!isClockedIn || !driverPosition?.lat || !me?.homeLat || !me?.homeLng) return;
@@ -1785,9 +1602,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const distMiles = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     if (distMiles <= 0.12) { // ~200 meters
       geofencePromptedRef.current = true;
-      setShowToast({ type: 'info', message: 'Looks like you\'re near home! Clock out to end your shift.', action: 'geofence-clockout' });
+      const timestamp = driverPosition.capturedAt || new Date().toISOString();
+      onDriverStatusUpdate?.(driverId, false, {
+        clockTimestamp: timestamp,
+        clockEventType: 'auto_out',
+        timeTrackingState: TT.OFF_SHIFT,
+        timeTrackingAnchor: 'HOME_GPS',
+        clockLocation: { lat: driverPosition.lat, lng: driverPosition.lng },
+      });
+      setShowToast({ type: 'success', message: 'Shift ended automatically at home.' });
     }
-  }, [isClockedIn, driverPosition?.lat, driverPosition?.lng, me?.homeLat, me?.homeLng, activeTrips.length]);
+  }, [isClockedIn, driverPosition?.lat, driverPosition?.lng, driverPosition?.capturedAt, me?.homeLat, me?.homeLng, activeTrips.length, driverId, onDriverStatusUpdate]);
 
   // ─── DISPATCHER ADDED TRIP DURING BREAK (Section 13) ───
   const prevTripsCountRef = useRef(activeTrips.length);
@@ -1795,13 +1620,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     const prevCount = prevTripsCountRef.current;
     prevTripsCountRef.current = activeTrips.length;
     if (activeTrips.length > prevCount && ttStateRef.current === TT.ON_BREAK) {
-      // New trip arrived while on break — cancel pending clock-out and resume
-      if (pendingClockOutRef.current) {
-        clearTimeout(pendingClockOutRef.current);
-        pendingClockOutRef.current = null;
-      }
+      // New work closes any legacy break state automatically.
       clockOutOfferedRef.current = false;
-      setShowClockOutOffer(false);
       ttResume();
       setShowToast({ type: 'success', message: 'New trip assigned — break ended, session resumed.' });
     }
@@ -3035,40 +2855,27 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
     if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); }
     setWorkNotesOpen(false);
 
-    // Check if all trips are done - offer clock-out with pending timer
+    // End timekeeping automatically. Home-to-home shifts close at the verified
+    // home geofence; first-pickup shifts close at the final completed trip.
     if ((isClockedIn || ttStateRef.current !== TT.OFF_SHIFT) && !clockOutOfferedRef.current) {
       const remaining = driverScopedTrips.filter(t =>
         isTripDateToday(t.date) && !isWorkflowTerminalTrip(t) && t.id !== showCompleteModal.id
       );
       if (remaining.length === 0) {
         clockOutOfferedRef.current = true;
-        const completedTrip = {
-          ...showCompleteModal,
-          completedAt: now,
-          arrivalDropoffTime: dropoffArrivalIso,
-        };
-        const pending = generatePendingClockOut({
-          lastTrip: completedTrip,
-          driver: me,
-          policyMode: timeTrackingPolicyMode,
-        });
-        if (pending.pendingClockOut && pending.estimatedClockOutTime) {
-          const travelMin = Math.max(Math.round(pending.pendingClockOut.travelMinutes || 0), 0);
-          ttEventsLogRef.current.push({
-            ...pending.pendingClockOut,
-            timestamp: now,
-            location: getTripDropoffLocation(showCompleteModal) || getDriverClockLocation(),
-          });
-          setClockOutEstimate({
-            minutes: travelMin,
-            targetTime: '',
-            label: travelMin > 0 ? `${travelMin} min travel home` : 'Clock out at dropoff',
-          });
-          setShowToast({ type: 'info', message: travelMin > 0 ? `Final trip complete. Return home, then clock out. Estimated travel: ${travelMin} min.` : 'Final trip complete. Clock out when the shift is finished.' });
+        if (timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && me?.homeLat && me?.homeLng) {
+          setShowToast({ type: 'info', message: 'Final trip complete. Timekeeping will end automatically when you arrive home.' });
         } else {
-          estimateClockOutFromHome();
+          const clockLocation = getTripDropoffLocation(showCompleteModal) || getDriverClockLocation();
+          onDriverStatusUpdate?.(driverId, false, {
+            clockTimestamp: dropoffArrivalIso,
+            clockEventType: 'auto_out',
+            timeTrackingState: TT.OFF_SHIFT,
+            timeTrackingAnchor: 'FINAL_TRIP',
+            ...(clockLocation ? { clockLocation } : {}),
+          });
+          setShowToast({ type: 'success', message: 'Final trip complete. Shift ended automatically.' });
         }
-        setShowClockOutOffer(true);
       }
     }
   };
@@ -5546,50 +5353,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               </div>
             </div>
 
-            {/* Time Tracking Controls */}
-            {!isClockedIn ? (
-              <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-950 to-slate-900 p-5 text-white shadow-xl">
-                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-500/20 blur-2xl" />
-                <div className="relative w-12 h-12 bg-white/10 text-blue-300 rounded-2xl flex items-center justify-center mb-4 ring-1 ring-white/10">
-                  <Clock size={24} />
+            {/* Automatic, trip-authoritative timekeeping. Drivers cannot create payroll punches. */}
+            <div className={`rounded-2xl border p-4 shadow-sm ${isClockedIn ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                  <Clock size={20} />
                 </div>
-                <h3 className="relative text-lg font-semibold mb-1">Ready to start your shift</h3>
-                <p className="relative text-xs text-slate-300 mb-4">Home-to-home is active. Start when leaving home and end only after returning home.</p>
-                <button type="button" onClick={handleClockToggle} className="relative w-full h-11 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-sm font-bold transition-colors shadow-lg shadow-blue-950/30 flex items-center justify-center gap-2"><Play size={16} /> Start shift</button>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-bold ${isClockedIn ? 'text-emerald-900' : 'text-slate-800'}`}>Automatic timekeeping</p>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {isClockedIn
+                      ? `Active · ${Math.floor(ttBillableMin / 60)}h ${ttBillableMin % 60}m`
+                      : 'Starts with the first verified trip event'}
+                  </p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${isClockedIn ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  {isClockedIn ? 'Tracking' : 'Standby'}
+                </span>
               </div>
-            ) : (
-              <div className={`rounded-2xl border p-4 shadow-sm ${
-                ttState === TT.ON_BREAK
-                  ? 'bg-amber-50 border-amber-200'
-                  : 'bg-emerald-50 border-emerald-200'
-              }`}>
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${ttState === TT.ON_BREAK ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
-                  <span className={`text-sm font-semibold uppercase tracking-wide ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
-                    {ttState === TT.ON_BREAK ? 'On Break' : 'Active'}
-                  </span>
-                  <span className="text-slate-400">·</span>
-                  <Clock size={13} className={ttState === TT.ON_BREAK ? 'text-amber-600' : 'text-emerald-600'} />
-                  <span className={`text-sm font-semibold ${ttState === TT.ON_BREAK ? 'text-amber-800' : 'text-emerald-800'}`}>
-                    {Math.floor(ttBillableMin / 60)}h {ttBillableMin % 60}m
-                  </span>
-                  {ttBreakMin > 0 && (
-                    <>
-                      <span className="text-slate-400">·</span>
-                      <span className={`text-xs font-semibold ${ttState === TT.ON_BREAK ? 'text-amber-700' : 'text-emerald-700'}`}>Break {ttBreakMin}m</span>
-                    </>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {ttState === TT.ON_SHIFT_ACTIVE ? (
-                    <button type="button" onClick={ttStartBreak} className="flex-1 h-11 rounded-xl text-sm font-bold transition-colors bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer">Pause time</button>
-                  ) : (
-                    <button type="button" onClick={ttResume} className="flex-1 h-11 rounded-xl text-sm font-bold transition-colors bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer">Continue shift</button>
-                  )}
-                  <button type="button" onClick={ttEndShift} className="flex-1 h-11 rounded-xl text-sm font-bold transition-colors bg-rose-100 text-rose-800 hover:bg-rose-200 cursor-pointer">End shift</button>
-                </div>
-              </div>
-            )}
+              <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                Trip timestamps and GPS home arrival control payroll automatically. Corrections require an administrator and remain in the audit log.
+              </p>
+            </div>
 
             {/* Analytics */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -5963,83 +5748,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
               onBack={() => setShowTTAdmin(false)}
               drivers={[...allDrivers, ...(dispatchers || [])]}
               trips={driverScopedTrips}
+              driverTelemetry={driverTelemetry}
               clockEvents={me?.clockEvents || []}
               timeData={{ policyMode: timeTrackingPolicyMode }}
               onUpdateClockEvents={onUpdateClockEvents}
               onUpdateHourlyRate={onUpdateHourlyRate}
             />
           </Suspense>
-        </div>
-      )}
-
-      {/* ===== CLOCK-OUT OFFER MODAL (last trip complete) ===== */}
-      {showClockOutOffer && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowClockOutOffer(false)}>
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 size={24} className="text-emerald-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 text-center">All trips complete!</h3>
-            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
-              You've finished all your trips. Would you like to end your shift?
-            </p>
-
-            <div className="mt-5 space-y-2">
-              <button onClick={() => { setShowClockOutOffer(false); handleClockToggle(); }} className="w-full h-7 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95 flex items-center justify-center gap-2">
-                <LogOut size={16} /> End Shift Now
-              </button>
-
-              <div className="border-t border-slate-100 pt-3 mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Schedule end of shift</p>
-                <div className="flex items-center gap-2">
-                  <input type="time" value={delayedClockOutTarget}
-                    onChange={(e) => setDelayedClockOutTarget(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition" />
-                  <button onClick={() => { if (delayedClockOutTarget) scheduleDelayedClockOut(delayedClockOutTarget); else setShowToast({ type: 'info', message: 'Select a time first.' }); }}
-                    disabled={!delayedClockOutTarget}
-                    className="h-7 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-medium text-xs transition active:scale-95">
-                    Set Time
-                  </button>
-                </div>
-              </div>
-
-              {clockOutEstimate && (
-                <div className="border-t border-slate-100 pt-3 mt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 text-center">Estimate from home</p>
-                  <button onClick={() => scheduleDelayedClockOut(clockOutEstimate.targetTime)} className="w-full h-7 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition active:scale-95 flex items-center justify-center gap-2">
-                    <Navigation size={16} /> End shift in ~{clockOutEstimate.label}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <button onClick={() => { setShowClockOutOffer(false); clockOutOfferedRef.current = false; }} className="w-full h-7 text-xs font-medium text-slate-500 hover:text-slate-700 mt-3 transition">
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== IDLE LOGOUT PROMPT MODAL ===== */}
-      {showIdleLogoutPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 200 }} onClick={() => setShowIdleLogoutPrompt(false)}>
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 pointer-events-auto" onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-              <LogOut size={24} className="text-slate-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 text-center">No upcoming trips</h3>
-            <p className="text-sm font-medium text-slate-500 text-center mt-2 leading-relaxed">
-              You don't have any trips right now. Would you like to end your shift?
-            </p>
-            <div className="grid grid-cols-2 gap-3 mt-6">
-              <button onClick={() => { setShowIdleLogoutPrompt(false); handleClockToggle(); }} className="h-7 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition active:scale-95">
-                End Shift
-              </button>
-              <button onClick={() => { setShowIdleLogoutPrompt(false); idlePromptedRef.current = true; }} className="h-7 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition active:scale-95">
-                Stay On
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -6657,11 +6372,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], activeMission
             {showToast.action === 'arrive-dropoff' && (
               <button type="button" onClick={() => { setShowToast(null); if (showToast.trip) handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-semibold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
                 Arrive
-              </button>
-            )}
-            {showToast.action === 'geofence-clockout' && (
-              <button type="button" onClick={() => { setShowToast(null); handleClockToggle(); }} className="px-4 py-2 bg-rose-500 rounded-xl text-xs font-semibold hover:bg-rose-400 transition-all shrink-0 cursor-pointer">
-                End Shift
               </button>
             )}
             <button type="button" onClick={() => setShowToast(null)} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 cursor-pointer">

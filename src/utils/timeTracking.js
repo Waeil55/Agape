@@ -305,7 +305,7 @@ const canonicalEventType = (type) => {
   const normalized = String(type || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
   if (normalized === 'IN' || normalized === 'CLOCKIN') return 'CLOCK_IN';
   if (normalized === 'AUTO_IN' || normalized === 'AUTOCLOCKIN') return 'AUTO_CLOCK_IN';
-  if (normalized === 'OUT' || normalized === 'CLOCKOUT') return 'CLOCK_OUT';
+  if (normalized === 'OUT' || normalized === 'CLOCKOUT' || normalized === 'AUTO_OUT' || normalized === 'AUTOCLOCKOUT') return 'CLOCK_OUT';
   if (normalized === 'PAUSE' || normalized === 'START_BREAK') return 'BREAK_START';
   if (normalized === 'RESUME' || normalized === 'END_BREAK') return 'BREAK_END';
   return normalized;
@@ -536,7 +536,7 @@ export const generatePendingClockOut = ({ lastTrip, driver, policyMode }) => {
     const lastDropoffLat = lastTrip.dropoffLat || lastTrip.pickupLat;
     const lastDropoffLng = lastTrip.dropoffLng || lastTrip.pickupLng;
 
-    if (lastDropoffLat && lastDropoffLng) {
+    if (lastDropoffLat != null && lastDropoffLng != null) {
       const travelMinutes = estimateTravelTimeMinutes(
         lastDropoffLat, lastDropoffLng,
         driver.homeLat, driver.homeLng
@@ -652,6 +652,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
   const events = [];
   const dateFilter = options.date || todayLocal();
   const driverId = driver?.id || driver?.email || options.driverId || '';
+  const automaticShift = options.automaticShift !== false;
 
   const toIso = (value) => {
     if (!value) return null;
@@ -691,12 +692,13 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     const lower = String(type || '').toLowerCase();
     if (lower.includes('break') && (lower.includes('end') || lower.includes('resume'))) return 'BREAK_END';
     if (lower.includes('break')) return 'BREAK_START';
+    if (lower.includes('out')) return 'CLOCK_OUT';
     if (lower.includes('auto')) return 'AUTO_CLOCK_IN';
     if (lower === 'in' || lower === 'clock_in' || lower === 'clockin') return 'CLOCK_IN';
     if (lower === 'out' || lower === 'clock_out' || lower === 'clockout') return 'CLOCK_OUT';
     if (lower === 'break_end') return 'BREAK_END';
     if (lower === 'break_start') return 'BREAK_START';
-    return lower.includes('out') ? 'CLOCK_OUT' : 'CLOCK_IN';
+    return 'CLOCK_IN';
   };
 
   const tripDateKey = (trip) => {
@@ -738,16 +740,6 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     })
     .filter(Boolean);
 
-  normalizedClockEvents.forEach((ce) => {
-    events.push({
-      type: ce.type,
-      timestamp: ce.timestamp,
-      location: ce.location,
-      driverId: ce.driverId || driverId,
-      date: ce.date,
-    });
-  });
-
   const normalizedTrips = [];
   (trips || []).forEach((trip) => {
     const date = tripDateKey(trip) || dateFilter;
@@ -785,10 +777,65 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     addTripEvent('TRIP_COMPLETED', trip.completedAt || trip.completedTime, dropoffLocation || pickupLocation);
   });
 
-  const hasClockIn = events.some((event) => event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN');
-  const firstWorkEvent = [...events]
+  const tripEvents = events.filter((event) => event.type === 'TRIP_EVENT');
+  const firstWorkEvent = [...tripEvents]
     .filter((event) => event.type === 'TRIP_EVENT')
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0];
+  const lastWorkEvent = [...tripEvents]
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+  const isAdminCorrection = (event) => (
+    event?.source === 'admin_correction'
+    || event?.authority === 'admin'
+    || Boolean(event?.correctedBy)
+    || Boolean(event?.correctionReason)
+  );
+  const retainedClockEvents = automaticShift && firstWorkEvent
+    ? normalizedClockEvents.filter((event) => (
+        event.type === 'BREAK_START'
+        || event.type === 'BREAK_END'
+        || isAdminCorrection(event)
+      ))
+    : normalizedClockEvents;
+
+  retainedClockEvents.forEach((ce) => {
+    events.push({
+      ...ce,
+      driverId: ce.driverId || driverId,
+      date: ce.date,
+    });
+  });
+
+  const correctedEnd = [...retainedClockEvents].reverse().find((event) => (
+    isAdminCorrection(event) && event.type === 'CLOCK_OUT'
+  ));
+  const hasClockIn = retainedClockEvents.some((event) => event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN');
+
+  const breadcrumbTime = (breadcrumb) => toIso(
+    breadcrumb?.capturedAt || breadcrumb?.recordedAt || breadcrumb?.timestamp || breadcrumb?.at
+  );
+  const homePoint = normalizePoint(driver?.homeLat, driver?.homeLng);
+  const homeBreadcrumbs = homePoint
+    ? (options.breadcrumbs || driver?.breadcrumbs || [])
+        .map((breadcrumb) => ({
+          timestamp: breadcrumbTime(breadcrumb),
+          location: normalizePoint(breadcrumb),
+          accuracy: Number(breadcrumb?.accuracy || 0),
+        }))
+        .filter((breadcrumb) => (
+          breadcrumb.timestamp
+          && breadcrumb.location
+          && (!breadcrumb.accuracy || breadcrumb.accuracy <= 200)
+          && shouldIncludeDate(isoDateKey(breadcrumb.timestamp))
+          && haversineDistanceMiles(
+            breadcrumb.location.lat,
+            breadcrumb.location.lng,
+            homePoint.lat,
+            homePoint.lng,
+          ) <= 0.12
+        ))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    : [];
 
   if (!hasClockIn && firstWorkEvent) {
     const anchor = calculateAnchor({
@@ -798,16 +845,59 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
       pickupLocation: firstWorkEvent.location,
       pickupTime: new Date(firstWorkEvent.timestamp),
     });
+    const firstWorkMs = new Date(firstWorkEvent.timestamp).getTime();
+    const gpsHomeDeparture = [...homeBreadcrumbs]
+      .reverse()
+      .find((breadcrumb) => {
+        const breadcrumbMs = new Date(breadcrumb.timestamp).getTime();
+        return breadcrumbMs <= firstWorkMs && firstWorkMs - breadcrumbMs <= 3 * 60 * 60 * 1000;
+      });
+    const automaticStart = policyMode === POLICY_MODES.PAY_FROM_HOME && gpsHomeDeparture
+      ? gpsHomeDeparture.timestamp
+      : (anchor.clockInTime ? anchor.clockInTime.toISOString() : firstWorkEvent.timestamp);
     events.push({
       type: 'AUTO_CLOCK_IN',
-      timestamp: anchor.clockInTime ? anchor.clockInTime.toISOString() : firstWorkEvent.timestamp,
-      location: anchor.anchorLocation || firstWorkEvent.location || null,
+      timestamp: automaticStart,
+      location: gpsHomeDeparture?.location || anchor.anchorLocation || firstWorkEvent.location || null,
       driverId,
       date: dateFilter,
-      anchorType: anchor.anchorType,
+      anchorType: gpsHomeDeparture ? 'HOME_GPS' : anchor.anchorType,
       travelMinutes: Math.round(anchor.travelMinutes || 0),
-      reason: 'FIRST_WORK_EVENT',
+      reason: gpsHomeDeparture ? 'HOME_DEPARTURE_GEOFENCE' : 'FIRST_WORK_EVENT',
+      source: 'authoritative_trip_ledger',
+      confidence: gpsHomeDeparture ? 'gps_verified' : (anchor.anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
     });
+  }
+
+  if (automaticShift && firstWorkEvent && lastWorkEvent && !correctedEnd) {
+    const terminalStatuses = new Set(['completed', 'complete', 'done', 'no show', 'no-show', 'noshow', 'cancelled', 'canceled']);
+    const historicalDate = dateFilter < todayLocal(options.now || new Date());
+    const allTripsTerminal = normalizedTrips.every((trip) => terminalStatuses.has(String(trip?.status || '').trim().toLowerCase()));
+    const lastWorkMs = new Date(lastWorkEvent.timestamp).getTime();
+    const gpsHomeArrival = homeBreadcrumbs.find((breadcrumb) => new Date(breadcrumb.timestamp).getTime() >= lastWorkMs);
+    const lastTrip = normalizedTrips.find((trip) => trip.id === lastWorkEvent.tripId) || normalizedTrips[normalizedTrips.length - 1];
+    const pending = generatePendingClockOut({ lastTrip, driver, policyMode });
+    const estimatedEnd = pending.estimatedClockOutTime && !Number.isNaN(pending.estimatedClockOutTime.getTime())
+      ? pending.estimatedClockOutTime.toISOString()
+      : lastWorkEvent.timestamp;
+    const automaticEnd = policyMode === POLICY_MODES.PAY_FROM_HOME && gpsHomeArrival
+      ? gpsHomeArrival.timestamp
+      : estimatedEnd;
+    const endMs = new Date(automaticEnd).getTime();
+    const nowMs = new Date(options.now || new Date()).getTime();
+    if (historicalDate || (allTripsTerminal && endMs <= nowMs)) {
+      events.push({
+        type: 'CLOCK_OUT',
+        timestamp: automaticEnd,
+        location: gpsHomeArrival?.location || (pending.pendingClockOut?.anchorType === 'HOME' ? homePoint : lastWorkEvent.location),
+        driverId,
+        date: dateFilter,
+        anchorType: gpsHomeArrival ? 'HOME_GPS' : (pending.pendingClockOut?.anchorType || 'LAST_WORK_EVENT'),
+        reason: gpsHomeArrival ? 'HOME_ARRIVAL_GEOFENCE' : 'LAST_WORK_EVENT_COMPLETE',
+        source: 'authoritative_trip_ledger',
+        confidence: gpsHomeArrival ? 'gps_verified' : (pending.pendingClockOut?.anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
+      });
+    }
   }
 
   events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -846,7 +936,8 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     sessions: sessions.map((session) => ({ ...session, driverId, date: dateFilter })),
     gapLog: gapLogWithMeta,
     gaps: gapLogWithMeta,
-    clockEvents: normalizedClockEvents,
+    clockEvents: events.filter((event) => event.type !== 'TRIP_EVENT'),
+    sourceClockEvents: normalizedClockEvents,
     trips: normalizedTrips,
     teleports,
     abuse,

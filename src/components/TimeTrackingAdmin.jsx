@@ -8,6 +8,7 @@ import {
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, validateTimeEventSequence } from '../utils/timeTracking';
 import { localCalendarYmd } from '../utils/tripDate';
 import { db, doc, setDoc } from '../config/firebase';
+import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 
 const formatMinutes = (minutes) => {
   const rounded = Math.max(0, Math.round(Number(minutes) || 0));
@@ -44,7 +45,7 @@ const getGapClassificationColor = (classification) => {
   }
 };
 
-const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeData = null, onUpdateClockEvents, onBack, onUpdateHourlyRate }) => {
+const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clockEvents = [], timeData = null, onUpdateClockEvents, onBack, onUpdateHourlyRate }) => {
   const [selectedDriver, setSelectedDriver] = useState('ALL');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [expandedDriver, setExpandedDriver] = useState(null);
@@ -131,7 +132,11 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       });
 
       Object.entries(byDate).forEach(([date, day]) => {
-        const model = buildTimeEvents(day.trips, driver, day.clockEvents, timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME, { date, breadcrumbs: driver.breadcrumbs || [] });
+        const model = buildTimeEvents(day.trips, driver, day.clockEvents, timeData?.policyMode || driver.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME, {
+          date,
+          breadcrumbs: getDriverTelemetryBreadcrumbs(driverTelemetry, driver, date),
+          automaticShift: true,
+        });
         const externalGaps = day.gaps.filter(gap => !model.gapLog.some(mg => mg.startTime === gap.startTime && mg.endTime === gap.endTime));
         day.trips = model.trips;
         day.date = date;
@@ -147,7 +152,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
       sessions[driverId] = byDate;
     });
     return sessions;
-  }, [filteredDrivers, trips, clockEvents, timeData, dateRange.from, dateRange.to]);
+  }, [filteredDrivers, trips, driverTelemetry, clockEvents, timeData, dateRange.from, dateRange.to]);
 
   const summaryStats = useMemo(() => {
     const allSessions = Object.values(driverSessions).flatMap(byDate => Object.values(byDate));
@@ -436,7 +441,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], clockEvents = [], timeDat
               <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
                 <Timer className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                 <p className="text-slate-500">No time tracking sessions found</p>
-                <p className="text-sm text-slate-400 mt-1">Sessions are created automatically when people clock in</p>
+                <p className="text-sm text-slate-400 mt-1">Sessions are created automatically from verified trip activity</p>
               </div>
             )}
           </div>

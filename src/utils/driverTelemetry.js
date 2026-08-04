@@ -45,6 +45,33 @@ export function getLatestDriverTelemetry(docs = [], driverId) {
     .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0))[0] || null;
 }
 
+export function getDriverTelemetryBreadcrumbs(docs = [], driver = {}, date = null) {
+  const keys = new Set([
+    driver?.id,
+    driver?.driverId,
+    driver?.uid,
+    driver?.email,
+    driver?.name,
+  ].filter(Boolean).map((value) => String(value).trim().toLowerCase()));
+
+  return (docs || [])
+    .filter((telemetry) => {
+      if (date && telemetry?.date !== date) return false;
+      const telemetryKeys = [
+        telemetry?.driverId,
+        telemetry?.uid,
+        telemetry?.driverEmail,
+        telemetry?.email,
+        telemetry?.driverName,
+      ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+      return telemetryKeys.some((value) => keys.has(value));
+    })
+    .flatMap((telemetry) => Array.isArray(telemetry?.breadcrumbs) ? telemetry.breadcrumbs : [])
+    .filter(Boolean)
+    .sort((a, b) => Date.parse(a?.capturedAt || a?.recordedAt || a?.timestamp || a?.at || 0)
+      - Date.parse(b?.capturedAt || b?.recordedAt || b?.timestamp || b?.at || 0));
+}
+
 export function haversineMiles(a, b) {
   const lat1 = Number(a?.lat);
   const lng1 = Number(a?.lng);

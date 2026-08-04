@@ -1960,21 +1960,33 @@ const App = () => {
     const wasClockedIn = Boolean(prevDriverState.clockedIn);
     const clockChanged = wasClockedIn !== clockedIn;
     let clockEvents = prevDriverState.clockEvents || [];
+    const eventDate = isoToLocalDateKey(eventTimestamp) || localCalendarYmd();
+    const appendClockEvent = (event) => {
+      const eventId = event.eventId || `${event.type}:${eventDate}`;
+      if (clockEvents.some((existing) => existing.eventId === eventId)) return;
+      clockEvents = [...clockEvents, {
+        ...event,
+        eventId,
+        source: event.source || 'trip_workflow',
+      }];
+    };
     if (clockChanged && clockedIn) {
-      const event = { type: clockEventType || (autoClockIn ? 'auto_in' : 'in'), timestamp: eventTimestamp };
+      const type = clockEventType || (autoClockIn ? 'auto_in' : 'in');
+      const event = { type, timestamp: eventTimestamp, eventId: `${type}:${driverId}:${eventDate}` };
       if (clockLocation) event.lat = clockLocation.lat;
       if (clockLocation) event.lng = clockLocation.lng;
-      clockEvents = [...clockEvents, event];
+      appendClockEvent(event);
     } else if (clockChanged && !clockedIn) {
-      const event = { type: clockEventType || 'out', timestamp: eventTimestamp };
+      const type = clockEventType || 'out';
+      const event = { type, timestamp: eventTimestamp, eventId: `${type}:${driverId}:${eventDate}` };
       if (clockLocation) event.lat = clockLocation.lat;
       if (clockLocation) event.lng = clockLocation.lng;
-      clockEvents = [...clockEvents, event];
+      appendClockEvent(event);
     } else if (clockEventType === 'break_start' || clockEventType === 'break_end') {
       const event = { type: clockEventType, timestamp: eventTimestamp };
       if (clockLocation) event.lat = clockLocation.lat;
       if (clockLocation) event.lng = clockLocation.lng;
-      clockEvents = [...clockEvents, event];
+      appendClockEvent({ ...event, eventId: `${clockEventType}:${driverId}:${eventTimestamp}` });
     }
     let extraPersist = { ...persistableExtraFields };
     if (clockChanged && clockedIn) {
@@ -2031,7 +2043,17 @@ const App = () => {
         const eDate = isoToLocalDateKey(e.timestamp || e.at);
         return eDate !== date;
       });
-      const newEvents = events.map(e => ({ ...e, timestamp: e.timestamp || e.at }));
+      const correctedAt = new Date().toISOString();
+      const newEvents = events.map((e, index) => ({
+        ...e,
+        timestamp: e.timestamp || e.at,
+        source: 'admin_correction',
+        authority: 'admin',
+        correctedBy: currentUser || 'admin',
+        correctedAt,
+        correctionReason,
+        eventId: `admin:${userId}:${date}:${index}:${e.type || 'event'}`,
+      }));
       const newClockEvents = [...filteredEvents, ...newEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       const saved = await upsertDriverProfile(userId, { clockEvents: newClockEvents });
       if (saved === false) throw new Error('Firestore did not confirm the timesheet correction.');
@@ -2049,7 +2071,17 @@ const App = () => {
           const eDate = isoToLocalDateKey(e.timestamp || e.at);
           return eDate !== date;
         });
-        const newEvents = events.map(e => ({ ...e, timestamp: e.timestamp || e.at }));
+        const correctedAt = new Date().toISOString();
+        const newEvents = events.map((e, index) => ({
+          ...e,
+          timestamp: e.timestamp || e.at,
+          source: 'admin_correction',
+          authority: 'admin',
+          correctedBy: currentUser || 'admin',
+          correctedAt,
+          correctionReason,
+          eventId: `admin:${userId}:${date}:${index}:${e.type || 'event'}`,
+        }));
         const newClockEvents = [...filteredEvents, ...newEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
         return { ...d, clockEvents: newClockEvents };
       }));
@@ -2939,6 +2971,7 @@ const App = () => {
             const myTrips = currentUserDriverTrips;
             const myDrivers = myDriver ? [myDriver] : [];
             return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+              driverTelemetry={driverTelemetry}
               allDrivers={drivers}
               dispatchers={dispatchers}
 

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, GAP_CLASSIFICATIONS } from '../utils/timeTracking';
 import { localCalendarYmd, isoToLocalDateKey } from '../utils/tripDate';
+import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 
 const fmt = (min) => {
   if (!min && min !== 0) return '--';
@@ -36,7 +37,7 @@ const gapColor = (c) => ({
 
 const abuseColor = (f) => f.length > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200';
 
-export default function PayrollReportPage({ drivers = [], trips = [], policyMode = POLICY_MODES.SMART_MODE, onPolicyChange }) {
+export default function PayrollReportPage({ drivers = [], trips = [], driverTelemetry = [], policyMode = POLICY_MODES.SMART_MODE, onPolicyChange }) {
   const [selectedDate, setSelectedDate] = useState(localCalendarYmd());
   const [selectedDriverId, setSelectedDriverId] = useState('ALL');
   const [expandedDriver, setExpandedDriver] = useState(null);
@@ -62,11 +63,15 @@ export default function PayrollReportPage({ drivers = [], trips = [], policyMode
         const d = isoToLocalDateKey(e.timestamp || e.at || e.time);
         return !selectedDate || d === selectedDate;
       });
-      const timeData = buildTimeEvents(driverTrips, driver, clockEvts, policyMode, { date: selectedDate, breadcrumbs: driver.breadcrumbs || [] });
+      const timeData = buildTimeEvents(driverTrips, driver, clockEvts, policyMode, {
+        date: selectedDate,
+        breadcrumbs: getDriverTelemetryBreadcrumbs(driverTelemetry, driver, selectedDate),
+        automaticShift: true,
+      });
       const payroll = generatePayrollOutput(timeData, Number(driver.hourlyRate || 0));
       return { driver, timeData, payroll, driverTrips, clockEvts };
     });
-  }, [filtered, trips, selectedDate, policyMode]);
+  }, [filtered, trips, driverTelemetry, selectedDate, policyMode]);
 
   const totals = useMemo(() => ({
     billableMin: reportData.reduce((s, r) => s + (r.payroll.payTime?.billableMinutes || 0), 0),
