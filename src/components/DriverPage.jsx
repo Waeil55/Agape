@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
-import { auth, db, doc, setDoc, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
+import { auth, db, doc, setDoc, collection, addDoc, serverTimestamp, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -518,7 +518,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemetry = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemetry = [], timeTrackingDeclarations = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
@@ -1391,6 +1391,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     const seed = normalizedEmail.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'USER';
     return `DRV-${seed}`;
   })();
+  const immutableTimeDeclarations = useMemo(() => {
+    const keys = new Set([driverId, me?.driverId, me?.uid, me?.email, currentUser].filter(Boolean).map((value) => String(value).trim().toLowerCase()));
+    return (timeTrackingDeclarations || []).filter((event) => [event?.driverId, event?.driverEmail, event?.email, event?.userId]
+      .filter(Boolean).map((value) => String(value).trim().toLowerCase()).some((value) => keys.has(value)));
+  }, [currentUser, driverId, me?.driverId, me?.email, me?.uid, timeTrackingDeclarations]);
 
   const getTripPickupLocation = useCallback((trip) => {
     const lat = Number(trip?.pickupLat ?? trip?.pickupLatitude);
@@ -1411,7 +1416,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
   ), [driverPosition?.lat, driverPosition?.lng]);
 
   const clockHistory = useMemo(() => {
-    const events = me?.clockEvents || [];
+    const events = [...(me?.clockEvents || []), ...immutableTimeDeclarations];
     const today = new Date();
     const days = [];
     let weeklyMilliseconds = 0;
@@ -1452,7 +1457,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     const weeklyTotal = weeklyMilliseconds / 3600000;
     const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
     return { days, weeklyTotal, weeklyOvertime };
-  }, [driverScopedTrips, driverTelemetry, me, timeTrackingPolicyMode]);
+  }, [driverScopedTrips, driverTelemetry, immutableTimeDeclarations, me, timeTrackingPolicyMode]);
 
   // Cleanup timekeeping interval on unmount.
   useEffect(() => {
@@ -1523,10 +1528,37 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     return () => { if (ttTickRef.current) { clearInterval(ttTickRef.current); ttTickRef.current = null; } };
   }, [ttState]);
 
-  // A legacy break is closed automatically when new assigned work arrives.
-  const ttResume = useCallback(() => {
+  const recordImmutableTimeDeclaration = useCallback(async (type, timestamp, location, reason) => {
+    const driverEmail = auth.currentUser?.email || me?.email || currentUser || '';
+    await addDoc(collection(db, 'timeTrackingDeclarations'), {
+      type,
+      timestamp,
+      driverId,
+      driverEmail,
+      userId: auth.currentUser?.uid || '',
+      location: location || null,
+      lat: location?.lat ?? null,
+      lng: location?.lng ?? null,
+      reason,
+      source: 'driver_personal_declaration',
+      createdAt: serverTimestamp(),
+    });
+  }, [currentUser, driverId, me?.email]);
+
+  // A legacy or personal break is closed automatically when new assigned work arrives.
+  const ttResume = useCallback(async () => {
     if (ttStateRef.current !== TT.ON_BREAK) return;
     const now = new Date().toISOString();
+    const resumeLocation = getDriverClockLocation();
+    if (me?.personalUnavailability?.active) {
+      try {
+        await recordImmutableTimeDeclaration('BREAK_END', now, resumeLocation, 'RETURNED_TO_WORK');
+      } catch (error) {
+        console.error('Failed to preserve personal-time return:', error);
+        setShowToast({ type: 'error', message: 'Return could not be securely recorded. Check the connection and try again.' });
+        return;
+      }
+    }
     if (ttBreakStartRef.current) {
       const breakMs = new Date(now) - new Date(ttBreakStartRef.current);
       ttAccumulatedBreakMsRef.current += Math.max(0, breakMs);
@@ -1536,15 +1568,63 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     ttBreakStartRef.current = null;
     setTtState(TT.ON_SHIFT_ACTIVE);
     ttStateRef.current = TT.ON_SHIFT_ACTIVE;
-    const resumeLocation = getDriverClockLocation();
     onDriverStatusUpdate?.(driverId, true, {
       clockTimestamp: now,
       clockEventType: 'break_end',
+      clockEventSource: me?.personalUnavailability?.active ? 'driver_personal_declaration' : 'legacy_break_recovery',
       timeTrackingState: TT.ON_SHIFT_ACTIVE,
+      personalUnavailability: null,
+      statusAuditTitle: me?.personalUnavailability?.active ? 'Driver Returned From Personal Time' : 'Driver Break Ended',
+      statusAuditMessage: `${me?.name || driverId} returned to automatic work tracking.`,
       ...(resumeLocation ? { clockLocation: resumeLocation } : {}),
     });
     setShowToast({ type: 'success', message: 'Break ended — back on shift.' });
-  }, [driverId, getDriverClockLocation, onDriverStatusUpdate]);
+  }, [driverId, getDriverClockLocation, me?.name, me?.personalUnavailability?.active, onDriverStatusUpdate, recordImmutableTimeDeclaration]);
+
+  const isPersonalTime = Boolean(me?.personalUnavailability?.active) && ttState === TT.ON_BREAK;
+  const hasTripInProgress = activeTrips.some((trip) => getWorkflowStepIndex(trip) >= 0);
+  const togglePersonalTime = useCallback(async () => {
+    if (!isClockedIn) {
+      setShowToast({ type: 'warning', message: 'Automatic tracking begins with verified trip activity.' });
+      return;
+    }
+    if (isPersonalTime) {
+      ttResume();
+      return;
+    }
+    if (hasTripInProgress) {
+      setShowToast({ type: 'error', message: 'Personal time cannot begin while a trip is in progress.' });
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    const location = getDriverClockLocation();
+    try {
+      await recordImmutableTimeDeclaration('BREAK_START', timestamp, location, 'PERSONAL_UNAVAILABLE');
+    } catch (error) {
+      console.error('Failed to preserve personal-time declaration:', error);
+      setShowToast({ type: 'error', message: 'Personal time could not be securely recorded. Check the connection and try again.' });
+      return;
+    }
+    ttBreakStartRef.current = timestamp;
+    setTtState(TT.ON_BREAK);
+    ttStateRef.current = TT.ON_BREAK;
+    onDriverStatusUpdate?.(driverId, true, {
+      clockTimestamp: timestamp,
+      clockEventType: 'break_start',
+      clockEventSource: 'driver_personal_declaration',
+      timeTrackingState: TT.ON_BREAK,
+      personalUnavailability: {
+        active: true,
+        startedAt: timestamp,
+        location: location || null,
+        source: 'driver_one_tap',
+      },
+      statusAuditTitle: 'Driver Declared Personal Time',
+      statusAuditMessage: `${me?.name || driverId} declared personal unavailability; timestamp and location were captured automatically.`,
+      ...(location ? { clockLocation: location } : {}),
+    });
+    setShowToast({ type: 'info', message: 'Personal time started. The timestamp and location were recorded automatically.' });
+  }, [driverId, getDriverClockLocation, hasTripInProgress, isClockedIn, isPersonalTime, me?.name, onDriverStatusUpdate, recordImmutableTimeDeclaration, ttResume]);
 
   const ttLogTripEvent = useCallback((eventType, tripId, location) => {
     const now = new Date().toISOString();
@@ -1605,9 +1685,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       const timestamp = driverPosition.capturedAt || new Date().toISOString();
       onDriverStatusUpdate?.(driverId, false, {
         clockTimestamp: timestamp,
-        clockEventType: 'auto_out',
-        timeTrackingState: TT.OFF_SHIFT,
-        timeTrackingAnchor: 'HOME_GPS',
+      clockEventType: 'auto_out',
+      clockEventSource: 'home_geofence',
+      timeTrackingState: TT.OFF_SHIFT,
+      timeTrackingAnchor: 'HOME_GPS',
+      pendingClockOut: null,
         clockLocation: { lat: driverPosition.lat, lng: driverPosition.lng },
       });
       setShowToast({ type: 'success', message: 'Shift ended automatically at home.' });
@@ -1626,6 +1708,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       setShowToast({ type: 'success', message: 'New trip assigned — break ended, session resumed.' });
     }
   }, [activeTrips.length, ttResume]);
+
+  const pendingCancelInFlightRef = useRef(false);
+  useEffect(() => {
+    if (!me?.pendingClockOut || activeTrips.length === 0 || pendingCancelInFlightRef.current) return;
+    pendingCancelInFlightRef.current = true;
+    onDriverStatusUpdate?.(driverId, true, {
+      pendingClockOut: null,
+      pendingClockOutCanceledAt: new Date().toISOString(),
+      pendingClockOutCancelReason: 'ACTIVE_WORK_FOUND',
+      statusAuditTitle: 'Pending Clock-Out Reconciled',
+      statusAuditMessage: `${me?.name || driverId} has active assigned work; the pending shift close was removed automatically.`,
+    });
+    const timer = setTimeout(() => { pendingCancelInFlightRef.current = false; }, 3000);
+    return () => clearTimeout(timer);
+  }, [activeTrips.length, driverId, me?.name, me?.pendingClockOut, onDriverStatusUpdate]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -2864,14 +2961,26 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       if (remaining.length === 0) {
         clockOutOfferedRef.current = true;
         if (timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && me?.homeLat && me?.homeLng) {
+          onDriverStatusUpdate?.(driverId, true, {
+            pendingClockOut: {
+              status: 'PENDING_HOME_ARRIVAL',
+              createdAt: dropoffArrivalIso,
+              lastTripId: showCompleteModal.id,
+              policyMode: timeTrackingPolicyMode,
+            },
+            statusAuditTitle: 'Pending Clock-Out Created',
+            statusAuditMessage: `${me?.name || driverId} completed the final assigned trip; the shift will close automatically at the verified home geofence unless new work is assigned.`,
+          });
           setShowToast({ type: 'info', message: 'Final trip complete. Timekeeping will end automatically when you arrive home.' });
         } else {
           const clockLocation = getTripDropoffLocation(showCompleteModal) || getDriverClockLocation();
           onDriverStatusUpdate?.(driverId, false, {
             clockTimestamp: dropoffArrivalIso,
             clockEventType: 'auto_out',
+            clockEventSource: 'final_trip_completion',
             timeTrackingState: TT.OFF_SHIFT,
             timeTrackingAnchor: 'FINAL_TRIP',
+            pendingClockOut: null,
             ...(clockLocation ? { clockLocation } : {}),
           });
           setShowToast({ type: 'success', message: 'Final trip complete. Shift ended automatically.' });
@@ -5354,7 +5463,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
             </div>
 
             {/* Automatic, trip-authoritative timekeeping. Drivers cannot create payroll punches. */}
-            <div className={`rounded-2xl border p-4 shadow-sm ${isClockedIn ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`rounded-2xl border p-4 shadow-sm ${isPersonalTime ? 'bg-blue-50 border-blue-200' : isClockedIn ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                   <Clock size={20} />
@@ -5362,18 +5471,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-bold ${isClockedIn ? 'text-emerald-900' : 'text-slate-800'}`}>Automatic timekeeping</p>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    {isClockedIn
+                    {isPersonalTime
+                      ? `Personal time · ${ttBreakMin}m recorded automatically`
+                      : isClockedIn
                       ? `Active · ${Math.floor(ttBillableMin / 60)}h ${ttBillableMin % 60}m`
                       : 'Starts with the first verified trip event'}
                   </p>
                 </div>
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${isClockedIn ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                  {isClockedIn ? 'Tracking' : 'Standby'}
+                  {isPersonalTime ? 'Personal' : isClockedIn ? 'Tracking' : 'Standby'}
                 </span>
               </div>
               <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
                 Trip timestamps and GPS home arrival control payroll automatically. Corrections require an administrator and remain in the audit log.
               </p>
+              {role === 'driver' && isClockedIn && (
+                <button type="button" onClick={togglePersonalTime} disabled={!isPersonalTime && hasTripInProgress} className={`mt-3 w-full rounded-xl px-4 py-2.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 ${isPersonalTime ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'border border-blue-200 bg-white text-blue-700 hover:bg-blue-50'}`}>
+                  {isPersonalTime ? 'Return to automatic work tracking' : hasTripInProgress ? 'Personal time unavailable during active trip' : 'Start personal time'}
+                </button>
+              )}
             </div>
 
             {/* Analytics */}
@@ -5749,6 +5865,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
               drivers={[...allDrivers, ...(dispatchers || [])]}
               trips={driverScopedTrips}
               driverTelemetry={driverTelemetry}
+              timeTrackingDeclarations={timeTrackingDeclarations}
               clockEvents={me?.clockEvents || []}
               timeData={{ policyMode: timeTrackingPolicyMode }}
               onUpdateClockEvents={onUpdateClockEvents}

@@ -175,6 +175,7 @@ const DesktopEnterpriseDashboard = ({
   bulkAssignTrips, createSharedRide, createLegMission, requestDeleteTrip, requestBulkDelete, updateTrip, updateTrashedTrip,
   makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal,
   driverTelemetry = [],
+  timeTrackingDeclarations = [],
   onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [],
   onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout
 }) => {
@@ -1033,6 +1034,7 @@ const DesktopEnterpriseDashboard = ({
           currentUser={currentUser}
           trips={trips}
           driverTelemetry={driverTelemetry}
+          timeTrackingDeclarations={timeTrackingDeclarations}
           drivers={drivers}
           dispatchers={dispatchers}
           assignTripToDriver={assignTripToDriver}
@@ -1157,6 +1159,7 @@ const DesktopEnterpriseDashboard = ({
           logs={logs}
           trips={trips}
           driverTelemetry={driverTelemetry}
+          timeTrackingDeclarations={timeTrackingDeclarations}
           assignTripToDriver={assignTripToDriver}
           requestAuthAction={requestAuthAction}
           onViewTrip={(ref) => {
@@ -1211,6 +1214,7 @@ const DesktopEnterpriseDashboard = ({
               drivers={[activeDriverWorkDriver]}
               trips={activeDriverWorkTrips}
               driverTelemetry={driverTelemetry}
+              timeTrackingDeclarations={timeTrackingDeclarations}
               allDrivers={allDrivers}
               dispatchers={dispatchers}
               phoneNumbers={phoneNumbers}

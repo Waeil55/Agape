@@ -30,14 +30,14 @@ const POLICY_LABELS = {
 };
 
 const gapColor = (c) => ({
-  SHORT: 'bg-emerald-100 text-emerald-800',
-  MEDIUM: 'bg-amber-100 text-amber-800',
-  LONG: 'bg-red-100 text-red-800',
+  WORK_WAITING: 'bg-emerald-100 text-emerald-800',
+  NEEDS_REVIEW: 'bg-amber-100 text-amber-800',
+  VERIFIED_PERSONAL: 'bg-blue-100 text-blue-800',
 }[c] || 'bg-slate-100 text-slate-700');
 
 const abuseColor = (f) => f.length > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200';
 
-export default function PayrollReportPage({ drivers = [], trips = [], driverTelemetry = [], policyMode = POLICY_MODES.SMART_MODE, onPolicyChange }) {
+export default function PayrollReportPage({ drivers = [], trips = [], driverTelemetry = [], timeTrackingDeclarations = [], policyMode = POLICY_MODES.SMART_MODE, onPolicyChange }) {
   const [selectedDate, setSelectedDate] = useState(localCalendarYmd());
   const [selectedDriverId, setSelectedDriverId] = useState('ALL');
   const [expandedDriver, setExpandedDriver] = useState(null);
@@ -59,7 +59,10 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
         const matchDriver = t.driverId === driver.id || (t.driverEmail && t.driverEmail.toLowerCase() === (driver.email || '').toLowerCase());
         return matchDate && matchDriver;
       });
-      const clockEvts = (driver.clockEvents || []).filter(e => {
+      const driverKeys = new Set([driver.id, driver.driverId, driver.uid, driver.email].filter(Boolean).map((value) => String(value).trim().toLowerCase()));
+      const immutableDeclarations = timeTrackingDeclarations.filter((event) => [event?.driverId, event?.driverEmail, event?.email, event?.userId]
+        .filter(Boolean).map((value) => String(value).trim().toLowerCase()).some((value) => driverKeys.has(value)));
+      const clockEvts = [...(driver.clockEvents || []), ...immutableDeclarations].filter(e => {
         const d = isoToLocalDateKey(e.timestamp || e.at || e.time);
         return !selectedDate || d === selectedDate;
       });
@@ -69,30 +72,32 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
         automaticShift: true,
       });
       const payroll = generatePayrollOutput(timeData, Number(driver.hourlyRate || 0));
-      return { driver, timeData, payroll, driverTrips, clockEvts };
+      return { driver, timeData, payroll, driverTrips, clockEvts, approvalEligible: timeData.approvalEligible };
     });
-  }, [filtered, trips, driverTelemetry, selectedDate, policyMode]);
+  }, [filtered, trips, driverTelemetry, timeTrackingDeclarations, selectedDate, policyMode]);
 
   const totals = useMemo(() => ({
-    billableMin: reportData.reduce((s, r) => s + (r.payroll.payTime?.billableMinutes || 0), 0),
-    totalPay: reportData.reduce((s, r) => s + (r.payroll.payTime?.totalPay || 0), 0),
+    billableMin: reportData.filter(r => r.approvalEligible).reduce((s, r) => s + (r.payroll.payTime?.billableMinutes || 0), 0),
+    totalPay: reportData.filter(r => r.approvalEligible).reduce((s, r) => s + (r.payroll.payTime?.totalPay || 0), 0),
     trips: reportData.reduce((s, r) => s + r.driverTrips.length, 0),
     gaps: reportData.reduce((s, r) => s + (r.timeData.gapLog?.length || 0), 0),
     abuse: reportData.filter(r => r.timeData.abuse?.suspicious).length,
   }), [reportData]);
 
   const exportCSV = useCallback(() => {
-    const rows = [['Driver', 'Email', 'Date', 'Policy', 'Clock In', 'Clock Out', 'Billable Hrs', 'Break Min', 'Trips', 'Gaps Excluded Min', 'Regular Pay', 'Overtime Pay', 'Total Pay', 'Abuse Flags']];
+    const rows = [['Driver', 'Email', 'Date', 'Policy', 'Approval', 'Clock In', 'Clock Out', 'Billable Hrs', 'Break Min', 'Trips', 'Verified Personal Min', 'Review Gaps', 'Regular Pay', 'Overtime Pay', 'Total Pay', 'Integrity Signals']];
     reportData.forEach(({ driver, payroll, timeData }) => {
       const pt = payroll.payTime;
       const excludedMin = (timeData.gapLog || []).filter(g => g.payrollEffect === 'EXCLUDED').reduce((s, g) => s + (g.durationMinutes || 0), 0);
+      const approved = timeData.approvalEligible;
       rows.push([
         driver.name || '', driver.email || '', selectedDate, POLICY_LABELS[policyMode] || policyMode,
+        approved ? 'Approved' : 'Needs review',
         fmtTime(timeData.sessions?.[0]?.clockInTime),
         fmtTime(timeData.sessions?.[timeData.sessions.length - 1]?.clockOutTime),
-        (pt?.billableHours || 0).toFixed(2), Math.round(payroll.sessionBreakdown?.reduce((s, b) => s + (b.breakMinutes || 0), 0) || 0),
-        timeData.trips?.length || 0, Math.round(excludedMin),
-        (pt?.regularPay || 0).toFixed(2), (pt?.overtimePay || 0).toFixed(2), (pt?.totalPay || 0).toFixed(2),
+        approved ? (pt?.billableHours || 0).toFixed(2) : '', Math.round(payroll.sessionBreakdown?.reduce((s, b) => s + (b.breakMinutes || 0), 0) || 0),
+        timeData.trips?.length || 0, Math.round(excludedMin), timeData.reviewRequiredGaps?.length || 0,
+        approved ? (pt?.regularPay || 0).toFixed(2) : '', approved ? (pt?.overtimePay || 0).toFixed(2) : '', approved ? (pt?.totalPay || 0).toFixed(2) : '',
         (timeData.abuse?.flags || []).join('; '),
       ]);
     });
@@ -158,7 +163,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
             <p className="text-sm">No payroll data for this date.</p>
           </div>
         )}
-        {reportData.map(({ driver, payroll, timeData }) => {
+        {reportData.map(({ driver, payroll, timeData, approvalEligible }) => {
           const pt = payroll.payTime;
           const isExpanded = expandedDriver === driver.id;
           const sessions = payroll.sessionBreakdown || [];
@@ -181,9 +186,9 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
                       {hasAbuse && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">? ABUSE FLAG</span>}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                      <span className="flex items-center gap-1"><Clock size={10} />{fmt(pt?.billableMinutes)}</span>
+                      <span className="flex items-center gap-1"><Clock size={10} />{approvalEligible ? fmt(pt?.billableMinutes) : 'Review required'}</span>
                       <span>·</span>
-                      <span className="flex items-center gap-1 text-emerald-600"><DollarSign size={10} />{fmtCurrency(pt?.totalPay)}</span>
+                      <span className={`flex items-center gap-1 ${approvalEligible ? 'text-emerald-600' : 'text-amber-600'}`}><DollarSign size={10} />{approvalEligible ? fmtCurrency(pt?.totalPay) : 'Not approved'}</span>
                       {driver.hourlyRate && <span className="text-slate-500">@ ${Number(driver.hourlyRate).toFixed(2)}/hr</span>}
                     </div>
                   </div>

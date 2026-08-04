@@ -253,6 +253,33 @@ service cloud.firestore {
       allow update: if signedIn() && (isAdmin() || resource.data.driverId == request.auth.uid);
       allow delete: if signedIn() && isAdmin();
     }
+    // Immutable payroll-gap decisions. Only authorized payroll reviewers may
+    // create a decision; corrections create a new record instead of rewriting history.
+    match /timeTrackingGapReviews/{reviewId} {
+      allow read: if signedIn() && isDispatcher();
+      allow create: if signedIn() && isDispatcher()
+        && request.resource.data.driverId is string
+        && request.resource.data.date is string
+        && request.resource.data.resolution in ['PAID_WAITING', 'PERSONAL_UNPAID']
+        && request.resource.data.correctionReason is string
+        && request.resource.data.correctionReason.size() >= 3
+        && request.resource.data.correctedBy == request.auth.token.email;
+      allow update, delete: if false;
+    }
+    // Driver declarations are append-only and server-timestamped. They can only
+    // reduce/segment claimed time; drivers cannot rewrite or erase the ledger.
+    match /timeTrackingDeclarations/{declarationId} {
+      allow read: if signedIn() && (isDispatcher() || resource.data.driverEmail == request.auth.token.email);
+      allow create: if signedIn()
+        && request.resource.data.driverEmail == request.auth.token.email
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.driverId is string
+        && request.resource.data.type in ['BREAK_START', 'BREAK_END']
+        && request.resource.data.reason in ['PERSONAL_UNAVAILABLE', 'RETURNED_TO_WORK']
+        && request.resource.data.source == 'driver_personal_declaration'
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
     // Approved payroll records (admin/dispatcher finalize, driver can read own)
     match /payrollRecords/{recordId} {
       allow read: if signedIn() && (isDispatcher() || resource.data.driverId == request.auth.uid);

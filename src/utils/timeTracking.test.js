@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   POLICY_MODES,
+  GAP_CLASSIFICATIONS,
+  PAYROLL_EFFECTS,
   buildTimeEvents,
+  classifyGap,
   generatePayrollOutput,
   stitchSessions,
   validateTimeEventSequence,
@@ -10,6 +13,31 @@ import {
 const event = (type, timestamp) => ({ type, timestamp });
 
 describe('payroll time ledger', () => {
+  it('never deducts an ambiguous gap based only on duration or movement', () => {
+    const gap = classifyGap(
+      '2026-08-03T09:00:00.000Z',
+      '2026-08-03T11:00:00.000Z',
+      { lat: 39.7, lng: -86.2 },
+      { lat: 39.9, lng: -86.0 },
+    );
+    expect(gap.classification).toBe(GAP_CLASSIFICATIONS.NEEDS_REVIEW);
+    expect(gap.payrollEffect).toBe(PAYROLL_EFFECTS.REVIEW);
+    expect(gap.auditRecord.notes).toContain('no payroll deduction');
+  });
+
+  it('excludes a gap only after an attributable verified-personal decision', () => {
+    const gap = classifyGap(
+      '2026-08-03T09:00:00.000Z',
+      '2026-08-03T11:00:00.000Z',
+      null,
+      null,
+      { resolution: 'PERSONAL_UNPAID', resolvedBy: 'admin@agape.test', resolutionReason: 'Driver confirmed personal appointment' },
+    );
+    expect(gap.classification).toBe(GAP_CLASSIFICATIONS.VERIFIED_PERSONAL);
+    expect(gap.payrollEffect).toBe(PAYROLL_EFFECTS.EXCLUDED);
+    expect(gap.auditRecord.resolvedBy).toBe('admin@agape.test');
+  });
+
   it('calculates a shift with a break from exact timestamps', () => {
     const ledger = stitchSessions([
       event('IN', '2026-07-27T08:00:00.000-04:00'),
@@ -200,5 +228,54 @@ describe('payroll time ledger', () => {
     expect(clockIn.anchorType).toBe('HOME');
     expect(clockIn.confidence).toBe('route_estimate');
     expect(clockIn.reason).toBe('FIRST_WORK_EVENT');
+  });
+
+  it('applies an administrator gap resolution without changing verified trip timestamps', () => {
+    const trips = [
+      { id: 'trip-1', date: '2026-08-03', status: 'Completed', arrivalTime: '2026-08-03T08:00:00.000Z', completedAt: '2026-08-03T09:00:00.000Z' },
+      { id: 'trip-2', date: '2026-08-03', status: 'Completed', arrivalTime: '2026-08-03T11:00:00.000Z', completedAt: '2026-08-03T12:00:00.000Z' },
+    ];
+    const unresolved = buildTimeEvents(trips, { id: 'driver-1' }, [], POLICY_MODES.PAY_FROM_FIRST_PICKUP, {
+      date: '2026-08-03', now: '2026-08-04T12:00:00.000Z',
+    });
+    expect(unresolved.billableMinutes).toBe(240);
+    expect(unresolved.approvalEligible).toBe(false);
+    expect(unresolved.reviewRequiredGaps).toHaveLength(1);
+
+    const resolved = buildTimeEvents(trips, { id: 'driver-1' }, [{
+      type: 'GAP_RESOLUTION',
+      timestamp: '2026-08-03T11:00:00.000Z',
+      gapStartTime: '2026-08-03T09:00:00.000Z',
+      gapEndTime: '2026-08-03T11:00:00.000Z',
+      resolution: 'PERSONAL_UNPAID',
+      source: 'admin_correction',
+      authority: 'admin',
+      correctedBy: 'admin@agape.test',
+      correctedAt: '2026-08-04T12:00:00.000Z',
+      correctionReason: 'Driver reported personal appointment',
+    }], POLICY_MODES.PAY_FROM_FIRST_PICKUP, {
+      date: '2026-08-03', now: '2026-08-04T12:00:00.000Z',
+    });
+    expect(resolved.billableMinutes).toBe(120);
+    expect(resolved.approvalEligible).toBe(true);
+    expect(resolved.reviewRequiredGaps).toHaveLength(0);
+  });
+
+  it('uses automatically timestamped personal-time events as an exact unpaid interval', () => {
+    const trips = [
+      { id: 'trip-1', date: '2026-08-03', status: 'Completed', arrivalTime: '2026-08-03T08:00:00.000Z', completedAt: '2026-08-03T09:00:00.000Z' },
+      { id: 'trip-2', date: '2026-08-03', status: 'Completed', arrivalTime: '2026-08-03T11:00:00.000Z', completedAt: '2026-08-03T12:00:00.000Z' },
+    ];
+    const model = buildTimeEvents(trips, { id: 'driver-1' }, [
+      { type: 'BREAK_START', timestamp: '2026-08-03T09:00:00.000Z', source: 'driver_personal_declaration' },
+      { type: 'BREAK_END', timestamp: '2026-08-03T11:00:00.000Z', source: 'driver_personal_declaration' },
+    ], POLICY_MODES.PAY_FROM_FIRST_PICKUP, {
+      date: '2026-08-03', now: '2026-08-04T12:00:00.000Z',
+    });
+
+    expect(model.billableMinutes).toBe(120);
+    expect(model.sessions[0].breakMinutes).toBe(120);
+    expect(model.reviewRequiredGaps).toHaveLength(0);
+    expect(model.approvalEligible).toBe(true);
   });
 });

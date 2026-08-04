@@ -498,7 +498,7 @@ const exportFullJson = (trips, drivers, dispatchers, vehicles, logs) => {
 
 const DesktopAdminPage = ({
   role, currentUser, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers,
-  addAuditLog, logs = [], trips = [], driverTelemetry = [], vehicles = [], setVehicles,
+  addAuditLog, logs = [], trips = [], driverTelemetry = [], timeTrackingDeclarations = [], vehicles = [], setVehicles,
   assignTripToDriver, requestAuthAction, onViewTrip
 }) => {
   const { unreadCount } = useChat({ alerts: true });
@@ -956,6 +956,7 @@ const DesktopAdminPage = ({
             drivers={drivers}
             trips={trips}
             driverTelemetry={driverTelemetry}
+            timeTrackingDeclarations={timeTrackingDeclarations}
             policyMode={payrollPolicy}
             onPolicyChange={setPayrollPolicy}
           />

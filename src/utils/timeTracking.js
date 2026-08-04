@@ -53,14 +53,15 @@ export const POLICY_MODES = {
 };
 
 export const GAP_CLASSIFICATIONS = {
-  SHORT: 'SHORT',           // 0-20 min: normal delay, continuous session
-  MEDIUM: 'MEDIUM',         // 20-90 min: unconfirmed break, no pay
-  LONG: 'LONG',             // 90+ min or GPS deviation: split session, personal time
+  WORK_WAITING: 'WORK_WAITING',
+  VERIFIED_PERSONAL: 'VERIFIED_PERSONAL',
+  NEEDS_REVIEW: 'NEEDS_REVIEW',
 };
 
 export const PAYROLL_EFFECTS = {
   INCLUDED: 'INCLUDED',
   EXCLUDED: 'EXCLUDED',
+  REVIEW: 'REVIEW',
 };
 
 export const ARRIVAL_RADIUS_FT = 200; // Default arrival radius in feet
@@ -234,7 +235,7 @@ export const calculateAnchor = ({ policyMode, driver, lastWorkLocation, pickupLo
  * @param {Object} nextLocation - { lat, lng }
  * @returns {{ classification: string, durationMinutes: number, payrollEffect: string, auditRecord: Object }}
  */
-export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLocation) => {
+export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLocation, context = {}) => {
   const last = new Date(lastEventTime);
   const next = new Date(nextEventTime);
   const durationMs = next.getTime() - last.getTime();
@@ -245,31 +246,34 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
   let notes = '';
   let gapDistanceMiles = null;
 
-  if (durationMinutes <= GAP_THRESHOLDS.SHORT_MAX) {
-    classification = GAP_CLASSIFICATIONS.SHORT;
+  const resolution = String(context?.resolution || '').trim().toUpperCase();
+  const verifiedPersonal = resolution === 'PERSONAL_UNPAID' || context?.verifiedPersonal === true;
+  const verifiedWaiting = resolution === 'PAID_WAITING' || context?.requiredToRemain === true || context?.sameTrip === true;
+
+  if (verifiedPersonal) {
+    classification = GAP_CLASSIFICATIONS.VERIFIED_PERSONAL;
+    payrollEffect = PAYROLL_EFFECTS.EXCLUDED;
+    notes = 'Verified off-duty personal time; excluded by an attributable payroll decision';
+  } else if (verifiedWaiting || durationMinutes <= GAP_THRESHOLDS.SHORT_MAX) {
+    classification = GAP_CLASSIFICATIONS.WORK_WAITING;
     payrollEffect = PAYROLL_EFFECTS.INCLUDED;
-    notes = 'Short gap - treated as normal delay';
-  } else if (durationMinutes <= GAP_THRESHOLDS.MEDIUM_MAX) {
-    classification = GAP_CLASSIFICATIONS.MEDIUM;
-    payrollEffect = PAYROLL_EFFECTS.EXCLUDED;
-    notes = 'Medium gap - unconfirmed break, no payroll';
+    notes = verifiedWaiting ? 'Work-related waiting supported by trip or review evidence' : 'Short operational gap included as continuous work';
   } else {
-    classification = GAP_CLASSIFICATIONS.LONG;
-    payrollEffect = PAYROLL_EFFECTS.EXCLUDED;
-    notes = 'Long gap - personal time suspected, excluded from payroll';
+    classification = GAP_CLASSIFICATIONS.NEEDS_REVIEW;
+    payrollEffect = PAYROLL_EFFECTS.REVIEW;
+    notes = 'Ambiguous gap remains included until an authorized reviewer records a decision; no payroll deduction was made';
   }
 
-  // Check for GPS deviation (location jumped significantly during gap)
-  if (lastLocation && nextLocation && classification !== GAP_CLASSIFICATIONS.LONG) {
+  // GPS movement is an integrity signal only. It never proves personal activity.
+  if (lastLocation && nextLocation) {
     gapDistanceMiles = haversineDistanceMiles(
       lastLocation.lat, lastLocation.lng,
       nextLocation.lat, nextLocation.lng
     );
-    // If driver moved >10 miles during a "short" gap, reclassify
-    if (gapDistanceMiles > 10 && classification === GAP_CLASSIFICATIONS.SHORT) {
-      classification = GAP_CLASSIFICATIONS.MEDIUM;
-      payrollEffect = PAYROLL_EFFECTS.EXCLUDED;
-      notes = `Reclassified: ${gapDistanceMiles.toFixed(1)}mi movement during short gap`;
+    if (gapDistanceMiles > 10 && classification === GAP_CLASSIFICATIONS.WORK_WAITING && !verifiedWaiting) {
+      classification = GAP_CLASSIFICATIONS.NEEDS_REVIEW;
+      payrollEffect = PAYROLL_EFFECTS.REVIEW;
+      notes = `${gapDistanceMiles.toFixed(1)}mi movement requires review; no payroll deduction was made`;
     }
   }
 
@@ -281,11 +285,17 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
     startLocation: lastLocation ? { lat: lastLocation.lat, lng: lastLocation.lng } : null,
     endLocation: nextLocation ? { lat: nextLocation.lat, lng: nextLocation.lng } : null,
     classification,
-    gapType: payrollEffect === PAYROLL_EFFECTS.EXCLUDED ? 'UNPAID_GAP' : 'WORK_CONTINUITY',
+    gapType: payrollEffect === PAYROLL_EFFECTS.EXCLUDED
+      ? 'VERIFIED_OFF_DUTY'
+      : payrollEffect === PAYROLL_EFFECTS.REVIEW ? 'REVIEW_REQUIRED' : 'WORK_CONTINUITY',
     payrollEffect,
     gapDistanceMiles: gapDistanceMiles == null ? null : Math.round(gapDistanceMiles * 10) / 10,
     notes,
     classifiedAt: new Date().toISOString(),
+    resolution: resolution || null,
+    resolvedBy: context?.resolvedBy || null,
+    resolvedAt: context?.resolvedAt || null,
+    resolutionReason: context?.resolutionReason || null,
   };
 
   return { classification, durationMinutes, payrollEffect, auditRecord };
@@ -299,7 +309,7 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
  * @param {Array} events - Sorted array of time events
  * @returns {{ sessions: Array, totalBillableMinutes: number, gapLog: Array }}
  */
-const CLOCK_EVENT_TYPES = new Set(['CLOCK_IN', 'AUTO_CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END', 'TRIP_EVENT']);
+const CLOCK_EVENT_TYPES = new Set(['CLOCK_IN', 'AUTO_CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END', 'TRIP_EVENT', 'GAP_RESOLUTION']);
 
 const canonicalEventType = (type) => {
   const normalized = String(type || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
@@ -343,6 +353,7 @@ export const validateTimeEventSequence = (events, options = {}) => {
     .sort((a, b) => a._ms - b._ms || a._sourceIndex - b._sourceIndex);
 
   normalizedEvents.forEach((event) => {
+    if (event.type === 'GAP_RESOLUTION') return;
     if (event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN') {
       if (onShift) anomalies.push({ code: 'DUPLICATE_CLOCK_IN', sourceIndex: event._sourceIndex, message: 'Clock in occurred while a shift was already open.' });
       else { onShift = true; onBreak = false; }
@@ -375,6 +386,7 @@ export const stitchSessions = (events, options = {}) => {
 
   const validation = validateTimeEventSequence(events, options);
   const sorted = validation.normalizedEvents.map((event, index) => ({ ...event, _ms: eventMillis(event), _index: index }));
+  const gapResolutions = sorted.filter((event) => event.type === 'GAP_RESOLUTION');
   const sessions = [];
   const gapLog = [];
   const anomalies = [...validation.anomalies];
@@ -399,6 +411,10 @@ export const stitchSessions = (events, options = {}) => {
 
   for (let i = 0; i < sorted.length; i++) {
     const event = sorted[i];
+
+    if (event.type === 'GAP_RESOLUTION') {
+      continue;
+    }
 
     if (event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN') {
       if (currentSession) continue;
@@ -453,11 +469,25 @@ export const stitchSessions = (events, options = {}) => {
         // Check for gap between this event and the previous one
         if (currentSession.events.length > 1) {
           const prevEvent = currentSession.events[currentSession.events.length - 2];
+          const matchingResolution = gapResolutions.find((resolution) => {
+            const startMs = eventMillis({ timestamp: resolution.gapStartTime });
+            const endMs = eventMillis({ timestamp: resolution.gapEndTime });
+            return startMs != null && endMs != null
+              && Math.abs(startMs - prevEvent._ms) <= 60000
+              && Math.abs(endMs - event._ms) <= 60000;
+          });
           const gap = classifyGap(
             prevEvent.timestamp,
             event.timestamp,
             prevEvent.location,
-            event.location
+            event.location,
+            {
+              sameTrip: Boolean(prevEvent.tripId && prevEvent.tripId === event.tripId),
+              resolution: matchingResolution?.resolution,
+              resolvedBy: matchingResolution?.correctedBy || matchingResolution?.resolvedBy,
+              resolvedAt: matchingResolution?.correctedAt || matchingResolution?.resolvedAt,
+              resolutionReason: matchingResolution?.correctionReason || matchingResolution?.resolutionReason,
+            }
           );
 
           gapLog.push({
@@ -467,13 +497,13 @@ export const stitchSessions = (events, options = {}) => {
           });
 
           if (gap.payrollEffect === PAYROLL_EFFECTS.EXCLUDED) {
-            // Record the gap for analytics, but DO NOT automatically deduct it as unpaid break time (excludedGapMinutes)
-            // Drivers are paid for standby time between trips unless they explicitly log a BREAK_START.
             currentSession.gapMinutes += gap.durationMinutes;
-            
-            if (gap.classification === GAP_CLASSIFICATIONS.LONG) {
+            currentSession.excludedGapMilliseconds += gap.durationMinutes * 60000;
+            if (gap.classification === GAP_CLASSIFICATIONS.VERIFIED_PERSONAL) {
               currentSession.personalGapMinutes += gap.durationMinutes;
             }
+          } else if (gap.payrollEffect === PAYROLL_EFFECTS.REVIEW) {
+            currentSession.gapMinutes += gap.durationMinutes;
           }
         }
       }
@@ -690,6 +720,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
 
   const normalizeClockType = (type) => {
     const lower = String(type || '').toLowerCase();
+    if (lower.includes('gap') && lower.includes('resolution')) return 'GAP_RESOLUTION';
     if (lower.includes('break') && (lower.includes('end') || lower.includes('resume'))) return 'BREAK_END';
     if (lower.includes('break')) return 'BREAK_START';
     if (lower.includes('out')) return 'CLOCK_OUT';
@@ -738,7 +769,10 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
         location: clockLocationFrom(ce),
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((event, index, all) => all.findIndex((candidate) => (
+      candidate.type === event.type && candidate.timestamp === event.timestamp
+    )) === index);
 
   const normalizedTrips = [];
   (trips || []).forEach((trip) => {
@@ -900,7 +934,15 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     }
   }
 
-  events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const eventPriority = (event) => {
+    if (event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN') return 0;
+    if (event.type === 'GAP_RESOLUTION' || event.type === 'BREAK_END') return 1;
+    if (event.type === 'TRIP_EVENT') return 2;
+    if (event.type === 'BREAK_START') return 3;
+    if (event.type === 'CLOCK_OUT') return 4;
+    return 2;
+  };
+  events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp) || eventPriority(a) - eventPriority(b));
 
   const calculationNow = options.now || new Date();
   const { sessions, totalBillableMinutes, totalBillableMilliseconds, gapLog, anomalies } = stitchSessions(events, {
@@ -928,6 +970,37 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     details: abuse.details,
     payrollEffect: 'REVIEW',
   }));
+  const reviewRequiredGaps = gapLogWithMeta.filter((gap) => gap.payrollEffect === PAYROLL_EFFECTS.REVIEW);
+  const estimatedBoundaries = events.filter((event) => (
+    (event.type === 'AUTO_CLOCK_IN' || event.type === 'CLOCK_OUT') && event.confidence === 'route_estimate'
+  ));
+  const openSessions = sessions.filter((session) => session.isOpen);
+  const reconciliationIssues = [
+    ...anomalies.map((issue) => ({ severity: 'critical', code: issue.code, message: issue.message })),
+    ...reviewRequiredGaps.map((gap) => ({
+      severity: 'review',
+      code: 'AMBIGUOUS_GAP',
+      message: `${Math.round(gap.durationMinutes)} minute gap requires an authorized paid-waiting or personal-time decision.`,
+      startTime: gap.startTime,
+      endTime: gap.endTime,
+    })),
+    ...estimatedBoundaries.map((event) => ({
+      severity: 'evidence',
+      code: 'ESTIMATED_BOUNDARY',
+      message: `${event.type === 'AUTO_CLOCK_IN' ? 'Shift start' : 'Shift end'} uses a route estimate because verified GPS boundary evidence was unavailable.`,
+      timestamp: event.timestamp,
+    })),
+  ];
+  const reconciliation = {
+    status: openSessions.length > 0 ? 'ACTIVE' : (anomalies.length > 0 || reviewRequiredGaps.length > 0 ? 'NEEDS_REVIEW' : 'READY'),
+    tripCount: normalizedTrips.length,
+    sessionCount: sessions.length,
+    unresolvedGapCount: reviewRequiredGaps.length,
+    verifiedPersonalGapCount: gapLogWithMeta.filter((gap) => gap.classification === GAP_CLASSIFICATIONS.VERIFIED_PERSONAL).length,
+    paidWaitingGapCount: gapLogWithMeta.filter((gap) => gap.classification === GAP_CLASSIFICATIONS.WORK_WAITING).length,
+    estimatedBoundaryCount: estimatedBoundaries.length,
+    issues: reconciliationIssues,
+  };
 
   return {
     date: dateFilter,
@@ -944,7 +1017,9 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     billableMinutes: totalBillableMinutes,
     billableMilliseconds: totalBillableMilliseconds,
     anomalies,
-    approvalEligible: anomalies.length === 0 && sessions.every((session) => !session.isOpen),
+    reviewRequiredGaps,
+    reconciliation,
+    approvalEligible: anomalies.length === 0 && reviewRequiredGaps.length === 0 && sessions.every((session) => !session.isOpen),
     policyMode,
   };
 };
@@ -991,8 +1066,11 @@ export const generatePayrollOutput = (timeData, hourlyRate = 0) => {
   if (overtimeHours > 0) {
     adminNotes.push(`Overtime: ${overtimeHours.toFixed(1)} hours at ${overtimeMultiplier}x rate`);
   }
-  if (gapLog.filter(g => g.classification === 'LONG').length > 0) {
-    adminNotes.push(`${gapLog.filter(g => g.classification === 'LONG').length} long gap(s) excluded from payroll`);
+  if (gapLog.filter(g => g.classification === GAP_CLASSIFICATIONS.VERIFIED_PERSONAL).length > 0) {
+    adminNotes.push(`${gapLog.filter(g => g.classification === GAP_CLASSIFICATIONS.VERIFIED_PERSONAL).length} verified personal-time gap(s) excluded from payroll`);
+  }
+  if (gapLog.filter(g => g.classification === GAP_CLASSIFICATIONS.NEEDS_REVIEW).length > 0) {
+    adminNotes.push(`${gapLog.filter(g => g.classification === GAP_CLASSIFICATIONS.NEEDS_REVIEW).length} ambiguous gap(s) require review; no automatic deduction was made`);
   }
   if (sessions.some(s => s.breakMinutes > 60)) {
     adminNotes.push('Extended break detected (>60 min)');

@@ -221,7 +221,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (subView === 'payroll') {
       return (
         <SubViewWrapper title="Payroll">
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><PayrollReportPage drivers={drivers} trips={trips} driverTelemetry={props.driverTelemetry || []} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><PayrollReportPage drivers={drivers} trips={trips} driverTelemetry={props.driverTelemetry || []} timeTrackingDeclarations={props.timeTrackingDeclarations || []} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }
@@ -229,7 +229,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (subView === 'activity') {
       return (
         <SubViewWrapper title="Activity Log">
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><TimeTrackingAdmin drivers={drivers} trips={trips} driverTelemetry={props.driverTelemetry || []} role={role} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><TimeTrackingAdmin drivers={drivers} trips={trips} driverTelemetry={props.driverTelemetry || []} timeTrackingDeclarations={props.timeTrackingDeclarations || []} role={role} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }
@@ -404,6 +404,7 @@ const MobileEnterpriseDashboard = (props) => {
               drivers={[selectedDriver]} allDrivers={props.allDrivers || drivers}
               trips={selectedTrips} dispatchers={props.dispatchers || []} phoneNumbers={props.phoneNumbers || {}}
               driverTelemetry={props.driverTelemetry || []}
+              timeTrackingDeclarations={props.timeTrackingDeclarations || []}
               onUpdateTrip={props.onUpdateDriverTrip || props.updateTrip} onCompleteTrip={props.onCompleteTrip}
               onDriverStatusUpdate={props.onDriverStatusUpdate} onUpdateClockEvents={props.onUpdateClockEvents}
               onUpdateHourlyRate={props.onUpdateHourlyRate} onUpdateDriverLocation={props.handleUpdateDriverLocation || props.updateDriverLocation}

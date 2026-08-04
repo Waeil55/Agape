@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, validateTimeEventSequence } from '../utils/timeTracking';
 import { localCalendarYmd } from '../utils/tripDate';
-import { db, doc, setDoc } from '../config/firebase';
+import { auth, db, doc, setDoc, runTransaction } from '../config/firebase';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 
 const formatMinutes = (minutes) => {
@@ -38,14 +38,14 @@ const timeInputValue = (value) => {
 
 const getGapClassificationColor = (classification) => {
   switch (classification) {
-    case 'SHORT': return 'bg-green-100 text-green-800';
-    case 'MEDIUM': return 'bg-yellow-100 text-yellow-800';
-    case 'LONG': return 'bg-red-100 text-red-800';
+    case 'WORK_WAITING': return 'bg-green-100 text-green-800';
+    case 'NEEDS_REVIEW': return 'bg-yellow-100 text-yellow-800';
+    case 'VERIFIED_PERSONAL': return 'bg-blue-100 text-blue-800';
     default: return 'bg-slate-100 text-slate-800';
   }
 };
 
-const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clockEvents = [], timeData = null, onUpdateClockEvents, onBack, onUpdateHourlyRate }) => {
+const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], timeTrackingDeclarations = [], clockEvents = [], timeData = null, onUpdateClockEvents, onBack, onUpdateHourlyRate }) => {
   const [selectedDriver, setSelectedDriver] = useState('ALL');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [expandedDriver, setExpandedDriver] = useState(null);
@@ -55,6 +55,8 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
   const [rateValue, setRateValue] = useState('');
   const [approvalMsg, setApprovalMsg] = useState(null);
   const [timesheetSaving, setTimesheetSaving] = useState(false);
+  const [gapReviewDraft, setGapReviewDraft] = useState(null);
+  const [gapReviewSaving, setGapReviewSaving] = useState(false);
   const editValidation = useMemo(
     () => editTimesheet ? validateTimeEventSequence(editTimesheet.events, { now: new Date() }) : null,
     [editTimesheet]
@@ -101,7 +103,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
         return values.length === 0 ? false : values.some(v => driverKeys.has(v));
       };
       const driverTrips = sourceTrips.filter(matchesDriver);
-      const driverClockEvents = [...(driver.clockEvents || []), ...sourceClockEvents.filter(matchesDriver)];
+      const driverClockEvents = [...(driver.clockEvents || []), ...sourceClockEvents.filter(matchesDriver), ...timeTrackingDeclarations.filter(matchesDriver)];
       const driverGaps = sourceGaps.filter(matchesDriver);
       const driverTeleports = sourceTeleports.filter(matchesDriver);
 
@@ -141,18 +143,20 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
         day.trips = model.trips;
         day.date = date;
         day.clockEvents = model.clockEvents;
+        day.sourceClockEvents = model.sourceClockEvents || [];
         day.events = model.events;
         day.sessions = model.sessions;
         day.gaps = [...model.gapLog, ...externalGaps];
         day.teleports = [...model.teleports, ...day.teleports];
         day.anomalies = model.anomalies || [];
+        day.reconciliation = model.reconciliation;
         day.approvalEligible = model.approvalEligible;
         day.payroll = generatePayrollOutput(model, Number(driver.hourlyRate || 0));
       });
       sessions[driverId] = byDate;
     });
     return sessions;
-  }, [filteredDrivers, trips, driverTelemetry, clockEvents, timeData, dateRange.from, dateRange.to]);
+  }, [filteredDrivers, trips, driverTelemetry, timeTrackingDeclarations, clockEvents, timeData, dateRange.from, dateRange.to]);
 
   const summaryStats = useMemo(() => {
     const allSessions = Object.values(driverSessions).flatMap(byDate => Object.values(byDate));
@@ -168,6 +172,44 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
   const getDayBillable = (day) => day.payroll?.payTime?.billableMilliseconds != null
     ? day.payroll.payTime.billableMilliseconds / 60000
     : day.payroll?.payTime?.billableMinutes ?? day.sessions.reduce((sum, s) => sum + (s.billableMinutes || 0), 0) ?? day.trips.reduce((sum, t) => sum + (t.billableMinutes || 0), 0);
+
+  const resolveGap = async (gap, resolution, reason) => {
+    const trimmedReason = String(reason || '').trim();
+    if (!trimmedReason) throw new Error('A review reason is required.');
+    const driverRef = doc(db, 'drivers', gap.driverId);
+    const eventId = `gap-resolution:${gap.driverId}:${gap.date}:${Date.parse(gap.startTime)}:${Date.parse(gap.endTime)}`;
+    const resolvedAt = new Date().toISOString();
+    const resolvedBy = auth.currentUser?.email || auth.currentUser?.uid || 'authorized-reviewer';
+    const resolutionEvent = {
+      eventId,
+      type: 'GAP_RESOLUTION',
+      timestamp: gap.endTime,
+      gapStartTime: gap.startTime,
+      gapEndTime: gap.endTime,
+      resolution,
+      source: 'admin_correction',
+      authority: 'payroll_reviewer',
+      correctedBy: resolvedBy,
+      correctedAt: resolvedAt,
+      correctionReason: trimmedReason,
+    };
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(driverRef);
+      if (!snapshot.exists()) throw new Error('Driver record was not found.');
+      const existing = Array.isArray(snapshot.data()?.clockEvents) ? snapshot.data().clockEvents : [];
+      const nextEvents = [...existing.filter((event) => event?.eventId !== eventId), resolutionEvent]
+        .sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at));
+      transaction.set(driverRef, { clockEvents: nextEvents, updatedAtLocal: resolvedAt }, { merge: true });
+      const immutableReviewId = `${eventId}:${Date.parse(resolvedAt)}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+      transaction.set(doc(db, 'timeTrackingGapReviews', immutableReviewId), {
+        ...resolutionEvent,
+        driverId: gap.driverId,
+        date: gap.date,
+        previousClassification: gap.classification,
+        previousPayrollEffect: gap.payrollEffect,
+      });
+    });
+  };
   const getPayableDayBillable = (day) => day.approvalEligible ? getDayBillable(day) : 0;
 
   const getDayEarnings = (day, hourlyRate) => {
@@ -410,12 +452,12 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
                                 {breaks > 0 && <span className="flex items-center gap-1 text-yellow-600"><Pause className="w-3 h-3" />{formatMinutes(breaks)}</span>}
                                 <span className="flex items-center gap-1"><Navigation className="w-3 h-3" />{day.trips.length}</span>
                                 {rate > 0 && <span className="font-semibold text-green-700">{formatCurrency(earnings)}</span>}
-                                <button onClick={() => setEditTimesheet({ driverId, date, events: [...day.clockEvents].sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)), correctionReason: '' })} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit Timesheet">
+                                <button onClick={() => setEditTimesheet({ driverId, date, events: [...day.sourceClockEvents].sort((a, b) => new Date(a.timestamp || a.at) - new Date(b.timestamp || b.at)), correctionReason: '' })} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit source timesheet events">
                                   <Edit2 size={14} />
                                 </button>
                               </div>
                             </div>
-                            {!isVerified && day.anomalies?.length > 0 && <div className="mb-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-xs text-amber-800">{day.anomalies.map((issue) => issue.message).join(' ')}</div>}
+                            {!isVerified && day.reconciliation?.issues?.length > 0 && <div className="mb-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-xs text-amber-800">{day.reconciliation.issues.filter((issue) => issue.severity !== 'evidence').map((issue) => issue.message).join(' ')}</div>}
                             {day.trips.length > 0 && (
                               <div className="ml-4 space-y-1">
                                 {day.trips.map((trip, i) => (
@@ -452,7 +494,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="p-4 border-b border-slate-100">
               <h3 className="font-medium text-slate-900">Gap Analysis</h3>
-              <p className="text-sm text-slate-500">Gaps between events classified by duration and payroll effect</p>
+              <p className="text-sm text-slate-500">Ambiguous time stays included until an authorized reviewer records an evidence-based decision.</p>
             </div>
             <div className="divide-y divide-slate-100">
               {(() => {
@@ -460,23 +502,54 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
                   Object.entries(byDate).flatMap(([date, session]) => session.gaps.map(g => ({ ...g, driverId, date })))
                 ).sort((a, b) => new Date(b.timestamp || b.startTime) - new Date(a.timestamp || a.startTime));
                 if (allGaps.length === 0) return <div className="p-8 text-center text-slate-500">No gaps recorded</div>;
-                return allGaps.map((gap, i) => (
-                  <div key={i} className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getGapClassificationColor(gap.classification)}`}>{gap.classification}</span>
-                      <div>
-                        <p className="text-sm text-slate-900">{gap.gapType === 'TRIP' ? 'Between trips' : gap.gapType === 'BREAK' ? 'Break' : 'After trip'}</p>
-                        <p className="text-xs text-slate-500">{formatDate(gap.timestamp || gap.startTime)} at {formatTime(gap.timestamp || gap.startTime)}</p>
+                return allGaps.map((gap, i) => {
+                  const gapKey = `${gap.driverId}:${gap.date}:${gap.startTime}:${gap.endTime}`;
+                  const reviewing = gapReviewDraft?.key === gapKey;
+                  return (
+                    <div key={gapKey || i} className="p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getGapClassificationColor(gap.classification)}`}>{String(gap.classification || '').replaceAll('_', ' ')}</span>
+                          <div>
+                            <p className="text-sm text-slate-900">{gap.gapType === 'VERIFIED_OFF_DUTY' ? 'Verified personal time' : gap.gapType === 'REVIEW_REQUIRED' ? 'Ambiguous gap' : 'Paid work continuity'}</p>
+                            <p className="text-xs text-slate-500">{formatDate(gap.startTime)} · {formatTime(gap.startTime)}–{formatTime(gap.endTime)}{gap.gapDistanceMiles != null ? ` · ${gap.gapDistanceMiles} mi movement` : ''}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 sm:justify-end">
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-slate-900">{formatMinutes(gap.durationMinutes)}</p>
+                            <p className={`text-xs ${gap.payrollEffect === 'EXCLUDED' ? 'text-blue-600' : gap.payrollEffect === 'REVIEW' ? 'text-amber-600' : 'text-green-600'}`}>
+                              {gap.payrollEffect === 'EXCLUDED' ? 'Verified unpaid' : gap.payrollEffect === 'REVIEW' ? 'Included pending review' : 'Included'}
+                            </p>
+                          </div>
+                          {gap.payrollEffect === 'REVIEW' && (
+                            <button type="button" onClick={() => setGapReviewDraft(reviewing ? null : { key: gapKey, reason: '' })} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100">
+                              {reviewing ? 'Cancel' : 'Review'}
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      {reviewing && (
+                        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                          <label className="mb-1 block text-xs font-bold text-slate-700">Evidence or decision reason</label>
+                          <input value={gapReviewDraft.reason} onChange={(event) => setGapReviewDraft({ ...gapReviewDraft, reason: event.target.value })} placeholder="Example: Dispatcher confirmed driver remained available at hospital" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                            <button disabled={gapReviewSaving || !gapReviewDraft.reason.trim()} type="button" onClick={async () => {
+                              try { setGapReviewSaving(true); await resolveGap(gap, 'PAID_WAITING', gapReviewDraft.reason); setGapReviewDraft(null); setApprovalMsg({ type: 'success', text: 'Gap recorded as paid work waiting.' }); }
+                              catch (error) { setApprovalMsg({ type: 'error', text: error.message || 'Gap decision could not be saved.' }); }
+                              finally { setGapReviewSaving(false); }
+                            }} className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">Paid work waiting</button>
+                            <button disabled={gapReviewSaving || !gapReviewDraft.reason.trim()} type="button" onClick={async () => {
+                              try { setGapReviewSaving(true); await resolveGap(gap, 'PERSONAL_UNPAID', gapReviewDraft.reason); setGapReviewDraft(null); setApprovalMsg({ type: 'success', text: 'Gap recorded as verified personal time.' }); }
+                              catch (error) { setApprovalMsg({ type: 'error', text: error.message || 'Gap decision could not be saved.' }); }
+                              finally { setGapReviewSaving(false); }
+                            }} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">Verified personal time</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-slate-900">{formatMinutes(gap.durationMinutes)}</p>
-                      <p className={`text-xs ${gap.payrollEffect === 'EXCLUDED' ? 'text-red-500' : 'text-green-500'}`}>
-                        {gap.payrollEffect === 'EXCLUDED' ? 'Excluded' : 'Included'}
-                      </p>
-                    </div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
           </div>
@@ -705,6 +778,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], clo
                     <option value="CLOCK_OUT">Clock Out</option>
                     <option value="BREAK_START">Break Start</option>
                     <option value="BREAK_END">Break End</option>
+                    <option value="GAP_RESOLUTION">Gap Resolution</option>
                   </select>
                   <input type="time" value={timeInputValue(event.timestamp || event.at)}
                     onChange={(e) => { const [h, m] = e.target.value.split(':'); const d = new Date(editTimesheet.date + 'T00:00:00'); d.setHours(parseInt(h), parseInt(m)); const n = [...editTimesheet.events]; n[index].timestamp = d.toISOString(); setEditTimesheet({ ...editTimesheet, events: n }); }}

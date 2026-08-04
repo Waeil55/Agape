@@ -7,7 +7,7 @@ import {
   Activity, Wand2, Lock, Briefcase, User,
   X
 } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -404,6 +404,7 @@ const App = () => {
   const tripsRef = useRef([]);
   const driverProfileBootstrapRef = useRef('');
   const [driverTelemetry, setDriverTelemetry] = useState([]);
+  const [timeTrackingDeclarations, setTimeTrackingDeclarations] = useState([]);
   const driverTelemetryRef = useRef([]);
   const realtimeReliability = useRealtimeReliability({ enabled: isAuthenticated });
 
@@ -869,6 +870,26 @@ const App = () => {
 
     return () => unsubscribe();
   }, [isAuthenticated, realtimeReliability.resubscribeKey]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !role) return undefined;
+    const declarationSource = role === 'driver'
+      ? query(collection(db, 'timeTrackingDeclarations'), where('driverEmail', '==', auth.currentUser?.email || currentUser || ''))
+      : collection(db, 'timeTrackingDeclarations');
+    const unsubscribe = onSnapshot(declarationSource, (snapshot) => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 45);
+      const cutoffMs = cutoff.getTime();
+      setTimeTrackingDeclarations(snapshot.docs
+        .map((itemDoc) => ({ id: itemDoc.id, ...itemDoc.data() }))
+        .filter((event) => {
+          const value = event.timestamp || event.createdAt;
+          const date = value?.toDate ? value.toDate() : value?.seconds ? new Date(value.seconds * 1000) : new Date(value || 0);
+          return Number.isFinite(date.getTime()) && date.getTime() >= cutoffMs;
+        }));
+    }, (error) => console.error('Time tracking declaration listener failed:', error));
+    return () => unsubscribe();
+  }, [currentUser, isAuthenticated, realtimeReliability.resubscribeKey, role]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -1954,6 +1975,9 @@ const App = () => {
       clockTimestamp,
       autoClockIn,
       clockEventType,
+      clockEventSource,
+      statusAuditTitle,
+      statusAuditMessage,
       ...persistableExtraFields
     } = extraFields || {};
     const eventTimestamp = clockTimestamp || autoClockIn || now;
@@ -1967,7 +1991,7 @@ const App = () => {
       clockEvents = [...clockEvents, {
         ...event,
         eventId,
-        source: event.source || 'trip_workflow',
+        source: event.source || clockEventSource || 'trip_workflow',
       }];
     };
     if (clockChanged && clockedIn) {
@@ -2017,12 +2041,14 @@ const App = () => {
     const changed = [];
     if (wasClockedIn !== clockedIn) changed.push({ field: 'clockedIn', before: prevDriverState.clockedIn, after: clockedIn });
     if (prevDriverState.status !== (clockedIn ? 'Available' : 'Offline')) changed.push({ field: 'status', before: prevDriverState.status, after: clockedIn ? 'Available' : 'Offline' });
-    addAuditLog(
-      clockedIn ? 'Driver Clocked In' : 'Driver Clocked Out',
-      `${driverName} ${clockedIn ? 'clocked in' : 'clocked out'}.`,
-      clockedIn ? 'emerald' : 'blue',
-      { entity: 'driver', id: driverId, diffs: changed }
-    );
+    if (clockChanged || clockEventType || statusAuditTitle) {
+      addAuditLog(
+        statusAuditTitle || (clockedIn ? 'Driver Clocked In' : 'Driver Clocked Out'),
+        statusAuditMessage || `${driverName} ${clockedIn ? 'clocked in' : 'clocked out'}.`,
+        clockedIn ? 'emerald' : 'blue',
+        { entity: 'driver', id: driverId, diffs: changed, eventSource: clockEventSource || 'trip_workflow' }
+      );
+    }
     if (driverId) {
       upsertDriverProfile(driverId, {
         clockedIn,
@@ -2972,6 +2998,7 @@ const App = () => {
             const myDrivers = myDriver ? [myDriver] : [];
             return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
               driverTelemetry={driverTelemetry}
+              timeTrackingDeclarations={timeTrackingDeclarations}
               allDrivers={drivers}
               dispatchers={dispatchers}
 
@@ -3077,6 +3104,7 @@ const App = () => {
               addAuditLog={addAuditLog}
               persistState={noop}
               driverTelemetry={driverTelemetry}
+              timeTrackingDeclarations={timeTrackingDeclarations}
               hasPermission={hasPermission}
               requestAuthAction={requestAuthAction}
               triggerSmartAssign={triggerSmartAssign}
