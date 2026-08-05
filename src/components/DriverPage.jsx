@@ -661,6 +661,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
 
   const [activeNav, setActiveNav] = useState(() => {
     if (defaultTripId) return 'active-trip';
+    // An admin/dispatcher embedding DriverPage is opening a trip workflow, not
+    // restoring that driver's personal portal. Never leak a driver's saved
+    // Settings/Tools/History tab into the operations Trips surface.
+    if (isEmbedded) return 'trips';
     const savedNav = localStorage.getItem(`agape_drvNav_${userKey}`) || 'trips';
     return ['trips', 'tools', 'history', 'settings', 'active-trip', 'chat'].includes(savedNav) ? savedNav : 'trips';
   });
@@ -675,10 +679,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
 
   useEffect(() => {
-    localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
+    if (!isEmbedded) localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
     localStorage.setItem(`agape_drvHistFilter_${userKey}`, historyFilter);
     localStorage.setItem(`agape_drvHistSearch_${userKey}`, historySearch);
-  }, [activeNav, historyFilter, historySearch, userKey]);
+  }, [activeNav, historyFilter, historySearch, userKey, isEmbedded]);
+
+  useEffect(() => {
+    if (!isEmbedded) return;
+    setActiveNav(defaultTripId ? 'active-trip' : 'trips');
+  }, [isEmbedded, defaultTripId, userKey]);
 
 
   const [selectedTrips, setSelectedTrips] = useState([]);

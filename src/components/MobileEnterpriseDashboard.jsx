@@ -24,6 +24,7 @@ const ReportsPage = lazy(() => import('./ReportsPage'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
 const DriverPage = lazy(() => import('./DriverPage'));
+const TripsPage = lazy(() => import('./TripsPage'));
 
 const MobileMenuPage = lazy(() => import('./MobileMenuPage'));
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
@@ -54,7 +55,13 @@ const MobileEnterpriseDashboard = (props) => {
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [toolsDriverId, setToolsDriverId] = useState(() => localStorage.getItem('agape_toolsDriverId') || '');
-  const [tripsDriverId, setTripsDriverId] = useState(() => localStorage.getItem('agape_tripsDriverId') || '');
+  const [toolSelectedTrips, setToolSelectedTrips] = useState([]);
+  const [toolAiSequence, setToolAiSequence] = useState(null);
+  const [toolAiSuggestions, setToolAiSuggestions] = useState([]);
+  const [toolAiOptimizing, setToolAiOptimizing] = useState(false);
+  const [toolGuidedMode, setToolGuidedMode] = useState(false);
+  const [toolGuidedStepIndex, setToolGuidedStepIndex] = useState(0);
+  const [toolRoutePlanStops, setToolRoutePlanStops] = useState(null);
   const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
 
@@ -73,13 +80,26 @@ const MobileEnterpriseDashboard = (props) => {
   }, [toolsDriverId]);
 
   useEffect(() => {
-    if (!tripsDriverId && driverWorkDrivers.length) setTripsDriverId(driverWorkDrivers[0].id);
-    else if (tripsDriverId && !driverWorkDrivers.some(driver => driver.id === tripsDriverId)) setTripsDriverId(driverWorkDrivers[0]?.id || '');
-  }, [driverWorkDrivers, tripsDriverId]);
+    setToolSelectedTrips([]);
+    setToolAiSequence(null);
+    setToolAiSuggestions([]);
+    setToolGuidedMode(false);
+    setToolGuidedStepIndex(0);
+    setToolRoutePlanStops(null);
+  }, [toolsDriverId]);
 
   useEffect(() => {
-    if (tripsDriverId) localStorage.setItem('agape_tripsDriverId', tripsDriverId);
-  }, [tripsDriverId]);
+    const selectedDriver = driverWorkDrivers.find(driver => driver.id === toolsDriverId);
+    const activeIds = selectedDriver ? driverWorkTrips.filter(trip => (
+      (trip.driverId === selectedDriver.id || trip.driverName === selectedDriver.name ||
+        String(trip.driverEmail || '').trim().toLowerCase() === String(selectedDriver.email || '').trim().toLowerCase())
+      && !['Completed', 'Canceled', 'Cancelled', 'Archived'].includes(trip.status)
+    )).map(trip => trip.id) : [];
+    setToolSelectedTrips(current => {
+      const stillActive = current.filter(id => activeIds.includes(id));
+      return stillActive.length ? stillActive : activeIds;
+    });
+  }, [toolsDriverId, driverWorkDrivers, driverWorkTrips]);
 
 
 
@@ -287,6 +307,18 @@ const MobileEnterpriseDashboard = (props) => {
           ))
         : [];
       const toolsActiveTrips = toolsTrips.filter(t => !['Completed', 'Canceled', 'Archived'].includes(t.status));
+      const selectAllToolTrips = () => setToolSelectedTrips(current => (
+        current.length === toolsActiveTrips.length ? [] : toolsActiveTrips.map(trip => trip.id)
+      ));
+      const optimizeToolTrips = () => {
+        const candidates = toolsActiveTrips.filter(trip => toolSelectedTrips.includes(trip.id));
+        if (!candidates.length) return;
+        setToolAiOptimizing(true);
+        const ordered = [...candidates].sort((a, b) => String(a.time || a.pickupTime || '').localeCompare(String(b.time || b.pickupTime || '')));
+        setToolAiSequence(ordered.map(trip => trip.id));
+        setToolAiSuggestions([{ type: 'route', message: `${ordered.length} trips ordered by scheduled pickup time.` }]);
+        setToolAiOptimizing(false);
+      };
 
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
@@ -315,33 +347,33 @@ const MobileEnterpriseDashboard = (props) => {
                   <DriverToolsPage
                     trips={toolsTrips}
                     activeTrips={toolsActiveTrips}
-                    aiSequence={[]}
-                    aiSuggestions={[]}
+                    aiSequence={toolAiSequence}
+                    aiSuggestions={toolAiSuggestions}
                     aiRideShare={[]}
                     conflicts={[]}
-                    aiOptimizing={false}
-                    guidedMode={false}
-                    guidedStepIndex={0}
-                    guidedSteps={[]}
+                    aiOptimizing={toolAiOptimizing}
+                    guidedMode={toolGuidedMode}
+                    guidedStepIndex={toolGuidedStepIndex}
+                    guidedSteps={toolAiSequence || []}
                     driverPosition={null}
                     appSettings={props.appSettings}
                     currentUser={toolsDriver.email || toolsDriver.id || currentUser}
                     role={role}
-                    onSetGuidedMode={() => {}}
-                    onSetGuidedStepIndex={() => {}}
-                    onSetAiSequence={() => {}}
-                    onSetAiSuggestions={() => {}}
-                    onRunAiOptimization={() => {}}
-                    onSelectAllTrips={() => {}}
-                    selectedTrips={[]}
-                    onSetSelectedTrips={() => {}}
+                    onSetGuidedMode={setToolGuidedMode}
+                    onSetGuidedStepIndex={setToolGuidedStepIndex}
+                    onSetAiSequence={setToolAiSequence}
+                    onSetAiSuggestions={setToolAiSuggestions}
+                    onRunAiOptimization={optimizeToolTrips}
+                    onSelectAllTrips={selectAllToolTrips}
+                    selectedTrips={toolSelectedTrips}
+                    onSetSelectedTrips={setToolSelectedTrips}
                     etas={{}}
                     onOpenInNav={props.onOpenInNav}
-                    onOpenSequencer={() => {}}
+                    onOpenSequencer={() => setSubView('route_planner')}
                     requestAuthAction={props.requestAuthAction}
-                    routePlanStops={null}
-                    onSetRoutePlanStops={() => {}}
-                    onSendToSequencer={() => {}}
+                    routePlanStops={toolRoutePlanStops}
+                    onSetRoutePlanStops={setToolRoutePlanStops}
+                    onSendToSequencer={(stops) => { setToolRoutePlanStops(stops); setSubView('route_planner'); }}
                   />
                 </Suspense>
               </ErrorBoundary>
@@ -382,37 +414,28 @@ const MobileEnterpriseDashboard = (props) => {
     }
 
     if (currentView === 'trips') {
-      const selectedDriver = driverWorkDrivers.find(driver => driver.id === tripsDriverId) || driverWorkDrivers[0];
-      const selectedTrips = selectedDriver ? driverWorkTrips.filter(trip => (
-        trip.driverId === selectedDriver.id || trip.driverName === selectedDriver.name ||
-        String(trip.driverEmail || '').trim().toLowerCase() === String(selectedDriver.email || '').trim().toLowerCase()
-      )) : [];
+      const selectedTasks = props.selectedTasks || [];
+      const toggleTaskSelection = (tripId) => props.setSelectedTasks?.(current => (
+        current.includes(tripId) ? current.filter(id => id !== tripId) : [...current, tripId]
+      ));
       return (
-        <div className="flex min-h-0 flex-1 flex-col bg-[var(--bg-app)]">
-          <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Driver trips</p><p className="truncate text-sm font-extrabold text-slate-950">{role === 'admin' ? 'Admin' : 'Dispatcher'} workflow view</p></div>
-              <select value={selectedDriver?.id || ''} onChange={event => setTripsDriverId(event.target.value)} className="max-w-[55%] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500">
-                {driverWorkDrivers.map(driver => <option key={driver.id || driver.email} value={driver.id}>{driver.name || driver.email || driver.id}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {selectedDriver ? <ErrorBoundary><Suspense fallback={<MobileFallback />}><DriverPage
-              currentUser={selectedDriver.email || selectedDriver.id || currentUser}
-              role={role} isEmbedded={true} onEmbeddedClose={() => handleNavClick('map')}
-              drivers={[selectedDriver]} allDrivers={props.allDrivers || drivers}
-              trips={selectedTrips} dispatchers={props.dispatchers || []} phoneNumbers={props.phoneNumbers || {}}
-              driverTelemetry={props.driverTelemetry || []}
-              timeTrackingDeclarations={props.timeTrackingDeclarations || []}
-              onUpdateTrip={props.onUpdateDriverTrip || props.updateTrip} onCompleteTrip={props.onCompleteTrip}
-              onDriverStatusUpdate={props.onDriverStatusUpdate} onUpdateClockEvents={props.onUpdateClockEvents}
-              onUpdateHourlyRate={props.onUpdateHourlyRate} onUpdateDriverLocation={props.handleUpdateDriverLocation || props.updateDriverLocation}
-              onAddAuditLog={props.addAuditLog} requestAuthAction={props.requestAuthAction}
-              appSettings={props.appSettings} onUpdateAppSettings={props.updateAppSettings}
-              onOpenSettings={() => setSubView('settings')} onLogout={props.onLogout}
-              onAddTrip={props.addTrip} showAddTripModal={props.showAddTripModal} setShowAddTripModal={props.setShowAddTripModal}
-            /></Suspense></ErrorBoundary> : <div className="flex h-full flex-col items-center justify-center px-8 text-center"><Home size={34} className="text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-700">No accessible drivers</p><p className="mt-1 text-xs text-slate-500">Driver access must be assigned before trips can be opened.</p></div>}
+        <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
+          {renderTopBar('Dispatch Manifest')}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" style={{ paddingBottom: 'calc(84px + env(safe-area-inset-bottom,0px))' }}>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><TripsPage
+              trips={driverWorkTrips}
+              role={role}
+              drivers={driverWorkDrivers}
+              selectedTasks={selectedTasks}
+              toggleTaskSelection={toggleTaskSelection}
+              onCreateLegMission={props.createLegMission}
+              onBulkAssignTrips={props.bulkAssignTrips}
+              onAssignTrip={props.assignTripToDriver}
+              onUnassignTrip={(tripId) => props.assignTripToDriver?.(tripId, '')}
+              onAddTrip={props.addTrip}
+              onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
+              onDeleteTrip={props.requestDeleteTrip}
+            /></Suspense></ErrorBoundary>
           </div>
         </div>
       );

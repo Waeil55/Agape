@@ -51,6 +51,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   } = useChat({ alerts: false });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [conversationFilter, setConversationFilter] = useState('all');
   const [composerText, setComposerText] = useState('');
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -221,7 +222,11 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     if (!other) return false;
     const lastMsgText = (ch.lastMessage?.text || '').toLowerCase();
     const query = searchQuery.toLowerCase();
-    return recordMatchesSearch(other, query, ['name', 'username', 'email', 'phone']) || lastMsgText.includes(query);
+    const matchesQuery = recordMatchesSearch(other, query, ['name', 'username', 'email', 'phone']) || lastMsgText.includes(query);
+    const matchesFilter = conversationFilter === 'all'
+      || (conversationFilter === 'unread' && unreadByChannel[ch.id] > 0)
+      || (conversationFilter === 'groups' && ch.type === 'group');
+    return matchesQuery && matchesFilter;
   });
 
   // Filter contacts (users not in active chats or all search matching contacts)
@@ -290,21 +295,13 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
           />
         </div>
 
-        {/* Stories Carousel */}
-        <div className="agape-messenger-stories flex gap-4 overflow-x-auto px-4 py-3 scrollbar-none border-b border-slate-100 bg-white shrink-0">
-          {users.slice(0, 8).map(u => (
-            <div
-              key={u.id}
-              onClick={() => startDirectChat(u)}
-              className="agape-messenger-story flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer"
-            >
-              <div className="agape-messenger-avatar-wrap">
-                <img src={getAvatarUrl(u)} alt={formatDisplayName(u)} className="agape-messenger-avatar w-12 h-12 rounded-full object-cover" />
-                <div className="agape-messenger-status-dot" />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-500 truncate w-14 text-center">{formatDisplayName(u)}</span>
-            </div>
-          ))}
+        <div className="agape-chat-filterbar shrink-0 flex items-center gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3">
+          {[
+            ['all', 'All'],
+            ['unread', `Unread${unreadCount ? ` ${unreadCount}` : ''}`],
+            ['groups', 'Groups'],
+          ].map(([value, label]) => <button key={value} onClick={() => setConversationFilter(value)} className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${conversationFilter === value ? 'bg-slate-950 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>)}
+          <button onClick={() => setShowNewChatModal(true)} className="ml-auto whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700">Team directory</button>
         </div>
 
         {/* Channels List */}

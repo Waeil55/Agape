@@ -4828,9 +4828,18 @@ html, body {
   display: flex;
   height: 100%;
   width: 100%;
-  background-color: #f8fafc;
+  background:
+    radial-gradient(circle at 80% 0%, rgb(37 99 235 / 7%), transparent 34%),
+    #f5f7fb;
   overflow: hidden;
 }
+
+.agape-chat-filterbar {
+  scrollbar-width: none;
+  background: rgb(255 255 255 / 92%);
+}
+
+.agape-chat-filterbar::-webkit-scrollbar { display: none; }
 
 @media (max-width: 767px) {
   .agape-messenger-container {

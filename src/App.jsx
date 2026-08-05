@@ -1582,7 +1582,29 @@ const App = () => {
   const assignTripToDriver = useCallback((tripId, driverId) => {
     const driver = drivers.find(d => d.id === driverId);
     const tripToAssign = trips.find(t => t.id === tripId);
-    if (!driver || !tripToAssign) return;
+    if (!tripToAssign) return;
+    if (!driverId) {
+      if (!canControlTrip(tripToAssign)) {
+        addAuditLog('Scope Blocked', `${currentUser} attempted to unassign a trip outside their dispatcher scope.`, 'rose');
+        return;
+      }
+      const nextStatus = ['Completed', 'Cancelled', 'No Show'].includes(tripToAssign.status) ? tripToAssign.status : 'Unassigned';
+      setTrips(prev => prev.map(t => t.id === tripId ? {
+        ...t,
+        status: nextStatus,
+        driverId: '',
+        driverEmail: null,
+        driverName: null,
+      } : t));
+      addAuditLog('Trip Unassigned', `${currentUser} removed the driver assignment from ${tripToAssign.patient || tripId}.`, 'amber', {
+        entity: 'trip', id: tripId, diffs: [
+          { field: 'driverId', before: tripToAssign.driverId || null, after: null },
+          { field: 'driverName', before: tripToAssign.driverName || null, after: null },
+        ],
+      });
+      return;
+    }
+    if (!driver) return;
     if (!canControlDriver(driver) || !canControlTrip(tripToAssign)) {
       addAuditLog('Scope Blocked', `${currentUser} attempted to assign a trip outside their dispatcher scope.`, 'rose');
       return;

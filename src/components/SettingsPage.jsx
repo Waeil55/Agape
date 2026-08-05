@@ -129,12 +129,13 @@ const SettingsPage = ({
   const resolvedInitialSection = initialSection === 'archives' ? 'archived' : initialSection;
   const [activeSection, setActiveSection] = useState(() => resolvedInitialSection || localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
   const [showArchivedTrips, setShowArchivedTrips] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
 
   useEffect(() => {
     if (resolvedInitialSection && resolvedInitialSection !== activeSection) {
       setActiveSection(resolvedInitialSection);
     }
-  }, [resolvedInitialSection, activeSection]);
+  }, [resolvedInitialSection, userKey]);
 
   useEffect(() => {
     localStorage.setItem(`agape_settingsSection_${userKey}`, activeSection);
@@ -146,6 +147,23 @@ const SettingsPage = ({
   const [deleteConfirmTrip, setDeleteConfirmTrip] = useState(null);
   const [chatRetention, setChatRetention] = useState({ enabled: false, legalHold: false, retentionDays: 365 });
   const [chatPolicyStatus, setChatPolicyStatus] = useState('');
+
+  const saveSettings = async (updates, driverOnly = false) => {
+    if (!_updateSettings) {
+      setSaveStatus('Settings service is unavailable for this account.');
+      return false;
+    }
+    setSaveStatus('Saving changes...');
+    try {
+      await Promise.resolve(_updateSettings(updates, driverOnly));
+      setSaveStatus('All changes saved.');
+      window.setTimeout(() => setSaveStatus(''), 2400);
+      return true;
+    } catch (error) {
+      setSaveStatus(error?.message || 'Changes could not be saved.');
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (role !== 'admin') return undefined;
@@ -538,7 +556,7 @@ const SettingsPage = ({
                     <div className="bg-white border border-slate-200 rounded-xl p-4">
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) _updateSettings?.({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:border-blue-500 outline-none text-base" />
+                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) saveSettings({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:border-blue-500 outline-none text-base" />
                         <span className="text-sm font-semibold text-slate-400">mi</span>
                       </div>
                     </div>
@@ -567,7 +585,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.theme === option.value;
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ theme: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => saveSettings({ theme: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -594,7 +612,7 @@ const SettingsPage = ({
                     const active = appSettings?.fontScale === option.value;
                     const isDriverMode = option.value === 'driver';
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => saveSettings({ fontScale: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? (isDriverMode ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'card-active bg-blue-50') : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? (isDriverMode ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
@@ -607,13 +625,13 @@ const SettingsPage = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold text-base"><Accessibility size={20} /> Readability Mode</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
-                  <button onClick={() => _updateSettings?.({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => saveSettings({ readability: 'normal' })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${appSettings?.readability !== 'enhanced' ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability !== 'enhanced' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><TextSelect size={20} /></div>
                     <div className="font-semibold text-sm text-slate-900">Standard</div>
                     <p className="text-xs text-slate-500 mt-0.5">Normal contrast and font weights</p>
                     {appSettings?.readability !== 'enhanced' && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
                   </button>
-                  <button onClick={() => _updateSettings?.({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
+                  <button onClick={() => saveSettings({ readability: 'enhanced' })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${appSettings?.readability === 'enhanced' ? 'ring-2 ring-amber-500 bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${appSettings?.readability === 'enhanced' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Eye size={20} /></div>
                     <div className="font-semibold text-sm text-slate-900">Enhanced</div>
                     <p className="text-xs text-slate-500 mt-0.5">Bolder text, stronger contrast, better spacing</p>
@@ -638,7 +656,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.navigationApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => saveSettings({ navigationApp: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -657,7 +675,7 @@ const SettingsPage = ({
                     const Icon = option.icon;
                     const active = appSettings?.routePlanNavApp === option.value;
                     return (
-                      <button key={option.value} onClick={() => _updateSettings?.({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <button key={option.value} onClick={() => saveSettings({ routePlanNavApp: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
                         <div className="font-semibold text-sm text-slate-900">{option.label}</div>
                         {active && <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">Active</span>}
@@ -701,7 +719,7 @@ const SettingsPage = ({
                     <label key={item.key} className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl cursor-pointer border border-slate-100">
                       <input type="checkbox" checked={checked} onChange={(e) => {
                         const n = { ...(appSettings?.notifications || {}), [item.key]: e.target.checked };
-                        _updateSettings?.({ notifications: n });
+                        saveSettings({ notifications: n });
                       }} className="w-5 h-5 mt-0.5 rounded" />
                       <div>
                         <p className="text-base font-semibold text-slate-800">{item.label}</p>
@@ -794,6 +812,7 @@ const SettingsPage = ({
 
       {/* Content */}
       <div className="w-full flex-1 min-w-0">
+        {saveStatus && <div role="status" className={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-bold ${saveStatus === 'All changes saved.' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : saveStatus.includes('Saving') ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{saveStatus.includes('Saving') ? <RefreshCw size={14} className="animate-spin" /> : saveStatus === 'All changes saved.' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}{saveStatus}</div>}
         {sectionContent()}
       </div>
       {deleteConfirmTrip && (
