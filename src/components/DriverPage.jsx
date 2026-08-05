@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
-import { auth, db, doc, setDoc, collection, addDoc, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
+import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -1527,6 +1527,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
   const [timeCorrectionRequests, setTimeCorrectionRequests] = useState([]);
   const [correctionDraft, setCorrectionDraft] = useState(null);
   const [correctionSaving, setCorrectionSaving] = useState(false);
+  const [correctionError, setCorrectionError] = useState('');
 
   const driverId = me?.id || (() => {
     const normalizedEmail = String(currentUser || '').trim().toLowerCase();
@@ -1594,6 +1595,41 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       const historicalOpenShift = dateKey < localCalendarYmd() && model.sessions.some((session) => session.isOpen);
       const hours = hasEvidence ? billableMs / 3600000 : null;
       const needsCorrection = historicalOpenShift || model.anomalies.length > 0 || model.reviewRequiredGaps?.length > 0;
+      const personalIntervals = [];
+      let openPersonalInterval = null;
+      [...model.events]
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        .forEach((event) => {
+          if (event.type === 'BREAK_START' && !openPersonalInterval) {
+            openPersonalInterval = event;
+          } else if (event.type === 'BREAK_END' && openPersonalInterval) {
+            const startMs = new Date(openPersonalInterval.timestamp).getTime();
+            const endMs = new Date(event.timestamp).getTime();
+            personalIntervals.push({
+              start: openPersonalInterval.timestamp,
+              end: event.timestamp,
+              minutes: Math.max(0, Math.round((endMs - startMs) / 60000)),
+              reason: openPersonalInterval.reason || 'PERSONAL_UNAVAILABLE',
+              endReason: event.reason || 'RETURNED_TO_WORK',
+              confidence: event.confidence || openPersonalInterval.confidence || 'recorded',
+              tripId: event.tripId || null,
+            });
+            openPersonalInterval = null;
+          }
+        });
+      if (openPersonalInterval) {
+        const startMs = new Date(openPersonalInterval.timestamp).getTime();
+        const endMs = dateKey === localCalendarYmd() ? Date.now() : startMs;
+        personalIntervals.push({
+          start: openPersonalInterval.timestamp,
+          end: null,
+          minutes: Math.max(0, Math.round((endMs - startMs) / 60000)),
+          reason: openPersonalInterval.reason || 'PERSONAL_UNAVAILABLE',
+          endReason: 'ACTIVE',
+          confidence: 'open',
+          tripId: null,
+        });
+      }
       const isFuture = dateKey > localCalendarYmd();
       const status = needsCorrection
         ? 'Review required'
@@ -1610,6 +1646,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
         clockOut: lastSession?.clockOutTime || null,
         hours,
         breakMin: Math.round(breakMs / 60000),
+        personalIntervals,
         anomalies: model.anomalies,
         reviewRequiredGaps: model.reviewRequiredGaps || [],
         reconciliation: model.reconciliation,
@@ -1745,9 +1782,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     const selectedDay = clockHistory.weekDays.find((day) => day.dateKey === selectedWorkDate)
       || clockHistory.days.find((day) => day.dateKey === selectedWorkDate);
     const driverEmail = auth.currentUser?.email || me?.email || currentUser || '';
+    if (!auth.currentUser?.uid || !driverEmail) {
+      setCorrectionError('Your secure session is not available. Sign in again, then submit the note.');
+      return;
+    }
     try {
       setCorrectionSaving(true);
-      await addDoc(collection(db, 'timeTrackingCorrectionRequests'), {
+      setCorrectionError('');
+      const requestId = `tcr_${auth.currentUser.uid}_${selectedWorkDate}_${Date.now()}`.replace(/[^A-Za-z0-9_-]/g, '_');
+      await setDoc(doc(db, 'timeTrackingCorrectionRequests', requestId), {
         driverId,
         driverEmail,
         userId: auth.currentUser?.uid || '',
@@ -1769,10 +1812,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
         createdAt: serverTimestamp(),
       });
       setCorrectionDraft(null);
-      setShowToast({ type: 'success', message: 'Your request was recorded for payroll review. The original time remains unchanged.' });
+      setCorrectionError('');
+      setShowToast({
+        type: 'success',
+        message: typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'Note saved securely on this device. It will sync automatically when service returns.'
+          : 'Note recorded for review. The original evidence remains preserved.',
+      });
     } catch (error) {
       console.error('Time correction request failed:', error);
-      setShowToast({ type: 'error', message: 'The request could not be securely saved. Check the connection and try again.' });
+      const message = error?.code === 'permission-denied'
+        ? 'This account is not authorized to submit a note. Sign out and sign back in to refresh access.'
+        : 'The note could not be saved. It remains in the editor so you can retry.';
+      setCorrectionError(message);
+      setShowToast({ type: 'error', message });
     } finally {
       setCorrectionSaving(false);
     }
@@ -6140,39 +6193,76 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-600">
                       <span>{selectedDay.tripCount} trip{selectedDay.tripCount === 1 ? '' : 's'}</span>
-                      <span>·</span><span>{selectedDay.breakMin || 0} personal minutes</span>
+                      <span>·</span><span>{selectedDay.breakMin || 0} min recorded personal time</span>
                       <span>·</span><span>{selectedDay.reconciliation?.estimatedBoundaryCount || 0} estimated boundaries</span>
                     </div>
+                    {selectedDay.personalIntervals?.length > 0 && (
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Personal-time evidence</p>
+                          <span className="text-[10px] font-semibold text-slate-500">{selectedDay.personalIntervals.length} interval{selectedDay.personalIntervals.length === 1 ? '' : 's'}</span>
+                        </div>
+                        <div className="mt-2 space-y-2">
+                          {selectedDay.personalIntervals.map((interval, index) => {
+                            const inferredReturn = interval.endReason === 'INFERRED_FROM_VERIFIED_PICKUP_RETURN_TRAVEL'
+                              || interval.endReason === 'VERIFIED_PICKUP_RETURN_TRAVEL';
+                            return (
+                              <div key={`${interval.start}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-800">
+                                  <span>{formatClockTime(interval.start)} → {interval.end ? formatClockTime(interval.end) : 'In progress'}</span>
+                                  <span>{interval.minutes} min</span>
+                                </div>
+                                <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                                  {interval.end
+                                    ? inferredReturn
+                                      ? `Return calculated from verified pickup${interval.tripId ? ` · Trip ${interval.tripId}` : ''}`
+                                      : 'Start and return were recorded directly'
+                                    : 'Active now; return will be recorded from the next verified work event'}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="mt-2 text-[10px] leading-4 text-slate-500">Recorded or evidence-calculated personal intervals are shown separately. Unclear gaps stay included until an authorized review is completed.</p>
+                      </div>
+                    )}
                     {selectedDay.needsCorrection && (
                       <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                        Payroll remains unapproved until the evidence issue is reviewed. No automatic deduction is made.
+                        Review required: recorded time remains included while the evidence issue is checked. No automatic reduction is made.
                       </div>
                     )}
                     {selectedRequests.length > 0 && (
                       <div className="mt-3 space-y-2">
                         {selectedRequests.map((request) => (
                           <div key={request.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                            <div className="min-w-0"><p className="text-xs font-semibold text-slate-800">{String(request.requestType || '').replaceAll('_', ' ')}</p><p className="truncate text-[10px] text-slate-500">{request.reason}</p></div>
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${request.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : request.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{request.status}</span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-slate-800">{{ SHIFT_NOTE: 'Evidence note', MISSING_START: 'Start-time correction', MISSING_END: 'End-time correction', INCORRECT_TIME: 'Time review request' }[request.requestType] || 'Time review request'}</p>
+                              <p className="mt-1 whitespace-pre-wrap text-[10px] leading-4 text-slate-600">{request.reason}</p>
+                              {request.proposedTime && <p className="mt-1 text-[10px] font-semibold text-blue-700">Proposed time: {request.proposedTime}</p>}
+                              {request.reviewerNote && <p className="mt-1 rounded-md bg-slate-50 px-2 py-1 text-[10px] leading-4 text-slate-600">Reviewer: {request.reviewerNote}</p>}
+                            </div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${request.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : request.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{request.status === 'resolved' ? 'Reviewed' : request.status === 'rejected' ? 'Not approved' : 'Review open'}</span>
                           </div>
                         ))}
                       </div>
                     )}
                     {role === 'driver' && !correctionDraft && (
-                      <button type="button" onClick={() => setCorrectionDraft({ requestType: selectedDay.needsCorrection ? 'INCORRECT_TIME' : 'SHIFT_NOTE', proposedTime: '', reason: '' })} className="mt-3 w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-50">
-                        Add note or request a correction
+                      <button type="button" onClick={() => { setCorrectionError(''); setCorrectionDraft({ requestType: selectedDay.needsCorrection ? 'INCORRECT_TIME' : 'SHIFT_NOTE', proposedTime: '', reason: '' }); }} className="mt-3 w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-50">
+                        Add evidence note or correction request
                       </button>
                     )}
                     {role === 'driver' && correctionDraft && (
                       <div className="mt-3 space-y-2 rounded-xl border border-blue-200 bg-white p-3">
                         <div className="grid grid-cols-2 gap-2">
                           <select value={correctionDraft.requestType} onChange={(event) => setCorrectionDraft({ ...correctionDraft, requestType: event.target.value })} className="rounded-lg border border-slate-300 px-2 py-2 text-xs outline-none focus:border-blue-500">
-                            <option value="INCORRECT_TIME">Incorrect time</option><option value="MISSING_START">Missing start</option><option value="MISSING_END">Missing end</option><option value="SHIFT_NOTE">Shift note</option>
+                            <option value="SHIFT_NOTE">Add information only</option><option value="INCORRECT_TIME">Other time issue</option><option value="MISSING_START">Correct start time</option><option value="MISSING_END">Correct end time</option>
                           </select>
                           {correctionDraft.requestType !== 'SHIFT_NOTE' && <input type="time" value={correctionDraft.proposedTime} onChange={(event) => setCorrectionDraft({ ...correctionDraft, proposedTime: event.target.value })} className="rounded-lg border border-slate-300 px-2 py-2 text-xs outline-none focus:border-blue-500" aria-label="Proposed corrected time" />}
                         </div>
-                        <textarea rows="3" value={correctionDraft.reason} onChange={(event) => setCorrectionDraft({ ...correctionDraft, reason: event.target.value })} placeholder="Explain what happened. The original record will remain preserved." className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-blue-500" />
-                        <div className="flex gap-2"><button type="button" onClick={() => setCorrectionDraft(null)} className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">Cancel</button><button type="button" disabled={correctionSaving || correctionDraft.reason.trim().length < 3} onClick={submitTimeCorrectionRequest} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">{correctionSaving ? 'Submitting…' : 'Submit for review'}</button></div>
+                        <textarea rows="3" value={correctionDraft.reason} onChange={(event) => { setCorrectionError(''); setCorrectionDraft({ ...correctionDraft, reason: event.target.value }); }} placeholder="Describe what happened and any evidence the reviewer should check. The original record stays preserved." className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-blue-500" />
+                        {correctionError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-semibold leading-4 text-rose-700">{correctionError}</p>}
+                        <p className="text-[10px] leading-4 text-slate-500">Submitting does not change recorded time automatically. An admin or dispatcher reviews it against trip and GPS evidence.</p>
+                        <div className="flex gap-2"><button type="button" onClick={() => { setCorrectionDraft(null); setCorrectionError(''); }} className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">Cancel</button><button type="button" disabled={correctionSaving || correctionDraft.reason.trim().length < 3} onClick={submitTimeCorrectionRequest} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">{correctionSaving ? 'Saving…' : correctionDraft.requestType === 'SHIFT_NOTE' ? 'Save evidence note' : 'Send for review'}</button></div>
                       </div>
                     )}
                   </div>
@@ -6201,7 +6291,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                                 {day.hours.toFixed(2)}h
                               </span>
                             ) : (
-                              <span className="text-xs font-semibold text-amber-700">Not payable</span>
+                              <span className="text-xs font-semibold text-amber-700">Awaiting evidence review</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 text-xs">
