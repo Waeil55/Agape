@@ -31,6 +31,7 @@ import {
 import { findRemovedDocumentIds } from '../utils/firestorePersistence';
 import { attachTenantScope, normalizeTenantId, recordBelongsToTenant } from '../utils/tenantScope';
 import { hydrateTripDriverIdentities } from '../utils/driverIdentity';
+import { queueSyncOperation, readAppData, saveAppData, saveField } from '../utils/localDB';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -274,10 +275,37 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    let remoteSnapshotReceived = false;
+    let localSaveTimer = null;
     const unsubscribers = [];
+
+    const persistLocalSnapshot = () => {
+      clearTimeout(localSaveTimer);
+      localSaveTimer = setTimeout(() => {
+        if (!cancelled) saveAppData(normalizeData(dataRef.current));
+      }, 150);
+    };
+
+    // Render the last authoritative snapshot immediately, including after an
+    // offline reload. Realtime listeners replace it when Firebase is reachable.
+    readAppData().then((cached) => {
+      if (cancelled || remoteSnapshotReceived || !cached) return;
+      const normalized = normalizeData(cached);
+      dataRef.current = normalized;
+      liveTripsRef.current = normalized.trips || [];
+      setState(prev => ({
+        ...prev,
+        ...normalized,
+        loading: false,
+        initialized: true,
+        error: null,
+        lastSavedAt: cached._lastLocalWrite || cached._lastSyncedAt || null,
+      }));
+    }).catch((error) => console.warn('Offline snapshot could not be restored:', error));
 
     const applyCollectionData = (field, snap) => {
       if (cancelled) return;
+      remoteSnapshotReceived = true;
       const nextList = [];
       snap.forEach((itemDoc) => {
         const data = itemDoc.data();
@@ -297,10 +325,12 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         initialized: true,
         error: null,
       }));
+      persistLocalSnapshot();
     };
 
     const applyTripsSnapshot = (snap) => {
       if (cancelled) return;
+      remoteSnapshotReceived = true;
       const liveTrips = [];
       const archivedTrips = [];
       const corruptedIds = [];
@@ -359,11 +389,13 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         console.warn(`Trip count dropped from ${prevCount} to ${currentCount} — potential data loss. Verify Firestore.`);
       }
       prevTripCountRef.current = currentCount;
+      persistLocalSnapshot();
 
     };
 
     const applyTripProgressSnapshot = (snap) => {
       if (cancelled) return;
+      remoteSnapshotReceived = true;
       const progressByTrip = {};
       snap.forEach((progressDoc) => {
         const data = progressDoc.data();
@@ -390,6 +422,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       const mergedTrips = mergedTripsBase.filter((t) => !trashedIds.has(t.id));
       dataRef.current = { ...baseData, trips: mergedTrips };
       setState(prev => ({ ...prev, trips: mergedTrips, loading: false, error: null, initialized: true }));
+      persistLocalSnapshot();
     };
 
     const setupListener = (ref, applyFn, label) => {
@@ -440,9 +473,11 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
 
     const unsubPhones = onSnapshot(doc(db, PHONE_NUMBERS_DOC), (snap) => {
       if (cancelled) return;
+      remoteSnapshotReceived = true;
       const phoneNumbers = snap.exists() ? { ...DEFAULT_DATA.phoneNumbers, ...snap.data() } : DEFAULT_DATA.phoneNumbers;
       dataRef.current = { ...normalizeData(dataRef.current), phoneNumbers };
       setState(prev => ({ ...prev, phoneNumbers, loading: false, error: null }));
+      persistLocalSnapshot();
     }, (err) => {
       if (cancelled || shouldIgnoreRealtimePermissionError(err)) return;
       console.error('Phones listener error:', err);
@@ -462,6 +497,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       cancelled = true;
       cleanupFns.forEach((fn) => fn());
       clearTimeout(loadingTimeoutId);
+      clearTimeout(localSaveTimer);
       unsubscribers.forEach((unsub) => unsub());
     };
 
@@ -478,6 +514,41 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     setState(prev => ({ ...prev, [field]: sanitized, saving: true, error: null }));
 
     try {
+      await saveField(field, sanitized);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        const collectionByField = {
+          trips: TRIPS_COLLECTION,
+          drivers: DRIVER_PROFILE_COLLECTION,
+          dispatchers: DISPATCHER_PROFILE_COLLECTION,
+          vehicles: VEHICLE_COLLECTION,
+        };
+        const targetCollection = collectionByField[field];
+        if (targetCollection && Array.isArray(sanitized)) {
+          const previousMap = new Map((previousData[field] || []).map((item) => [String(item.id), item]));
+          const changed = sanitized.filter((item) => item?.id && JSON.stringify(previousMap.get(String(item.id))) !== JSON.stringify(item));
+          await Promise.all(changed.map((item) => queueSyncOperation({
+            type: 'setDoc',
+            collection: targetCollection,
+            docId: String(item.id),
+            data: sanitizeForFirestore(attachTenantScope(item, activeTenantId)),
+          })));
+        } else if (field === 'phoneNumbers') {
+          await queueSyncOperation({
+            type: 'setDoc',
+            collection: 'systemConfig',
+            docId: 'phoneNumbers',
+            data: attachTenantScope(sanitized, activeTenantId),
+          });
+        }
+        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+        setState(prev => ({
+          ...prev,
+          saving: pendingWritesRef.current > 0,
+          lastSavedAt: new Date().toISOString(),
+          error: null,
+        }));
+        return true;
+      }
       if (MIRRORED_TRIP_FIELDS.has(field)) {
         const archivedTrips = cleanTripCollection(dataRef.current.trashedTrips || [])
           .filter((trip) => trip?.id || trip?.bookingId)
@@ -589,6 +660,16 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     setState(prev => ({ ...prev, trips: nextTrips }));
 
     try {
+      await saveField('trips', nextTrips);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await queueSyncOperation({
+          type: 'setDoc',
+          collection: DRIVER_TRIP_PROGRESS_COLLECTION,
+          docId: String(tripId),
+          data: progressDoc,
+        });
+        return true;
+      }
       await setDoc(doc(db, DRIVER_TRIP_PROGRESS_COLLECTION, tripId), progressDoc, { merge: true });
       return true;
     } catch (err) {
@@ -608,6 +689,16 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     dataRef.current = { ...normalizeData(dataRef.current), drivers: nextDrivers };
     setState(prev => ({ ...prev, drivers: nextDrivers, error: null }));
     try {
+      await saveField('drivers', nextDrivers);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await queueSyncOperation({
+          type: 'setDoc',
+          collection: DRIVER_PROFILE_COLLECTION,
+          docId: String(driverId),
+          data: nextDriver,
+        });
+        return true;
+      }
       await setDoc(doc(db, DRIVER_PROFILE_COLLECTION, driverId), nextDriver, { merge: true });
       if (Object.prototype.hasOwnProperty.call(updates, 'vehicle')) {
         if (nextDriver.vehicle) {

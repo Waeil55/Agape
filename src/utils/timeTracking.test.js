@@ -4,6 +4,7 @@ import {
   GAP_CLASSIFICATIONS,
   PAYROLL_EFFECTS,
   buildTimeEvents,
+  calculateReturnToWorkFromPickup,
   classifyGap,
   generatePayrollOutput,
   stitchSessions,
@@ -13,6 +14,30 @@ import {
 const event = (type, timestamp) => ({ type, timestamp });
 
 describe('payroll time ledger', () => {
+  it('back-calculates return from break using verified pickup arrival and route time', () => {
+    const result = calculateReturnToWorkFromPickup({
+      breakStartTime: '2026-08-05T15:00:00.000Z',
+      pickupArrivalTime: '2026-08-05T16:00:00.000Z',
+      breakLocation: { lat: 39.7, lng: -86.2 },
+      pickupLocation: { lat: 39.8, lng: -86.1 },
+      routedTravelMinutes: 22,
+    });
+
+    expect(result.returnTimeIso).toBe('2026-08-05T15:38:00.000Z');
+    expect(result.travelMinutes).toBe(22);
+    expect(result.source).toBe('ROUTED_PICKUP_BACKCALCULATION');
+  });
+
+  it('never back-calculates return before the recorded break began', () => {
+    const result = calculateReturnToWorkFromPickup({
+      breakStartTime: '2026-08-05T15:50:00.000Z',
+      pickupArrivalTime: '2026-08-05T16:00:00.000Z',
+      routedTravelMinutes: 45,
+    });
+
+    expect(result.returnTimeIso).toBe('2026-08-05T15:50:00.000Z');
+    expect(result.travelMinutes).toBe(10);
+  });
   it('ignores corrupted legacy timestamps without crashing the driver portal', () => {
     const corruptTimestamp = { toDate: () => new Date('Invalid Date') };
     expect(() => buildTimeEvents([
@@ -307,5 +332,35 @@ describe('payroll time ledger', () => {
     expect(model.sessions[0].breakMinutes).toBe(120);
     expect(model.reviewRequiredGaps).toHaveLength(0);
     expect(model.approvalEligible).toBe(true);
+  });
+
+  it('recovers a missing break end by back-calculating from the next verified pickup', () => {
+    const trips = [
+      {
+        id: 'trip-1', date: '2026-08-03', status: 'Completed',
+        arrivalTime: '2026-08-03T08:00:00.000Z', completedAt: '2026-08-03T09:00:00.000Z',
+        pickupLat: 39.7, pickupLng: -86.2,
+      },
+      {
+        id: 'trip-2', date: '2026-08-03', status: 'Completed',
+        arrivalTime: '2026-08-03T11:00:00.000Z', completedAt: '2026-08-03T12:00:00.000Z',
+        pickupLat: 39.8, pickupLng: -86.1,
+      },
+    ];
+    const model = buildTimeEvents(trips, { id: 'driver-1' }, [{
+      type: 'BREAK_START',
+      timestamp: '2026-08-03T09:00:00.000Z',
+      lat: 39.7,
+      lng: -86.2,
+      source: 'driver_personal_declaration',
+    }], POLICY_MODES.PAY_FROM_FIRST_PICKUP, {
+      date: '2026-08-03', now: '2026-08-04T12:00:00.000Z',
+    });
+
+    const inferredEnd = model.events.find((item) => item.type === 'BREAK_END');
+    expect(inferredEnd.reason).toBe('INFERRED_FROM_VERIFIED_PICKUP_RETURN_TRAVEL');
+    expect(new Date(inferredEnd.timestamp).getTime()).toBeLessThan(new Date('2026-08-03T11:00:00.000Z').getTime());
+    expect(inferredEnd.travelMinutes).toBeGreaterThan(0);
+    expect(model.anomalies).toEqual([]);
   });
 });

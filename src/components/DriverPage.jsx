@@ -29,6 +29,7 @@ import {
   TIME_TRACKING_STATES,
   POLICY_MODES,
   calculateAnchor,
+  calculateReturnToWorkFromPickup,
   validateArrival,
   classifyGap,
   generatePendingClockOut,
@@ -47,6 +48,7 @@ import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersis
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
+import { queueSyncOperation } from '../utils/localDB';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -1580,7 +1582,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
 
   const recordImmutableTimeDeclaration = useCallback(async (type, timestamp, location, reason) => {
     const driverEmail = auth.currentUser?.email || me?.email || currentUser || '';
-    await addDoc(collection(db, 'timeTrackingDeclarations'), {
+    const declarationId = `decl_${driverId || auth.currentUser?.uid || 'driver'}_${type}_${String(timestamp).replace(/[^0-9A-Za-z]/g, '')}`;
+    const declaration = {
       type,
       timestamp,
       driverId,
@@ -1591,8 +1594,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       lng: location?.lng ?? null,
       reason,
       source: 'driver_personal_declaration',
+      createdAtLocal: new Date().toISOString(),
+    };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      await queueSyncOperation({
+        type: 'setDoc',
+        collection: 'timeTrackingDeclarations',
+        docId: declarationId,
+        data: declaration,
+      });
+      return;
+    }
+    await setDoc(doc(db, 'timeTrackingDeclarations', declarationId), {
+      ...declaration,
       createdAt: serverTimestamp(),
-    });
+    }, { merge: true });
   }, [currentUser, driverId, me?.email]);
 
   const submitTimeCorrectionRequest = useCallback(async () => {
@@ -1637,14 +1653,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     }
   }, [clockHistory.days, clockHistory.weekDays, correctionDraft, currentUser, driverId, me?.email, me?.name, selectedWorkDate]);
 
-  // A legacy or personal break is closed automatically when new assigned work arrives.
-  const ttResume = useCallback(async () => {
+  // Resume can be immediate or back-calculated from verified pickup arrival.
+  const ttResume = useCallback(async (resumeContext = {}) => {
     if (ttStateRef.current !== TT.ON_BREAK) return;
-    const now = new Date().toISOString();
-    const resumeLocation = getDriverClockLocation();
+    const now = toSafeIso(resumeContext.timestamp, new Date().toISOString());
+    const resumeLocation = resumeContext.location || getDriverClockLocation();
+    const reason = resumeContext.reason || 'RETURNED_TO_WORK';
     if (me?.personalUnavailability?.active) {
       try {
-        await recordImmutableTimeDeclaration('BREAK_END', now, resumeLocation, 'RETURNED_TO_WORK');
+        await recordImmutableTimeDeclaration('BREAK_END', now, resumeLocation, reason);
       } catch (error) {
         console.error('Failed to preserve personal-time return:', error);
         setShowToast({ type: 'error', message: 'Return could not be securely recorded. Check the connection and try again.' });
@@ -1656,7 +1673,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       ttAccumulatedBreakMsRef.current += Math.max(0, breakMs);
       setTtBreakMin(Math.floor(ttAccumulatedBreakMsRef.current / 60000));
     }
-    ttEventsLogRef.current.push({ type: 'BREAK_END', timestamp: now, breakDurationMilliseconds: ttBreakStartRef.current ? Math.max(0, new Date(now) - new Date(ttBreakStartRef.current)) : 0 });
+    ttEventsLogRef.current.push({
+      type: 'BREAK_END',
+      timestamp: now,
+      breakDurationMilliseconds: ttBreakStartRef.current ? Math.max(0, new Date(now) - new Date(ttBreakStartRef.current)) : 0,
+      reason,
+      tripId: resumeContext.tripId || null,
+      travelMinutes: resumeContext.travelMinutes ?? null,
+      calculationSource: resumeContext.calculationSource || null,
+      confidence: resumeContext.confidence || null,
+      pickupArrivalTime: resumeContext.pickupArrivalTime || null,
+    });
     ttBreakStartRef.current = null;
     setTtState(TT.ON_SHIFT_ACTIVE);
     ttStateRef.current = TT.ON_SHIFT_ACTIVE;
@@ -1668,10 +1695,57 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       personalUnavailability: null,
       statusAuditTitle: me?.personalUnavailability?.active ? 'Driver Returned From Personal Time' : 'Driver Break Ended',
       statusAuditMessage: `${me?.name || driverId} returned to automatic work tracking.`,
+      breakReturnTripId: resumeContext.tripId || null,
+      breakReturnTravelMinutes: resumeContext.travelMinutes ?? null,
+      breakReturnCalculationSource: resumeContext.calculationSource || null,
+      breakReturnConfidence: resumeContext.confidence || null,
+      breakReturnPickupArrivalTime: resumeContext.pickupArrivalTime || null,
       ...(resumeLocation ? { clockLocation: resumeLocation } : {}),
     });
-    setShowToast({ type: 'success', message: 'Break ended — back on shift.' });
+    setShowToast({
+      type: 'success',
+      message: resumeContext.travelMinutes > 0
+        ? `Back on shift — ${Math.round(resumeContext.travelMinutes)} min return travel calculated from verified pickup arrival.`
+        : 'Break ended — back on shift.',
+    });
   }, [driverId, getDriverClockLocation, me?.name, me?.personalUnavailability?.active, onDriverStatusUpdate, recordImmutableTimeDeclaration]);
+
+  const resumeBreakFromPickup = useCallback(async (trip, pickupLocation, pickupArrivalTime, driverLocation) => {
+    if (ttStateRef.current !== TT.ON_BREAK) return null;
+    const breakStartTime = ttBreakStartRef.current || me?.lastBreakStart || me?.personalUnavailability?.startedAt;
+    const lastBreakEvent = [...ttEventsLogRef.current].reverse().find((event) => event.type === 'BREAK_START');
+    const breakLocation = me?.personalUnavailability?.location || lastBreakEvent?.location || null;
+    let routedTravelMinutes = null;
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+      try {
+        const route = breakLocation && pickupLocation
+          ? await getTravelDuration(breakLocation, pickupLocation)
+          : null;
+        if (route?.durationSeconds >= 0) routedTravelMinutes = route.durationSeconds / 60;
+      } catch (error) {
+        console.warn('Return-to-work route lookup failed; using deterministic offline estimate:', error);
+      }
+    }
+    const calculation = calculateReturnToWorkFromPickup({
+      breakStartTime,
+      pickupArrivalTime,
+      breakLocation,
+      pickupLocation,
+      routedTravelMinutes,
+    });
+    if (!calculation) return null;
+    await ttResume({
+      timestamp: calculation.returnTimeIso,
+      location: breakLocation || driverLocation || pickupLocation,
+      reason: 'VERIFIED_PICKUP_RETURN_TRAVEL',
+      tripId: trip?.id || null,
+      travelMinutes: calculation.travelMinutes,
+      calculationSource: calculation.source,
+      confidence: calculation.confidence,
+      pickupArrivalTime: calculation.pickupArrivalTime,
+    });
+    return calculation;
+  }, [me?.lastBreakStart, me?.personalUnavailability?.location, me?.personalUnavailability?.startedAt, ttResume]);
 
   const isPersonalTime = Boolean(me?.personalUnavailability?.active) && ttState === TT.ON_BREAK;
   const hasTripInProgress = activeTrips.some((trip) => getWorkflowStepIndex(trip) >= 0);
@@ -1794,12 +1868,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     const prevCount = prevTripsCountRef.current;
     prevTripsCountRef.current = activeTrips.length;
     if (activeTrips.length > prevCount && ttStateRef.current === TT.ON_BREAK) {
-      // New work closes any legacy break state automatically.
       clockOutOfferedRef.current = false;
-      ttResume();
-      setShowToast({ type: 'success', message: 'New trip assigned — break ended, session resumed.' });
+      setShowToast({ type: 'info', message: 'New trip assigned. Personal time will end automatically from verified pickup travel.' });
     }
-  }, [activeTrips.length, ttResume]);
+  }, [activeTrips.length]);
 
   const pendingCancelInFlightRef = useRef(false);
   useEffect(() => {
@@ -2437,7 +2509,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     setShowOdometerPrompt(trip);
   };
 
-  const submitOdometer = () => {
+  const submitOdometer = async () => {
     if (!showOdometerPrompt || !odometerValue) return;
     const odo = parseInt(odometerValue, 10);
     if (isNaN(odo)) return;
@@ -2453,6 +2525,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
         return;
       }
     }
+
+    await resumeBreakFromPickup(showOdometerPrompt, pickupLocation, nowIso, driverLocation);
 
     let autoStartedShift = false;
     if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
@@ -2524,7 +2598,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     }
   };
 
-  const confirmArrival = () => {
+  const confirmArrival = async () => {
     if (!showArrivalConfirm) return;
     const odo = parseInt(arrivalOdometer, 10) || lastOdometer;
     if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
@@ -2539,6 +2613,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
         return;
       }
     }
+    await resumeBreakFromPickup(showArrivalConfirm, pickupLocation, nowIso, driverLocation);
     let autoStartedShift = false;
     if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
       const anchor = calculateAnchor({

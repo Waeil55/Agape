@@ -2010,6 +2010,13 @@ const App = () => {
       const event = { type: clockEventType, timestamp: eventTimestamp };
       if (clockLocation) event.lat = clockLocation.lat;
       if (clockLocation) event.lng = clockLocation.lng;
+      if (clockEventType === 'break_end') {
+        event.tripId = persistableExtraFields.breakReturnTripId || null;
+        event.travelMinutes = persistableExtraFields.breakReturnTravelMinutes ?? null;
+        event.calculationSource = persistableExtraFields.breakReturnCalculationSource || null;
+        event.confidence = persistableExtraFields.breakReturnConfidence || null;
+        event.pickupArrivalTime = persistableExtraFields.breakReturnPickupArrivalTime || null;
+      }
       appendClockEvent({ ...event, eventId: `${clockEventType}:${driverId}:${eventTimestamp}` });
     }
     let extraPersist = { ...persistableExtraFields };

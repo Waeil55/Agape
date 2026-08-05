@@ -100,6 +100,49 @@ export const estimateTravelTimeMinutes = (lat1, lng1, lat2, lng2) => {
   return (effectiveMiles / ASSUMED_TRAVEL_SPEED_MPH) * 60;
 };
 
+/**
+ * Derive the moment a driver returned to paid work after personal time.
+ * Pickup arrival is the verified endpoint. The route duration is subtracted
+ * from it and strictly capped by the recorded break start, so the engine can
+ * neither erase time before the break nor pay unverified idle time.
+ */
+export const calculateReturnToWorkFromPickup = ({
+  breakStartTime,
+  pickupArrivalTime,
+  breakLocation,
+  pickupLocation,
+  routedTravelMinutes,
+} = {}) => {
+  const breakStart = toValidDate(breakStartTime);
+  const pickupArrival = toValidDate(pickupArrivalTime);
+  if (!breakStart || !pickupArrival || pickupArrival < breakStart) return null;
+
+  const routedMinutes = Number(routedTravelMinutes);
+  const hasRoutedDuration = Number.isFinite(routedMinutes) && routedMinutes >= 0;
+  const estimatedMinutes = breakLocation && pickupLocation
+    ? estimateTravelTimeMinutes(
+        breakLocation.lat ?? breakLocation.latitude,
+        breakLocation.lng ?? breakLocation.longitude,
+        pickupLocation.lat ?? pickupLocation.latitude,
+        pickupLocation.lng ?? pickupLocation.longitude,
+      )
+    : 0;
+  const requestedTravelMinutes = hasRoutedDuration ? routedMinutes : estimatedMinutes;
+  const availableBreakMinutes = Math.max(0, (pickupArrival.getTime() - breakStart.getTime()) / 60000);
+  const travelMinutes = Math.min(Math.max(0, requestedTravelMinutes), availableBreakMinutes);
+  const returnTime = new Date(pickupArrival.getTime() - travelMinutes * 60000);
+
+  return {
+    returnTime,
+    returnTimeIso: returnTime.toISOString(),
+    pickupArrivalTime: pickupArrival.toISOString(),
+    travelMinutes,
+    travelMinutesRounded: Math.round(travelMinutes),
+    source: hasRoutedDuration ? 'ROUTED_PICKUP_BACKCALCULATION' : (estimatedMinutes > 0 ? 'OFFLINE_ROUTE_ESTIMATE' : 'VERIFIED_PICKUP_ARRIVAL'),
+    confidence: hasRoutedDuration ? 'route_verified' : (estimatedMinutes > 0 ? 'route_estimate' : 'trip_verified'),
+  };
+};
+
 // ─── GPS ARRIVAL VALIDATION ──────────────────────────────────────
 export const validateArrival = (driverLat, driverLng, targetLat, targetLng, radiusMeters = ARRIVAL_RADIUS_METERS) => {
   if (driverLat == null || driverLng == null || targetLat == null || targetLng == null) {
@@ -834,7 +877,45 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
       ))
     : normalizedClockEvents;
 
-  retainedClockEvents.forEach((ce) => {
+  const reconciledClockEvents = [...retainedClockEvents];
+  if (automaticShift) {
+    retainedClockEvents
+      .filter((event) => event.type === 'BREAK_START')
+      .forEach((breakStart) => {
+        const breakStartMs = new Date(breakStart.timestamp).getTime();
+        const explicitEnd = retainedClockEvents.find((event) => (
+          event.type === 'BREAK_END' && new Date(event.timestamp).getTime() >= breakStartMs
+        ));
+        if (explicitEnd) return;
+        const nextPickup = tripEvents
+          .filter((event) => event.eventType === 'ARRIVED_PICKUP' && new Date(event.timestamp).getTime() >= breakStartMs)
+          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0];
+        if (!nextPickup) return;
+        const calculation = calculateReturnToWorkFromPickup({
+          breakStartTime: breakStart.timestamp,
+          pickupArrivalTime: nextPickup.timestamp,
+          breakLocation: breakStart.location,
+          pickupLocation: nextPickup.location,
+        });
+        if (!calculation) return;
+        reconciledClockEvents.push({
+          type: 'BREAK_END',
+          timestamp: calculation.returnTimeIso,
+          location: breakStart.location || nextPickup.location || null,
+          driverId,
+          date: dateFilter,
+          tripId: nextPickup.tripId || null,
+          travelMinutes: calculation.travelMinutes,
+          calculationSource: calculation.source,
+          confidence: calculation.confidence,
+          pickupArrivalTime: calculation.pickupArrivalTime,
+          reason: 'INFERRED_FROM_VERIFIED_PICKUP_RETURN_TRAVEL',
+          source: 'authoritative_trip_ledger',
+        });
+      });
+  }
+
+  reconciledClockEvents.forEach((ce) => {
     events.push({
       ...ce,
       driverId: ce.driverId || driverId,
@@ -842,10 +923,10 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     });
   });
 
-  const correctedEnd = [...retainedClockEvents].reverse().find((event) => (
+  const correctedEnd = [...reconciledClockEvents].reverse().find((event) => (
     isAdminCorrection(event) && event.type === 'CLOCK_OUT'
   ));
-  const hasClockIn = retainedClockEvents.some((event) => event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN');
+  const hasClockIn = reconciledClockEvents.some((event) => event.type === 'CLOCK_IN' || event.type === 'AUTO_CLOCK_IN');
 
   const breadcrumbTime = (breadcrumb) => toIso(
     breadcrumb?.capturedAt || breadcrumb?.recordedAt || breadcrumb?.timestamp || breadcrumb?.at

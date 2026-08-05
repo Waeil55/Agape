@@ -2,7 +2,22 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'agape-offline-asset-manifest',
+      generateBundle(_options, bundle) {
+        const files = Object.values(bundle)
+          .map((item) => `/${item.fileName}`)
+          .filter((fileName) => fileName !== '/asset-manifest.json');
+        this.emitFile({
+          type: 'asset',
+          fileName: 'asset-manifest.json',
+          source: JSON.stringify({ version: 1, files: [...new Set(files)].sort() }),
+        });
+      },
+    },
+  ],
   server: {
     port: 3000,
     open: true,
