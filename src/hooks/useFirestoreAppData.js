@@ -436,6 +436,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     cleanupFns.push(setupListener(collection(db, DISPATCHER_PROFILE_COLLECTION), (snap) => applyCollectionData('dispatchers', snap), 'Dispatchers'));
     cleanupFns.push(setupListener(collection(db, VEHICLE_COLLECTION), (snap) => applyCollectionData('vehicles', snap), 'Vehicles'));
     cleanupFns.push(setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION), applyTripProgressSnapshot, 'TripProgress'));
+    cleanupFns.push(setupListener(collection(db, 'logs'), (snap) => applyCollectionData('logs', snap), 'Activity'));
 
     const unsubPhones = onSnapshot(doc(db, PHONE_NUMBERS_DOC), (snap) => {
       if (cancelled) return;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle, Edit2, BrainCircuit, Activity, UserCheck, UserX } from 'lucide-react';
-import { db, firebaseConfig, collection, getDocs, setDoc, doc, deleteDoc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut, functions, httpsCallable } from '../config/firebase';
+import { db, collection, getDocs, functions, httpsCallable } from '../config/firebase';
 import { analyzeActivityLogs } from '../config/ai';
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
@@ -14,13 +14,6 @@ const authEmailToUsername = (value = '') => {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized.endsWith(`@${INTERNAL_AUTH_DOMAIN}`)) return normalized.split('@')[0];
   return normalized.split('@')[0] || normalized;
-};
-
-const buildStableProfileId = (role, uid) => {
-  const seed = String(uid || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'USER';
-  if (role === 'dispatcher') return `DSP-${seed}`;
-  if (role === 'driver') return `DRV-${seed}`;
-  return null;
 };
 
 const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers, addAuditLog, currentUser, role, requestAuthAction, logs = [], children, onSmartNavigate, singleColumn, hideActivityFeed, activityFeedOnly, hideRoleCards, hideAiInsights }) => {
@@ -81,41 +74,16 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       setFormError('That username is already in use.');
       return;
     }
-    let secondaryApp;
     try {
-      // Initialize a secondary app to avoid logging out the admin
-      const secondaryAppName = `secondary-${Date.now()}`;
-      secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
-      const secondaryAuth = getAuth(secondaryApp);
       const authEmail = usernameToAuthEmail(username);
-      
-      const userCred = await createUserWithEmailAndPassword(secondaryAuth, authEmail, form.password);
-      const profileId = buildStableProfileId(form.role, userCred.user.uid);
-      await setDoc(doc(db, 'users', userCred.user.uid), { email: authEmail, username, name: username, role: form.role, phone: form.phone, profileId, loginType: 'username', accessStatus: 'active', employmentStatus: 'active', disabled: false }, { merge: true });
-      
-      // Cleanup: sign out and delete secondary app
-      await authSignOut(secondaryAuth);
-      await deleteApp(secondaryApp);
-      
-      if (form.role === 'dispatcher') {
-        const id = profileId;
-        setDispatchers(prev => [...prev, { id, name: username, email: authEmail, username, hourlyRate: form.hourlyRate || '' }]);
-      } else if (form.role === 'driver') {
-        const id = profileId;
-        const newDriver = {
-          id, name: username, email: authEmail, username, phone: form.phone, status: 'Available', vehicle: 'Pending', dist: '--',
-          currentZone: 'TBD', odometer: 0, nextOilChange: 5000,
-          assignedTo: '', schedule: [], clockedIn: false, hourlyRate: form.hourlyRate || ''
-        };
-        setDrivers(prev => [...prev, newDriver]);
-      }
+      const createUserFn = httpsCallable(functions, 'createUser');
+      await createUserFn({ email: authEmail, username, name: username, password: form.password, role: form.role, phone: form.phone, hourlyRate: form.hourlyRate });
       
       addAuditLog('User Created', `${currentUser} created ${form.role} account: ${username}`, 'emerald', { entity: 'user', id: username, diffs: [{ field: 'role', before: null, after: form.role }, { field: 'username', before: null, after: username }] });
       await loadUsers();
       setShowForm(false);
       setForm({ username: '', password: '', role: 'driver', phone: '', hourlyRate: '' });
     } catch (err) {
-      if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
       setFormError(err.message.replace('Firebase: ', ''));
     }
   };
@@ -149,16 +117,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       return;
     }
     try {
-      // 1. Try to delete from Firebase Auth using the Cloud Function
-      try {
-        const deleteUserFn = httpsCallable(functions, 'deleteUser');
-        await deleteUserFn({ uid: user.uid });
-      } catch (fnErr) {
-        console.warn("Cloud function deleteUser failed (likely IAM issue). Falling back to soft-delete:", fnErr.message);
-      }
-
-      // 2. Delete from Firestore database (Soft delete fallback)
-      await deleteDoc(doc(db, 'users', user.uid));
+      const deleteUserFn = httpsCallable(functions, 'deleteUser');
+      const result = await deleteUserFn({ uid: user.uid });
+      if (!result?.data?.success) throw new Error('The server did not confirm permanent deletion.');
       setDispatchers(prev => prev.filter(d => d.email !== user.email));
       setDrivers(prev => prev.filter(d => d.email !== user.email));
       
@@ -169,7 +130,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       console.error("Delete Error:", err);
       const msg = err?.message || '';
       if (msg.includes('permission-denied') || msg.includes('Missing or insufficient')) {
-        setFormError('Permission denied. Make sure your admin user document exists in Firestore database.');
+        setFormError('Permanent deletion was refused. Verify this account is an active Agape administrator. Nothing was deleted locally.');
       } else {
         setFormError(`Failed to delete user: ${msg}`);
       }

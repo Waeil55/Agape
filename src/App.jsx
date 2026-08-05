@@ -2170,12 +2170,21 @@ const App = () => {
       completedVehicle: resolveTripVehicle(trip, completionDriver) || '',
       completedDriverName: completionDriver?.name || trip.completedDriverName || trip.driverName || '',
     });
+    const completedVehicleName = nextTrip.completedVehicle;
     if (role === 'driver') {
       upsertDriverTrip(tripId, nextTrip);
       upsertDriverProfile(driverId, { odometer });
     } else {
       setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
       setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
+    }
+    if (completedVehicleName && Number.isFinite(Number(odometer))) {
+      setVehicles(prev => prev.map((vehicle) => {
+        const matches = vehicle.id === completionDriver?.vehicleId
+          || String(vehicle.name || '').trim().toLowerCase() === String(completedVehicleName).trim().toLowerCase();
+        if (!matches || Number(vehicle.odometer || 0) >= Number(odometer)) return vehicle;
+        return { ...vehicle, odometer: Number(odometer), odometerUpdatedAt: completedAt, odometerSourceTripId: tripId };
+      })).catch((error) => console.error('Vehicle odometer synchronization failed:', error));
     }
     const diffs = [];
     Object.keys(nextTrip || {}).forEach((key) => {
@@ -2192,9 +2201,12 @@ const App = () => {
     );
     // Maintenance check
     if (driver) {
-      const dueIn = (driver.nextOilChange || 50000) - odometer;
+      const assignedVehicle = vehicles.find((vehicle) => vehicle.id === driver.vehicleId
+        || String(vehicle.name || '').trim().toLowerCase() === String(completedVehicleName || '').trim().toLowerCase());
+      const nextOilChange = Number(assignedVehicle?.nextOilChangeOdometer || assignedVehicle?.nextOilChange || driver.nextOilChange || 50000);
+      const dueIn = nextOilChange - Number(odometer);
       if (dueIn <= 200) {
-        addAuditLog('⚠️ Maintenance Alert', `${driver.name}'s vehicle needs oil change at ${driver.nextOilChange?.toLocaleString()} mi (current: ${odometer?.toLocaleString()} mi).`, 'amber');
+        addAuditLog('Maintenance Alert', `${completedVehicleName || driver.name}'s oil service is due at ${nextOilChange.toLocaleString()} mi (current: ${Number(odometer).toLocaleString()} mi).`, dueIn < 0 ? 'rose' : 'amber', { entity: 'vehicle', id: assignedVehicle?.id || completedVehicleName });
       }
     }
     if (notificationsEnabled) {

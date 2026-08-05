@@ -42,6 +42,11 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
     }
+    match /deleted_user_tombstones/{userId} {
+      // Server-only employment identity ledger. Prevents a deleted account from
+      // being silently recreated by profile synchronization or a stale client.
+      allow read, create, update, delete: if false;
+    }
     match /routeData/{document} {
       allow read: if signedIn();
       allow write: if signedIn();

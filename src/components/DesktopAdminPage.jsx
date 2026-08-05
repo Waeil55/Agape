@@ -4,8 +4,9 @@ import {
   UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase,
   MessageCircle, DollarSign, LayoutDashboard, Users, Search,
   RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2,
+  CalendarClock, Wrench,
 } from 'lucide-react';
-import { sendPasswordResetEmail, auth, db, firebaseConfig, setDoc, doc, deleteApp, initializeApp, getAuth, createUserWithEmailAndPassword, signOut as authSignOut } from '../config/firebase';
+import { sendPasswordResetEmail, auth, functions, httpsCallable } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
 import { aiSecurityAnalysis } from '../config/ai';
 import { isInOutTrip } from '../utils/inOutTrips';
@@ -17,6 +18,9 @@ import DriverPerformanceCard from './DriverPerformanceCard';
 
 import { getDriverLiveStatus } from '../constants/statuses';
 import PayrollReportPage from './PayrollReportPage';
+import TimeTrackingAdmin from './TimeTrackingAdmin';
+import AdminActivityCenter from './admin/AdminActivityCenter';
+import { summarizeFleetMaintenance } from '../utils/fleetMaintenance';
 import { ChatPage } from './chat/ChatPage';
 import { useChat } from '../hooks/useChat';
 import {
@@ -51,13 +55,6 @@ const usernameToAuthEmail = (username = '') => {
   const normalized = normalizeUsername(username);
   return normalized ? `${normalized}@${INTERNAL_AUTH_DOMAIN}` : '';
 };
-const buildStableProfileId = (role, uid) => {
-  const seed = String(uid || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'USER';
-  if (role === 'dispatcher') return `DSP-${seed}`;
-  if (role === 'driver') return `DRV-${seed}`;
-  return null;
-};
-
 const ACTIVE_TRIP_STATUSES = new Set([
   'Assigned', 'In Progress', 'In Mission', 'En Route', 'Navigating Pickup',
   'At Pickup', 'In Transit', 'Navigating Dropoff', 'At Dropoff', 'Arrived',
@@ -575,61 +572,11 @@ const DesktopAdminPage = ({
       return;
     }
 
-    let secondaryApp;
     setCreatingUser(true);
     try {
-      secondaryApp = initializeApp(firebaseConfig, `secondary-admin-create-${Date.now()}`);
-      const secondaryAuth = getAuth(secondaryApp);
-      const userCred = await createUserWithEmailAndPassword(secondaryAuth, authEmail, createForm.password);
-      const profileId = buildStableProfileId(createUserRole, userCred.user.uid);
-      await setDoc(doc(db, 'users', userCred.user.uid), {
-        email: authEmail,
-        username,
-        name: username,
-        role: createUserRole,
-        phone: createForm.phone,
-        profileId,
-        loginType: 'username',
-        accessStatus: 'active',
-        employmentStatus: 'active',
-        disabled: false,
-      }, { merge: true });
-
-      await authSignOut(secondaryAuth);
-      await deleteApp(secondaryApp);
-      secondaryApp = null;
-
-      if (createUserRole === 'dispatcher') {
-        setDispatchers(prev => [...prev, {
-          id: profileId,
-          name: username,
-          email: authEmail,
-          username,
-          phone: createForm.phone,
-          clockedIn: false,
-        }]);
-      } else {
-        const currentDispatcher = role === 'dispatcher'
-          ? dispatchers.find((item) => normalizeEmail(item.email) === normalizeEmail(currentUser))
-          : null;
-        setDrivers(prev => [...prev, {
-          id: profileId,
-          name: username,
-          email: authEmail,
-          username,
-          phone: createForm.phone,
-          status: 'Available',
-          vehicle: 'Pending Assignment',
-          dist: '--',
-          currentZone: 'TBD',
-          odometer: 0,
-          nextOilChange: 5000,
-          assignedDispatcher: currentDispatcher?.id || '',
-          assignedTo: currentDispatcher?.id || '',
-          schedule: [],
-          clockedIn: false,
-        }]);
-      }
+      const createUserFn = httpsCallable(functions, 'createUser');
+      const result = await createUserFn({ email: authEmail, username, name: username, password: createForm.password, role: createUserRole, phone: createForm.phone });
+      const profileId = result?.data?.profileId;
 
       addAuditLog(
         createUserRole === 'dispatcher' ? 'Dispatcher Added' : 'Driver Added',
@@ -639,7 +586,6 @@ const DesktopAdminPage = ({
       );
       closeCreateUser();
     } catch (err) {
-      if (secondaryApp) await deleteApp(secondaryApp).catch(() => {});
       setCreateError(String(err?.message || 'Could not create account.').replace('Firebase: ', ''));
     } finally {
       setCreatingUser(false);
@@ -741,6 +687,11 @@ const DesktopAdminPage = ({
     return { online, busy, offline };
   }, [drivers]);
 
+  const maintenance = useMemo(
+    () => summarizeFleetMaintenance(vehicles, completedTrips, drivers),
+    [vehicles, completedTrips, drivers]
+  );
+
   const filteredDrivers = useMemo(() => {
     const q = driverQuery.trim().toLowerCase();
     if (!q) return activeDrivers;
@@ -785,7 +736,7 @@ const DesktopAdminPage = ({
             <AdminMetricTile icon={Truck} value={drivers.length} label="Drivers" hint={`${driverStatusCounts.online} online`} tone="brand" />
             <AdminMetricTile icon={RadioTower} value={driverStatusCounts.busy} label="Busy now" hint={`${activeTrips.length} active trips`} tone="warning" />
             <AdminMetricTile icon={CircleDot} value={unassignedTrips.length} label="Unassigned" hint="Need attention" tone={unassignedTrips.length ? 'danger' : 'success'} />
-            <AdminMetricTile icon={Briefcase} value={dispatchers.length} label="Dispatchers" hint={`${completedTrips.length} completed`} tone="info" />
+            <AdminMetricTile icon={Wrench} value={maintenance.overdue + maintenance.dueSoon} label="Service attention" hint={`${maintenance.overdue} overdue`} tone={maintenance.overdue ? 'danger' : maintenance.dueSoon ? 'warning' : 'success'} />
           </div>
 
           <div className="admin-intelligence-grid">
@@ -880,42 +831,27 @@ const DesktopAdminPage = ({
       content: (
         <AdminSectionFrame
           eyebrow="Access control"
-          title="People directory"
-          action={(
-            <div className="flex items-center gap-2">
-              <AdminSearch icon={Search} value={teamQuery} onChange={setTeamQuery} placeholder="Search people..." />
-              <AdminButton variant="ghost" size="sm" onClick={runSecurityAnalysis} disabled={aiSecLoading}>
-                {aiSecLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-                {aiSecLoading ? 'Scanning' : 'Security'}
-              </AdminButton>
-              <AdminButton variant="primary" size="sm" onClick={() => openCreateUser('dispatcher')}>
-                <Plus size={14} /> Add dispatcher
-              </AdminButton>
-            </div>
-          )}
+          title="Identity, employment & access"
         >
-          <div className="admin-people-grid">
-            {filteredUsers.map((user, i) => {
-              const live = user._role === 'driver' ? getDriverLiveStatus(user) : null;
-              return (
-                <TeamMemberCard
-                  key={`${user._source}-${user.id || i}`}
-                  user={user}
-                  role={role}
-                  live={live}
-                  pwResetMsg={pwResetMsg}
-                  onResetPassword={handlePasswordReset}
-                  onDelete={handleDeleteUser}
-                  onRoleChange={(targetUser, newRole) => {
-                    if (newRole === targetUser._role) return;
-                    if (requestAuthAction) requestAuthAction(`Change ${targetUser.name} from ${targetUser._role} to ${newRole}`, () => handleRoleChange(targetUser, newRole));
-                    else handleRoleChange(targetUser, newRole);
-                  }}
-                />
-              );
-            })}
-            {filteredUsers.length === 0 && <AdminEmpty icon={Users} title="No matching people" hint="Try a different name, role, or email" />}
-          </div>
+          <UsersPage
+            drivers={drivers} setDrivers={setDrivers}
+            dispatchers={dispatchers} setDispatchers={setDispatchers}
+            addAuditLog={addAuditLog} currentUser={currentUser}
+            role={role} requestAuthAction={requestAuthAction}
+            logs={logs} hideActivityFeed hideAiInsights hideRoleCards
+          />
+        </AdminSectionFrame>
+      ) },
+    { id: 'time', title: 'Driver Time & Notes', icon: CalendarClock, roles: ['admin', 'dispatcher'],
+      content: (
+        <AdminSectionFrame eyebrow="Workforce control" title="Driver time, notes & corrections">
+          <TimeTrackingAdmin
+            drivers={drivers}
+            trips={trips}
+            driverTelemetry={driverTelemetry}
+            timeTrackingDeclarations={timeTrackingDeclarations}
+            onUpdateHourlyRate={(driverId, hourlyRate) => upsertDriverProfile?.(driverId, { hourlyRate })}
+          />
         </AdminSectionFrame>
       ) },
     { id: 'activity', title: 'Activity', icon: Activity, roles: ['admin', 'dispatcher'],
@@ -938,14 +874,7 @@ const DesktopAdminPage = ({
             </div>
           )}
         >
-          <UsersPage
-            activityFeedOnly
-            drivers={drivers} setDrivers={setDrivers}
-            dispatchers={dispatchers} setDispatchers={setDispatchers}
-            addAuditLog={addAuditLog} currentUser={currentUser}
-            role={role} requestAuthAction={requestAuthAction}
-            logs={logs}
-          />
+          <AdminActivityCenter logs={logs} onViewTrip={onViewTrip} />
         </AdminSectionFrame>
       ) },
 

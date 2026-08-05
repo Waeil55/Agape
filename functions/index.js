@@ -208,6 +208,7 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
     if (!targetSnapshot.exists || (targetSnapshot.data().tenantId || "agape-care") !== actor.tenantId) {
       throw new functions.https.HttpsError("not-found", "User was not found in this organization.");
     }
+    const target = targetSnapshot.data();
     await targetRef.set({
       accessStatus: "revoked",
       disabled: true,
@@ -225,8 +226,38 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
       tenantId: actor.tenantId,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    await admin.auth().deleteUser(uid);
-    return { success: true, message: "User deleted successfully." };
+    const normalizedEmail = String(target.email || "").trim().toLowerCase();
+    const profileId = String(target.profileId || "").trim();
+    const cleanupRefs = [targetRef];
+    if (profileId && target.role === "driver") cleanupRefs.push(admin.firestore().doc(`driverProfiles/${profileId}`));
+    if (profileId && target.role === "dispatcher") cleanupRefs.push(admin.firestore().doc(`dispatcherProfiles/${profileId}`));
+    if (normalizedEmail) {
+      const [driverProfiles, dispatcherProfiles] = await Promise.all([
+        admin.firestore().collection("driverProfiles").where("email", "==", normalizedEmail).get(),
+        admin.firestore().collection("dispatcherProfiles").where("email", "==", normalizedEmail).get(),
+      ]);
+      driverProfiles.docs.forEach((item) => cleanupRefs.push(item.ref));
+      dispatcherProfiles.docs.forEach((item) => cleanupRefs.push(item.ref));
+    }
+    const cleanupBatch = admin.firestore().batch();
+    cleanupBatch.set(admin.firestore().doc(`deleted_user_tombstones/${uid}`), {
+      uid,
+      normalizedEmail,
+      username: String(target.username || "").trim().toLowerCase(),
+      profileId: profileId || null,
+      role: target.role || null,
+      tenantId: actor.tenantId,
+      deletedBy: context.auth.uid,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    [...new Map(cleanupRefs.map((ref) => [ref.path, ref])).values()].forEach((ref) => cleanupBatch.delete(ref));
+    await cleanupBatch.commit();
+    try {
+      await admin.auth().deleteUser(uid);
+    } catch (authError) {
+      if (authError?.code !== "auth/user-not-found") throw authError;
+    }
+    return { success: true, deletedUid: uid, deletedProfiles: cleanupRefs.length, message: "Authentication and organization profiles permanently deleted." };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError("internal", error.message || "Failed to delete user.");
@@ -1714,19 +1745,60 @@ exports.createUser = functions.https.onCall(async (data, context) => {
   if (!allowedRoles.has(role)) {
     throw new functions.https.HttpsError("invalid-argument", "A valid role is required.");
   }
-  const ref = await admin.firestore().collection("users").add({
-    email: String(data?.email || "").trim().toLowerCase(),
-    name: String(data?.name || "").trim(),
-    username: String(data?.username || "").trim(),
+  const email = String(data?.email || "").trim().toLowerCase();
+  const username = String(data?.username || "").trim().toLowerCase();
+  const name = String(data?.name || username).trim();
+  const password = String(data?.password || "");
+  if (!email || !username || password.length < 6) {
+    throw new functions.https.HttpsError("invalid-argument", "Username, email, and a password of at least 6 characters are required.");
+  }
+  const priorDeletion = await admin.firestore().collection("deleted_user_tombstones")
+    .where("normalizedEmail", "==", email).limit(1).get();
+  if (!priorDeletion.empty && data?.allowRehire !== true) {
+    throw new functions.https.HttpsError("failed-precondition", "This identity was permanently deleted. Use the explicit rehire workflow to create a new account.");
+  }
+  let authUser;
+  try {
+    authUser = await admin.auth().createUser({ email, password, displayName: name, disabled: false });
+  } catch (error) {
+    throw new functions.https.HttpsError(error?.code === "auth/email-already-exists" ? "already-exists" : "internal", error.message || "Authentication account could not be created.");
+  }
+  const seed = String(authUser.uid).replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase() || "USER";
+  const profileId = role === "driver" ? `DRV-${seed}` : role === "dispatcher" ? `DSP-${seed}` : null;
+  const profile = {
+    uid: authUser.uid,
+    email,
+    name,
+    username,
     role,
+    phone: String(data?.phone || "").trim(),
+    hourlyRate: data?.hourlyRate === "" || data?.hourlyRate == null ? null : Number(data.hourlyRate),
+    profileId,
+    loginType: "username",
     tenantId: actor.tenantId,
     accessStatus: "active",
     employmentStatus: "active",
     disabled: false,
     createdBy: context.auth.uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  return { id: ref.id };
+  };
+  try {
+    const batch = admin.firestore().batch();
+    batch.set(admin.firestore().doc(`users/${authUser.uid}`), profile);
+    if (profileId && role === "driver") batch.set(admin.firestore().doc(`driverProfiles/${profileId}`), {
+      ...profile, id: profileId, status: "Available", vehicle: "", vehicleId: "", currentZone: "TBD", odometer: 0,
+    });
+    if (profileId && role === "dispatcher") batch.set(admin.firestore().doc(`dispatcherProfiles/${profileId}`), { ...profile, id: profileId, clockedIn: false });
+    batch.set(admin.firestore().collection("audit_logs").doc(), {
+      action: "security.user_created", entityType: "user", entityId: authUser.uid,
+      actorId: context.auth.uid, tenantId: actor.tenantId, role, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  } catch (error) {
+    await admin.auth().deleteUser(authUser.uid).catch(() => {});
+    throw new functions.https.HttpsError("internal", error.message || "User profile could not be created.");
+  }
+  return { uid: authUser.uid, profileId, email, username, role };
 });
 
 exports.dayRollover = functions.pubsub.schedule("0 0 * * *").onRun(async (ctx) => {
