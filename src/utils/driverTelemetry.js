@@ -6,6 +6,7 @@ const STOP_EVENT_LIMIT = 30;
 
 export function todayLocal(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return todayLocal(new Date());
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 

@@ -13,6 +13,16 @@ import {
 const event = (type, timestamp) => ({ type, timestamp });
 
 describe('payroll time ledger', () => {
+  it('ignores corrupted legacy timestamps without crashing the driver portal', () => {
+    const corruptTimestamp = { toDate: () => new Date('Invalid Date') };
+    expect(() => buildTimeEvents([
+      { id: 'legacy-trip', date: '2026-08-05', status: 'Completed', arrivalTime: 'Invalid Date', completedAt: corruptTimestamp },
+    ], { id: 'driver-1' }, [
+      { type: 'IN', timestamp: 'Invalid Date' },
+      { type: 'OUT', timestamp: { seconds: Number.POSITIVE_INFINITY } },
+    ], POLICY_MODES.PAY_FROM_HOME, { date: '2026-08-05', now: '2026-08-05T12:00:00.000Z' })).not.toThrow();
+  });
+
   it('never deducts an ambiguous gap based only on duration or movement', () => {
     const gap = classifyGap(
       '2026-08-03T09:00:00.000Z',

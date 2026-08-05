@@ -7,6 +7,7 @@
  */
 
 import { todayLocal } from './driverTelemetry';
+import { toSafeIso } from './safeDate';
 
 const toNumber = (value) => {
   const number = Number(value);
@@ -686,15 +687,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
   const automaticShift = options.automaticShift !== false;
 
   const toIso = (value) => {
-    if (!value) return null;
-    if (typeof value === 'string') {
-      const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? null : date.toISOString();
-    }
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
-    if (typeof value.toDate === 'function') return value.toDate().toISOString();
-    if (value.seconds) return new Date(value.seconds * 1000).toISOString();
-    return null;
+    return toSafeIso(value);
   };
 
   const isoDateKey = (value) => {

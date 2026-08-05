@@ -79,7 +79,8 @@ export function isoToLocalDateKey(isoString) {
 
 /** Local calendar YYYY-MM-DD for a Date (default: now). */
 export function localCalendarYmd(d = new Date()) {
-  return localYmd(d);
+  const date = d instanceof Date ? d : new Date(d);
+  return Number.isNaN(date.getTime()) ? localYmd(new Date()) : localYmd(date);
 }
 
 export function calendarDateKeyDaysAgo(daysAgo = 0, from = new Date()) {

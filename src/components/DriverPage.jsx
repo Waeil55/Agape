@@ -46,6 +46,7 @@ import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
+import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -1408,7 +1409,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     return onSnapshot(source, (snapshot) => {
       setTimeCorrectionRequests(snapshot.docs
         .map((itemDoc) => ({ id: itemDoc.id, ...itemDoc.data() }))
-        .sort((a, b) => String(b.createdAt?.toDate?.()?.toISOString?.() || b.clientCreatedAt || '').localeCompare(String(a.createdAt?.toDate?.()?.toISOString?.() || a.clientCreatedAt || ''))));
+        .sort((a, b) => (safeDateMillis(b.createdAt ?? b.clientCreatedAt, 0) || 0) - (safeDateMillis(a.createdAt ?? a.clientCreatedAt, 0) || 0)));
     }, (error) => console.error('Time correction request listener failed:', error));
   }, [currentUser, me?.email]);
 
@@ -1509,7 +1510,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     if (isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
       const now = new Date();
       const clockedInAt = me?.clockedInAt;
-      const clockInTime = clockedInAt ? new Date(clockedInAt) : now;
+      const clockInTime = toValidDate(clockedInAt) || now;
       const elapsedMs = Math.max(0, now - clockInTime);
       const savedBreakMs = Number(me?.totalBreakMilliseconds)
         || Math.max(0, Number(me?.totalBreakMinutes || 0) * 60000);
@@ -1523,8 +1524,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       const billableMs = Math.max(0, elapsedMs - totalBreakMs);
       setTtState(isOnBreak ? TT.ON_BREAK : TT.ON_SHIFT_ACTIVE);
       ttStateRef.current = isOnBreak ? TT.ON_BREAK : TT.ON_SHIFT_ACTIVE;
-      ttClockInTimeRef.current = clockInTime.toISOString();
-      ttEventsLogRef.current = [{ type: clockedInAt ? 'AUTO_CLOCK_IN' : 'CLOCK_IN', timestamp: clockInTime.toISOString(), location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null }];
+      const safeClockInIso = toSafeIso(clockInTime, now.toISOString());
+      ttClockInTimeRef.current = safeClockInIso;
+      ttEventsLogRef.current = [{ type: toValidDate(clockedInAt) ? 'AUTO_CLOCK_IN' : 'CLOCK_IN', timestamp: safeClockInIso, location: driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null }];
       ttAccumulatedBreakMsRef.current = savedBreakMs;
       setTtBillableMin(Math.floor(billableMs / 60000));
       setTtBreakMin(Math.floor(totalBreakMs / 60000));
