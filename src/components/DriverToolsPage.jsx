@@ -51,6 +51,7 @@ const sanitizeStorageKey = (value) => String(value || 'anon').replace(/[^a-zA-Z0
 const cleanRouteAddress = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 const stopSignature = (stop) => `${cleanRouteAddress(stop?.label).toLowerCase()}|${stop?.tripId || ''}|${stop?.stopType || ''}`;
 const stopTypeRank = (stopType) => (stopType === 'PU' ? 0 : stopType === 'DO' ? 1 : 2);
+const coordinateLabelPattern = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/;
 
 const createBlankStop = (letter = 'A') => ({
   id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -92,6 +93,19 @@ const normalizeStopOrder = (items = [], driverPosition = null) => {
       type: 'stop',
       letter: String.fromCharCode(65 + index),
     }));
+
+  // A trip's pickup is a hard precedence constraint. Preserve the operator's
+  // route order, but never allow its dropoff to remain ahead of its pickup.
+  const tripIds = [...new Set(rest.map((stop) => stop.tripId).filter(Boolean))];
+  tripIds.forEach((tripId) => {
+    const pickupIndex = rest.findIndex((stop) => stop.tripId === tripId && stop.stopType === 'PU');
+    const dropoffIndex = rest.findIndex((stop) => stop.tripId === tripId && stop.stopType === 'DO');
+    if (pickupIndex >= 0 && dropoffIndex >= 0 && dropoffIndex < pickupIndex) {
+      const [pickup] = rest.splice(pickupIndex, 1);
+      rest.splice(dropoffIndex, 0, pickup);
+    }
+  });
+  rest.forEach((stop, index) => { stop.letter = String.fromCharCode(65 + index); });
 
   return [origin, ...rest];
 };
@@ -301,6 +315,11 @@ const RoutePlanSection = ({
   useEffect(() => {
     if (!routePlanStops || routePlanStops.length === 0) return;
     const imported = routePlanStops.map(normalizeImportedStop).filter(stop => cleanRouteAddress(stop.label));
+    imported.sort((a, b) => {
+      if (a.tripId && b.tripId && a.tripId === b.tripId) return stopTypeRank(a.stopType) - stopTypeRank(b.stopType);
+      const timeDifference = timeToMinutes(a.stopTime) - timeToMinutes(b.stopTime);
+      return timeDifference || stopTypeRank(a.stopType) - stopTypeRank(b.stopType);
+    });
     if (imported.length === 0) {
       setRouteError('No usable addresses were found in the selected trips.');
       if (onSetRoutePlanStops) onSetRoutePlanStops(null);
@@ -622,7 +641,7 @@ const RoutePlanSection = ({
                       </div>
                     )}
                     <PlacesAutocompleteInput
-                      value={stop.label}
+                      value={stop.type === 'origin' && stop.source === 'gps' && coordinateLabelPattern.test(cleanRouteAddress(stop.label)) ? 'Current GPS location' : stop.label}
                       onChange={(v) => handleTextChange(index, v)}
                       placeholder={index === 0 ? 'Starting point or current location' : `Stop ${stop.letter} address`}
                       className="text-[7px] font-normal text-slate-400 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
@@ -813,25 +832,6 @@ const DriverToolsPage = ({
           </div>
         </div>
       )}
-
-      {/* Advanced Tools Section */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mb-2">
-        <button
-          onClick={onOpenSequencer}
-          className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-50 transition"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
-              <Route size={16} className="text-indigo-600" />
-            </div>
-            <div className="text-left">
-              <h3 className="text-sm font-semibold text-slate-800">Route Plan</h3>
-              <p className="text-xs font-semibold text-slate-400">Advanced planning engine & templates</p>
-            </div>
-          </div>
-          <ChevronRight size={16} className="text-slate-300" />
-        </button>
-      </div>
 
       {/* Route Plan */}
       <RoutePlanSection

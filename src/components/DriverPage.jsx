@@ -1454,7 +1454,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       const breakMs = model.sessions.reduce((sum, session) => sum + (session.breakMilliseconds || 0), 0);
       const hasEvidence = model.events.length > 0;
       const historicalOpenShift = dateKey < localCalendarYmd() && model.sessions.some((session) => session.isOpen);
-      const hours = hasEvidence && model.approvalEligible ? billableMs / 3600000 : null;
+      const hours = hasEvidence ? billableMs / 3600000 : null;
       const needsCorrection = historicalOpenShift || model.anomalies.length > 0 || model.reviewRequiredGaps?.length > 0;
       const isFuture = dateKey > localCalendarYmd();
       const status = needsCorrection
@@ -1475,6 +1475,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
         anomalies: model.anomalies,
         reviewRequiredGaps: model.reviewRequiredGaps || [],
         reconciliation: model.reconciliation,
+        approvalEligible: model.approvalEligible,
         needsCorrection,
         status,
       };
@@ -5736,15 +5737,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
               )}
             </div>
 
-            {/* Clock History (last 14 days) */}
+            {/* Unified evidence-backed weekly timecard */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-slate-800 font-semibold"><Clock size={16} /> Clock History</div>
+                <div className="flex items-center gap-2 text-slate-800 font-semibold"><Clock size={16} /> Work Time</div>
                 {clockHistory.days.some(d => d.hasEvents) && (
                   <button
                     type="button"
                     onClick={() => {
-                      const rows = [['Date', 'Clock In', 'Clock Out', 'Verified Hours', 'Break Minutes', 'Status', 'Issues', 'In Location', 'Out Location']];
+                      const rows = [['Date', 'Recorded Start', 'Recorded End', 'Recorded Hours', 'Personal Minutes', 'Approval Status', 'Issues', 'In Location', 'Out Location']];
                       clockHistory.days.filter(d => d.hasEvents).forEach(d => {
                         rows.push([
                           d.dateKey,
@@ -5759,7 +5760,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                         ]);
                       });
                       rows.push(['', '', '', '', '', '', '', '', '']);
-                      rows.push(['Current Week Verified Total', '', '', clockHistory.weeklyTotal.toFixed(2), '', '', '', '', '']);
+                      rows.push(['Current Week Recorded Total', '', '', clockHistory.weeklyTotal.toFixed(2), '', '', '', '', '']);
                       if (clockHistory.weeklyOvertime > 0) rows.push(['Current Week Overtime', '', '', clockHistory.weeklyOvertime.toFixed(2), '', '', '', '', '']);
                       const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
                       const blob = new Blob([csv], { type: 'text/csv' });
@@ -5803,7 +5804,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                     <div className="mt-3 grid grid-cols-3 rounded-xl border border-slate-200 bg-white p-3 text-center">
                       <div><p className="text-[9px] font-bold uppercase text-slate-400">Verified start</p><p className="mt-1 text-xs font-bold text-slate-800">{selectedDay.clockIn ? formatClockTime(selectedDay.clockIn) : '—'}</p></div>
                       <div className="border-x border-slate-100"><p className="text-[9px] font-bold uppercase text-slate-400">Verified end</p><p className="mt-1 text-xs font-bold text-slate-800">{selectedDay.clockOut ? formatClockTime(selectedDay.clockOut) : '—'}</p></div>
-                      <div><p className="text-[9px] font-bold uppercase text-slate-400">Approved time</p><p className="mt-1 text-xs font-bold text-blue-700">{selectedDay.hours != null ? `${selectedDay.hours.toFixed(2)}h` : 'Pending'}</p></div>
+                      <div><p className="text-[9px] font-bold uppercase text-slate-400">Recorded time</p><p className="mt-1 text-xs font-bold text-blue-700">{selectedDay.hours != null ? `${selectedDay.hours.toFixed(2)}h` : '—'}</p></div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-600">
                       <span>{selectedDay.tripCount} trip{selectedDay.tripCount === 1 ? '' : 's'}</span>
@@ -5845,6 +5846,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                   </div>
                 );
               })()}
+              {false && <>
               <p className="mb-2 mt-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">Recent verified records</p>
               {clockHistory.days.length === 0 || clockHistory.days.every(d => !d.hasEvents) ? (
                 <p className="text-xs text-slate-500 text-center py-4">No clock in/out history yet.</p>
@@ -5907,6 +5909,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                   </div>
                 </>
               )}
+              </>}
+              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                <div><p className="text-xs font-semibold text-slate-600">Current week recorded</p><p className="text-[10px] text-slate-400">Payroll approval remains evidence-controlled</p></div>
+                <span className={`text-sm font-bold ${clockHistory.weeklyOvertime > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{clockHistory.weeklyTotal.toFixed(2)}h{clockHistory.weeklyOvertime > 0 && <span className="ml-1 text-[10px]">({clockHistory.weeklyOvertime.toFixed(2)}h OT)</span>}</span>
+              </div>
             </div>
 
             {/* Navigation App */}

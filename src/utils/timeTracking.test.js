@@ -230,17 +230,18 @@ describe('payroll time ledger', () => {
     expect(clockIn.reason).toBe('FIRST_WORK_EVENT');
   });
 
-  it('applies an administrator gap resolution without changing verified trip timestamps', () => {
+  it('keeps between-trip waiting paid and allows an attributable personal-time correction', () => {
     const trips = [
       { id: 'trip-1', date: '2026-08-03', status: 'Completed', arrivalTime: '2026-08-03T08:00:00.000Z', completedAt: '2026-08-03T09:00:00.000Z' },
       { id: 'trip-2', date: '2026-08-03', status: 'Completed', arrivalTime: '2026-08-03T11:00:00.000Z', completedAt: '2026-08-03T12:00:00.000Z' },
     ];
-    const unresolved = buildTimeEvents(trips, { id: 'driver-1' }, [], POLICY_MODES.PAY_FROM_FIRST_PICKUP, {
+    const paidWaiting = buildTimeEvents(trips, { id: 'driver-1' }, [], POLICY_MODES.PAY_FROM_FIRST_PICKUP, {
       date: '2026-08-03', now: '2026-08-04T12:00:00.000Z',
     });
-    expect(unresolved.billableMinutes).toBe(240);
-    expect(unresolved.approvalEligible).toBe(false);
-    expect(unresolved.reviewRequiredGaps).toHaveLength(1);
+    expect(paidWaiting.billableMinutes).toBe(240);
+    expect(paidWaiting.approvalEligible).toBe(true);
+    expect(paidWaiting.reviewRequiredGaps).toHaveLength(0);
+    expect(paidWaiting.gapLog.some((gap) => gap.classification === GAP_CLASSIFICATIONS.WORK_WAITING)).toBe(true);
 
     const resolved = buildTimeEvents(trips, { id: 'driver-1' }, [{
       type: 'GAP_RESOLUTION',

@@ -483,6 +483,7 @@ export const stitchSessions = (events, options = {}) => {
             event.location,
             {
               sameTrip: Boolean(prevEvent.tripId && prevEvent.tripId === event.tripId),
+              requiredToRemain: prevEvent.type === 'TRIP_EVENT' && event.type === 'TRIP_EVENT',
               resolution: matchingResolution?.resolution,
               resolvedBy: matchingResolution?.correctedBy || matchingResolution?.resolvedBy,
               resolvedAt: matchingResolution?.correctedAt || matchingResolution?.resolvedAt,
