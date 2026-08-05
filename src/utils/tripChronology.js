@@ -1,4 +1,5 @@
 import { timeToMinutes, tripCalendarDateKey } from './tripDate';
+import { toValidDate } from './safeDate';
 
 const COMPLETION_FIELDS = [
   'completedAt',
@@ -22,23 +23,9 @@ const PICKUP_FIELDS = [
 
 const toDate = (value) => {
   if (!value) return null;
-  if (typeof value === 'object' && typeof value.toDate === 'function') {
-    const date = value.toDate();
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  if (typeof value === 'object' && Number.isFinite(value.seconds)) {
-    const date = new Date(value.seconds * 1000);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  if (typeof value === 'number') {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
   const raw = String(value).trim();
   if (!raw || /^\d{1,2}:\d{2}(?:\s*(?:am|pm))?$/i.test(raw)) return null;
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return toValidDate(value);
 };
 
 const clockMinutes = (value) => {
@@ -99,4 +86,3 @@ export const compareTripsByCompletionAscending = (left, right, overrides = {}) =
     { numeric: true, sensitivity: 'base' },
   );
 };
-

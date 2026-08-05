@@ -7,7 +7,7 @@
  */
 
 import { todayLocal } from './driverTelemetry';
-import { toSafeIso } from './safeDate';
+import { hasExplicitTime, toSafeIso, toValidDate } from './safeDate';
 
 const toNumber = (value) => {
   const number = Number(value);
@@ -324,8 +324,8 @@ const canonicalEventType = (type) => {
 
 const eventMillis = (event) => {
   const value = event?.timestamp || event?.at || event?.time || event?.createdAt;
-  const date = value?.toDate ? value.toDate() : value?.seconds ? new Date(value.seconds * 1000) : new Date(value);
-  return Number.isFinite(date.getTime()) ? date.getTime() : null;
+  const date = toValidDate(value);
+  return date ? date.getTime() : null;
 };
 
 export const validateTimeEventSequence = (events, options = {}) => {
@@ -561,7 +561,10 @@ export const generatePendingClockOut = ({ lastTrip, driver, policyMode }) => {
   const lastDropoffTime = lastTrip.arrivalDropoffTime || lastTrip.completedAt;
   if (!lastDropoffTime) return { pendingClockOut: null, estimatedClockOutTime: null };
 
-  const dropoffTime = new Date(lastDropoffTime);
+  const dropoffTime = toValidDate(lastDropoffTime);
+  if (!dropoffTime || !hasExplicitTime(lastDropoffTime)) {
+    return { pendingClockOut: null, estimatedClockOutTime: null };
+  }
 
   if (policyMode === POLICY_MODES.PAY_FROM_HOME && driver?.homeLat && driver?.homeLng) {
     // Calculate travel time from last dropoff to home
@@ -802,7 +805,12 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     addTripEvent('ARRIVED_PICKUP', trip.arrivalTime || trip.arrivedPickupAt, pickupLocation);
     addTripEvent('DEPARTED_PICKUP', trip.departedPickupTime || trip.departedPickupAt, pickupLocation);
     addTripEvent('ARRIVED_DROPOFF', trip.arrivalDropoffTime || trip.arrivedDropoffAt, dropoffLocation);
-    addTripEvent('TRIP_COMPLETED', trip.completedAt || trip.completedTime, dropoffLocation || pickupLocation);
+    const completionTimestamp = trip.completedAt || trip.completedTime;
+    const terminalStatus = ['completed', 'complete', 'done', 'no show', 'no-show', 'noshow', 'cancelled', 'canceled']
+      .includes(String(trip?.status || '').trim().toLowerCase());
+    if (terminalStatus && hasExplicitTime(completionTimestamp)) {
+      addTripEvent('TRIP_COMPLETED', completionTimestamp, dropoffLocation || pickupLocation);
+    }
   });
 
   const tripEvents = events.filter((event) => event.type === 'TRIP_EVENT');

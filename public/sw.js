@@ -1,9 +1,9 @@
-/* Agape Care PWA Service Worker v21
+/* Agape Care PWA Service Worker v27
    App shell + static assets. Network-first for navigation.
    Firestore onSnapshot listeners own all realtime data delivery.
 */
 
-const CACHE_VERSION = 'agape-v26';
+const CACHE_VERSION = 'agape-v27';
 const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 
 self.addEventListener('install', (event) => {
@@ -18,7 +18,7 @@ self.addEventListener('activate', (event) => {
     Promise.all([
       caches.keys().then((cacheNames) => Promise.all(
         cacheNames
-          .filter((name) => /^agape-|^workbox-/i.test(name))
+          .filter((name) => name !== RUNTIME_CACHE && (/^agape-|^workbox-/i.test(name)))
           .map((name) => caches.delete(name))
       )),
       self.clients.claim(),
@@ -57,7 +57,7 @@ self.addEventListener('fetch', (event) => {
   // Navigation: Network-First with background cache update and offline fallback
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then((response) => {
           if (response.ok) {
             const clone = response.clone();

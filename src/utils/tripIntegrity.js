@@ -1,3 +1,5 @@
+import { toSafeIso } from './safeDate';
+
 const PLACEHOLDER_NAMES = new Set([
   '',
   '-',
@@ -41,7 +43,7 @@ export const textValue = (value) => {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
-  if (value?.toDate && typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (value?.toDate && typeof value.toDate === 'function') return toSafeIso(value, '');
   if (typeof value === 'object') {
     return [
       value.address,

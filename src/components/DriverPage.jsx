@@ -192,7 +192,8 @@ const getHistoryStatusMeta = (status) => HISTORY_STATUS_META[normalizeWorkflowSt
 const formatTripDetailClock = (value) => {
   if (!value) return '--';
   if (typeof value === 'object' && typeof value.toDate === 'function') {
-    const d = value.toDate();
+    const d = toValidDate(value);
+    if (!d) return '--';
     return Number.isNaN(d.getTime()) ? '--' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
   if (typeof value === 'object' && typeof value.seconds === 'number') {
@@ -385,7 +386,8 @@ const getCurrentWorkflowStep = (trip) => getWorkflowSteps(trip).findIndex(s => !
 
 const formatClockTime = (iso) => {
   if (!iso) return '';
-  const d = new Date(iso);
+  const d = toValidDate(iso);
+  if (!d) return '';
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
@@ -1091,7 +1093,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     if (!me?.id) return;
     const completed = driverScopedTrips
       .filter(t => isWorkflowTerminalTrip(t) && t.dropoffOdometer)
-      .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+      .sort((a, b) => (safeDateMillis(b.completedAt, 0) || 0) - (safeDateMillis(a.completedAt, 0) || 0));
     if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
   }, [driverScopedTrips, me?.id]);
 

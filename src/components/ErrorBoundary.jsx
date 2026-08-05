@@ -27,7 +27,11 @@ export default class ErrorBoundary extends React.Component {
 
   handleClearCache = () => {
     sessionStorage.removeItem('agape_reload_count');
-    const doReload = () => location.reload(true);
+    const doReload = () => {
+      const url = new URL(location.href);
+      url.searchParams.set('agape-update', Date.now().toString(36));
+      location.replace(url.toString());
+    };
     const promises = [];
     if ('caches' in window) {
       promises.push(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
@@ -38,21 +42,6 @@ export default class ErrorBoundary extends React.Component {
       ));
     }
     
-    // Attempt to clear IndexedDB (Firestore cache)
-    if (window.indexedDB && window.indexedDB.databases) {
-      promises.push(
-        window.indexedDB.databases().then(dbs => {
-          return Promise.all(dbs.map(db => new Promise((resolve) => {
-            if (!db.name) return resolve();
-            const req = window.indexedDB.deleteDatabase(db.name);
-            req.onsuccess = resolve;
-            req.onerror = resolve;
-            req.onblocked = resolve;
-          })));
-        }).catch(() => Promise.resolve())
-      );
-    }
-
     Promise.all(promises).then(doReload).catch(doReload);
   };
 

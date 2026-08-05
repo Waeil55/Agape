@@ -9,6 +9,11 @@ describe('tripCalendarDateKey', () => {
 
   it('parses US MM/DD/YYYY format', () => {
     expect(tripCalendarDateKey('06/30/2026')).toBe('2026-06-30');
+    expect(tripCalendarDateKey('08-05-2026')).toBe('2026-08-05');
+  });
+
+  it('contains corrupt Firestore timestamp objects', () => {
+    expect(tripCalendarDateKey({ toDate: () => { throw new Error('corrupt'); } })).toBeUndefined();
   });
 
   it('returns undefined for null/undefined/empty', () => {

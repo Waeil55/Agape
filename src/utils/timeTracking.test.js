@@ -23,6 +23,25 @@ describe('payroll time ledger', () => {
     ], POLICY_MODES.PAY_FROM_HOME, { date: '2026-08-05', now: '2026-08-05T12:00:00.000Z' })).not.toThrow();
   });
 
+  it('does not treat an imported service-date marker as an active trip completion event', () => {
+    const model = buildTimeEvents([
+      {
+        id: '107489324',
+        date: '2026-08-05',
+        status: 'In Progress',
+        startedAt: '2026-08-05T12:00:00.000Z',
+        completedAt: '08-05-2026',
+        pickupLocation: { lat: 39.8, lng: -86.1 },
+      },
+    ], { id: 'DRV-GGQOR7' }, [], POLICY_MODES.PAY_FROM_HOME, {
+      date: '2026-08-05',
+      now: '2026-08-05T13:00:00.000Z',
+    });
+
+    expect(model.events.some((item) => item.eventType === 'TRIP_COMPLETED')).toBe(false);
+    expect(model.reconciliation.status).toBe('ACTIVE');
+  });
+
   it('never deducts an ambiguous gap based only on duration or movement', () => {
     const gap = classifyGap(
       '2026-08-03T09:00:00.000Z',

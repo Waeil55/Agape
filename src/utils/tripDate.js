@@ -28,9 +28,13 @@ export function tripCalendarDateKey(value) {
 
   if (typeof value === 'object') {
     if (typeof value.toDate === 'function') {
-      const d = value.toDate();
-      if (Number.isNaN(d.getTime())) return undefined;
-      return localYmd(d);
+      try {
+        const d = value.toDate();
+        if (Number.isNaN(d.getTime())) return undefined;
+        return localYmd(d);
+      } catch {
+        return undefined;
+      }
     }
     if (value instanceof Date) {
       const d = value;
@@ -52,7 +56,7 @@ export function tripCalendarDateKey(value) {
     return `${iso[1]}-${String(iso[2]).padStart(2, '0')}-${String(iso[3]).padStart(2, '0')}`;
   }
 
-  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  const us = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
   if (us) {
     const year = us[3].length === 2 ? `20${us[3]}` : us[3];
     return `${year}-${String(us[1]).padStart(2, '0')}-${String(us[2]).padStart(2, '0')}`;
