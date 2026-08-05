@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
-import { minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
+import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
 import { auth, db, doc, setDoc, collection, addDoc, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
@@ -85,6 +85,13 @@ const formatTimeInput = (v) => {
   const m = String(v).match(/(\d{1,2}):(\d{2})/);
   return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v;
 };
+
+const getCompletionPickupBoundary = (trip) => latestWorkflowTimestamp(
+  trip?.arrivalTime,
+  trip?.startTime,
+  trip?.pickupArrival,
+  trip?.pickupArrivalTime,
+);
 
 const timeInputOrBlank = (value) => {
   const formatted = formatTimeInput(value);
@@ -676,6 +683,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
   const [completeError, setCompleteError] = useState('');
+  const [completeTimeNotice, setCompleteTimeNotice] = useState('');
   const [completeRating, setCompleteRating] = useState(0);
   const [completeRatingHover, setCompleteRatingHover] = useState(0);
   const [departedTime, setDepartedTime] = useState('');
@@ -2957,17 +2965,53 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     const odometerSeed = trip.dropoffOdometer || (lastOdometer > 0 ? lastOdometer : trip.pickupOdometer) || '';
     setCompleteOdometer(odometerSeed ? String(odometerSeed) : '');
     setCompleteError('');
+    setCompleteTimeNotice('');
     const nowLocal = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const defaultTime = `${pad(nowLocal.getHours())}:${pad(nowLocal.getMinutes())}`;
+    const pickupArrivalClock = formatTimeInput(getCompletionPickupBoundary(trip));
+    const storedDepartureClock = formatTimeInput(trip.departedPickupTime);
     const normalizedClocks = normalizeCompletionClocks({
-      pickupArrival: formatTimeInput(trip.arrivalTime || trip.startTime),
-      pickupDeparture: formatTimeInput(trip.departedPickupTime),
+      pickupArrival: pickupArrivalClock,
+      pickupDeparture: storedDepartureClock,
       dropoffArrival: formatTimeInput(trip.arrivalDropoffTime),
       now: defaultTime,
     });
+    if (storedDepartureClock && normalizedClocks.pickupDeparture !== storedDepartureClock) {
+      setCompleteTimeNotice(`Pickup departure was aligned to the recorded pickup arrival (${to12hrFromTimeInput(pickupArrivalClock)}).`);
+    }
     setDepartedTime(normalizedClocks.pickupDeparture);
     setArrivalDropoffTime(normalizedClocks.dropoffArrival);
+  };
+
+  const updateCompletionDeparture = (value) => {
+    const pickupArrivalClock = formatTimeInput(getCompletionPickupBoundary(showCompleteModal));
+    const normalized = normalizeCompletionClocks({
+      pickupArrival: pickupArrivalClock,
+      pickupDeparture: value,
+      dropoffArrival: arrivalDropoffTime,
+      now: value,
+    });
+    setDepartedTime(normalized.pickupDeparture);
+    setArrivalDropoffTime(normalized.dropoffArrival);
+    setCompleteError('');
+    setCompleteTimeNotice(normalized.pickupDeparture !== value
+      ? `Pickup departure cannot precede pickup arrival. It was adjusted to ${to12hrFromTimeInput(normalized.pickupDeparture)}.`
+      : '');
+  };
+
+  const updateCompletionDropoffArrival = (value) => {
+    const normalized = normalizeCompletionClocks({
+      pickupArrival: formatTimeInput(getCompletionPickupBoundary(showCompleteModal)),
+      pickupDeparture: departedTime,
+      dropoffArrival: value,
+      now: value,
+    });
+    setArrivalDropoffTime(normalized.dropoffArrival);
+    setCompleteError('');
+    setCompleteTimeNotice(normalized.dropoffArrival !== value
+      ? `Dropoff arrival cannot precede pickup departure. It was adjusted to ${to12hrFromTimeInput(normalized.dropoffArrival)}.`
+      : '');
   };
 
   const submitComplete = () => {
@@ -2986,10 +3030,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     const now = new Date().toISOString();
     const serviceDate = tripCalendarDateKey(showCompleteModal.date) || localCalendarYmd();
     const departedPickupIso = timeToIsoForTripDate(departedTime, serviceDate) || now;
-    const dropoffArrivalIso = showCompleteModal.arrivalDropoffTime
-      || timeToIsoForTripDate(arrivalDropoffTime, serviceDate)
+    const dropoffArrivalIso = timeToIsoForTripDate(arrivalDropoffTime, serviceDate)
+      || showCompleteModal.arrivalDropoffTime
       || now;
-    const pickupArrivalIso = showCompleteModal.arrivalTime || showCompleteModal.startTime;
+    const pickupArrivalIso = getCompletionPickupBoundary(showCompleteModal);
     // The form intentionally captures minute precision. Compare the stored
     // workflow timestamps at that same precision so 10:35 is not rejected
     // merely because the arrival event contains seconds (for example 10:35:38).
@@ -3021,6 +3065,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     setShowCompleteModal(null);
     setCompleteOdometer('');
     setCompleteError('');
+    setCompleteTimeNotice('');
     setCompleteRating(0);
     setCompleteRatingHover(0);
 
@@ -4833,17 +4878,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                   <span className="text-sm font-semibold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '-'} mi</span>
                 </div>
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-xs text-slate-500 font-semibold uppercase">Started At</span>
-                  <span className="text-sm font-semibold text-slate-900">{showCompleteModal.startTime ? new Date(showCompleteModal.startTime).toLocaleTimeString() : '-'}</span>
+                  <span className="text-xs text-slate-500 font-semibold uppercase">Pickup Arrival</span>
+                  <span className="text-sm font-semibold text-slate-900">{getCompletionPickupBoundary(showCompleteModal) ? new Date(getCompletionPickupBoundary(showCompleteModal)).toLocaleTimeString() : '-'}</span>
                 </div>
                 <div>
                   <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Departed Pickup Time</label>
-                  <input type="time" value={departedTime} onChange={(e) => setDepartedTime(e.target.value)}
+                  <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} onChange={(e) => updateCompletionDeparture(e.target.value)}
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1" />
                 </div>
                 <div>
                   <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Arrival Dropoff Time</label>
-                  <input type="time" value={arrivalDropoffTime} onChange={(e) => setArrivalDropoffTime(e.target.value)}
+                  <input type="time" value={arrivalDropoffTime} min={departedTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1" />
                 </div>
                 <div>
@@ -4866,6 +4911,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                 {completeError && (
                   <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-semibold text-rose-700">
                     {completeError}
+                  </p>
+                )}
+                {completeTimeNotice && !completeError && (
+                  <p className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-center text-xs font-semibold text-blue-700">
+                    {completeTimeNotice}
                   </p>
                 )}
                 {showCompleteModal.pickupOdometer && completeOdometer && (
@@ -4900,7 +4950,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
             </div>
 
             <div className="flex gap-3 mt-2 shrink-0 pt-2">
-              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteRating(0); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteRating(0); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
               <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
             </div>
           </div>

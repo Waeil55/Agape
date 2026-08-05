@@ -29,6 +29,17 @@ export const normalizeCompletionClocks = ({
   return { pickupDeparture: departure, dropoffArrival: dropoff };
 };
 
+export const latestWorkflowTimestamp = (...values) => values
+  .flat()
+  .reduce((latest, value) => {
+    if (!value) return latest;
+    const dateValue = typeof value?.toDate === 'function' ? value.toDate() : value;
+    const milliseconds = dateValue instanceof Date ? dateValue.getTime() : new Date(dateValue).getTime();
+    if (!Number.isFinite(milliseconds)) return latest;
+    if (!latest || milliseconds > latest.milliseconds) return { value, milliseconds };
+    return latest;
+  }, null)?.value || '';
+
 export const minuteEpoch = value => {
   const milliseconds = value instanceof Date ? value.getTime() : new Date(value).getTime();
   return Number.isFinite(milliseconds) ? Math.floor(milliseconds / 60_000) : NaN;
