@@ -610,6 +610,25 @@ export const generatePendingClockOut = ({ lastTrip, driver, policyMode }) => {
   }
 
   if (policyMode === POLICY_MODES.PAY_FROM_HOME && driver?.homeLat && driver?.homeLng) {
+    const persistedTravelMinutes = Number(lastTrip.dropoffToHomeTravelMinutes);
+    if (Number.isFinite(persistedTravelMinutes) && persistedTravelMinutes >= 0) {
+      const persistedArrival = toValidDate(lastTrip.estimatedHomeArrivalTime);
+      const estimatedClockOutTime = persistedArrival
+        || new Date(dropoffTime.getTime() + persistedTravelMinutes * 60 * 1000);
+      return {
+        pendingClockOut: {
+          type: 'PENDING_CLOCK_OUT',
+          reason: 'END_OF_DAY',
+          estimatedAt: estimatedClockOutTime.toISOString(),
+          lastTripId: lastTrip.id,
+          travelMinutes: persistedTravelMinutes,
+          anchorType: 'HOME_ROUTE',
+          calculationSource: lastTrip.dropoffToHomeCalculationSource || 'PERSISTED_HOME_ROUTE',
+          confidence: lastTrip.dropoffToHomeConfidence || 'route_verified',
+        },
+        estimatedClockOutTime,
+      };
+    }
     // Calculate travel time from last dropoff to home
     const lastDropoffLat = lastTrip.dropoffLat || lastTrip.pickupLat;
     const lastDropoffLng = lastTrip.dropoffLng || lastTrip.pickupLng;
@@ -955,6 +974,11 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     : [];
 
   if (!hasClockIn && firstWorkEvent) {
+    const firstTrip = normalizedTrips.find((trip) => trip.id === firstWorkEvent.tripId);
+    const persistedTravelMinutes = Number(firstTrip?.homeToPickupTravelMinutes);
+    const hasPersistedHomeRoute = policyMode === POLICY_MODES.PAY_FROM_HOME
+      && Number.isFinite(persistedTravelMinutes)
+      && persistedTravelMinutes >= 0;
     const anchor = calculateAnchor({
       policyMode,
       driver,
@@ -971,18 +995,23 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
       });
     const automaticStart = policyMode === POLICY_MODES.PAY_FROM_HOME && gpsHomeDeparture
       ? gpsHomeDeparture.timestamp
+      : hasPersistedHomeRoute
+        ? new Date(firstWorkMs - persistedTravelMinutes * 60000).toISOString()
       : (anchor.clockInTime ? anchor.clockInTime.toISOString() : firstWorkEvent.timestamp);
+    const persistedHomeLocation = normalizePoint(firstTrip?.homeLocationSnapshot);
     events.push({
       type: 'AUTO_CLOCK_IN',
       timestamp: automaticStart,
-      location: gpsHomeDeparture?.location || anchor.anchorLocation || firstWorkEvent.location || null,
+      location: gpsHomeDeparture?.location || persistedHomeLocation || anchor.anchorLocation || firstWorkEvent.location || null,
       driverId,
       date: dateFilter,
-      anchorType: gpsHomeDeparture ? 'HOME_GPS' : anchor.anchorType,
-      travelMinutes: Math.round(anchor.travelMinutes || 0),
-      reason: gpsHomeDeparture ? 'HOME_DEPARTURE_GEOFENCE' : 'FIRST_WORK_EVENT',
+      anchorType: gpsHomeDeparture ? 'HOME_GPS' : (hasPersistedHomeRoute ? 'HOME_ROUTE' : anchor.anchorType),
+      travelMinutes: Math.round(gpsHomeDeparture ? 0 : (hasPersistedHomeRoute ? persistedTravelMinutes : (anchor.travelMinutes || 0))),
+      reason: gpsHomeDeparture ? 'HOME_DEPARTURE_GEOFENCE' : (hasPersistedHomeRoute ? 'HOME_TO_FIRST_PICKUP_ROUTE' : 'FIRST_WORK_EVENT'),
       source: 'authoritative_trip_ledger',
-      confidence: gpsHomeDeparture ? 'gps_verified' : (anchor.anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
+      confidence: gpsHomeDeparture
+        ? 'gps_verified'
+        : (hasPersistedHomeRoute ? (firstTrip?.homeToPickupConfidence || 'route_verified') : (anchor.anchorType === 'HOME' ? 'route_estimate' : 'trip_verified')),
     });
   }
 
@@ -1006,13 +1035,15 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
       events.push({
         type: 'CLOCK_OUT',
         timestamp: automaticEnd,
-        location: gpsHomeArrival?.location || (pending.pendingClockOut?.anchorType === 'HOME' ? homePoint : lastWorkEvent.location),
+        location: gpsHomeArrival?.location || (String(pending.pendingClockOut?.anchorType || '').startsWith('HOME') ? homePoint : lastWorkEvent.location),
         driverId,
         date: dateFilter,
         anchorType: gpsHomeArrival ? 'HOME_GPS' : (pending.pendingClockOut?.anchorType || 'LAST_WORK_EVENT'),
         reason: gpsHomeArrival ? 'HOME_ARRIVAL_GEOFENCE' : 'LAST_WORK_EVENT_COMPLETE',
         source: 'authoritative_trip_ledger',
-        confidence: gpsHomeArrival ? 'gps_verified' : (pending.pendingClockOut?.anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
+        confidence: gpsHomeArrival
+          ? 'gps_verified'
+          : (pending.pendingClockOut?.confidence || (String(pending.pendingClockOut?.anchorType || '').startsWith('HOME') ? 'route_estimate' : 'trip_verified')),
       });
     }
   }

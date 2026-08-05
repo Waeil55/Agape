@@ -257,6 +257,60 @@ describe('payroll time ledger', () => {
     expect(model.billableMinutes).toBe(140);
   });
 
+  it('uses persisted route durations when imported trips have addresses but no coordinates', () => {
+    const model = buildTimeEvents([{
+      id: 'trip-route-boundaries',
+      date: '2026-08-05',
+      status: 'Completed',
+      arrivalTime: '2026-08-05T08:00:00.000Z',
+      arrivalDropoffTime: '2026-08-05T09:00:00.000Z',
+      completedAt: '2026-08-05T09:01:00.000Z',
+      homeToPickupTravelMinutes: 25,
+      homeToPickupConfidence: 'route_verified',
+      dropoffToHomeTravelMinutes: 30,
+      dropoffToHomeConfidence: 'route_verified',
+      estimatedHomeArrivalTime: '2026-08-05T09:30:00.000Z',
+    }], { id: 'driver-1', homeLat: 39.7, homeLng: -86.2 }, [], POLICY_MODES.PAY_FROM_HOME, {
+      date: '2026-08-05',
+      now: '2026-08-06T12:00:00.000Z',
+    });
+
+    const clockIn = model.events.find((item) => item.type === 'AUTO_CLOCK_IN');
+    const clockOut = model.events.find((item) => item.type === 'CLOCK_OUT');
+    expect(clockIn.timestamp).toBe('2026-08-05T07:35:00.000Z');
+    expect(clockIn.anchorType).toBe('HOME_ROUTE');
+    expect(clockOut.timestamp).toBe('2026-08-05T09:30:00.000Z');
+    expect(clockOut.anchorType).toBe('HOME_ROUTE');
+    expect(model.billableMinutes).toBe(115);
+  });
+
+  it('prefers actual home GPS evidence over persisted route estimates', () => {
+    const model = buildTimeEvents([{
+      id: 'trip-gps-override',
+      date: '2026-08-05',
+      status: 'Completed',
+      arrivalTime: '2026-08-05T08:00:00.000Z',
+      arrivalDropoffTime: '2026-08-05T09:00:00.000Z',
+      completedAt: '2026-08-05T09:01:00.000Z',
+      homeToPickupTravelMinutes: 25,
+      dropoffToHomeTravelMinutes: 30,
+    }], { id: 'driver-1', homeLat: 39.7, homeLng: -86.2 }, [], POLICY_MODES.PAY_FROM_HOME, {
+      date: '2026-08-05',
+      now: '2026-08-06T12:00:00.000Z',
+      breadcrumbs: [
+        { capturedAt: '2026-08-05T07:20:00.000Z', lat: 39.7, lng: -86.2, accuracy: 8 },
+        { capturedAt: '2026-08-05T09:42:00.000Z', lat: 39.7001, lng: -86.2001, accuracy: 7 },
+      ],
+    });
+
+    const clockIn = model.events.find((item) => item.type === 'AUTO_CLOCK_IN');
+    const clockOut = model.events.find((item) => item.type === 'CLOCK_OUT');
+    expect(clockIn.timestamp).toBe('2026-08-05T07:20:00.000Z');
+    expect(clockOut.timestamp).toBe('2026-08-05T09:42:00.000Z');
+    expect(clockIn.confidence).toBe('gps_verified');
+    expect(clockOut.confidence).toBe('gps_verified');
+  });
+
   it('rejects stale or inaccurate home GPS samples and labels the fallback as an estimate', () => {
     const model = buildTimeEvents([{
       id: 'trip-1',
