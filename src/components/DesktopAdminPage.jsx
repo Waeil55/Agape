@@ -496,7 +496,7 @@ const exportFullJson = (trips, drivers, dispatchers, vehicles, logs) => {
 const DesktopAdminPage = ({
   role, currentUser, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers,
   addAuditLog, logs = [], trips = [], driverTelemetry = [], timeTrackingDeclarations = [], vehicles = [], setVehicles,
-  assignTripToDriver, requestAuthAction, onViewTrip
+  assignTripToDriver, requestAuthAction, onViewTrip, appSettings = {}, onUpdateAppSettings
 }) => {
   const { unreadCount } = useChat({ alerts: true });
   const [activeSection, setActiveSection] = useState('overview');
@@ -688,8 +688,8 @@ const DesktopAdminPage = ({
   }, [drivers]);
 
   const maintenance = useMemo(
-    () => summarizeFleetMaintenance(vehicles, completedTrips, drivers),
-    [vehicles, completedTrips, drivers]
+    () => summarizeFleetMaintenance(vehicles, completedTrips, drivers, appSettings.maintenancePolicy),
+    [vehicles, completedTrips, drivers, appSettings.maintenancePolicy]
   );
 
   const filteredDrivers = useMemo(() => {
@@ -736,7 +736,7 @@ const DesktopAdminPage = ({
             <AdminMetricTile icon={Truck} value={drivers.length} label="Drivers" hint={`${driverStatusCounts.online} online`} tone="brand" />
             <AdminMetricTile icon={RadioTower} value={driverStatusCounts.busy} label="Busy now" hint={`${activeTrips.length} active trips`} tone="warning" />
             <AdminMetricTile icon={CircleDot} value={unassignedTrips.length} label="Unassigned" hint="Need attention" tone={unassignedTrips.length ? 'danger' : 'success'} />
-            <AdminMetricTile icon={Wrench} value={maintenance.overdue + maintenance.dueSoon} label="Service attention" hint={`${maintenance.overdue} overdue`} tone={maintenance.overdue ? 'danger' : maintenance.dueSoon ? 'warning' : 'success'} />
+            <AdminMetricTile icon={Wrench} value={maintenance.attention} label="Service attention" hint={`${maintenance.overdue + maintenance.due} due · ${maintenance.dueSoon} soon`} tone={maintenance.overdue || maintenance.due ? 'danger' : maintenance.attention ? 'warning' : 'success'} />
           </div>
 
           <div className="admin-intelligence-grid">
@@ -822,6 +822,7 @@ const DesktopAdminPage = ({
             trips={trips} onAssignTrip={assignTripToDriver}
             requestAuthAction={requestAuthAction}
             vehicles={vehicles} setVehicles={setVehicles}
+            appSettings={appSettings} onUpdateAppSettings={onUpdateAppSettings}
             createIntent={vehicleCreateIntent}
             onCreateIntentHandled={() => setVehicleCreateIntent(null)}
           />

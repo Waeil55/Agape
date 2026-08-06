@@ -5,10 +5,10 @@ import AIInsightsBanner from './AIInsightsBanner';
 import { aiAnalyzeDriver } from '../config/ai';
 import { geocodeAddress } from '../config/maps';
 import { POLICY_MODES } from '../utils/timeTracking';
-import { getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
+import { getVehicleMaintenanceStatus, normalizeMaintenancePolicy, summarizeFleetMaintenance } from '../utils/fleetMaintenance';
 import { functions, httpsCallable } from '../config/firebase';
 
-const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled }) => {
+const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled, appSettings = {}, onUpdateAppSettings }) => {
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
   const findAssignedDriver = useCallback((v) => {
@@ -39,7 +39,9 @@ const [form, setForm] = useState({
   const [editingScheduleIdx, setEditingScheduleIdx] = useState(null);
   const [vehicleForm, setVehicleForm] = useState(false);
   const [editVehicleId, setEditVehicleId] = useState(null);
-  const [vForm, setVForm] = useState({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '', lastOilChangeOdometer: '', oilChangeIntervalMiles: '5000', lastOilChangeDate: '' });
+  const maintenancePolicy = normalizeMaintenancePolicy(appSettings.maintenancePolicy);
+  const [policyDraft, setPolicyDraft] = useState(maintenancePolicy);
+  const [vForm, setVForm] = useState({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '', lastOilChangeOdometer: '', oilChangeIntervalMiles: String(maintenancePolicy.oilChangeIntervalMiles), oilDueSoonMiles: String(maintenancePolicy.oilDueSoonMiles), lastOilChangeDate: '', lastFilterChangeDate: '', filterChangeIntervalMonths: String(maintenancePolicy.filterChangeIntervalMonths), filterDueSoonDays: String(maintenancePolicy.filterDueSoonDays) });
   const [aiDriverInsights, setAiDriverInsights] = useState({});
   const [aiDriverLoading, setAiDriverLoading] = useState({});
   const [aiDriverModal, setAiDriverModal] = useState(null);
@@ -77,13 +79,15 @@ const [form, setForm] = useState({
     }
   }, [assignVehicleToDriver, drivers, savingAssignment, upsertDriverProfile, vehicles]);
   
-  const resetVForm = () => setVForm({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '', lastOilChangeOdometer: '', oilChangeIntervalMiles: '5000', lastOilChangeDate: '' });
+  useEffect(() => setPolicyDraft(maintenancePolicy), [appSettings.maintenancePolicy]);
+
+  const resetVForm = () => setVForm({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '', lastOilChangeOdometer: '', oilChangeIntervalMiles: String(maintenancePolicy.oilChangeIntervalMiles), oilDueSoonMiles: String(maintenancePolicy.oilDueSoonMiles), lastOilChangeDate: '', lastFilterChangeDate: '', filterChangeIntervalMonths: String(maintenancePolicy.filterChangeIntervalMonths), filterDueSoonDays: String(maintenancePolicy.filterDueSoonDays) });
   
   const openVAdd = () => { setEditVehicleId(null); resetVForm(); setVehicleForm(true); };
   
   const openVEdit = (v) => {
     setEditVehicleId(v.id);
-    setVForm({ name: v.name, make: v.make || '', model: v.model || '', year: v.year || '', color: v.color || '', plate: v.plate || '', vin: v.vin || '', odometer: v.odometer || '', lastOilChangeOdometer: v.lastOilChangeOdometer ?? '', oilChangeIntervalMiles: v.oilChangeIntervalMiles || '5000', lastOilChangeDate: v.lastOilChangeDate || '' });
+    setVForm({ name: v.name, make: v.make || '', model: v.model || '', year: v.year || '', color: v.color || '', plate: v.plate || '', vin: v.vin || '', odometer: v.odometer || '', lastOilChangeOdometer: v.lastOilChangeOdometer ?? '', oilChangeIntervalMiles: v.oilChangeIntervalMiles || String(maintenancePolicy.oilChangeIntervalMiles), oilDueSoonMiles: v.oilDueSoonMiles || String(maintenancePolicy.oilDueSoonMiles), lastOilChangeDate: v.lastOilChangeDate || '', lastFilterChangeDate: v.lastFilterChangeDate || '', filterChangeIntervalMonths: v.filterChangeIntervalMonths || String(maintenancePolicy.filterChangeIntervalMonths), filterDueSoonDays: v.filterDueSoonDays || String(maintenancePolicy.filterDueSoonDays) });
     setVehicleForm(true);
   };
 
@@ -107,8 +111,8 @@ const [form, setForm] = useState({
           || String(driver.vehicle || '').trim().toLowerCase() === String(vehicles.find(vehicle => vehicle.id === editVehicleId)?.name || '').trim().toLowerCase())
         : null;
       const saved = editVehicleId
-        ? await setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm } : v))
-        : await setVehicles(prev => [...prev, { ...vForm, id: `VHC-${Date.now()}`, status: 'Available' }]);
+        ? await setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm, updatedAt: new Date().toISOString() } : v))
+        : await setVehicles(prev => [...prev, { ...vForm, id: `VHC-${Date.now()}`, status: 'Available', createdAt: new Date().toISOString(), inServiceOdometer: Number(vForm.odometer || 0) }]);
       if (saved === false) throw new Error('Firestore did not confirm the vehicle save.');
       if (editVehicleId && previouslyAssignedDriver && assignVehicleToDriver) {
         await assignVehicleToDriver(previouslyAssignedDriver.id, vForm.name.trim());
@@ -155,6 +159,53 @@ const [form, setForm] = useState({
         return disp && d.assignedDispatcher === disp.id;
       })
     : drivers;
+
+  const visibleVehicles = role === 'dispatcher'
+    ? vehicles.filter((vehicle) => filteredDrivers.some((driver) => driver.vehicleId === vehicle.id || String(driver.vehicle || '').trim().toLowerCase() === String(vehicle.name || '').trim().toLowerCase()))
+    : vehicles;
+  const maintenanceSummary = summarizeFleetMaintenance(visibleVehicles, trips, drivers, maintenancePolicy);
+
+  const saveFleetPolicy = async (applyToVehicles = false) => {
+    const normalized = normalizeMaintenancePolicy(policyDraft);
+    const execute = async () => {
+      if (onUpdateAppSettings) await onUpdateAppSettings({ maintenancePolicy: normalized });
+      if (applyToVehicles) {
+        const saved = await setVehicles((items) => items.map((vehicle) => ({
+          ...vehicle,
+          oilChangeIntervalMiles: normalized.oilChangeIntervalMiles,
+          oilDueSoonMiles: normalized.oilDueSoonMiles,
+          filterChangeIntervalMonths: normalized.filterChangeIntervalMonths,
+          filterDueSoonDays: normalized.filterDueSoonDays,
+          updatedAt: new Date().toISOString(),
+        })));
+        if (saved === false) throw new Error('Firestore did not confirm the fleet policy update.');
+      }
+      addAuditLog?.('Maintenance Policy Updated', `${currentUser} updated fleet maintenance defaults${applyToVehicles ? ' and applied them to all vehicles' : ''}.`, 'indigo', { entity: 'fleetMaintenance' });
+      setPolicyDraft(normalized);
+    };
+    if (applyToVehicles && requestAuthAction) return requestAuthAction('Apply maintenance defaults to every vehicle', execute);
+    return execute();
+  };
+
+  const recordMaintenanceService = (vehicle, type) => {
+    const service = getVehicleMaintenanceStatus(vehicle, trips, drivers, maintenancePolicy);
+    const label = type === 'oil' ? 'oil change' : 'annual filter change';
+    const execute = async () => {
+      const timestamp = new Date().toISOString();
+      const record = { id: `MNT-${Date.now()}`, type, servicedAt: timestamp, odometer: service.odometer, recordedAt: timestamp, recordedBy: currentUser };
+      const saved = await setVehicles((items) => items.map((item) => item.id === vehicle.id ? {
+        ...item,
+        odometer: Math.max(Number(item.odometer || 0), service.odometer),
+        ...(type === 'oil' ? { lastOilChangeOdometer: service.odometer, lastOilChangeDate: timestamp.slice(0, 10), nextOilChangeOdometer: null } : { lastFilterChangeDate: timestamp.slice(0, 10) }),
+        maintenanceHistory: [record, ...(item.maintenanceHistory || [])].slice(0, 100),
+        updatedAt: timestamp,
+      } : item));
+      if (saved === false) throw new Error('Firestore did not confirm the maintenance record.');
+      addAuditLog?.('Vehicle Service Recorded', `${currentUser} recorded ${label} for ${vehicle.name} at ${service.odometer.toLocaleString()} miles.`, 'emerald', { entity: 'vehicle', id: vehicle.id, maintenanceType: type, odometer: service.odometer });
+    };
+    if (requestAuthAction) return requestAuthAction(`Record ${label} for ${vehicle.name}`, execute);
+    return execute();
+  };
 
   const analyzeDriver = useCallback(async (driver) => {
     if (aiDriverLoading[driver.id]) return;
@@ -620,14 +671,46 @@ const [form, setForm] = useState({
       )}
 
       {resolvedTab === 'vehicles' && (
-        <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm">
+        <div className="space-y-4">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Fleet maintenance policy</p>
+                <h3 className="mt-1 text-base font-bold text-slate-900">Mileage and annual service controls</h3>
+                <p className="mt-1 text-xs text-slate-500">Completed-trip odometers update automatically. Service resets require password confirmation and create an audit record.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-bold">
+                <span className="rounded-lg bg-rose-50 px-3 py-2 text-rose-700">{maintenanceSummary.overdue + maintenanceSummary.due} due</span>
+                <span className="rounded-lg bg-amber-50 px-3 py-2 text-amber-700">{maintenanceSummary.dueSoon} soon</span>
+                <span className="rounded-lg bg-blue-50 px-3 py-2 text-blue-700">{maintenanceSummary.setupRequired} setup</span>
+                <span className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-700">{maintenanceSummary.healthy} current</span>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['oilChangeIntervalMiles', 'Oil interval (miles)'],
+                ['oilDueSoonMiles', 'Oil warning (miles)'],
+                ['filterChangeIntervalMonths', 'Filter interval (months)'],
+                ['filterDueSoonDays', 'Filter warning (days)'],
+              ].map(([field, label]) => (
+                <label key={field} className="text-xs font-semibold text-slate-600">{label}
+                  <input type="number" min="1" value={policyDraft[field]} onChange={(event) => setPolicyDraft((current) => ({ ...current, [field]: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                </label>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={() => saveFleetPolicy(false)} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">Save fleet defaults</button>
+              <button onClick={() => saveFleetPolicy(true)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Apply defaults to every vehicle</button>
+            </div>
+          </section>
+          <div className="bg-white border border-slate-100/50 rounded-xl overflow-hidden shadow-sm">
           <div className="space-y-3 p-3 sm:hidden">
-            {vehicles.length === 0 ? (
+            {visibleVehicles.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">No vehicles yet. Click "Add Vehicle" to create one.</div>
             ) : (
-              vehicles.map((v) => {
+              visibleVehicles.map((v) => {
                 const assignedDriver = findAssignedDriver(v);
-                const service = getVehicleMaintenanceStatus(v, trips, drivers);
+                const service = getVehicleMaintenanceStatus(v, trips, drivers, maintenancePolicy);
                 return (
                   <div key={v.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
@@ -649,8 +732,11 @@ const [form, setForm] = useState({
                         <p className="mt-1 font-semibold text-slate-700">{service.odometer.toLocaleString()} mi</p>
                       </div>
                     </div>
-                    <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-semibold ${service.status === 'overdue' ? 'border-rose-200 bg-rose-50 text-rose-700' : service.status === 'due_soon' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                      Oil service {service.status === 'overdue' ? `${Math.abs(service.milesRemaining).toLocaleString()} mi overdue` : `in ${service.milesRemaining.toLocaleString()} mi`} · due {service.nextService.toLocaleString()} mi
+                    <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-semibold ${['overdue', 'due'].includes(service.oil.status) ? 'border-rose-200 bg-rose-50 text-rose-700' : service.oil.status === 'due_soon' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                      Oil: {service.oil.status.replace('_', ' ')} · {service.oil.milesRemaining.toLocaleString()} mi · due {service.oil.nextServiceOdometer.toLocaleString()} mi
+                    </div>
+                    <div className={`mt-2 rounded-xl border px-3 py-2 text-xs font-semibold ${['overdue', 'due'].includes(service.filter.status) ? 'border-rose-200 bg-rose-50 text-rose-700' : ['due_soon', 'setup_required'].includes(service.filter.status) ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                      Filter: {service.filter.status === 'setup_required' ? 'service baseline required' : `${service.filter.status.replace('_', ' ')} · due ${service.filter.nextServiceDate}`}
                     </div>
                     <select value={assignedDriver?.id || ''} onChange={async (e) => {
                       const driverId = e.target.value;
@@ -667,6 +753,8 @@ const [form, setForm] = useState({
                       ))}
                     </select>
                     <div className="mt-3 flex gap-2">
+                      <button onClick={() => recordMaintenanceService(v, 'oil')} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">Reset oil cycle</button>
+                      <button onClick={() => recordMaintenanceService(v, 'filter')} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">Reset filter cycle</button>
                       <button onClick={() => openVEdit(v)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" title="Edit" aria-label="Edit"><Edit2 size={14} /></button>
                       {(role === 'admin' || role === 'dispatcher') && (
                         <button onClick={() => deleteVehicle(v)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" title="Delete" aria-label="Delete"><Trash2 size={14} /></button>
@@ -691,19 +779,19 @@ const [form, setForm] = useState({
                 </tr>
               </thead>
               <tbody>
-                {vehicles.length === 0 ? (
+                {visibleVehicles.length === 0 ? (
                   <tr><td colSpan="7" className="px-3 sm:px-6 py-8 sm:py-12 text-center text-slate-500 text-xs">No vehicles yet. Click "Add Vehicle" to create one.</td></tr>
                 ) : (
-                  vehicles.map((v) => {
+                  visibleVehicles.map((v) => {
                     const assignedDriver = findAssignedDriver(v);
-                    const service = getVehicleMaintenanceStatus(v, trips, drivers);
+                    const service = getVehicleMaintenanceStatus(v, trips, drivers, maintenancePolicy);
                     return (
                       <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs font-semibold text-slate-900">{v.name}</td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{v.make || '-'} {v.model || ''}</td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden md:table-cell">{v.year || '-'} / {v.color || '-'}</td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden lg:table-cell font-mono">{v.plate || '-'} / {v.vin ? v.vin.slice(-6) : '-'}</td>
-                        <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs hidden lg:table-cell"><p className="font-semibold text-slate-700">{service.odometer.toLocaleString()} mi</p><p className={service.status === 'overdue' ? 'text-rose-600' : service.status === 'due_soon' ? 'text-amber-600' : 'text-emerald-600'}>{service.status === 'overdue' ? `${Math.abs(service.milesRemaining).toLocaleString()} overdue` : `${service.milesRemaining.toLocaleString()} to service`}</p></td>
+                        <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs hidden lg:table-cell"><p className="font-semibold text-slate-700">{service.odometer.toLocaleString()} mi</p><p className={['overdue', 'due'].includes(service.oil.status) ? 'text-rose-600' : service.oil.status === 'due_soon' ? 'text-amber-600' : 'text-emerald-600'}>Oil: {service.oil.status.replace('_', ' ')}</p><p className={['overdue', 'due'].includes(service.filter.status) ? 'text-rose-600' : ['due_soon', 'setup_required'].includes(service.filter.status) ? 'text-amber-600' : 'text-emerald-600'}>Filter: {service.filter.status.replace('_', ' ')}</p></td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600">
                           <select value={assignedDriver?.id || ''} onChange={async (e) => {
                             const driverId = e.target.value;
@@ -722,6 +810,8 @@ const [form, setForm] = useState({
                         </td>
                         <td className="px-3 sm:px-6 py-1.5">
                           <div className="flex gap-1">
+                            <button onClick={() => recordMaintenanceService(v, 'oil')} className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100" title="Password-confirmed oil service reset">Oil done</button>
+                            <button onClick={() => recordMaintenanceService(v, 'filter')} className="rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100" title="Password-confirmed filter service reset">Filter done</button>
                             <button onClick={() => openVEdit(v)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit" aria-label="Edit"><Edit2 size={14} /></button>
                             {(role === 'admin' || role === 'dispatcher') && (
                               <button onClick={() => deleteVehicle(v)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete" aria-label="Delete"><Trash2 size={14} /></button>
@@ -735,6 +825,7 @@ const [form, setForm] = useState({
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 
@@ -1129,11 +1220,27 @@ const [form, setForm] = useState({
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Oil Change Interval (mi)</label>
-                    <input type="number" min="500" step="100" value={vForm.oilChangeIntervalMiles} onChange={(e) => setVForm({ ...vForm, oilChangeIntervalMiles: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="5000" />
+                    <input type="number" min="500" step="100" value={vForm.oilChangeIntervalMiles} onChange={(e) => setVForm({ ...vForm, oilChangeIntervalMiles: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="4000" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Oil Due-Soon Warning (mi)</label>
+                    <input type="number" min="50" step="50" value={vForm.oilDueSoonMiles} onChange={(e) => setVForm({ ...vForm, oilDueSoonMiles: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="500" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Last Oil Change Date</label>
                     <input type="date" value={vForm.lastOilChangeDate} onChange={(e) => setVForm({ ...vForm, lastOilChangeDate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Last Filter Change Date</label>
+                    <input type="date" value={vForm.lastFilterChangeDate} onChange={(e) => setVForm({ ...vForm, lastFilterChangeDate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Filter Interval (months)</label>
+                    <input type="number" min="1" value={vForm.filterChangeIntervalMonths} onChange={(e) => setVForm({ ...vForm, filterChangeIntervalMonths: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="12" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Filter Due-Soon Warning (days)</label>
+                    <input type="number" min="1" value={vForm.filterDueSoonDays} onChange={(e) => setVForm({ ...vForm, filterDueSoonDays: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="30" />
                   </div>
                 </div>
               </div>

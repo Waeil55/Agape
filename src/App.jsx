@@ -18,6 +18,7 @@ import { requestNotificationPermission, showLocalNotification, onForegroundMessa
 import { playNotificationSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS } from './utils/nativeActions';
 import { resolveTripVehicle } from './utils/vehiclePersistence';
+import { getVehicleMaintenanceStatus } from './utils/fleetMaintenance';
 import { initPlatform } from './utils/platform';
 import {
   buildTelemetryDocId,
@@ -44,7 +45,7 @@ import { hydrateTripDriverIdentity } from './utils/driverIdentity';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v357';
+const APP_VERSION = 'v358';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -152,6 +153,12 @@ const DEFAULT_APP_SETTINGS = {
   navigationApp: 'google',
   routePlanNavApp: 'google',
   timeTrackingPolicy: 'PAY_FROM_HOME',
+  maintenancePolicy: {
+    oilChangeIntervalMiles: 4000,
+    oilDueSoonMiles: 500,
+    filterChangeIntervalMonths: 12,
+    filterDueSoonDays: 30,
+  },
 };
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
@@ -2239,14 +2246,20 @@ const App = () => {
       'emerald',
       { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
     );
-    // Maintenance check
+    // Maintenance check uses the same authoritative policy as the fleet workspace.
     if (driver) {
       const assignedVehicle = vehicles.find((vehicle) => vehicle.id === driver.vehicleId
         || String(vehicle.name || '').trim().toLowerCase() === String(completedVehicleName || '').trim().toLowerCase());
-      const nextOilChange = Number(assignedVehicle?.nextOilChangeOdometer || assignedVehicle?.nextOilChange || driver.nextOilChange || 50000);
-      const dueIn = nextOilChange - Number(odometer);
-      if (dueIn <= 200) {
-        addAuditLog('Maintenance Alert', `${completedVehicleName || driver.name}'s oil service is due at ${nextOilChange.toLocaleString()} mi (current: ${Number(odometer).toLocaleString()} mi).`, dueIn < 0 ? 'rose' : 'amber', { entity: 'vehicle', id: assignedVehicle?.id || completedVehicleName });
+      if (assignedVehicle) {
+        const service = getVehicleMaintenanceStatus({ ...assignedVehicle, odometer: Math.max(Number(assignedVehicle.odometer || 0), Number(odometer || 0)) }, [], drivers, appSettings.maintenancePolicy);
+        if (service.attention) {
+          const details = [
+            service.oil.status !== 'healthy' ? `oil ${service.oil.status.replace('_', ' ')} (${service.oil.milesRemaining.toLocaleString()} mi remaining)` : '',
+            service.filter.status !== 'healthy' ? `filter ${service.filter.status.replace('_', ' ')}${service.filter.nextServiceDate ? ` (${service.filter.nextServiceDate})` : ''}` : '',
+          ].filter(Boolean).join('; ');
+          addAuditLog('Maintenance Alert', `${assignedVehicle.name}: ${details}.`, ['overdue', 'due'].includes(service.status) ? 'rose' : 'amber', { entity: 'vehicle', id: assignedVehicle.id, maintenanceStatus: service.status });
+          if (notificationsEnabled) showLocalNotification('Vehicle maintenance reminder', `${assignedVehicle.name}: ${details}.`, 'notification');
+        }
       }
     }
     if (notificationsEnabled) {
@@ -3049,6 +3062,7 @@ const App = () => {
             const myTrips = currentUserDriverTrips;
             const myDrivers = myDriver ? [myDriver] : [];
             return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+              vehicles={vehicles}
               driverTelemetry={driverTelemetry}
               timeTrackingDeclarations={timeTrackingDeclarations}
               allDrivers={drivers}

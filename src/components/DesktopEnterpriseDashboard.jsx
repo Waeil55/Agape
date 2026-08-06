@@ -1195,6 +1195,8 @@ const DesktopEnterpriseDashboard = ({
           timeTrackingDeclarations={timeTrackingDeclarations}
           assignTripToDriver={assignTripToDriver}
           requestAuthAction={requestAuthAction}
+          appSettings={appSettings}
+          onUpdateAppSettings={updateAppSettings}
           onViewTrip={(ref) => {
             const trip = trips.find(t => t.id === ref || t.bookingId === ref);
             if (trip) setTripDetails(trip);
@@ -1246,6 +1248,7 @@ const DesktopEnterpriseDashboard = ({
               role="driver"
               drivers={[activeDriverWorkDriver]}
               trips={activeDriverWorkTrips}
+              vehicles={vehicles}
               driverTelemetry={driverTelemetry}
               timeTrackingDeclarations={timeTrackingDeclarations}
               allDrivers={allDrivers}

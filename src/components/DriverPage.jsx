@@ -21,7 +21,7 @@ import {
   Repeat, Zap, X, Route, Plus,
   CheckSquare, Map, BarChart3, Sun, Moon,
   Download, FileText, AlertTriangle, Info,
-  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair
+  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Wrench
 } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { tripMatchesSearch } from '../utils/search';
@@ -46,6 +46,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
+import { getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
@@ -560,7 +561,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemetry = [], timeTrackingDeclarations = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
@@ -585,6 +586,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     },
     [drivers, allDrivers, currentUser]
   );
+  const assignedVehicleRecord = useMemo(() => vehicles.find((vehicle) => (
+    (me?.vehicleId && vehicle.id === me.vehicleId)
+    || String(vehicle.name || '').trim().toLowerCase() === String(me?.vehicle || '').trim().toLowerCase()
+  )), [me?.vehicle, me?.vehicleId, vehicles]);
+  const vehicleMaintenance = useMemo(() => assignedVehicleRecord
+    ? getVehicleMaintenanceStatus(assignedVehicleRecord, trips, allDrivers?.length ? allDrivers : drivers, appSettings.maintenancePolicy)
+    : null, [assignedVehicleRecord, trips, allDrivers, drivers, appSettings.maintenancePolicy]);
+
+  useEffect(() => {
+    if (role !== 'driver' || !vehicleMaintenance?.attention || !assignedVehicleRecord?.id) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const fingerprint = `${assignedVehicleRecord.id}:${vehicleMaintenance.oil.status}:${vehicleMaintenance.filter.status}:${today}`;
+    const storageKey = 'agape-maintenance-reminder';
+    if (localStorage.getItem(storageKey) === fingerprint) return;
+    const oilNeedsAttention = vehicleMaintenance.oil.status !== 'healthy';
+    const message = oilNeedsAttention
+      ? `Oil service is ${vehicleMaintenance.oil.status.replace('_', ' ')} for ${assignedVehicleRecord.name}. ${vehicleMaintenance.oil.milesRemaining.toLocaleString()} miles remaining.`
+      : `Filter service is ${vehicleMaintenance.filter.status.replace('_', ' ')} for ${assignedVehicleRecord.name}.`;
+    showLocalNotification('Vehicle maintenance reminder', message, 'notification');
+    playNotificationSound('warning');
+    localStorage.setItem(storageKey, fingerprint);
+  }, [assignedVehicleRecord, role, vehicleMaintenance]);
   // Time-tracking reconciliation runs early in this component. Resolve the
   // policy beside the authoritative driver profile so every hook sees an
   // initialized value (and production minification cannot expose a TDZ crash).
@@ -3957,6 +3980,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
               </select>
             </div>
           )}
+        </div>
+      )}
+
+      {vehicleMaintenance?.attention && !(activeNav === 'active-trip' && activeWorkTrip) && (
+        <div className={`mx-3 mt-2 flex shrink-0 items-start gap-3 rounded-xl border px-3 py-2.5 ${['overdue', 'due'].includes(vehicleMaintenance.status) ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          <Wrench size={17} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold">{assignedVehicleRecord?.name} maintenance {vehicleMaintenance.status.replace('_', ' ')}</p>
+            <p className="mt-0.5 text-[11px] font-medium">
+              Oil: {vehicleMaintenance.oil.status.replace('_', ' ')} ({vehicleMaintenance.oil.milesRemaining.toLocaleString()} mi) · Filter: {vehicleMaintenance.filter.status.replace('_', ' ')}{vehicleMaintenance.filter.nextServiceDate ? ` (${vehicleMaintenance.filter.nextServiceDate})` : ''}. Contact dispatch before continued operation if service is due.
+            </p>
+          </div>
         </div>
       )}
 

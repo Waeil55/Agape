@@ -1,18 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { deriveVehicleOdometer, getVehicleMaintenanceStatus } from './fleetMaintenance';
+import { DEFAULT_MAINTENANCE_POLICY, deriveVehicleOdometer, getVehicleMaintenanceStatus } from './fleetMaintenance';
 
 describe('fleet maintenance', () => {
   it('uses the highest completed-trip odometer for the assigned vehicle', () => {
-    const vehicle = { id: 'V1', name: 'Van 1', odometer: 1000 };
+    const vehicle = { id: 'V1', name: 'Van 1', odometer: '1,000' };
     const drivers = [{ id: 'D1', vehicleId: 'V1', vehicle: 'Van 1' }];
-    const trips = [{ driverId: 'D1', dropoffOdometer: 1325 }, { vehicleId: 'V1', dropoffOdometer: 1400 }];
+    const trips = [{ driverId: 'D1', dropoffOdometer: 1325 }, { vehicleId: 'V1', dropoffOdometer: '1,400' }];
     expect(deriveVehicleOdometer(vehicle, trips, drivers)).toBe(1400);
   });
 
-  it('marks service overdue from an explicit interval', () => {
-    const result = getVehicleMaintenanceStatus({ name: 'Van 1', odometer: 6100, lastOilChangeOdometer: 1000, oilChangeIntervalMiles: 5000 });
-    expect(result.nextService).toBe(6000);
-    expect(result.status).toBe('overdue');
-    expect(result.milesRemaining).toBe(-100);
+  it('does not attribute an explicitly recorded vehicle to a different current assignment', () => {
+    const vehicle = { id: 'V2', name: 'Van 2', odometer: 2000 };
+    const drivers = [{ id: 'D1', vehicleId: 'V2', vehicle: 'Van 2' }];
+    const trips = [{ driverId: 'D1', vehicleId: 'V1', completedVehicle: 'Van 1', dropoffOdometer: 9000 }];
+    expect(deriveVehicleOdometer(vehicle, trips, drivers)).toBe(2000);
+  });
+
+  it('uses the enterprise 4,000 mile default and marks the exact threshold due', () => {
+    const result = getVehicleMaintenanceStatus({ odometer: 5000, lastOilChangeOdometer: 1000 });
+    expect(result.oil.intervalMiles).toBe(DEFAULT_MAINTENANCE_POLICY.oilChangeIntervalMiles);
+    expect(result.oil.nextServiceOdometer).toBe(5000);
+    expect(result.oil.status).toBe('due');
+  });
+
+  it('warns before oil service is due', () => {
+    const result = getVehicleMaintenanceStatus({ odometer: 4600, lastOilChangeOdometer: 1000, lastFilterChangeDate: '2026-01-01' });
+    expect(result.oil.milesRemaining).toBe(400);
+    expect(result.oil.status).toBe('due_soon');
+  });
+
+  it('tracks annual filter service and due-soon dates independently', () => {
+    const result = getVehicleMaintenanceStatus(
+      { odometer: 1000, lastOilChangeOdometer: 1000, lastFilterChangeDate: '2025-09-01' },
+      [], [], {}, new Date('2026-08-06T12:00:00Z'),
+    );
+    expect(result.filter.nextServiceDate).toBe('2026-09-01');
+    expect(result.filter.status).toBe('due_soon');
+  });
+
+  it('requires a filter baseline instead of inventing a service date', () => {
+    const result = getVehicleMaintenanceStatus({ odometer: 1000, lastOilChangeOdometer: 1000 });
+    expect(result.filter.status).toBe('setup_required');
+    expect(result.attention).toBe(true);
   });
 });

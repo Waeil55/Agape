@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   Activity, BellRing, Briefcase, CheckCircle2, CircleDot, Clock3, KeyRound,
   LayoutDashboard, Loader2, Mail, Phone, RadioTower, Search, ShieldCheck,
-  TrendingUp, Truck, Users,
+  TrendingUp, Truck, Users, Wrench,
 } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
@@ -11,6 +11,7 @@ import {
   AdminShell, AdminCard, AdminCardHead, AdminBadge, AdminButton,
   AdminIconButton, AdminAvatar, AdminSearch, AdminEmpty,
 } from './admin/AdminKit';
+import DriversVehiclesPage from './DriversVehiclesPage';
 
 const ACTIVE_TRIP_STATUSES = new Set([
   'Assigned', 'In Progress', 'In Mission', 'En Route', 'Navigating Pickup',
@@ -210,6 +211,15 @@ const MobileAdminPage = ({
   role,
   requestAuthAction,
   addAuditLog,
+  vehicles = [],
+  setVehicles,
+  upsertDriverProfile,
+  assignVehicleToDriver,
+  onAssignTrip,
+  onUploadForDriver,
+  appSettings = {},
+  onUpdateAppSettings,
+  updateAppSettings,
 }) => {
   const [pwResetMsg, setPwResetMsg] = useState({});
   const [activeTab, setActiveTab] = useState('overview');
@@ -328,6 +338,7 @@ const MobileAdminPage = ({
   const sections = [
     { id: 'overview', title: 'Command', label: 'Home', icon: LayoutDashboard, subtitle: `${openTrips.length} open trips` },
     { id: 'drivers', title: 'Fleet Board', label: 'Drivers', icon: Truck, subtitle: `${drivers.length} drivers`, badge: activeTrips.length || undefined },
+    { id: 'fleet', title: 'Maintenance', label: 'Service', icon: Wrench, subtitle: `${vehicles.length} vehicles` },
     { id: 'people', title: 'People', label: 'People', icon: Users, subtitle: `${allUsers.length} profiles` },
     { id: 'activity', title: 'Activity', label: 'Activity', icon: Activity, subtitle: `${logs.length} events` },
   ];
@@ -412,6 +423,17 @@ const MobileAdminPage = ({
               {filteredDrivers.length === 0 && <AdminEmpty icon={Truck} title="No matching drivers" hint="Try another name, vehicle, or zone" />}
             </div>
           </>
+        )}
+
+        {activeTab === 'fleet' && (
+          <DriversVehiclesPage
+            role={role} drivers={drivers} setDrivers={setDrivers}
+            upsertDriverProfile={upsertDriverProfile} assignVehicleToDriver={assignVehicleToDriver}
+            dispatchers={dispatchers} addAuditLog={addAuditLog} currentUser={currentUser}
+            trips={trips} onAssignTrip={onAssignTrip} onUploadForDriver={onUploadForDriver}
+            requestAuthAction={requestAuthAction} vehicles={vehicles} setVehicles={setVehicles}
+            appSettings={appSettings} onUpdateAppSettings={onUpdateAppSettings || updateAppSettings} mode="vehicles"
+          />
         )}
 
         {activeTab === 'people' && (
