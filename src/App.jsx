@@ -45,7 +45,7 @@ import { hydrateTripDriverIdentity } from './utils/driverIdentity';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v358';
+const APP_VERSION = 'v359';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -2258,7 +2258,7 @@ const App = () => {
             service.filter.status !== 'healthy' ? `filter ${service.filter.status.replace('_', ' ')}${service.filter.nextServiceDate ? ` (${service.filter.nextServiceDate})` : ''}` : '',
           ].filter(Boolean).join('; ');
           addAuditLog('Maintenance Alert', `${assignedVehicle.name}: ${details}.`, ['overdue', 'due'].includes(service.status) ? 'rose' : 'amber', { entity: 'vehicle', id: assignedVehicle.id, maintenanceStatus: service.status });
-          if (notificationsEnabled) showLocalNotification('Vehicle maintenance reminder', `${assignedVehicle.name}: ${details}.`, 'notification');
+          if (notificationsEnabled && role !== 'driver') showLocalNotification('Vehicle maintenance reminder', `${assignedVehicle.name}: ${details}.`, 'notification');
         }
       }
     }
@@ -3063,6 +3063,7 @@ const App = () => {
             const myDrivers = myDriver ? [myDriver] : [];
             return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
               vehicles={vehicles}
+              setVehicles={setVehicles}
               driverTelemetry={driverTelemetry}
               timeTrackingDeclarations={timeTrackingDeclarations}
               allDrivers={drivers}

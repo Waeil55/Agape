@@ -1249,6 +1249,7 @@ const DesktopEnterpriseDashboard = ({
               drivers={[activeDriverWorkDriver]}
               trips={activeDriverWorkTrips}
               vehicles={vehicles}
+              setVehicles={setVehicles}
               driverTelemetry={driverTelemetry}
               timeTrackingDeclarations={timeTrackingDeclarations}
               allDrivers={allDrivers}
