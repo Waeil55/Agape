@@ -91,9 +91,9 @@ const formatTimeInput = (v) => {
 
 const getCompletionPickupBoundary = (trip) => latestWorkflowTimestamp(
   trip?.arrivalTime,
-  trip?.startTime,
   trip?.pickupArrival,
   trip?.pickupArrivalTime,
+  trip?.arrivedPickupAt,
 );
 
 const calculateBoundaryTravel = async (origin, destination) => {
@@ -1020,9 +1020,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
 
     const todayTrips = driverScopedTrips.filter((trip) => isTripDateToday(trip.date));
-    const workTrips = todayTrips.filter((trip) => (
-      trip.arrivalTime || trip.startTime || trip.startedAt || trip.arrivalDropoffTime || trip.completedAt
-    ));
+    const pickupBoundaryTrips = todayTrips.filter((trip) => getCompletionPickupBoundary(trip));
+    const workTrips = pickupBoundaryTrips.length > 0
+      ? pickupBoundaryTrips
+      : todayTrips.filter((trip) => trip.startTime || trip.startedAt || trip.arrivalDropoffTime || trip.completedAt);
     if (workTrips.length === 0) return;
     const timestampMs = (trip, fields) => fields.reduce((found, field) => {
       if (Number.isFinite(found)) return found;
@@ -1030,15 +1031,17 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
       return Number.isFinite(value) ? value : found;
     }, NaN);
     const firstTrip = [...workTrips].sort((a, b) => (
-      timestampMs(a, ['arrivalTime', 'startTime', 'startedAt'])
-      - timestampMs(b, ['arrivalTime', 'startTime', 'startedAt'])
+      timestampMs(a, ['arrivalTime', 'pickupArrival', 'pickupArrivalTime', 'arrivedPickupAt', 'startTime', 'startedAt'])
+      - timestampMs(b, ['arrivalTime', 'pickupArrival', 'pickupArrivalTime', 'arrivedPickupAt', 'startTime', 'startedAt'])
     ))[0];
     const completedTrips = workTrips.filter((trip) => normalizeWorkflowStatus(trip.status) === 'completed');
     const allTerminal = todayTrips.length > 0 && todayTrips.every(isWorkflowTerminalTrip);
+    const dropoffBoundaryTrips = completedTrips.filter((trip) => trip.arrivalDropoffTime || trip.arrivedDropoffAt);
+    const lastTripCandidates = dropoffBoundaryTrips.length > 0 ? dropoffBoundaryTrips : completedTrips;
     const lastTrip = allTerminal
-      ? [...completedTrips].sort((a, b) => (
-          timestampMs(b, ['arrivalDropoffTime', 'completedAt'])
-          - timestampMs(a, ['arrivalDropoffTime', 'completedAt'])
+      ? [...lastTripCandidates].sort((a, b) => (
+          timestampMs(b, ['arrivalDropoffTime', 'arrivedDropoffAt', 'completedAt'])
+          - timestampMs(a, ['arrivalDropoffTime', 'arrivedDropoffAt', 'completedAt'])
         ))[0]
       : null;
 

@@ -284,6 +284,32 @@ describe('payroll time ledger', () => {
     expect(model.billableMinutes).toBe(115);
   });
 
+  it('anchors route-derived boundaries to pickup and dropoff arrivals instead of workflow button taps', () => {
+    const model = buildTimeEvents([{
+      id: 'trip-button-boundaries',
+      date: '2026-08-05',
+      status: 'Completed',
+      startedAt: '2026-08-05T07:15:00.000Z',
+      arrivalTime: '2026-08-05T08:00:00.000Z',
+      arrivalDropoffTime: '2026-08-05T09:00:00.000Z',
+      completedAt: '2026-08-05T09:45:00.000Z',
+      homeToPickupTravelMinutes: 25,
+      homeToPickupConfidence: 'route_verified',
+      dropoffToHomeTravelMinutes: 30,
+      dropoffToHomeConfidence: 'route_verified',
+    }], { id: 'driver-1', homeLat: 39.7, homeLng: -86.2 }, [], POLICY_MODES.PAY_FROM_HOME, {
+      date: '2026-08-05',
+      now: '2026-08-06T12:00:00.000Z',
+    });
+
+    const clockIn = model.events.find((item) => item.type === 'AUTO_CLOCK_IN');
+    const clockOut = model.events.find((item) => item.type === 'CLOCK_OUT');
+    expect(clockIn.timestamp).toBe('2026-08-05T07:35:00.000Z');
+    expect(clockOut.timestamp).toBe('2026-08-05T09:30:00.000Z');
+    expect(clockIn.reason).toBe('HOME_TO_FIRST_PICKUP_ROUTE');
+    expect(clockOut.reason).toBe('DROPOFF_TO_HOME_ROUTE');
+  });
+
   it('prefers actual home GPS evidence over persisted route estimates', () => {
     const model = buildTimeEvents([{
       id: 'trip-gps-override',
@@ -335,7 +361,7 @@ describe('payroll time ledger', () => {
     const clockIn = model.events.find((item) => item.type === 'AUTO_CLOCK_IN');
     expect(clockIn.anchorType).toBe('HOME');
     expect(clockIn.confidence).toBe('route_estimate');
-    expect(clockIn.reason).toBe('FIRST_WORK_EVENT');
+    expect(clockIn.reason).toBe('FIRST_PICKUP_ARRIVAL');
   });
 
   it('keeps between-trip waiting paid and allows an attributable personal-time correction', () => {

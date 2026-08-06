@@ -881,6 +881,17 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0];
   const lastWorkEvent = [...tripEvents]
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+  // Payroll boundaries are anchored to physical service events. Start/Complete
+  // button taps are workflow metadata and can occur early or late; they must
+  // never replace verified pickup/dropoff arrival times when those exist.
+  const firstPickupArrivalEvent = [...tripEvents]
+    .filter((event) => event.eventType === 'ARRIVED_PICKUP')
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0];
+  const lastDropoffArrivalEvent = [...tripEvents]
+    .filter((event) => event.eventType === 'ARRIVED_DROPOFF')
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+  const firstBoundaryEvent = firstPickupArrivalEvent || firstWorkEvent;
+  const lastBoundaryEvent = lastDropoffArrivalEvent || lastWorkEvent;
 
   const isAdminCorrection = (event) => (
     event?.source === 'admin_correction'
@@ -888,7 +899,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     || Boolean(event?.correctedBy)
     || Boolean(event?.correctionReason)
   );
-  const retainedClockEvents = automaticShift && firstWorkEvent
+  const retainedClockEvents = automaticShift && firstBoundaryEvent
     ? normalizedClockEvents.filter((event) => (
         event.type === 'BREAK_START'
         || event.type === 'BREAK_END'
@@ -973,8 +984,8 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     : [];
 
-  if (!hasClockIn && firstWorkEvent) {
-    const firstTrip = normalizedTrips.find((trip) => trip.id === firstWorkEvent.tripId);
+  if (!hasClockIn && firstBoundaryEvent) {
+    const firstTrip = normalizedTrips.find((trip) => trip.id === firstBoundaryEvent.tripId);
     const persistedTravelMinutes = Number(firstTrip?.homeToPickupTravelMinutes);
     const hasPersistedHomeRoute = policyMode === POLICY_MODES.PAY_FROM_HOME
       && Number.isFinite(persistedTravelMinutes)
@@ -983,10 +994,10 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
       policyMode,
       driver,
       lastWorkLocation: options.lastWorkLocation || null,
-      pickupLocation: firstWorkEvent.location,
-      pickupTime: new Date(firstWorkEvent.timestamp),
+      pickupLocation: firstBoundaryEvent.location,
+      pickupTime: new Date(firstBoundaryEvent.timestamp),
     });
-    const firstWorkMs = new Date(firstWorkEvent.timestamp).getTime();
+    const firstWorkMs = new Date(firstBoundaryEvent.timestamp).getTime();
     const gpsHomeDeparture = [...homeBreadcrumbs]
       .reverse()
       .find((breadcrumb) => {
@@ -997,17 +1008,17 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
       ? gpsHomeDeparture.timestamp
       : hasPersistedHomeRoute
         ? new Date(firstWorkMs - persistedTravelMinutes * 60000).toISOString()
-      : (anchor.clockInTime ? anchor.clockInTime.toISOString() : firstWorkEvent.timestamp);
+      : (anchor.clockInTime ? anchor.clockInTime.toISOString() : firstBoundaryEvent.timestamp);
     const persistedHomeLocation = normalizePoint(firstTrip?.homeLocationSnapshot);
     events.push({
       type: 'AUTO_CLOCK_IN',
       timestamp: automaticStart,
-      location: gpsHomeDeparture?.location || persistedHomeLocation || anchor.anchorLocation || firstWorkEvent.location || null,
+      location: gpsHomeDeparture?.location || persistedHomeLocation || anchor.anchorLocation || firstBoundaryEvent.location || null,
       driverId,
       date: dateFilter,
       anchorType: gpsHomeDeparture ? 'HOME_GPS' : (hasPersistedHomeRoute ? 'HOME_ROUTE' : anchor.anchorType),
       travelMinutes: Math.round(gpsHomeDeparture ? 0 : (hasPersistedHomeRoute ? persistedTravelMinutes : (anchor.travelMinutes || 0))),
-      reason: gpsHomeDeparture ? 'HOME_DEPARTURE_GEOFENCE' : (hasPersistedHomeRoute ? 'HOME_TO_FIRST_PICKUP_ROUTE' : 'FIRST_WORK_EVENT'),
+      reason: gpsHomeDeparture ? 'HOME_DEPARTURE_GEOFENCE' : (hasPersistedHomeRoute ? 'HOME_TO_FIRST_PICKUP_ROUTE' : (firstPickupArrivalEvent ? 'FIRST_PICKUP_ARRIVAL' : 'LEGACY_FIRST_WORK_EVENT')),
       source: 'authoritative_trip_ledger',
       confidence: gpsHomeDeparture
         ? 'gps_verified'
@@ -1015,17 +1026,17 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
     });
   }
 
-  if (automaticShift && firstWorkEvent && lastWorkEvent && !correctedEnd) {
+  if (automaticShift && firstBoundaryEvent && lastBoundaryEvent && !correctedEnd) {
     const terminalStatuses = new Set(['completed', 'complete', 'done', 'no show', 'no-show', 'noshow', 'cancelled', 'canceled']);
     const historicalDate = dateFilter < todayLocal(options.now || new Date());
     const allTripsTerminal = normalizedTrips.every((trip) => terminalStatuses.has(String(trip?.status || '').trim().toLowerCase()));
-    const lastWorkMs = new Date(lastWorkEvent.timestamp).getTime();
+    const lastWorkMs = new Date(lastBoundaryEvent.timestamp).getTime();
     const gpsHomeArrival = homeBreadcrumbs.find((breadcrumb) => new Date(breadcrumb.timestamp).getTime() >= lastWorkMs);
-    const lastTrip = normalizedTrips.find((trip) => trip.id === lastWorkEvent.tripId) || normalizedTrips[normalizedTrips.length - 1];
+    const lastTrip = normalizedTrips.find((trip) => trip.id === lastBoundaryEvent.tripId) || normalizedTrips[normalizedTrips.length - 1];
     const pending = generatePendingClockOut({ lastTrip, driver, policyMode });
     const estimatedEnd = pending.estimatedClockOutTime && !Number.isNaN(pending.estimatedClockOutTime.getTime())
       ? pending.estimatedClockOutTime.toISOString()
-      : lastWorkEvent.timestamp;
+      : lastBoundaryEvent.timestamp;
     const automaticEnd = policyMode === POLICY_MODES.PAY_FROM_HOME && gpsHomeArrival
       ? gpsHomeArrival.timestamp
       : estimatedEnd;
@@ -1035,11 +1046,11 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
       events.push({
         type: 'CLOCK_OUT',
         timestamp: automaticEnd,
-        location: gpsHomeArrival?.location || (String(pending.pendingClockOut?.anchorType || '').startsWith('HOME') ? homePoint : lastWorkEvent.location),
+        location: gpsHomeArrival?.location || (String(pending.pendingClockOut?.anchorType || '').startsWith('HOME') ? homePoint : lastBoundaryEvent.location),
         driverId,
         date: dateFilter,
         anchorType: gpsHomeArrival ? 'HOME_GPS' : (pending.pendingClockOut?.anchorType || 'LAST_WORK_EVENT'),
-        reason: gpsHomeArrival ? 'HOME_ARRIVAL_GEOFENCE' : 'LAST_WORK_EVENT_COMPLETE',
+        reason: gpsHomeArrival ? 'HOME_ARRIVAL_GEOFENCE' : (String(pending.pendingClockOut?.anchorType || '').startsWith('HOME') ? 'DROPOFF_TO_HOME_ROUTE' : (lastDropoffArrivalEvent ? 'LAST_DROPOFF_ARRIVAL' : 'LEGACY_LAST_WORK_EVENT')),
         source: 'authoritative_trip_ledger',
         confidence: gpsHomeArrival
           ? 'gps_verified'
