@@ -584,6 +584,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
     },
     [drivers, allDrivers, currentUser]
   );
+  // Time-tracking reconciliation runs early in this component. Resolve the
+  // policy beside the authoritative driver profile so every hook sees an
+  // initialized value (and production minification cannot expose a TDZ crash).
+  const timeTrackingPolicyMode = me?.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME;
   const normalizedCurrentUserEmail = useMemo(
     () => (currentUser || me?.email || '').trim().toLowerCase(),
     [currentUser, me?.email]
@@ -1519,7 +1523,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
 
   const isClockedIn = me?.clockedIn || false;
   const TT = TIME_TRACKING_STATES;
-  const timeTrackingPolicyMode = me?.timeTrackingPolicy || POLICY_MODES.PAY_FROM_HOME;
   const [ttState, setTtState] = useState(TT.OFF_SHIFT);
   const ttStateRef = useRef(TT.OFF_SHIFT);
   const [ttBillableMin, setTtBillableMin] = useState(0);
