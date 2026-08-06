@@ -602,7 +602,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     const execute = async () => {
       setMaintenanceResetting(type);
       try {
-        await auth.currentUser?.getIdToken(true);
         const recordMaintenance = httpsCallable(functions, 'recordDriverVehicleMaintenance');
         const response = await recordMaintenance({ vehicleId: assignedVehicleRecord.id, type });
         if (!response.data?.success) throw new Error('The server did not confirm the maintenance record.');

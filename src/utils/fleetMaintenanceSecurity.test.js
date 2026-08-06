@@ -23,6 +23,7 @@ describe('driver maintenance security contract', () => {
   it('routes driver settings resets through the callable instead of direct Firestore writes', () => {
     const source = readProjectFile('src/components/DriverPage.jsx');
     expect(source).toContain("httpsCallable(functions, 'recordDriverVehicleMaintenance')");
+    expect(source).not.toContain('getIdToken(true)');
     expect(source).not.toContain('The maintenance reset was not confirmed by Firestore.');
   });
 });
