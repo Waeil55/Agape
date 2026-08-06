@@ -189,6 +189,137 @@ async function requireAdmin(context) {
   return requireRole(context, ["admin"]);
 }
 
+function requireRecentAuthentication(context, maxAgeSeconds = 300) {
+  const authenticatedAt = Number(context.auth?.token?.auth_time || 0);
+  const ageSeconds = Math.floor(Date.now() / 1000) - authenticatedAt;
+  if (!authenticatedAt || ageSeconds < 0 || ageSeconds > maxAgeSeconds) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Enter your password again before recording vehicle maintenance.",
+    );
+  }
+}
+
+function maintenanceNumber(value) {
+  const number = Number(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+// Drivers cannot write fleetVehicles directly. This narrow command is the only
+// driver-authorized maintenance mutation: it verifies assignment and permits
+// only a completed oil/filter service cycle reset at the server-known odometer.
+exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, context) => {
+  const actor = await requireRole(context, ["driver", "dispatcher", "admin"]);
+  requireRecentAuthentication(context);
+
+  const vehicleId = String(data?.vehicleId || "").trim();
+  const maintenanceType = String(data?.type || "").trim().toLowerCase();
+  if (!vehicleId || !["oil", "filter"].includes(maintenanceType)) {
+    throw new functions.https.HttpsError("invalid-argument", "A valid vehicle and service type are required.");
+  }
+
+  const db = admin.firestore();
+  const vehicleRef = db.doc(`fleetVehicles/${vehicleId}`);
+  const auditRef = db.collection("audit_logs").doc();
+  const now = admin.firestore.Timestamp.now();
+  const nowIso = now.toDate().toISOString();
+  const actorEmail = String(context.auth.token.email || actor.email || "").trim().toLowerCase();
+
+  const result = await db.runTransaction(async (transaction) => {
+    const vehicleSnapshot = await transaction.get(vehicleRef);
+    if (!vehicleSnapshot.exists) {
+      throw new functions.https.HttpsError("not-found", "The assigned vehicle no longer exists.");
+    }
+    const vehicle = vehicleSnapshot.data() || {};
+    const actorTenant = actor.tenantId || "agape-care";
+    const vehicleTenant = vehicle.tenantId || actorTenant;
+    if (vehicleTenant !== actorTenant) {
+      throw new functions.https.HttpsError("permission-denied", "This vehicle belongs to another organization.");
+    }
+
+    let driverProfile = null;
+    if (actor.role === "driver") {
+      const profileIds = [actor.profileId, context.auth.uid].filter(Boolean);
+      for (const profileId of profileIds) {
+        const profileSnapshot = await transaction.get(db.doc(`driverProfiles/${profileId}`));
+        if (profileSnapshot.exists) {
+          driverProfile = { id: profileSnapshot.id, ...profileSnapshot.data() };
+          break;
+        }
+      }
+      if (!driverProfile && actorEmail) {
+        const profileQuery = db.collection("driverProfiles").where("email", "==", actorEmail).limit(1);
+        const profileResults = await transaction.get(profileQuery);
+        if (!profileResults.empty) driverProfile = { id: profileResults.docs[0].id, ...profileResults.docs[0].data() };
+      }
+
+      const assignedIds = new Set([
+        driverProfile?.id,
+        driverProfile?.vehicleId,
+        vehicle.driverId,
+        vehicle.assignedDriver,
+      ].filter(Boolean).map(String));
+      const vehicleName = String(vehicle.name || "").trim().toLowerCase();
+      const profileVehicleName = String(driverProfile?.vehicle || "").trim().toLowerCase();
+      const assignmentMatches = Boolean(driverProfile) && (
+        String(driverProfile.vehicleId || "") === vehicleId
+        || (vehicleName && profileVehicleName === vehicleName)
+        || assignedIds.has(String(driverProfile.id)) && [vehicle.driverId, vehicle.assignedDriver].map(String).includes(String(driverProfile.id))
+      );
+      if (!assignmentMatches) {
+        throw new functions.https.HttpsError("permission-denied", "Only the driver currently assigned to this vehicle can record its service.");
+      }
+    }
+
+    const odometer = maintenanceNumber(vehicle.odometer);
+    if (odometer === null || odometer > 10000000) {
+      throw new functions.https.HttpsError("failed-precondition", "The vehicle odometer is unavailable or invalid.");
+    }
+
+    const maintenanceRecord = {
+      id: auditRef.id,
+      type: maintenanceType,
+      servicedAt: nowIso,
+      odometer,
+      recordedAt: nowIso,
+      recordedBy: actorEmail || context.auth.uid,
+      recordedByUid: context.auth.uid,
+      source: actor.role === "driver" ? "driver-settings" : "fleet-console",
+    };
+    const history = [maintenanceRecord, ...(Array.isArray(vehicle.maintenanceHistory) ? vehicle.maintenanceHistory : [])].slice(0, 100);
+    const vehicleUpdate = {
+      maintenanceHistory: history,
+      updatedAt: nowIso,
+      updatedAtServer: now,
+    };
+    if (maintenanceType === "oil") {
+      vehicleUpdate.lastOilChangeOdometer = odometer;
+      vehicleUpdate.lastOilChangeDate = nowIso.slice(0, 10);
+      vehicleUpdate.nextOilChangeOdometer = admin.firestore.FieldValue.delete();
+    } else {
+      vehicleUpdate.lastFilterChangeDate = nowIso.slice(0, 10);
+    }
+
+    transaction.update(vehicleRef, vehicleUpdate);
+    transaction.set(auditRef, {
+      action: "vehicle.maintenance_recorded",
+      entityType: "vehicle",
+      entityId: vehicleId,
+      vehicleName: vehicle.name || "",
+      maintenanceType,
+      odometer,
+      actorId: context.auth.uid,
+      actorEmail,
+      actorRole: actor.role,
+      tenantId: actorTenant,
+      createdAt: now,
+    });
+    return { vehicleId, maintenanceType, odometer, servicedAt: nowIso };
+  });
+
+  return { success: true, ...result };
+});
+
 async function requireAdminOrDispatcher(context) {
   return requireRole(context, ["admin", "dispatcher"]);
 }

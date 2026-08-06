@@ -45,7 +45,7 @@ import { hydrateTripDriverIdentity } from './utils/driverIdentity';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v359';
+const APP_VERSION = 'v360';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -2586,8 +2586,12 @@ const App = () => {
       setAuthPassword('');
       setAuthActionPayload(null);
       setReAuthError('');
-    } catch {
-      setReAuthError('Invalid password. Action denied.');
+    } catch (error) {
+      const code = String(error?.code || '').toLowerCase();
+      const isCredentialError = code.includes('wrong-password') || code.includes('invalid-credential') || code.includes('user-mismatch');
+      setReAuthError(isCredentialError
+        ? 'Invalid password. Action denied.'
+        : (error?.message || 'The secured action could not be completed.'));
     }
   };
 

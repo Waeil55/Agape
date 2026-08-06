@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
-import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot } from '../config/firebase';
+import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -597,38 +597,23 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const [maintenanceResetting, setMaintenanceResetting] = useState('');
 
   const resetVehicleMaintenanceCycle = useCallback((type) => {
-    if (!assignedVehicleRecord?.id || !vehicleMaintenance || !setVehicles || maintenanceResetting) return;
+    if (!assignedVehicleRecord?.id || !vehicleMaintenance || maintenanceResetting) return;
     const serviceName = type === 'oil' ? 'oil mileage cycle' : 'filter service cycle';
     const execute = async () => {
       setMaintenanceResetting(type);
       try {
-        const timestamp = new Date().toISOString();
-        const record = {
-          id: `MNT-${Date.now()}`,
-          type,
-          servicedAt: timestamp,
-          odometer: vehicleMaintenance.odometer,
-          recordedAt: timestamp,
-          recordedBy: currentUser,
-          source: 'driver-settings',
-        };
-        const saved = await setVehicles((items) => items.map((vehicle) => vehicle.id === assignedVehicleRecord.id ? {
-          ...vehicle,
-          odometer: Math.max(Number(vehicle.odometer || 0), vehicleMaintenance.odometer),
-          ...(type === 'oil'
-            ? { lastOilChangeOdometer: vehicleMaintenance.odometer, lastOilChangeDate: timestamp.slice(0, 10), nextOilChangeOdometer: null }
-            : { lastFilterChangeDate: timestamp.slice(0, 10) }),
-          maintenanceHistory: [record, ...(vehicle.maintenanceHistory || [])].slice(0, 100),
-          updatedAt: timestamp,
-        } : vehicle));
-        if (saved === false) throw new Error('The maintenance reset was not confirmed by Firestore.');
-        onAddAuditLog?.('Driver Vehicle Service Recorded', `${me?.name || currentUser} reset the ${serviceName} for ${assignedVehicleRecord.name} at ${vehicleMaintenance.odometer.toLocaleString()} miles.`, 'emerald', { entity: 'vehicle', id: assignedVehicleRecord.id, maintenanceType: type, odometer: vehicleMaintenance.odometer, source: 'driver-settings' });
+        await auth.currentUser?.getIdToken(true);
+        const recordMaintenance = httpsCallable(functions, 'recordDriverVehicleMaintenance');
+        const response = await recordMaintenance({ vehicleId: assignedVehicleRecord.id, type });
+        if (!response.data?.success) throw new Error('The server did not confirm the maintenance record.');
+        onAddAuditLog?.('Driver Vehicle Service Recorded', `${me?.name || currentUser} reset the ${serviceName} for ${assignedVehicleRecord.name} at ${Number(response.data.odometer).toLocaleString()} miles.`, 'emerald', { entity: 'vehicle', id: assignedVehicleRecord.id, maintenanceType: type, odometer: response.data.odometer, source: 'driver-settings' });
+        setShowToast({ type: 'success', message: `${type === 'oil' ? 'Oil mileage' : 'Filter'} service cycle saved successfully.` });
       } finally {
         setMaintenanceResetting('');
       }
     };
     if (requestAuthAction) requestAuthAction(`Reset ${serviceName} for ${assignedVehicleRecord.name}`, execute);
-  }, [assignedVehicleRecord, currentUser, maintenanceResetting, me?.name, onAddAuditLog, requestAuthAction, setVehicles, vehicleMaintenance]);
+  }, [assignedVehicleRecord, currentUser, maintenanceResetting, me?.name, onAddAuditLog, requestAuthAction, vehicleMaintenance]);
   // Time-tracking reconciliation runs early in this component. Resolve the
   // policy beside the authoritative driver profile so every hook sees an
   // initialized value (and production minification cannot expose a TDZ crash).
