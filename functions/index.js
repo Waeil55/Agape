@@ -201,14 +201,35 @@ function requireRecentAuthentication(context, maxAgeSeconds = 300) {
 }
 
 function maintenanceNumber(value) {
-  const number = Number(String(value ?? "").replace(/,/g, "").trim());
+  const normalized = String(value ?? "").replace(/,/g, "").trim();
+  if (!normalized) return null;
+  const number = Number(normalized);
   return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+async function resolveMaintenanceDriverProfile(actor, context, actorEmail) {
+  const db = admin.firestore();
+  const profileIds = [...new Set([actor.profileId, context.auth.uid].filter(Boolean).map(String))];
+  for (const profileId of profileIds) {
+    const profileSnapshot = await db.doc(`driverProfiles/${profileId}`).get();
+    if (profileSnapshot.exists) return { id: profileSnapshot.id, ...profileSnapshot.data() };
+  }
+  if (actorEmail) {
+    const directEmailResults = await db.collection("driverProfiles").where("email", "==", actorEmail).limit(1).get();
+    if (!directEmailResults.empty) return { id: directEmailResults.docs[0].id, ...directEmailResults.docs[0].data() };
+    const allProfiles = await db.collection("driverProfiles").limit(500).get();
+    const caseInsensitiveMatch = allProfiles.docs.find((item) => String(item.data()?.email || "").trim().toLowerCase() === actorEmail);
+    if (caseInsensitiveMatch) return { id: caseInsensitiveMatch.id, ...caseInsensitiveMatch.data() };
+  }
+  return null;
 }
 
 // Drivers cannot write fleetVehicles directly. This narrow command is the only
 // driver-authorized maintenance mutation: it verifies assignment and permits
 // only a completed oil/filter service cycle reset at the server-known odometer.
 exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, context) => {
+  const requestId = crypto.randomUUID();
+  try {
   const actor = await requireRole(context, ["driver", "dispatcher", "admin"]);
   requireRecentAuthentication(context);
 
@@ -224,6 +245,12 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
   const now = admin.firestore.Timestamp.now();
   const nowIso = now.toDate().toISOString();
   const actorEmail = String(context.auth.token.email || actor.email || "").trim().toLowerCase();
+  const driverProfile = actor.role === "driver"
+    ? await resolveMaintenanceDriverProfile(actor, context, actorEmail)
+    : null;
+  if (actor.role === "driver" && !driverProfile) {
+    throw new functions.https.HttpsError("failed-precondition", "Your driver profile is not connected to this login. Ask dispatch to reconnect the profile.");
+  }
 
   const result = await db.runTransaction(async (transaction) => {
     const vehicleSnapshot = await transaction.get(vehicleRef);
@@ -237,34 +264,13 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
       throw new functions.https.HttpsError("permission-denied", "This vehicle belongs to another organization.");
     }
 
-    let driverProfile = null;
     if (actor.role === "driver") {
-      const profileIds = [actor.profileId, context.auth.uid].filter(Boolean);
-      for (const profileId of profileIds) {
-        const profileSnapshot = await transaction.get(db.doc(`driverProfiles/${profileId}`));
-        if (profileSnapshot.exists) {
-          driverProfile = { id: profileSnapshot.id, ...profileSnapshot.data() };
-          break;
-        }
-      }
-      if (!driverProfile && actorEmail) {
-        const profileQuery = db.collection("driverProfiles").where("email", "==", actorEmail).limit(1);
-        const profileResults = await transaction.get(profileQuery);
-        if (!profileResults.empty) driverProfile = { id: profileResults.docs[0].id, ...profileResults.docs[0].data() };
-      }
-
-      const assignedIds = new Set([
-        driverProfile?.id,
-        driverProfile?.vehicleId,
-        vehicle.driverId,
-        vehicle.assignedDriver,
-      ].filter(Boolean).map(String));
       const vehicleName = String(vehicle.name || "").trim().toLowerCase();
       const profileVehicleName = String(driverProfile?.vehicle || "").trim().toLowerCase();
-      const assignmentMatches = Boolean(driverProfile) && (
+      const assignmentMatches = (
         String(driverProfile.vehicleId || "") === vehicleId
         || (vehicleName && profileVehicleName === vehicleName)
-        || assignedIds.has(String(driverProfile.id)) && [vehicle.driverId, vehicle.assignedDriver].map(String).includes(String(driverProfile.id))
+        || [vehicle.driverId, vehicle.assignedDriver].filter(Boolean).map(String).includes(String(driverProfile.id))
       );
       if (!assignmentMatches) {
         throw new functions.https.HttpsError("permission-denied", "Only the driver currently assigned to this vehicle can record its service.");
@@ -317,7 +323,24 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
     return { vehicleId, maintenanceType, odometer, servicedAt: nowIso };
   });
 
-  return { success: true, ...result };
+  functions.logger.info("Driver vehicle maintenance recorded.", { requestId, vehicleId, maintenanceType, actorUid: context.auth.uid });
+  return { success: true, requestId, ...result };
+  } catch (error) {
+    functions.logger.error("Driver vehicle maintenance failed.", {
+      requestId,
+      actorUid: context.auth?.uid || null,
+      vehicleId: String(data?.vehicleId || ""),
+      maintenanceType: String(data?.type || ""),
+      code: error?.code || "unknown",
+      message: error?.message || String(error),
+      stack: String(error?.stack || "").slice(0, 4000),
+    });
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError(
+      "internal",
+      `Maintenance could not be saved. No vehicle data was changed. Reference ${requestId}.`,
+    );
+  }
 });
 
 async function requireAdminOrDispatcher(context) {
