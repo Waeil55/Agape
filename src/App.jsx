@@ -31,7 +31,7 @@ import {
 import { buildLocationFraudSignals } from './utils/locationFraud';
 import { buildLocationEvent, emitSystemEvent } from './services/firestoreEventEngine';
 import './utils/clientExport';
-import { registerServiceWorker, setupSWMessageHandler, skipWaiting } from './utils/swManager';
+import { registerServiceWorker, setupSWMessageHandler } from './utils/swManager';
 import { syncQueueProcessor } from './services/syncQueueProcessor';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useRealtimeReliability } from './hooks/useRealtimeReliability';
@@ -45,7 +45,7 @@ import { hydrateTripDriverIdentity } from './utils/driverIdentity';
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v361';
+const APP_VERSION = 'v362';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -83,19 +83,11 @@ async function repairBrowserStatePreservingAuth() {
   }
 }
 
-// Version changes should refresh stale app assets, never wipe Firebase Auth IndexedDB.
+// Record the running version for diagnostics. Service-worker updates are deliberately
+// activated on the next natural launch (or by explicit user action), never by
+// interrupting an active driver/dispatcher workspace with a forced reload.
 try {
-  const storedVersion = localStorage.getItem(APP_VERSION_KEY);
-  if (storedVersion && storedVersion !== APP_VERSION) {
-    localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
-    const reloadKey = `${APP_VERSION_KEY}_reload_${APP_VERSION}`;
-    if (!sessionStorage.getItem(reloadKey)) {
-      sessionStorage.setItem(reloadKey, '1');
-      clearAgapeStaticCaches().finally(() => window.location.reload());
-    }
-  } else {
-    localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
-  }
+  localStorage.setItem(APP_VERSION_KEY, APP_VERSION);
 } catch {
   // Storage can be unavailable in restricted browser modes; let Firebase handle auth state.
 }
@@ -400,7 +392,6 @@ const App = () => {
   const loginAttemptRef = useRef(0);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
-  const loadingStartedAtRef = useRef(0);
   
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -468,8 +459,6 @@ const App = () => {
   useEffect(() => {
     let cleanupSWMessages = () => {};
 
-    const onSWUpdate = () => { skipWaiting(); };
-    window.addEventListener('swUpdateAvailable', onSWUpdate);
     const onControllerChange = () => {
       // Signal controller change locally; main thread registers separate effect below to show non-blocking toast
       window.dispatchEvent(new CustomEvent('agape:sw-updated'));
@@ -490,7 +479,6 @@ const App = () => {
     })();
     return () => {
       cleanupSWMessages();
-      window.removeEventListener('swUpdateAvailable', onSWUpdate);
       window.removeEventListener('swControllerChanged', onControllerChange);
     };
   }, []);
@@ -959,7 +947,6 @@ const App = () => {
     let unsubFcm = null;
     let cancelled = false;
     authBootResolvedRef.current = false;
-    loadingStartedAtRef.current = Date.now();
 
     // Watchdog: if nothing resolves, unblock loading and show recovery.
     const bootWatchdog = setTimeout(() => {
@@ -1037,10 +1024,9 @@ const App = () => {
       });
 
       authBootResolvedRef.current = true;
-      const elapsed = Date.now() - loadingStartedAtRef.current;
-      const delay = Math.max(0, 1000 - elapsed);
-      if (delay > 0) setTimeout(() => setIsLoading(false), delay);
-      else setIsLoading(false);
+      // Never hold an authenticated user behind an artificial splash delay.
+      // Firestore continues hydrating and listening in the mounted workspace.
+      setIsLoading(false);
     };
 
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -3024,7 +3010,7 @@ const App = () => {
             </div>
             <div className="space-y-2">
               <h1 className="text-2xl font-black text-white tracking-tight drop-shadow-md">Agape Care</h1>
-              <p className="text-sm font-medium text-white/70">Preparing your workspace...</p>
+              {showLoadingRecovery && <p className="text-sm font-medium text-white/70">Restoring your secure session...</p>}
             </div>
             <div className="w-48 h-1 bg-white/15 rounded-full overflow-hidden">
               <div className="h-full bg-white/60 rounded-full animate-loadingSlide" />

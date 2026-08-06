@@ -3,7 +3,7 @@
    Firestore onSnapshot listeners own all realtime data delivery.
 */
 
-const CACHE_VERSION = 'agape-v32';
+const CACHE_VERSION = 'agape-v33';
 const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 const CORE_ASSETS = ['/index.html', '/manifest.webmanifest', '/agape.png', '/agape.svg'];
 
@@ -31,7 +31,9 @@ async function cacheOfflineApplication() {
 
 self.addEventListener('install', (event) => {
   event.waitUntil(cacheOfflineApplication());
-  self.skipWaiting();
+  // Do not take control of a workspace that is already open. The fully cached
+  // release activates automatically after all current Agape windows close, or
+  // when the operator explicitly accepts the update prompt.
 });
 
 self.addEventListener('activate', (event) => {

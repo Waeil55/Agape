@@ -8,6 +8,7 @@ const PWAUpdatePrompt = () => {
   useEffect(() => {
     const handler = () => setShowUpdate(true);
     window.onNewVersionAvailable = handler;
+    window.addEventListener('swUpdateAvailable', handler);
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then((reg) => {
@@ -28,6 +29,7 @@ const PWAUpdatePrompt = () => {
 
     return () => {
       window.onNewVersionAvailable = null;
+      window.removeEventListener('swUpdateAvailable', handler);
     };
   }, []);
 

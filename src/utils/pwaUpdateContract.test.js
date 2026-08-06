@@ -16,6 +16,21 @@ describe('PWA update contract', () => {
     expect(vite).toContain("fileName: 'asset-manifest.json'");
   });
 
+  it('never interrupts an active workspace to activate or reload an update', () => {
+    const worker = readFileSync(new URL('../../public/sw.js', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+    const installHandler = worker.match(/self\.addEventListener\('install',[\s\S]*?\n\}\);/)?.[0] || '';
+    expect(installHandler).not.toContain('self.skipWaiting()');
+    expect(app).not.toContain('clearAgapeStaticCaches().finally(() => window.location.reload())');
+    expect(app).not.toContain('1000 - elapsed');
+  });
+
+  it('offers an explicit update without making background refresh noisy', () => {
+    const prompt = readFileSync(new URL('../components/pwa/PWAUpdatePrompt.jsx', import.meta.url), 'utf8');
+    expect(prompt).toContain("window.addEventListener('swUpdateAvailable', handler)");
+    expect(prompt).toContain("reg.waiting.postMessage({ type: 'SKIP_WAITING' })");
+  });
+
   it('marks the agape5 application shell as no-store', () => {
     const firebase = JSON.parse(readFileSync(new URL('../../firebase.json', import.meta.url), 'utf8'));
     const agape5 = firebase.hosting.find((target) => target.target === 'agape5');
