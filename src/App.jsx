@@ -1822,13 +1822,23 @@ const App = () => {
   };
 
   const addTrip = useCallback((newTrip) => {
-    let tripToAdd = { ...newTrip };
+    const createdAt = new Date().toISOString();
+    let tripToAdd = {
+      ...newTrip,
+      id: newTrip?.id || `trip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      bookingId: String(newTrip?.bookingId || '').trim() || `MANUAL-${Date.now()}`,
+      date: tripCalendarDateKey(newTrip?.date) || localCalendarYmd(),
+      status: newTrip?.status || (newTrip?.driverId ? 'Assigned' : 'Unassigned'),
+      createdAt: newTrip?.createdAt || createdAt,
+      createdBy: newTrip?.createdBy || currentUser,
+      createdByRole: newTrip?.createdByRole || role,
+    };
     if (role === 'driver') {
       const driverProfile = currentUserDriverProfile || buildDriverProfileFromEmail(currentUser || '', auth.currentUser?.uid || '');
       if (!driverProfile?.id) {
         addAuditLog('Trip Blocked', `${currentUser} attempted to add a trip before driver profile sync completed.`, 'rose');
         addToast('Trip Not Saved', 'Your driver profile is still syncing. Try again in a moment.', 'danger');
-        return;
+        return false;
       }
       tripToAdd = {
         ...tripToAdd,
@@ -1844,7 +1854,7 @@ const App = () => {
       if (!canControlDriver(selectedDriver)) {
         addAuditLog('Scope Blocked', `${currentUser} attempted to add a trip for an out-of-scope driver.`, 'rose');
         addToast('Trip Blocked', role === 'driver' ? 'Drivers can only create trips for themselves.' : 'Dispatchers can only assign trips to their assigned drivers.', 'danger');
-        return;
+        return false;
       }
     }
 
@@ -1885,6 +1895,7 @@ const App = () => {
     const tripCount = allTrips.length;
     addAuditLog('Trip Added', `${currentUser} added trip for ${tripToAdd.patient} (${tripToAdd.bookingId})${tripCount > 1 ? ` + ${tripCount - 1} recurring` : ''}.`, 'emerald');
     addToast('Trip Added', `${tripToAdd.patient}'s trip has been added successfully${tripCount > 1 ? ` (${tripCount} total)` : ''}.`, 'success');
+    return true;
   }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver, addAuditLog, addToast, setTrips]);
 
   const executeDeleteTrip = (tripId) => {

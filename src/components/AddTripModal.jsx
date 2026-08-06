@@ -145,7 +145,8 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
         reviewed: false,
       };
 
-      await onAddTrip(newTrip);
+      const saved = await Promise.resolve(onAddTrip(newTrip));
+      if (saved === false) throw new Error('The trip was rejected by access or validation rules.');
       onClose();
     } catch (err) {
       setErrors({ submit: err.message || 'Failed to save trip. Please try again.' });

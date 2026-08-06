@@ -50,6 +50,7 @@ import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '.
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
 import { queueSyncOperation } from '../utils/localDB';
+import { buildDriverDailyAnalytics } from '../utils/driverAnalytics';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -804,7 +805,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
   const [routePlanSequencerOrigin, setRoutePlanSequencerOrigin] = useState(null);
   const [sequencerKey, setSequencerKey] = useState(0);
   const [driverPosition, setDriverPosition] = useState(null);
-  const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, timeSaved: 0, totalDriveTime: 0, efficiency: 0 });
+  const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, totalDriveTime: 0, idleMinutes: 0, drivingPercent: 0, idlePercent: 0, efficiency: 0 });
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [etas, setEtas] = useState({});
@@ -1256,25 +1257,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
 
   // Analytics calculation
   useEffect(() => {
-    if (me?.clockedIn) {
-      const completed = driverScopedTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed');
-      const allMine = driverScopedTrips;
-      const totalDist = allMine.reduce((sum, t) => sum + (t.distance || 0), 0);
-      const totalTime = completed.reduce((sum, t) => {
-        if (t.startTime && t.completedAt) {
-          return sum + (new Date(t.completedAt) - new Date(t.startTime)) / 60000;
-        }
-        return sum;
-      }, 0);
-      setAnalytics({
-        tripsCompleted: completed.length,
-        totalDistance: totalDist,
-        timeSaved: completed.length * 5,
-        totalDriveTime: totalTime,
-        efficiency: completed.length > 0 ? Math.round((completed.length / (totalTime || 1)) * 60) : 0,
-      });
-    }
-  }, [driverScopedTrips, me?.clockedIn]);
+    setAnalytics(buildDriverDailyAnalytics(driverScopedTrips, localCalendarYmd()));
+  }, [driverScopedTrips]);
 
   const getTodayStr = () => localCalendarYmd();
 
@@ -5975,11 +5959,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
             {/* Analytics */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3 text-left">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                     <BarChart3 size={18} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm     font-semibold text-slate-900">Today's Analytics</p>
                     <p className="text-slate-500 text-xs font-semibold">{analytics.tripsCompleted} trips completed</p>
                   </div>
@@ -5991,15 +5975,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     {[
                       { label: 'Trips Done', value: analytics.tripsCompleted, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
-                      { label: 'Distance', value: `${analytics.totalDistance} mi`, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { label: 'Distance', value: `${analytics.totalDistance.toLocaleString(undefined, { maximumFractionDigits: 1 })} mi`, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                       { label: 'Drive Time', value: formatDuration(analytics.totalDriveTime), icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
                       { label: 'Efficiency', value: `${analytics.efficiency}/hr`, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
                     ].map(stat => {
                       const Icon = stat.icon;
                       return (
-                        <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
+                        <div key={stat.label} className={`${stat.bg} min-w-0 rounded-xl p-3 text-center`}>
                           <Icon size={16} className={`mx-auto mb-1 ${stat.color}`} />
-                          <p className="text-sm font-semibold text-slate-900">{stat.value}</p>
+                          <p className="truncate text-sm font-semibold tabular-nums text-slate-900" title={String(stat.value)}>{stat.value}</p>
                           <p className="text-micro font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
                         </div>
                       );
@@ -6011,19 +5995,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], driverTelemet
                       <div>
                         <div className="flex justify-between text-xs text-slate-500 mb-0.5">
                           <span>Driving</span>
-                          <span>{analytics.totalDriveTime > 0 ? `${Math.round((analytics.totalDriveTime / (analytics.totalDriveTime || 1)) * 100)}%` : '0%'}</span>
+                          <span>{analytics.drivingPercent}%</span>
                         </div>
                         <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, analytics.totalDriveTime > 0 ? 70 : 0)}%` }} />
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${analytics.drivingPercent}%` }} />
                         </div>
                       </div>
                       <div>
                         <div className="flex justify-between text-xs text-slate-500 mb-0.5">
                           <span>Idle/Waiting</span>
-                          <span>30%</span>
+                          <span>{analytics.idlePercent}%</span>
                         </div>
                         <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-amber-500 rounded-full" style={{ width: '30%' }} />
+                          <div className="h-full bg-amber-500 rounded-full" style={{ width: `${analytics.idlePercent}%` }} />
                         </div>
                       </div>
                     </div>

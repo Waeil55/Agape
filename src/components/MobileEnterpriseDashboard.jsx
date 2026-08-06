@@ -47,7 +47,7 @@ const MobileFallback = () => (
 const MobileEnterpriseDashboard = (props) => {
   const { unreadCount } = useChat({ alerts: true });
   const { trips = [], drivers = [], currentUser, role } = props;
-  const [currentView, setCurrentView] = useState('map');
+  const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null);
   const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [tripDetails, setTripDetails] = useState(null);
@@ -425,6 +425,7 @@ const MobileEnterpriseDashboard = (props) => {
             <ErrorBoundary><Suspense fallback={<MobileFallback />}><TripsPage
               trips={driverWorkTrips}
               role={role}
+              currentUser={currentUser}
               drivers={driverWorkDrivers}
               selectedTasks={selectedTasks}
               toggleTaskSelection={toggleTaskSelection}

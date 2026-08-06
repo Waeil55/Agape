@@ -31,6 +31,7 @@ const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
+const TripsPage = lazy(() => import('./TripsPage'));
 const WellTransSyncPage = lazy(() => import('../features/welltrans-sync/components/WellTransSyncPage'));
 const AgapeCommandCenter = lazy(() => import('./AgapeCommandCenter'));
 
@@ -353,6 +354,11 @@ const DesktopEnterpriseDashboard = ({
       title: 'Dispatch Board',
       description: 'Manage trips, drivers, routes, and live dispatch from one place.',
     },
+    trips: {
+      eyebrow: '',
+      title: 'Trips Workspace',
+      description: 'Create, assign, edit, group, and monitor every trip from one responsive operational manifest.',
+    },
     drive: {
       eyebrow: '',
       title: 'Driver Workstation',
@@ -400,6 +406,7 @@ const DesktopEnterpriseDashboard = ({
   const topNavItems = useMemo(() => {
     const items = [
       { id: 'dispatch', label: 'Dispatch', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
+      { id: 'trips', label: 'Trips', icon: ClipboardList, active: activePanel === 'trips', action: () => setActivePanel('trips') },
       { id: 'schedule', label: 'Tools', icon: Route, active: activePanel === 'routePlanner' || showSequencerModal, action: () => setActivePanel('routePlanner') },
       ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
@@ -420,6 +427,10 @@ const DesktopEnterpriseDashboard = ({
         return [
           { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
           { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
+        ];
+      case 'trips':
+        return [
+          { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
         ];
       case 'liveMap':
         return [
@@ -447,6 +458,7 @@ const DesktopEnterpriseDashboard = ({
   // Command palette commands
   const commands = useMemo(() => [
     { id: 'ops', label: 'Go to Operations', icon: LayoutDashboard, action: () => setActivePanel('operations') },
+    { id: 'trips', label: 'Go to Trips', icon: ClipboardList, action: () => setActivePanel('trips') },
     { id: 'map', label: 'Go to Live Map', icon: MapPin, action: () => setActivePanel('liveMap') },
     { id: 'sequencer', label: 'Open Tools', icon: Route, action: () => setActivePanel('routePlanner') },
     { id: 'routes', label: 'Go to Route Plan', icon: Route, action: () => setActivePanel('routePlanner') },
@@ -1146,6 +1158,27 @@ const DesktopEnterpriseDashboard = ({
           <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
         </Suspense></ErrorBoundary>
       );
+      case 'trips': return (
+        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
+          <TripsPage
+            trips={trips}
+            role={role}
+            currentUser={currentUser}
+            drivers={drivers}
+            selectedTasks={selectedTasks}
+            toggleTaskSelection={(tripId) => setSelectedTasks((current) => (
+              current.includes(tripId) ? current.filter((id) => id !== tripId) : [...current, tripId]
+            ))}
+            onCreateLegMission={createLegMission}
+            onBulkAssignTrips={bulkAssignTrips}
+            onAssignTrip={assignTripToDriver}
+            onUnassignTrip={(tripId) => assignTripToDriver?.(tripId, '')}
+            onAddTrip={addTrip}
+            onUpdateTrip={updateTrip}
+            onDeleteTrip={requestDeleteTrip}
+          />
+        </Suspense></ErrorBoundary>
+      );
 
       case 'archives': return <ErrorBoundary><Suspense fallback={<LazyFallback />}><ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} /></Suspense></ErrorBoundary>;
       case 'admin': return (
@@ -1256,7 +1289,7 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${['reports', 'admin', 'drive', 'chat', 'welltrans'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat', 'welltrans'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${['reports', 'trips', 'admin', 'drive', 'chat', 'welltrans'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat', 'welltrans'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
@@ -1267,6 +1300,8 @@ const DesktopEnterpriseDashboard = ({
               <div className={
                 activePanel === 'drive' || activePanel === 'admin' || activePanel === 'welltrans'
                   ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
+                  : activePanel === 'trips'
+                    ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4 lg:p-5'
                   : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>
                 {renderPanelContent()}

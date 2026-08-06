@@ -48,7 +48,9 @@ const toTimeInput = (value) => {
   return clock ? `${clock[1].padStart(2, '0')}:${clock[2]}` : '';
 };
 
-const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
+const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
+
+const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
   const today = useMemo(() => getTodayStr(), []);
   const [sortBy, setSortBy] = useState('time');
   const [selectedTrip, setSelectedTrip] = useState(null);
@@ -62,7 +64,9 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
   const feedbackTimerRef = React.useRef(null);
 
   React.useEffect(() => () => clearTimeout(feedbackTimerRef.current), []);
-  const [newTrip, setNewTrip] = useState({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
+  const [newTrip, setNewTrip] = useState(() => buildNewTripDraft(today));
+  const [savingCreate, setSavingCreate] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [editTrip, setEditTrip] = useState(null);
   const [manifestDate, setManifestDate] = useState(today);
   const [showAllDates, setShowAllDates] = useState(false);
@@ -239,6 +243,58 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
       setAssignmentFeedback(`Trip was not saved: ${error?.message || 'unknown error'}`);
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleCreate = async (event) => {
+    event.preventDefault();
+    if (savingCreate) return;
+    setCreateError('');
+    if (!onAddTrip) {
+      setCreateError('Trip creation is unavailable in this workspace.');
+      return;
+    }
+    const selectedDriver = drivers.find((driver) => driver.id === newTrip.driverId);
+    const createdAt = new Date().toISOString();
+    const reference = String(newTrip.bookingId || '').trim() || `MANUAL-${Date.now()}`;
+    const record = {
+      ...newTrip,
+      id: `trip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      bookingId: reference,
+      patient: String(newTrip.patient || '').trim(),
+      pickup: String(newTrip.pickup || '').trim(),
+      dropoff: String(newTrip.dropoff || '').trim(),
+      status: selectedDriver ? 'Assigned' : 'Unassigned',
+      driverId: selectedDriver?.id || null,
+      driverName: selectedDriver?.name || null,
+      driverEmail: selectedDriver?.email || null,
+      createdAt,
+      createdBy: currentUser || role || 'operations',
+      createdByRole: role || 'operations',
+      source: 'manual_manifest',
+      pickupOdometer: null,
+      dropoffOdometer: null,
+      arrivalTime: null,
+      arrivalDropoffTime: null,
+      departedPickupTime: null,
+      completedAt: null,
+      reviewed: false,
+    };
+    setSavingCreate(true);
+    try {
+      const saved = await Promise.resolve(onAddTrip(record));
+      if (saved === false) throw new Error('The trip was rejected by access or validation rules.');
+      setNewTrip(buildNewTripDraft(record.date || today));
+      setManifestDate(record.date || today);
+      setShowAllDates(false);
+      setShowCreateForm(false);
+      setAssignmentFeedback(`Trip ${reference} created`);
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => setAssignmentFeedback(''), 3000);
+    } catch (error) {
+      setCreateError(error?.message || 'Trip could not be saved.');
+    } finally {
+      setSavingCreate(false);
     }
   };
 
@@ -603,7 +659,7 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
               <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={20} /></button>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); onAddTrip(newTrip); setShowCreateForm(false); setNewTrip({ patient: '', bookingId: '', date: today, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' }); }} className="space-y-6">
+            <form onSubmit={handleCreate} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
@@ -614,8 +670,12 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   <input type="text" value={newTrip.bookingId} onChange={(e) => setNewTrip({...newTrip, bookingId: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" placeholder="Optional" />
                 </div>
                 <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Service Date</label>
+                  <input type="date" required value={newTrip.date} onChange={(e) => setNewTrip({...newTrip, date: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
+                </div>
+                <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Time</label>
-                  <input type="text" required placeholder="08:00 AM" value={newTrip.time} onChange={(e) => setNewTrip({...newTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <input type="time" required value={newTrip.time} onChange={(e) => setNewTrip({...newTrip, time: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
@@ -661,7 +721,8 @@ const TripsPage = ({ trips, role, drivers, selectedTasks, toggleTaskSelection, o
                   {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle ? `(${d.vehicle})` : ''}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full py-5 bg-emerald-600 text-white rounded-xl font-bold text-base shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition">Create Manifest Entry</button>
+              {createError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{createError}</div>}
+              <button type="submit" disabled={savingCreate} className="w-full py-5 bg-emerald-600 text-white rounded-xl font-bold text-base shadow-xl shadow-emerald-500/20 active:scale-[0.98] transition disabled:cursor-wait disabled:opacity-60">{savingCreate ? 'Saving Trip...' : 'Create Manifest Entry'}</button>
             </form>
           </div>
         </div>
