@@ -186,8 +186,13 @@ const findPairTrip = (trip, byId, byBookingId) => {
 
   const n = getTripBookingNumber(trip);
   if (n === null) return null;
-  const target = String((String(trip.inOutLeg || '').toUpperCase() === 'B') ? n - 1 : n + 1);
-  return byBookingId.get(target) || null;
+  const leg = String(trip.inOutLeg || '').toUpperCase();
+  const target = leg === 'B' ? n - 1 : leg === 'A' ? n + 1 : null;
+  if (target !== null) {
+    const found = byBookingId.get(String(target));
+    if (found) return found;
+  }
+  return byBookingId.get(String(n + 1)) || byBookingId.get(String(n - 1)) || null;
 };
 
 export const stackInOutPairs = (trips = []) => {
@@ -213,7 +218,7 @@ export const stackInOutPairs = (trips = []) => {
     }
 
     const pair = findPairTrip(trip, byId, byBookingId);
-    if (pair && !used.has(pair.id) && isInOutTrip(pair)) {
+    if (pair && !used.has(pair.id)) {
       const tripLeg = String(trip.inOutLeg || '').toUpperCase();
       const pairLeg = String(pair.inOutLeg || '').toUpperCase();
       let first = trip;
