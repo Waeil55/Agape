@@ -5061,18 +5061,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== SCHEDULE / TYPE EDITOR ===== */}
       {scheduleEditorTrip && scheduleEditDraft && (
-        <section className="mx-2 my-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
-          <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6" style={{ zIndex: 120 }}>
+          <div className="w-full sm:max-w-lg bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh]" style={{ zIndex: 10 }}>
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
                 <h3 className="text-base font-semibold text-slate-950">Update Trip Time</h3>
                 <p className="text-xs font-semibold text-slate-500 truncate">{scheduleEditorTrip.patient} #{scheduleEditorTrip.bookingId || scheduleEditorTrip.id}</p>
               </div>
-              <button type="button" onClick={closeScheduleEditor} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer"><X size={17} /></button>
+              <button type="button" onClick={closeScheduleEditor} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer shrink-0"><X size={17} /></button>
             </div>
 
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+              <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'time', label: 'Set Time', hint: 'Exact pickup time' },
                   { id: 'willcall', label: 'Will Call', hint: 'No fixed time' },
@@ -5085,10 +5085,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                       key={mode.id}
                       type="button"
                       onClick={() => updateScheduleDraft('mode', mode.id)}
-                      className={`rounded-xl border px-3 py-3 text-left transition-all cursor-pointer ${active ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                      className={`rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer ${active ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                     >
-                      <p className="text-sm font-semibold uppercase tracking-wide">{mode.label}</p>
-                      <p className="text-xs font-semibold opacity-70 mt-0.5">{mode.hint}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide">{mode.label}</p>
+                      <p className="text-[10px] font-semibold opacity-70 mt-0.5">{mode.hint}</p>
                     </button>
                   );
                 })}
@@ -5101,7 +5101,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                     type="time"
                     value={scheduleEditDraft.time || ''}
                     onChange={(e) => updateScheduleDraft('time', e.target.value)}
-                    className="mt-1 w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 text-base     font-semibold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                    className="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
                   />
                   {scheduleEditDraft.mode === 'inout' && (
                     <p className="mt-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-700">
@@ -5120,14 +5120,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
               {scheduleEditDraft.mode === 'urgent' && (
                 <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Deadline Date</label>
                       <input
                         type="date"
                         value={scheduleEditDraft.deadlineDate || ''}
                         onChange={(e) => updateScheduleDraft('deadlineDate', e.target.value)}
-                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm     font-semibold text-slate-900 outline-none focus:border-rose-400"
+                        className="mt-1 w-full h-10 rounded-xl border border-rose-100 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-rose-400"
                       />
                     </div>
                     <div>
@@ -5136,7 +5136,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                         type="time"
                         value={scheduleEditDraft.deadlineTime || ''}
                         onChange={(e) => updateScheduleDraft('deadlineTime', e.target.value)}
-                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm     font-semibold text-slate-900 outline-none focus:border-rose-400"
+                        className="mt-1 w-full h-10 rounded-xl border border-rose-100 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-rose-400"
                       />
                     </div>
                   </div>
@@ -5149,11 +5149,11 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                         step="0.5"
                         value={scheduleEditDraft.requiredWithinHours || ''}
                         onChange={(e) => updateScheduleDraft('requiredWithinHours', e.target.value)}
-                        className="mt-1 w-full h-11 rounded-xl border border-rose-100 bg-white px-3 text-sm     font-semibold text-slate-900 outline-none focus:border-rose-400"
+                        className="mt-1 w-full h-10 rounded-xl border border-rose-100 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-rose-400"
                         placeholder="3"
                       />
                     </div>
-                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-7 px-4 rounded-xl bg-rose-600 text-white text-xs font-semibold cursor-pointer">Apply</button>
+                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-8 px-4 rounded-xl bg-rose-600 text-white text-xs font-semibold cursor-pointer">Apply</button>
                   </div>
                   {(() => {
                     const deadline = scheduleEditDraft.deadlineDate && scheduleEditDraft.deadlineTime
@@ -5182,12 +5182,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
               </p>
             </div>
 
-            <div className="px-5 pb-5 flex gap-3">
-              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-7 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold cursor-pointer">Cancel</button>
-              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-7 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer">Save</button>
+            <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold cursor-pointer">Cancel</button>
+              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer">Save</button>
             </div>
           </div>
-        </section>
+        </div>
       )}
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
