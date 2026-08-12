@@ -4906,7 +4906,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
                     const getPrimaryAction = () => {
                       const s = normalizeWorkflowStatus(trip.status);
-                      if (s === 'assigned' || s === 'unassigned') return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
+                      if (s === 'assigned' || s === 'unassigned') return { label: 'Start Trip', icon: <Clock size={16} />, gradient: 'bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 shadow-slate-500/25', phase: 'pickup', badge: 'TOMORROW', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
                       if (s === 'in progress' || s === 'in mission' || s === 'en route') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); openTripWorkPage(trip.id); } };
                       if (s === 'navigating pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); openTripWorkPage(trip.id); } };
                       if (s === 'at pickup') return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); openTripWorkPage(trip.id); } };
@@ -5030,6 +5030,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                                     <div className="flex items-center gap-2 mb-2">
                                       <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-8 ${primary.gradient} text-sm md:text-base text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
                                         {primary.icon} {primary.label}
+                                        {primary.badge && <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold uppercase bg-white/20 rounded-md">{primary.badge}</span>}
                                       </button>
                                       {(() => {
                                         const cardStepBackTarget = getTripWorkStepBackTarget(trip);
