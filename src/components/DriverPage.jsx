@@ -19,7 +19,7 @@ import {
   Home, Settings, LogOut,
   ArrowRight, Search,
   Repeat, Zap, X, Route, Plus,
-  CheckSquare, Map, BarChart3, Sun, Moon,
+  CheckSquare, Map, BarChart3, Sun, Moon, Calendar,
   Download, FileText, AlertTriangle, Info,
   Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Wrench
 } from 'lucide-react';
@@ -833,6 +833,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const [routePlanSequencerOrigin, setRoutePlanSequencerOrigin] = useState(null);
   const [sequencerKey, setSequencerKey] = useState(0);
   const [driverPosition, setDriverPosition] = useState(null);
+  const [tomorrowExpanded, setTomorrowExpanded] = useState(false);
   const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, totalDriveTime: 0, idleMinutes: 0, drivingPercent: 0, idlePercent: 0, efficiency: 0 });
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -1450,6 +1451,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     if (urgencyDiff !== 0) return urgencyDiff;
     return timeToMinutes(a.time) - timeToMinutes(b.time);
   })), [activeTrips, guidedMode, guidedSteps, guidedStepIndex, driverScopedTrips, aiSequence, activeSortKeyOverrides]);
+
+  const todayKey = localCalendarYmd();
+  const todayTrips = useMemo(() => orderedTrips.filter(t => tripCalendarDateKey(t.date) === todayKey), [orderedTrips, todayKey]);
+  const tomorrowTrips = useMemo(() => orderedTrips.filter(t => tripCalendarDateKey(t.date) !== todayKey), [orderedTrips, todayKey]);
 
   // Notify urgent trips (once per trip)
   useEffect(() => {
@@ -4294,7 +4299,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                   <Download size={16} /> Export
                 </button>
               )}
-              <span className="text-xs text-white/70 font-medium ml-0.5">{activeTrips.length} trip{activeTrips.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-white/70 font-medium ml-0.5">{todayTrips.length} trip{todayTrips.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
@@ -4676,10 +4681,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
             </div>
           ) : (
             <div className="space-y-1 pb-2">
-              {orderedTrips.map((trip, idx) => {
-                const showWcHeader = isWillCall(trip) && (idx === 0 || !isWillCall(orderedTrips[idx - 1])) && willCallTrips.length > 0;
+              {todayTrips.map((trip, idx) => {
+                const showWcHeader = isWillCall(trip) && (idx === 0 || !isWillCall(todayTrips[idx - 1])) && willCallTrips.length > 0;
                 const tripIsInOut = isInOutTrip(trip);
-                const showInOutHeader = tripIsInOut && (idx === 0 || !isInOutTrip(orderedTrips[idx - 1]));
+                const showInOutHeader = tripIsInOut && (idx === 0 || !isInOutTrip(todayTrips[idx - 1]));
                 const urgentCountdown = getUrgentCountdownText(trip);
                 const isSelected = selectedTrips.includes(trip.id);
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
@@ -4760,7 +4765,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                         tripIsInOut ? 'IN/OUT' : null,
                         tripIsInOut && trip.inOutLeg ? `${trip.inOutLeg} LEG` : null,
                         tripIsInOut ? `STAY ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} MIN` : null,
-                        tripCalendarDateKey(trip.date) !== localCalendarYmd() ? 'Tomorrow' : null,
                         isSequenced ? 'Route Plan' : null,
                       ].filter(Boolean),
                       pickup: { address: trip.pickup, phone: trip.pickupPhone },
@@ -4861,6 +4865,192 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                   </React.Fragment>
               );
               })}
+            </div>
+          )}
+
+          {tomorrowTrips.length > 0 && (
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setTomorrowExpanded(prev => !prev)}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl active:scale-[0.99] cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar size={15} className="text-slate-400" />
+                  <span className="text-sm font-semibold text-slate-700">Tomorrow</span>
+                  <span className="text-xs text-slate-400 font-medium">{tomorrowTrips.length} trip{tomorrowTrips.length !== 1 ? 's' : ''}</span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`text-slate-400 transition-transform duration-200 ${tomorrowExpanded ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {tomorrowExpanded && (
+                <div className="space-y-1 mt-1 pb-2">
+                  {tomorrowTrips.map((trip, idx) => {
+                    const tripIsInOut = isInOutTrip(trip);
+                    const showInOutHeader = tripIsInOut && (idx === 0 || !isInOutTrip(tomorrowTrips[idx - 1]));
+                    const urgentCountdown = getUrgentCountdownText(trip);
+                    const isSelected = selectedTrips.includes(trip.id);
+                    const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
+                    const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
+                    const isTerminal = isWorkflowTerminalTrip(trip);
+                    const isActiveTrip = trip.id === me?.activeTripId;
+
+                    const workflowSteps = getWorkflowSteps(trip);
+                    const currentStepIdx = getCurrentWorkflowStep(trip);
+                    const totalSteps = workflowSteps.length;
+                    const isDropoffPhase = workflowSteps[currentStepIdx]?.phase === 'dropoff';
+                    const activeBarColor = isDropoffPhase ? 'bg-orange-500' : 'bg-blue-500';
+                    const doneBarColor = 'bg-emerald-400';
+
+                    const getPrimaryAction = () => {
+                      const s = normalizeWorkflowStatus(trip.status);
+                      if (s === 'assigned' || s === 'unassigned') return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => { impact('heavy'); advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() }); openTripWorkPage(trip.id); } };
+                      if (s === 'in progress' || s === 'in mission' || s === 'en route') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); openTripWorkPage(trip.id); } };
+                      if (s === 'navigating pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); openTripWorkPage(trip.id); } };
+                      if (s === 'at pickup') return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); openTripWorkPage(trip.id); } };
+                      if (s === 'in transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); openTripWorkPage(trip.id); } };
+                      if (s === 'navigating dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); openTripWorkPage(trip.id); } };
+                      if (s === 'at dropoff' || s === 'arrived') {
+                        if (showCompleteModal && showCompleteModal.id === trip.id) return null;
+                        return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-600/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); openTripWorkPage(trip.id); } };
+                      }
+                      return null;
+                    };
+                    const primary = getPrimaryAction();
+                    const workflowPhase = primary?.phase || 'pickup';
+
+                    return (
+                      <React.Fragment key={trip.id}>
+                        {showInOutHeader && (
+                          <div className="flex items-center gap-2 px-1 py-1.5 mt-1">
+                            <div className="h-px flex-1 bg-blue-200" />
+                            <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">IN / OUT</span>
+                            <div className="h-px flex-1 bg-blue-200" />
+                          </div>
+                        )}
+                        <Suspense fallback={<div className="h-20 bg-slate-100 rounded-xl animate-pulse" />}>
+                          <TaskCard
+                            task={{
+                              id: trip.id,
+                              time: getTripCardTimeLabel(trip),
+                              patient: trip.patient,
+                              patientName: trip.patient,
+                              status: trip.status,
+                              bookingId: trip.bookingId,
+                              notes: trip.notes,
+                              urgentTrip: !!trip.urgentTrip,
+                              urgentDeadlineAt: trip.urgentDeadlineAt,
+                              urgentDeadlineTime: trip.urgentDeadlineTime,
+                              legs: legsCount > 1 ? `${legsCount} LEGS` : '1 LEG',
+                              patientPhone: trip.patientPhone,
+                              patientMobile: trip.patientMobile,
+                              pickupPhone: trip.pickupPhone,
+                              dropoffPhone: trip.dropoffPhone,
+                              guardianPhone: trip.guardianPhone,
+                              escortPhone: trip.escortPhone,
+                              emergencyContact: trip.emergencyContact,
+                              details: {
+                                distance: trip.distance ? `${trip.distance} mi` : null,
+                                passengerType: '',
+                                mobility: trip.wheelchair || trip.mobility,
+                              },
+                              tags: [
+                                trip.urgentTrip ? 'URGENT' : null,
+                                trip.urgentTrip && trip.urgentDeadlineTime ? `DEADLINE ${to12hrFromTimeInput(trip.urgentDeadlineTime)}` : null,
+                                trip.urgentTrip && urgentCountdown ? urgentCountdown.toUpperCase() : null,
+                                tripIsInOut ? 'IN/OUT' : null,
+                                tripIsInOut && trip.inOutLeg ? `${trip.inOutLeg} LEG` : null,
+                                tripIsInOut ? `STAY ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} MIN` : null,
+                                isSequenced ? 'Route Plan' : null,
+                              ].filter(Boolean),
+                              pickup: { address: trip.pickup, phone: trip.pickupPhone },
+                              dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
+                              workflowPhase,
+                              activeTrip: isActiveTrip,
+                            }}
+                            expandedId={null}
+                            onToggle={(id) => openTripWorkPage(id)}
+                            isSelected={isSelected}
+                            onSelect={toggleTripSelect}
+                            actions={{
+                              onNavigatePickup: (t) => openInNavApp(t.pickup?.address || t.pickup, suggestNavApp(t.pickup?.address || t.pickup)),
+                              onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
+                              onCall: (t) => handleSmartCall(t),
+                              onSms: (t) => handleSmartSMS(t),
+                              onContacts: (t) => openContactSelector(t),
+                              onRevert: revertTripStatus,
+                              onShowLegs: handleShowLegs,
+                              onEditTrip: handleStartInlineEdit,
+                              onScheduleEdit: () => openScheduleEditor(trip),
+                              onClearActiveTrip: clearActiveTrip,
+                              onNoShow: handleNoShow,
+                              onCancel: handleCancel,
+                              onReroute: handleReroute,
+                              onTransfer: () => openTransferPrompt('trip', trip),
+                              renderWorkflow: !isTerminal && primary ? () => {
+                                const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
+                                const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
+                                const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
+                                const cardStepBackTarget = getTripWorkStepBackTarget(trip);
+                                const canUndo = !!cardStepBackTarget;
+                                return (
+                                  <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
+                                    <div className="flex items-center gap-0.5 mb-2">
+                                      {workflowSteps.map((step, idx) => (
+                                        <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
+                                      ))}
+                                      {canUndo && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (cardStepBackTarget && window.confirm(`Go back to "${cardStepBackTarget.label}"?`)) {
+                                              impact('medium');
+                                              advanceWorkflow(trip, cardStepBackTarget.status, cardStepBackTarget.fields, { allowRegression: true });
+                                            }
+                                          }}
+                                          className="ml-2 w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer shrink-0"
+                                          title="Undo last step"
+                                          aria-label="Undo last workflow step"
+                                        >
+                                          <RotateCcw size={16} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className={`text-xs font-semibold uppercase tracking-wide ${labelColor}`}>
+                                        {isDropoffPhase ? 'Dropoff Phase' : 'Pickup Phase'}
+                                      </span>
+                                      <span className="text-xs font-medium text-slate-500">
+                                        Step {Math.min(currentStepIdx + 1, totalSteps)} of {totalSteps}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <button type="button" onClick={(e) => { e.stopPropagation(); primary.onClick(); }} className={`flex-[4] h-8 ${primary.gradient} text-sm md:text-base text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm`}>
+                                        {primary.icon} {primary.label}
+                                      </button>
+                                      {(() => {
+                                        const cardStepBackTarget = getTripWorkStepBackTarget(trip);
+                                        return cardStepBackTarget ? (
+                                          <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Go back to "${cardStepBackTarget.label}"?`)) { impact('medium'); advanceWorkflow(trip, cardStepBackTarget.status, cardStepBackTarget.fields, { allowRegression: true }); } }} className="h-8 px-3 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-orange-600 hover:border-orange-300 transition-all cursor-pointer flex items-center gap-1 text-xs font-medium shadow-sm">
+                                            <RotateCcw size={13} /> Back
+                                          </button>
+                                        ) : null;
+                                      })()}
+                                    </div>
+                                  </div>
+                                );
+                              } : null,
+                            }}
+                          />
+                        </Suspense>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
