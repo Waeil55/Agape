@@ -713,7 +713,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
         <div className="flex items-center gap-0 px-3 py-2 min-w-0">
 
           {/* Brand pill */}
-          <div className="flex shrink-0 h-8 items-center gap-1.5 rounded-lg bg-slate-950 px-3 text-[11px] font-black text-white mr-3">
+          <div className="flex shrink-0 h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-[11px] font-black text-white mr-3">
             <Sparkles size={12} className="text-blue-300" />
             <span className="tracking-wider">WELLTRANS</span>
           </div>
@@ -900,7 +900,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             <button key={id} onClick={() => {
               if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
               setTab(id);
-            }} className={`h-7 rounded-md px-2.5 text-[10px] font-semibold transition ${tab === id ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>
+            }} className={`h-7 rounded-md px-2.5 text-[10px] font-semibold transition ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>
               {label}
             </button>
           ))}
@@ -1680,7 +1680,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                       openLocalAgent();
                       window.setTimeout(() => setCredentialRefreshKey(value => value + 1), 2500);
                     }}
-                    className="rounded-lg bg-slate-900 px-3 py-2 text-[10px] font-semibold text-white hover:bg-slate-800"
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-[10px] font-semibold text-white hover:bg-blue-700"
                   >
                     Start local Agent
                   </button>
@@ -2007,7 +2007,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       )}
 
       {showInstallHelp && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div>

@@ -2597,7 +2597,7 @@ const App = () => {
     };
 
     return (
-      <div className="flex-1 bg-[#5a94af] flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
+      <div className="flex-1 bg-blue-600 flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(90,148,175,0.45)),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[length:auto,48px_48px,48px_48px]" />
         
         <div className="w-full max-w-lg bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-6 sm:p-8 relative z-10">
@@ -2976,7 +2976,7 @@ const App = () => {
         </div>
       )}
       {isAuthenticated && enterpriseSessionSecurity.warning && (
-        <div className="bg-slate-950 border-b border-amber-400/40 px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold text-white flex items-center justify-between gap-3 shadow-lg z-[100]">
+        <div className="bg-blue-600 border-b border-amber-400/40 px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold text-white flex items-center justify-between gap-3 shadow-lg z-[100]">
           <span className="flex items-center gap-2 min-w-0">
             <ShieldCheck size={17} className="shrink-0 text-amber-300" />
             <span className="truncate">
@@ -2995,7 +2995,7 @@ const App = () => {
 
       {/* LOADING SCREEN */}
       {isLoading ? (
-        <div className="flex-1 bg-gradient-to-br from-[#3d7a96] via-[#5a94af] to-[#7bb3c9] flex items-center justify-center px-4 font-outfit overflow-hidden relative">
+        <div className="flex-1 bg-blue-600 flex items-center justify-center px-4 font-outfit overflow-hidden relative">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute -top-32 -right-32 w-96 h-96 bg-white/5 rounded-full animate-pulse" />
             <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-white/5 rounded-full animate-pulse" style={{ animationDelay: '1s' }} />

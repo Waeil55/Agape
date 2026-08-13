@@ -308,24 +308,24 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
   return (
     <div className="min-h-0 flex-1 bg-slate-50">
       <div className="max-w-[1600px] mx-auto px-3 sm:px-5 py-5 pb-24">
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 sm:p-7 mb-5 text-white shadow-xl shadow-slate-900/10">
-          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+        <section className="relative overflow-hidden rounded-3xl bg-blue-600 p-5 sm:p-7 mb-5 text-slate-900 shadow-xl shadow-blue-600/10">
+          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl" />
           <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div className="flex items-center gap-4">
             {onBack && (
-              <button onClick={onBack} className="p-2.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition">
+              <button onClick={onBack} className="p-2.5 text-slate-700 hover:text-slate-900 hover:bg-white/10 rounded-xl transition">
                 <X size={20} />
               </button>
             )}
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-950/40"><Timer size={24} /></div>
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-lg shadow-blue-950/40"><Timer size={24} className="text-blue-600" /></div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-300">Workforce Operations</p>
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Time & Payroll Control Center</h1>
-              <p className="mt-1 text-sm text-slate-300">Exact event-ledger calculations, correction controls, and payroll readiness.</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-200">Workforce Operations</p>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">Time & Payroll Control Center</h1>
+              <p className="mt-1 text-sm text-slate-700">Exact event-ledger calculations, correction controls, and payroll readiness.</p>
             </div>
           </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${summaryStats.unresolved ? 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/20' : 'bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-300/20'}`}>
+              <span className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${summaryStats.unresolved ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300/40' : 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300/40'}`}>
                 {summaryStats.unresolved ? <AlertTriangle size={15} /> : <CheckCircle size={15} />}{summaryStats.unresolved ? `${summaryStats.unresolved} need correction` : 'Payroll ledger healthy'}
               </span>
               <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-900 rounded-xl text-sm font-bold hover:bg-blue-50 shadow-sm transition">

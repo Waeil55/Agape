@@ -35,62 +35,67 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
   ];
 
   return (
-    <div className="w-full h-full bg-slate-50 flex flex-col overflow-y-auto overscroll-contain">
+    <div className="flex h-full w-full flex-col overflow-y-auto overscroll-contain bg-slate-50 pb-24 [content-visibility:auto]">
       {/* Header Profile Section */}
-      <div className="px-6 pt-6 pb-6 bg-white border-b border-slate-200">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center text-xl font-black text-blue-600 shadow-sm border border-blue-100">
+      <section className="border-b border-slate-200 bg-white px-4 pb-5 pt-5" aria-label="Signed-in profile">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Workspace profile</p>
+          <div className="mt-3 flex min-w-0 items-center gap-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-lg font-semibold text-blue-700">
             {getInitials(currentUser)}
           </div>
-          <div>
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-wide truncate">{currentUser || 'User'}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <Shield size={12} className="text-blue-600" />
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{role === 'admin' ? 'Administrator' : 'Dispatcher'}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-semibold tracking-tight text-slate-950">{currentUser || 'User'}</h2>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Shield size={14} className="text-blue-600" aria-hidden="true" />
+              <p className="text-xs font-semibold text-slate-600">{role === 'admin' ? 'Administrator access' : 'Dispatcher access'}</p>
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </section>
 
       {/* Menu Links */}
-      <div className="px-3 py-6 space-y-6">
+      <div className="space-y-5 px-3 py-5">
         {SECTIONS.map((section, idx) => {
           const visibleItems = section.items.filter((item) => role === 'admin' || !item.adminOnly);
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={idx} className="space-y-2">
-              <h3 className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{section.title}</h3>
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <section key={idx} className="space-y-2" aria-labelledby={`mobile-menu-section-${idx}`}>
+              <h3 id={`mobile-menu-section-${idx}`} className="px-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{section.title}</h3>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 {visibleItems.map((item, i) => (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => setSubView(item.id)}
-                    className={`w-full flex items-center gap-4 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left ${i !== visibleItems.length - 1 ? 'border-b border-slate-100' : ''}`}
+                    className={`flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 active:bg-slate-100 ${i !== visibleItems.length - 1 ? 'border-b border-slate-100' : ''}`}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.bg}`}>
-                      <item.icon size={18} className={item.color} />
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${item.bg}`}>
+                      <item.icon size={19} className={item.color} aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{item.desc}</p>
+                      <p className="mt-0.5 text-xs font-medium leading-snug text-slate-500">{item.desc}</p>
                     </div>
-                    <ChevronRight size={16} className="text-slate-400 shrink-0" />
+                    <ChevronRight size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
                   </button>
                 ))}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>
 
       {/* Logout */}
-      <div className="px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-4">
+      <div className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-2">
         <button
+          type="button"
           onClick={onLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-white border border-rose-200 text-rose-600 font-bold hover:bg-rose-50 active:scale-95 transition-all shadow-sm"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-bold text-rose-700 shadow-sm transition-colors hover:bg-rose-50"
         >
-          <LogOut size={16} />
+          <LogOut size={17} aria-hidden="true" />
           Sign Out
         </button>
       </div>

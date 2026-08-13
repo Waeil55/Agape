@@ -276,7 +276,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowNewChatModal(true)}
-              className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg shadow-slate-900/15"
+              className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg shadow-blue-600/15"
               title="Start new chat"
             >
               <Plus size={18} strokeWidth={2.5} />
@@ -300,7 +300,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
             ['all', 'All'],
             ['unread', `Unread${unreadCount ? ` ${unreadCount}` : ''}`],
             ['groups', 'Groups'],
-          ].map(([value, label]) => <button key={value} onClick={() => setConversationFilter(value)} className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${conversationFilter === value ? 'bg-slate-950 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>)}
+          ].map(([value, label]) => <button key={value} onClick={() => setConversationFilter(value)} className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${conversationFilter === value ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>)}
           <button onClick={() => setShowNewChatModal(true)} className="ml-auto whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700">Team directory</button>
         </div>
 
@@ -491,12 +491,12 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       )}
 
       {activeChannel && otherContact && showDetails && (
-        <div className="xl:hidden fixed inset-0 z-[320] bg-slate-950/45 backdrop-blur-sm flex items-end" onClick={() => setShowDetails(false)}>
+        <div className="xl:hidden fixed inset-0 z-[320] bg-black/40 backdrop-blur-sm flex items-end" onClick={() => setShowDetails(false)}>
           <div className="w-full rounded-t-[28px] bg-white p-5 pb-[calc(24px+env(safe-area-inset-bottom,0px))] shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
             <div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Contact</p><h3 className="mt-1 text-base font-black text-slate-950">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center"><X size={17} /></button></div>
             <div className="mt-5 flex items-center gap-4 rounded-2xl bg-slate-50 p-4"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="h-16 w-16 rounded-2xl shadow-md" /><div className="min-w-0"><h4 className="text-base font-black text-slate-950 truncate">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Available</span></div></div>
-            <div className="mt-3 grid grid-cols-2 gap-3"><button onClick={() => otherContact.phone && makeCall(otherContact.phone)} disabled={!otherContact.phone} className="h-12 rounded-2xl bg-slate-950 text-white text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40"><Phone size={16} /> Call</button><a href={otherContact.email ? `mailto:${otherContact.email}` : undefined} className={`h-12 rounded-2xl bg-blue-50 text-blue-700 text-xs font-bold flex items-center justify-center gap-2 ${!otherContact.email ? 'opacity-40 pointer-events-none' : ''}`}><Mail size={16} /> Email</a></div>
+            <div className="mt-3 grid grid-cols-2 gap-3"><button onClick={() => otherContact.phone && makeCall(otherContact.phone)} disabled={!otherContact.phone} className="h-12 rounded-2xl bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40"><Phone size={16} /> Call</button><a href={otherContact.email ? `mailto:${otherContact.email}` : undefined} className={`h-12 rounded-2xl bg-blue-50 text-blue-700 text-xs font-bold flex items-center justify-center gap-2 ${!otherContact.email ? 'opacity-40 pointer-events-none' : ''}`}><Mail size={16} /> Email</a></div>
           </div>
         </div>
       )}
@@ -549,7 +549,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
           </div>
         </div>
       )}
-      {forwardingMessage && <div className="fixed inset-0 z-[330] flex items-end justify-center bg-slate-950/55 p-0 sm:items-center sm:p-6" onClick={() => setForwardingMessage(null)}><div className="max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={event => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Forward</p><h3 className="text-base font-black text-slate-950">Choose a conversation</h3></div><button onClick={() => setForwardingMessage(null)} className="h-8 w-8 rounded-full bg-slate-100"><X size={15} className="mx-auto" /></button></div><div className="space-y-2">{channels.filter(channel => channel.id !== activeChannelId).map(channel => { const contact = getOtherParticipant(channel); return <button key={channel.id} onClick={async () => { await forwardMessage(forwardingMessage, channel.id); setForwardingMessage(null); }} className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left hover:border-blue-200 hover:bg-blue-50"><img src={getAvatarUrl(contact)} alt="" className="h-9 w-9 rounded-full" /><span className="text-sm font-bold text-slate-800">{formatDisplayName(contact)}</span></button>; })}</div></div></div>}
+      {forwardingMessage && <div className="fixed inset-0 z-[330] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-6" onClick={() => setForwardingMessage(null)}><div className="max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={event => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Forward</p><h3 className="text-base font-black text-slate-950">Choose a conversation</h3></div><button onClick={() => setForwardingMessage(null)} className="h-8 w-8 rounded-full bg-slate-100"><X size={15} className="mx-auto" /></button></div><div className="space-y-2">{channels.filter(channel => channel.id !== activeChannelId).map(channel => { const contact = getOtherParticipant(channel); return <button key={channel.id} onClick={async () => { await forwardMessage(forwardingMessage, channel.id); setForwardingMessage(null); }} className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left hover:border-blue-200 hover:bg-blue-50"><img src={getAvatarUrl(contact)} alt="" className="h-9 w-9 rounded-full" /><span className="text-sm font-bold text-slate-800">{formatDisplayName(contact)}</span></button>; })}</div></div></div>}
     </div>
   );
 };

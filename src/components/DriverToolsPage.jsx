@@ -751,7 +751,7 @@ const DriverToolsPage = ({
         const nextTrip = nextTripId ? trips.find(t => t.id === nextTripId) : null;
         const pct = Math.round((guidedStepIndex / aiSequence.length) * 100);
         return (
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0 z-10">
+          <div className="bg-blue-600 rounded-xl p-3 shadow-md shadow-indigo-200/40 sticky top-0 z-10">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-xs font-bold text-white">{guidedStepIndex + 1}</span>
@@ -846,7 +846,7 @@ const DriverToolsPage = ({
 
       {/* Smart Route Panel */}
       {aiSequence && aiSequence.length >= 2 && !guidedMode && (
-        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-[1.5px] shadow-lg shadow-indigo-200/50">
+        <div className="bg-blue-600 rounded-xl p-[1.5px] shadow-lg shadow-indigo-200/50">
           <div className="bg-white rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <BrainCircuit size={16} className="text-indigo-600" />
@@ -867,7 +867,7 @@ const DriverToolsPage = ({
             </div>
               <div className="flex gap-2">
               <button onClick={() => { onSetGuidedMode(true); onSetGuidedStepIndex(0); onSetAiSuggestions([]); }}
-                className="flex-1 h-10 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 shadow-sm">
+                className="flex-1 h-10 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 shadow-sm">
                 <Play size={13} /> Start Smart Route
               </button>
               <button

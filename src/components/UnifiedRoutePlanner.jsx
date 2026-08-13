@@ -210,7 +210,7 @@ const UnifiedRoutePlanner = ({
           <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain pb-24 px-3 sm:px-4 pt-3">
             {/* AI Quick Actions */}
             {selectedTrips.length >= 1 && (
-              <div className="mb-3 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-xl p-3 shadow-lg shadow-indigo-200/50">
+              <div className="mb-3 bg-blue-600 rounded-xl p-3 shadow-lg shadow-blue-200/50">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
@@ -238,7 +238,7 @@ const UnifiedRoutePlanner = ({
 
             {/* Smart Route */}
             {aiSequence && aiSequence.length >= 2 && !guidedMode && (
-              <div className="mb-3 rounded-xl overflow-hidden shadow-lg shadow-blue-900/10 bg-gradient-to-br from-blue-600 to-blue-500">
+              <div className="mb-3 rounded-xl overflow-hidden shadow-lg shadow-blue-900/10 bg-blue-600">
                 <div className="p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <BrainCircuit size={14} className="text-white/80" />
@@ -497,7 +497,7 @@ const UnifiedRoutePlanner = ({
         {activeTab === 'build' && (
           <div className="h-full overflow-hidden flex flex-col">
             {selectedTrips.length >= 1 && (
-              <div className="shrink-0 mx-3 mt-2 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-xl p-2.5 shadow-md shadow-indigo-200/40">
+              <div className="shrink-0 mx-3 mt-2 bg-blue-600 rounded-xl p-2.5 shadow-md shadow-blue-200/40">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-extrabold text-white truncate">{selectedTrips.length} selected</span>
                   <div className="flex gap-1 shrink-0">

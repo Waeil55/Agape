@@ -71,7 +71,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
           <h3 className="text-lg font-semibold text-slate-900 mb-1">{results.error ? 'Failed' : 'Messages Sent'}</h3>
           {results.sent !== undefined && <p className="text-sm text-slate-600 mb-4">{results.sent} sent, {results.failed} failed</p>}
           {results.error && <p className="text-sm text-rose-600 mb-4">{results.error}</p>}
-          <button onClick={onClose} className="px-6 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 transition-colors">Done</button>
+          <button onClick={onClose} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl text-sm hover:bg-blue-700 transition-colors">Done</button>
         </div>
       </div>
     );

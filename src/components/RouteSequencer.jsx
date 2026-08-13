@@ -907,25 +907,25 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       </div>
 
       {/* ===== METRICS BAR ===== */}
-      <div className="bg-slate-900 text-white px-3 lg:px-5 py-2 flex items-center gap-3 overflow-x-auto hide-scrollbar flex-shrink-0">
+      <div className="bg-white border border-slate-200 px-3 lg:px-5 py-2 flex items-center gap-3 overflow-x-auto hide-scrollbar flex-shrink-0">
         <div className="flex gap-2 sm:gap-5 min-w-max">
-          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
-            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400" />
+          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
             <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Stops:</span>
             <span className="text-xs sm:text-sm font-semibold">{routeMetrics.stops}</span>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
-            <Route className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
+          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+            <Route className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
             <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Miles:</span>
             <span className="text-xs sm:text-sm font-semibold">{routeMetrics.miles}</span>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
-            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />
+          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
             <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Est:</span>
             <span className="text-xs sm:text-sm font-semibold">{routeMetrics.estTime}</span>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
-            <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-400" />
+          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+            <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-500" />
             <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Pool:</span>
             <span className="text-xs sm:text-sm font-semibold">{availableToday.length}</span>
           </div>
@@ -933,7 +933,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
         <div className="hidden lg:flex items-center gap-1.5">
           <CarFront className="w-3.5 h-3.5 text-slate-500" />
           <span className="text-xs uppercase font-semibold tracking-wider text-slate-500">Capacity:</span>
-          <span className="text-sm font-semibold text-blue-400">{VEHICLE_CAPACITY} seats</span>
+          <span className="text-sm font-semibold text-blue-600">{VEHICLE_CAPACITY} seats</span>
         </div>
       </div>
 
@@ -1368,7 +1368,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== SAVE MODAL ===== */}
       {showSaveModal && (
-        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/20 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
               <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -1567,7 +1567,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== SAVED TEMPLATES MODAL ===== */}
       {showTemplatesModal && (
-        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/20 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh]">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
               <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -1668,7 +1668,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
       {/* ===== ADD TEMP TRIP MODAL ===== */}
       {showAddTempModal && (
-        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/20 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
               <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">

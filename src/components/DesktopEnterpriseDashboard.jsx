@@ -523,7 +523,7 @@ const DesktopEnterpriseDashboard = ({
                 aria-label={item.label}
                 className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
                   item.active
-                    ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                 }`}
                 title={item.label}
@@ -556,7 +556,7 @@ const DesktopEnterpriseDashboard = ({
               title={showRightPanel ? 'Close command panel' : 'Open command panel'}
               className={`p-2 rounded-full transition flex items-center justify-center text-xs font-bold shadow-sm border ${
                 showRightPanel
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 border-slate-200/40 text-slate-600'
               }`}
             >
@@ -587,7 +587,7 @@ const DesktopEnterpriseDashboard = ({
           title={displayLoginId}
           className="flex h-10 min-w-[108px] items-center gap-2 rounded-full border border-slate-200 bg-white px-2 text-left shadow-sm transition hover:bg-slate-50"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold uppercase text-white shadow-sm shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold uppercase text-white shadow-sm shrink-0">
             {(currentUser || 'U')[0]}
           </div>
           <div className="min-w-0 pr-1.5">
@@ -601,7 +601,7 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="bg-blue-600 text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
       </div>

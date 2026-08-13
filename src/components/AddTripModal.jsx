@@ -174,7 +174,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-3xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-blue-600 rounded-t-3xl">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <Plus size={18} className="text-white" />
@@ -486,7 +486,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dis
             type="submit"
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-black text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

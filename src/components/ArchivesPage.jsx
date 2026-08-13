@@ -497,7 +497,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                     <col className="w-[7%]" />
                     <col className="w-20" />
                   </colgroup>
-                  <thead className="sticky top-0 z-10 bg-slate-800 text-white shadow-sm">
+                  <thead className="sticky top-0 z-10 bg-slate-100 text-slate-700 shadow-sm">
                     <tr>
                       <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Date</th>
                       <th className="px-3 py-1.5 text-left font-semibold">Driver</th>
