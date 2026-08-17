@@ -9,6 +9,7 @@ import { normalizeDateValue } from '../utils/normalizeDate';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 import { isCompanyDriverPlaceholder } from '../utils/driverIdentity';
+import { analyzePhoneOwnershipForTrips, isValidPhoneDigits } from '../utils/clientPhoneResolution';
 
 
 const timeToMinutes = (t) => {
@@ -1113,54 +1114,39 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         }
       });
 
-      // Global normalization: ALL trips for the same patient get the same client phone
-      // This catches non-IN/OUT trips too
-      const patientGlobalPhone = {};
-      const patientGlobalHospital = {};
+      // Global Phone Ownership & Identification Engine (37-section specification rules)
+      // Group all trips by patient and resolve phone ownership deterministically
+      const patientAnalysisMap = new Map();
       pairedMapped.forEach(t => {
         const pk = (t.patient || '').trim().toLowerCase();
-        if (!pk) return;
-        const pp = cleanPhone(t.patientPhone);
-        const hp = cleanPhone(t.hospitalPhone);
-        if (pp && isValidPhone(pp) && !patientGlobalPhone[pk]) patientGlobalPhone[pk] = pp;
-        if (hp && isValidPhone(hp) && !patientGlobalHospital[pk]) patientGlobalHospital[pk] = hp;
-      });
-
-      // Cross-check: if a phone is shared by >1 patient, it's a facility phone — remove from patientPhone
-      const phonePatientCount = {};
-      pairedMapped.forEach(t => {
-        const pk = (t.patient || '').trim().toLowerCase();
-        const pp = cleanPhone(t.patientPhone);
-        if (pp && pk) {
-          if (!phonePatientCount[pp]) phonePatientCount[pp] = new Set();
-          phonePatientCount[pp].add(pk);
+        if (pk && !patientAnalysisMap.has(pk)) {
+          const analysis = analyzePhoneOwnershipForTrips(pairedMapped, t.patient);
+          patientAnalysisMap.set(pk, analysis);
         }
       });
 
       pairedMapped.forEach(t => {
         const pk = (t.patient || '').trim().toLowerCase();
-        const pp = cleanPhone(t.patientPhone);
-        const hp = cleanPhone(t.hospitalPhone);
+        const analysis = patientAnalysisMap.get(pk);
 
-        // If patientPhone is shared across multiple patients, it's a facility — replace with best
-        if (pp && phonePatientCount[pp] && phonePatientCount[pp].size > 1) {
-          t.patientPhone = patientGlobalPhone[pk] || '';
-          // If the shared phone is also our hospitalPhone, clear patientPhone entirely
-          if (cleanPhone(t.patientPhone) === hp) t.patientPhone = '';
-        }
-
-        // Ensure same patient always gets same phone
-        if (pk && patientGlobalPhone[pk] && isValidPhone(patientGlobalPhone[pk])) {
-          t.patientPhone = patientGlobalPhone[pk];
-        }
-        if (pk && patientGlobalHospital[pk] && isValidPhone(patientGlobalHospital[pk])) {
-          t.hospitalPhone = patientGlobalHospital[pk];
+        if (analysis) {
+          t.patientPhone = analysis.clientPhone || '';
+          t.clientPhone = analysis.clientPhone || '';
+          t.guardianPhone = analysis.guardianPhone || '';
+          t.parentPhone = analysis.parentPhone || '';
+          t.escortPhone = analysis.escortPhone || '';
+          t.hospitalPhone = (analysis.facilityPhones && analysis.facilityPhones[0]) || t.hospitalPhone || '';
+          t.phoneConfidence = analysis.phoneConfidence || 'UNKNOWN';
+          t.phoneSource = analysis.phoneSource || '';
+          t.phoneNeedsReview = analysis.phoneNeedsReview || false;
+          t.phoneEvidenceMap = analysis.phoneEvidenceMap || {};
         }
 
-        // Safety: patientPhone should never equal hospitalPhone
-        if (cleanPhone(t.patientPhone) && cleanPhone(t.patientPhone) === cleanPhone(t.hospitalPhone)) {
-          t.patientPhone = '';
-        }
+        // Preserve raw source phone fields
+        t.sourcePickupPhone = t._originalRow?.['Phone Pickup'] || t._originalRow?.['pickupPhone'] || t.pickupPhone || '';
+        t.sourceDropoffPhone = t._originalRow?.['Phone Dropoff'] || t._originalRow?.['dropoffPhone'] || t.dropoffPhone || '';
+        t.sourcePickupLocation = t._originalRow?.['Site Name(orig)'] || t.pickupSiteName || t.pickup || '';
+        t.sourceDropoffLocation = t._originalRow?.['Site Name(dest)'] || t.dropoffSiteName || t.dropoff || '';
       });
 
       setMappedTrips(pairedMapped);
