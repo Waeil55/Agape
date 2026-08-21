@@ -1728,6 +1728,30 @@ const App = () => {
     };
   };
 
+  // Publishes a verified odometer reading to the vehicle record so the value
+  // is global for that vehicle across every driver and device. The update is
+  // monotonic (never lowers a reading) and keeps an audit trail of which trip
+  // produced it.
+  const syncVehicleOdometerFromTrip = (tripLike, odometerValue, eventAtIso) => {
+    const reading = Number(String(odometerValue ?? '').replace(/,/g, ''));
+    if (!tripLike || !Number.isFinite(reading) || reading <= 0) return;
+    const readingDriver = driversRef.current.find(driver => driver.id === tripLike.driverId)
+      || driversRef.current.find(driver => normalizeEmail(driver.email) === normalizeEmail(tripLike.driverEmail));
+    const tripVehicleName = resolveTripVehicle(tripLike, readingDriver) || '';
+    if (!tripVehicleName) return;
+    setVehicles(prev => prev.map((vehicle) => {
+      const matches = (readingDriver?.vehicleId && vehicle.id === readingDriver.vehicleId)
+        || String(vehicle.name || '').trim().toLowerCase() === String(tripVehicleName).trim().toLowerCase();
+      if (!matches || Number(vehicle.odometer || 0) >= reading) return vehicle;
+      return {
+        ...vehicle,
+        odometer: reading,
+        odometerUpdatedAt: eventAtIso || new Date().toISOString(),
+        odometerSourceTripId: tripLike.id,
+      };
+    })).catch((error) => console.error('Vehicle odometer synchronization failed:', error));
+  };
+
   const updateTrip = (tripIdOrObject, partialFields = null) => {
     const updatedTrip = typeof tripIdOrObject === 'string'
       ? (() => { const existing = trips.find(t => t.id === tripIdOrObject); return existing ? { ...existing, ...partialFields } : null; })()
@@ -1768,6 +1792,15 @@ const App = () => {
 
     const enrichedTrip = enrichTripMetrics(nextTripState);
     const persistence = setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
+    // Keep the vehicle odometer global: a completion raises it to the final
+    // reading, and an in-progress pickup reading publishes immediately so
+    // shared vehicles never present a stale number to the next driver.
+    const completedReading = enrichedTrip.dropoffOdometer;
+    if (String(enrichedTrip.status || '').trim().toLowerCase() === 'completed' && completedReading !== undefined && completedReading !== null && completedReading !== '') {
+      syncVehicleOdometerFromTrip(enrichedTrip, completedReading, enrichedTrip.completedAt);
+    } else if (!isTerminal && enrichedTrip.pickupOdometer !== undefined) {
+      syncVehicleOdometerFromTrip(enrichedTrip, enrichedTrip.pickupOdometer, enrichedTrip.arrivalTime || enrichedTrip.workflowUpdatedAt || null);
+    }
     // Log detailed before/after changes
     if (prevTrip) {
       const changed = [];
@@ -2212,12 +2245,7 @@ const App = () => {
       setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
     }
     if (completedVehicleName && Number.isFinite(Number(odometer))) {
-      setVehicles(prev => prev.map((vehicle) => {
-        const matches = vehicle.id === completionDriver?.vehicleId
-          || String(vehicle.name || '').trim().toLowerCase() === String(completedVehicleName).trim().toLowerCase();
-        if (!matches || Number(vehicle.odometer || 0) >= Number(odometer)) return vehicle;
-        return { ...vehicle, odometer: Number(odometer), odometerUpdatedAt: completedAt, odometerSourceTripId: tripId };
-      })).catch((error) => console.error('Vehicle odometer synchronization failed:', error));
+      syncVehicleOdometerFromTrip(nextTrip, odometer, completedAt);
     }
     const diffs = [];
     Object.keys(nextTrip || {}).forEach((key) => {

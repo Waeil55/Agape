@@ -2266,6 +2266,88 @@ textarea {
   }
 }
 
+/* ===== TRIP ACTION WINDOWS (odometer / signature / completion / password) =====
+   Centered dialog on every size, height-bounded with internal scrolling.
+   Keyboard stability, two modes:
+   - Resizing viewports (Android, interactive-widget=resizes-content): the
+     overlay simply fills the visible area, so the browser itself keeps the
+     window centered and fully visible above the keyboard — no JS math, no
+     possible gap.
+   - Non-resizing viewports (iOS): DriverPage measures the covered part of
+     the open window and lifts it by exactly that amount via --agape-kb-shift
+     (smooth transform, self-correcting). */
+:root {
+  --agape-kb-shift: 0px;
+}
+
+.trip-window-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.trip-window-panel {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 24rem;
+  max-height: min(72dvh, 34rem, 100%);
+  background: #ffffff;
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.35);
+  pointer-events: auto;
+  transform: translateY(calc(-1 * var(--agape-kb-shift, 0px)));
+  transition: transform 160ms ease-out;
+}
+
+/* While a trip window is open, stop the background page from panning when
+   the keyboard focuses an input inside the window. */
+html.trip-window-open,
+html.trip-window-open body {
+  overflow: hidden !important;
+}
+
+/* When the keyboard is open, dock the window just above it (8px gap)
+   instead of centering — no floating empty space between window and
+   keyboard. On Android the browser's own resize does the work; on iOS the
+   measured --agape-kb-shift lift lands the window at the same spot. */
+html.trip-window-kb-open .trip-window-overlay {
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+}
+
+/* Signature windows get extra breathing room for a comfortable confirm. */
+.trip-window-panel-signature {
+  min-height: 25rem;
+}
+
+.trip-window-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.trip-window-footer {
+  flex: none;
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+@supports not (height: 1dvh) {
+  .trip-window-panel {
+    max-height: min(72vh, 34rem, 100%);
+  }
+}
+
 /* ===== PWA STANDALONE MODE STYLES ===== */
 @media (display-mode: standalone) {
   html {

@@ -47,6 +47,7 @@ import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
+import { deriveVehicleOdometerState, evaluateOdometerEntry } from '../utils/vehicleOdometer';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
@@ -97,6 +98,72 @@ const getCompletionPickupBoundary = (trip) => latestWorkflowTimestamp(
   trip?.pickupArrivalTime,
   trip?.arrivedPickupAt,
 );
+
+// Shared live feedback for every odometer entry window: precise errors,
+// typo warnings, and the explicit verification acknowledgment required
+// before an unusual reading may be saved.
+const OdometerGuardFeedback = ({ evaluation, ack, onAckChange, compact = false }) => {
+  if (!evaluation || evaluation.status === 'empty' || evaluation.status === 'ok') return null;
+  if (compact) {
+    return (
+      <div className="mt-2 space-y-1.5">
+        {evaluation.errors.map((error, index) => (
+          <p key={`odo-error-${index}`} className="text-xs font-semibold text-rose-600 text-center">{error}</p>
+        ))}
+        {evaluation.warnings.map((warning, index) => (
+          <p key={`odo-warning-${index}`} className="text-xs font-semibold text-amber-600 text-center">{warning}</p>
+        ))}
+        {evaluation.status === 'confirm' && (
+          <button type="button" onClick={() => onAckChange(!ack)} aria-pressed={ack} className={`w-full flex items-center gap-2 p-2 rounded-xl border transition cursor-pointer text-left ${ack ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${ack ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+              {ack && <Check size={10} className="text-white" />}
+            </span>
+            <span className="text-xs text-slate-600 font-medium">I read this number directly from the vehicle dashboard and verified every digit.</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 space-y-2">
+      {evaluation.errors.map((error, index) => (
+        <p key={`odo-error-${index}`} className="text-sm text-rose-700 font-semibold text-center bg-rose-50 rounded-xl px-4 py-3 border border-rose-200">{error}</p>
+      ))}
+      {evaluation.warnings.map((warning, index) => (
+        <p key={`odo-warning-${index}`} className="text-sm text-amber-700 font-semibold text-center bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">{warning}</p>
+      ))}
+      {evaluation.status === 'confirm' && (
+        <button type="button" onClick={() => onAckChange(!ack)} aria-pressed={ack} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer text-left ${ack ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+          <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${ack ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+            {ack && <Check size={12} className="text-white" />}
+          </span>
+          <span className="text-sm text-slate-600 font-medium">I read this number directly from the vehicle dashboard and verified every digit.</span>
+        </button>
+      )}
+    </div>
+  );
+};
+
+const OdometerBaselineLine = ({ vehicleName, miles }) => (
+  <p className="text-xs text-slate-500 mt-2">
+    {vehicleName ? <span className="font-semibold text-slate-700">{vehicleName}</span> : null}
+    {miles > 0
+      ? <> · Last verified: <strong className="text-slate-700">{Math.round(miles).toLocaleString()} mi</strong></>
+      : ' · No verified reading yet'}
+  </p>
+);
+
+// Mobile soft keyboards only appear for focus that happens close to the
+// user's tap. autoFocus alone is unreliable inside async React commits, so
+// every trip-window opener calls this right after mounting its window.
+const focusTripWindowInput = () => {
+  setTimeout(() => {
+    const el = document.querySelector('.trip-window-panel input[autofocus]');
+    if (el) {
+      try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+    }
+  }, 80);
+};
 
 const calculateBoundaryTravel = async (origin, destination) => {
   if (!origin || !destination) return { minutes: 0, source: 'NO_ROUTE_EVIDENCE', confidence: 'missing' };
@@ -593,6 +660,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const vehicleMaintenance = useMemo(() => assignedVehicleRecord
     ? getVehicleMaintenanceStatus(assignedVehicleRecord, trips, allDrivers?.length ? allDrivers : drivers, appSettings.maintenancePolicy)
     : null, [assignedVehicleRecord, trips, allDrivers, drivers, appSettings.maintenancePolicy]);
+  // Global per-vehicle odometer: resolved from the Firestore-synced vehicle
+  // record plus every trip reading for this vehicle (any driver), so a shared
+  // van or a fresh device never presents a stale per-device number.
+  const vehicleOdometerState = useMemo(() => deriveVehicleOdometerState({
+    vehicle: assignedVehicleRecord || {},
+    trips,
+    drivers: allDrivers?.length ? allDrivers : drivers,
+  }), [assignedVehicleRecord, trips, allDrivers, drivers]);
+  const currentVehicleOdometer = vehicleOdometerState.miles || 0;
 
   const [maintenanceResetting, setMaintenanceResetting] = useState('');
 
@@ -757,10 +833,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const [completeOdometer, setCompleteOdometer] = useState('');
   const [completeError, setCompleteError] = useState('');
   const [completeTimeNotice, setCompleteTimeNotice] = useState('');
-  const [completeRating, setCompleteRating] = useState(0);
-  const [completeRatingHover, setCompleteRatingHover] = useState(0);
+  const [completeAck, setCompleteAck] = useState(false);
+  const [odometerError, setOdometerError] = useState('');
+  const [odometerAck, setOdometerAck] = useState(false);
   const [departedTime, setDepartedTime] = useState('');
   const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
+
+  // Strict odometer gate shared by every trip window that records a reading.
+  // The baseline is the global per-vehicle value; `lastOdometer` is only a
+  // fallback for drivers without an assigned vehicle record.
+  const runOdometerGuard = useCallback(({ raw, pickupOdometer = null } = {}) => evaluateOdometerEntry({
+    raw,
+    baselineMiles: currentVehicleOdometer || lastOdometer,
+    pickupOdometer,
+  }), [currentVehicleOdometer, lastOdometer]);
+  const resetOdometerPromptState = useCallback(() => {
+    setOdometerError('');
+    setOdometerAck(false);
+  }, [setOdometerAck, setOdometerError]);
   const [scheduleEditorTrip, setScheduleEditorTrip] = useState(null);
   const [scheduleEditDraft, setScheduleEditDraft] = useState(null);
   const [scheduleEditError, setScheduleEditError] = useState('');
@@ -1269,14 +1359,83 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     }
   };
 
-  // Load last odometer from completed trips
+  // The global vehicle reading is authoritative; the per-driver completed-trip
+  // scan below is only a fallback for drivers without an assigned vehicle.
   useEffect(() => {
+    if (currentVehicleOdometer > 0) {
+      setLastOdometer(currentVehicleOdometer);
+      return;
+    }
     if (!me?.id) return;
     const completed = driverScopedTrips
       .filter(t => isWorkflowTerminalTrip(t) && t.dropoffOdometer)
       .sort((a, b) => (safeDateMillis(b.completedAt, 0) || 0) - (safeDateMillis(a.completedAt, 0) || 0));
     if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
-  }, [driverScopedTrips, me?.id]);
+  }, [driverScopedTrips, me?.id, currentVehicleOdometer]);
+
+  // Keeps trip action windows (odometer, signature, completion, password)
+  // visually stable when the on-screen keyboard opens. On resizing viewports
+  // (Android) the browser itself keeps the centered window above the
+  // keyboard and this lift computes to zero. On non-resizing viewports
+  // (iOS) it measures how much of the open window is covered and lifts it by
+  // exactly that amount (--agape-kb-shift). A ResizeObserver on the open
+  // window plus focus listeners keep the lift self-correcting, and the
+  // trip-window-open class stops the background page from panning.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return undefined;
+    const visualViewport = window.visualViewport;
+    let frame = 0;
+    let settleTimer = 0;
+    let observedPanel = null;
+    let fullHeight = window.innerHeight;
+    const syncWindowShift = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const panel = document.querySelector('.trip-window-panel');
+        document.documentElement.classList.toggle('trip-window-open', !!panel);
+        if (resizeObserver && panel !== observedPanel) {
+          if (observedPanel) resizeObserver.unobserve(observedPanel);
+          if (panel) resizeObserver.observe(panel);
+          observedPanel = panel;
+        }
+        fullHeight = Math.max(fullHeight, window.innerHeight);
+        const visibleBottom = Math.min(window.innerHeight, visualViewport.offsetTop + visualViewport.height);
+        const keyboardOpen = fullHeight - visibleBottom > 120;
+        document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
+        let shift = 0;
+        if (panel && keyboardOpen) {
+          const rect = panel.getBoundingClientRect();
+          shift = Math.max(0, Math.ceil(rect.bottom - visibleBottom + 8));
+        }
+        document.documentElement.style.setProperty('--agape-kb-shift', `${shift}px`);
+      });
+    };
+    const scheduleSettlePass = () => {
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(syncWindowShift, 220);
+    };
+    const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncWindowShift) : null;
+    syncWindowShift();
+    visualViewport.addEventListener('resize', syncWindowShift);
+    visualViewport.addEventListener('scroll', syncWindowShift);
+    window.addEventListener('resize', syncWindowShift);
+    document.addEventListener('focusin', scheduleSettlePass, true);
+    document.addEventListener('focusout', scheduleSettlePass, true);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (settleTimer) clearTimeout(settleTimer);
+      if (resizeObserver) resizeObserver.disconnect();
+      visualViewport.removeEventListener('resize', syncWindowShift);
+      visualViewport.removeEventListener('scroll', syncWindowShift);
+      window.removeEventListener('resize', syncWindowShift);
+      document.removeEventListener('focusin', scheduleSettlePass, true);
+      document.removeEventListener('focusout', scheduleSettlePass, true);
+      document.documentElement.classList.remove('trip-window-open');
+      document.documentElement.classList.remove('trip-window-kb-open');
+      document.documentElement.style.setProperty('--agape-kb-shift', '0px');
+    };
+  }, []);
 
   // GPS is mandatory — always active on mount
   // Clean up undo timeout on unmount
@@ -2380,15 +2539,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const handleArriveRoutePlanStop = useCallback((stop) => {
     if (!stop) return;
     impact('heavy');
-    setRouteStopOdometerValue(lastOdometer > 0 ? String(lastOdometer) : '');
+    setRouteStopOdometerValue(currentVehicleOdometer > 0 ? String(currentVehicleOdometer) : '');
+    resetOdometerPromptState();
     setRouteStopOdometerPrompt(stop);
-  }, [lastOdometer]);
+    focusTripWindowInput();
+  }, [currentVehicleOdometer, resetOdometerPromptState]);
 
   const submitRouteStopOdometer = useCallback(() => {
     if (!routeStopOdometerPrompt || !routeStopOdometerValue) return;
-    const odo = parseInt(routeStopOdometerValue, 10);
-    if (Number.isNaN(odo) || odo <= 0) return;
-    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
+    const evaluation = runOdometerGuard({ raw: routeStopOdometerValue });
+    if (evaluation.status === 'empty' || evaluation.status === 'invalid' || evaluation.status === 'blocked') {
+      setOdometerError(evaluation.errors[0] || 'Enter the current odometer reading.');
+      return;
+    }
+    if (evaluation.status === 'confirm' && !odometerAck) {
+      setOdometerError('Review the warning and confirm the reading before saving.');
+      return;
+    }
+    const odo = evaluation.value;
+    setOdometerError('');
     const nowIso = new Date().toISOString();
     void saveRoutePlanStopWorkflow(routeStopOdometerPrompt, {
       status: 'Arrived',
@@ -2399,7 +2568,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     setLastOdometer(odo);
     setRouteStopOdometerPrompt(null);
     setRouteStopOdometerValue('');
-  }, [currentUser, lastOdometer, routeStopOdometerPrompt, routeStopOdometerValue, saveRoutePlanStopWorkflow]);
+  }, [currentUser, odometerAck, routeStopOdometerPrompt, routeStopOdometerValue, runOdometerGuard, saveRoutePlanStopWorkflow]);
 
   const handleRoutePlanStopSignature = useCallback((stop) => {
     if (!stop) return;
@@ -2714,16 +2883,28 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   };
 
   const handleArrivePickup = (trip) => {
-    const autoOdo = lastOdometer > 0 ? String(lastOdometer) : '';
+    const autoOdo = currentVehicleOdometer > 0
+      ? String(currentVehicleOdometer)
+      : (lastOdometer > 0 ? String(lastOdometer) : '');
     setOdometerValue(autoOdo);
+    resetOdometerPromptState();
     setShowOdometerPrompt(trip);
+    focusTripWindowInput();
   };
 
   const submitOdometer = async () => {
     if (!showOdometerPrompt || !odometerValue) return;
-    const odo = parseInt(odometerValue, 10);
-    if (isNaN(odo)) return;
-    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
+    const evaluation = runOdometerGuard({ raw: odometerValue });
+    if (evaluation.status === 'empty' || evaluation.status === 'invalid' || evaluation.status === 'blocked') {
+      setOdometerError(evaluation.errors[0] || 'Enter the current odometer reading.');
+      return;
+    }
+    if (evaluation.status === 'confirm' && !odometerAck) {
+      setOdometerError('Review the warning and confirm the reading before continuing.');
+      return;
+    }
+    const odo = evaluation.value;
+    setOdometerError('');
     // Record pickup arrival + departure timestamps using canonical fields
     const nowIso = new Date().toISOString();
     const pickupLocation = getTripPickupLocation(showOdometerPrompt);
@@ -2833,8 +3014,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
   const confirmArrival = async () => {
     if (!showArrivalConfirm) return;
-    const odo = parseInt(arrivalOdometer, 10) || lastOdometer;
-    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
+    const arrivalEvaluation = runOdometerGuard({ raw: arrivalOdometer });
+    if (arrivalEvaluation.status === 'empty' || arrivalEvaluation.status === 'invalid' || arrivalEvaluation.status === 'blocked') {
+      setShowToast({ type: 'warning', message: arrivalEvaluation.errors[0] || 'Enter the current odometer reading before confirming arrival.' });
+      return;
+    }
+    if (arrivalEvaluation.status === 'confirm' && !odometerAck) {
+      setShowToast({ type: 'warning', message: 'Review the odometer warning and confirm the reading first.' });
+      return;
+    }
+    const odo = arrivalEvaluation.value;
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
     const pickupLocation = getTripPickupLocation(showArrivalConfirm);
@@ -3293,10 +3482,15 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
   const openCompleteModal = (trip) => {
     setShowCompleteModal(trip);
-    const odometerSeed = trip.dropoffOdometer || (lastOdometer > 0 ? lastOdometer : trip.pickupOdometer) || '';
+    const odometerSeed = trip.dropoffOdometer
+      || (currentVehicleOdometer > 0
+        ? currentVehicleOdometer
+        : (lastOdometer > 0 ? lastOdometer : trip.pickupOdometer))
+      || '';
     setCompleteOdometer(odometerSeed ? String(odometerSeed) : '');
     setCompleteError('');
     setCompleteTimeNotice('');
+    setCompleteAck(false);
     const nowLocal = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const defaultTime = `${pad(nowLocal.getHours())}:${pad(nowLocal.getMinutes())}`;
@@ -3313,6 +3507,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     }
     setDepartedTime(normalizedClocks.pickupDeparture);
     setArrivalDropoffTime(normalizedClocks.dropoffArrival);
+    focusTripWindowInput();
   };
 
   const updateCompletionDeparture = (value) => {
@@ -3347,17 +3542,24 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
   const submitComplete = async () => {
     if (!showCompleteModal) return;
-    if (!completeOdometer) {
+    const evaluation = runOdometerGuard({
+      raw: completeOdometer,
+      pickupOdometer: showCompleteModal.pickupOdometer ?? null,
+    });
+    if (evaluation.status === 'empty') {
       setCompleteError('Enter the final odometer reading before completing this trip.');
       return;
     }
-    const odo = parseInt(completeOdometer, 10);
-    if (isNaN(odo) || odo <= 0) {
-      setCompleteError('Use a valid odometer reading greater than zero.');
+    if (evaluation.status === 'invalid' || evaluation.status === 'blocked') {
+      setCompleteError(evaluation.errors.join(' '));
       return;
     }
-    if (lastOdometer > 0 && odo < lastOdometer && !window.confirm(`Warning: ${odo.toLocaleString()} mi is less than the last recorded reading of ${lastOdometer.toLocaleString()} mi. Continue anyway?`)) return;
-    if (showCompleteModal.pickupOdometer && odo < Number(showCompleteModal.pickupOdometer) && !window.confirm(`Warning: final odometer is less than pickup odometer (${Number(showCompleteModal.pickupOdometer).toLocaleString()} mi). Continue anyway?`)) return;
+    if (evaluation.status === 'confirm' && !completeAck) {
+      setCompleteError('Review the warning and confirm the reading is correct before completing.');
+      return;
+    }
+    const odo = evaluation.value;
+    setCompleteError('');
     const now = new Date().toISOString();
     const serviceDate = tripCalendarDateKey(showCompleteModal.date) || localCalendarYmd();
     const departedPickupIso = timeToIsoForTripDate(departedTime, serviceDate) || now;
@@ -3412,7 +3614,6 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         dropoffLocationSnapshot: dropoffLocation || null,
         timeTrackingBoundaryPolicy: POLICY_MODES.PAY_FROM_HOME,
       } : {}),
-      ...(completeRating > 0 ? { feedback: { overall: completeRating, driverRating: completeRating } } : {}),
     });
     if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
       ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, getTripDropoffLocation(showCompleteModal) || getDriverClockLocation());
@@ -3423,8 +3624,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     setCompleteOdometer('');
     setCompleteError('');
     setCompleteTimeNotice('');
-    setCompleteRating(0);
-    setCompleteRatingHover(0);
+    setCompleteAck(false);
 
     // Save odometer to Firestore directly
     if (navigator.onLine) {
@@ -5191,113 +5391,123 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       )}
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
-      {showOdometerPrompt && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-6">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <MapPin size={28} className="text-emerald-600" />
+      {showOdometerPrompt && (() => {
+        const arrivalEvaluation = runOdometerGuard({ raw: odometerValue });
+        return (
+          <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+            <div className="trip-window-panel">
+              <div className="trip-window-body p-4">
+                <div className="text-center mb-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                    <MapPin size={18} className="text-emerald-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">Arrived at Pickup</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
+                  <div className="flex justify-center">
+                    <OdometerBaselineLine vehicleName={assignedVehicleRecord?.name || me?.vehicle || ''} miles={currentVehicleOdometer || lastOdometer} />
+                  </div>
                 </div>
-                <h3 className="text-xl     font-semibold text-slate-900">Arrived at Pickup</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{showOdometerPrompt.patient} — {to12hr(showOdometerPrompt.time)}</p>
-                {lastOdometer > 0 && (
-                  <p className="text-sm text-slate-500 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
-                )}
-              </div>
-              <button type="button" onClick={() => setShowOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Current Odometer (mi)</label>
+                <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Current Odometer (mi)</label>
                 <input
                   type="number"
                   inputMode="numeric"
-                  value={odometerValue}
-                  onChange={(e) => setOdometerValue(e.target.value)}
-                  placeholder='Enter full odometer reading'
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xl text-center focus:border-blue-500 outline-none"
                   autoFocus
+                  value={odometerValue}
+                  onChange={(e) => { setOdometerValue(e.target.value); setOdometerError(''); }}
+                  placeholder='Enter full odometer reading'
+                  className={`w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
-                {lastOdometer > 0 && odometerValue && parseInt(odometerValue, 10) < lastOdometer && (
-                  <p className="text-sm text-amber-700 font-semibold mt-2 text-center bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
-                    {parseInt(odometerValue, 10).toLocaleString()} mi is less than last reading of {lastOdometer.toLocaleString()} mi. You can continue if you're sure.
-                  </p>
+                <OdometerGuardFeedback compact evaluation={arrivalEvaluation} ack={odometerAck} onAckChange={setOdometerAck} />
+                {odometerError && (
+                  <p className="mt-2 text-center text-xs font-semibold text-rose-600">{odometerError}</p>
                 )}
               </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitOdometer} disabled={!odometerValue} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm Arrival</button>
+              <div className="trip-window-footer px-4 pb-4">
+                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button
+                  type="button"
+                  onClick={submitOdometer}
+                  disabled={!odometerValue || arrivalEvaluation.status === 'invalid' || arrivalEvaluation.status === 'blocked' || (arrivalEvaluation.status === 'confirm' && !odometerAck)}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  Confirm Arrival
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ===== ROUTE STOP ODOMETER PROMPT ===== */}
-      {routeStopOdometerPrompt && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-6">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
-                  <Gauge size={28} className="text-white" />
+      {routeStopOdometerPrompt && (() => {
+        const stopEvaluation = runOdometerGuard({ raw: routeStopOdometerValue });
+        return (
+          <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+            <div className="trip-window-panel">
+              <div className="trip-window-body p-4">
+                <div className="text-center mb-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                    <Gauge size={18} className="text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">Arrived at Stop</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
+                  <div className="flex justify-center">
+                    <OdometerBaselineLine vehicleName={assignedVehicleRecord?.name || me?.vehicle || ''} miles={currentVehicleOdometer || lastOdometer} />
+                  </div>
                 </div>
-                <h3 className="text-xl     font-semibold text-slate-900">Arrived at Stop</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopOdometerPrompt.name || `Stop ${routeStopOdometerPrompt.sequenceIndex}`}</p>
-                {lastOdometer > 0 && (
-                  <p className="text-sm text-slate-500 mt-2">Current odometer: <strong className="text-slate-700">{lastOdometer?.toLocaleString()} mi</strong></p>
-                )}
-              </div>
-              <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Odometer at Arrival</label>
+                <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival</label>
                 <input
                   type="number"
                   inputMode="numeric"
-                  value={routeStopOdometerValue}
-                  onChange={(e) => setRouteStopOdometerValue(e.target.value)}
-                  placeholder="Enter odometer reading"
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xl text-center focus:border-blue-500 outline-none"
                   autoFocus
+                  value={routeStopOdometerValue}
+                  onChange={(e) => { setRouteStopOdometerValue(e.target.value); setOdometerError(''); }}
+                  placeholder="Enter odometer reading"
+                  className={`w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
+                <OdometerGuardFeedback compact evaluation={stopEvaluation} ack={odometerAck} onAckChange={setOdometerAck} />
+                {odometerError && (
+                  <p className="mt-2 text-center text-xs font-semibold text-rose-600">{odometerError}</p>
+                )}
               </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={submitRouteStopOdometer} disabled={!routeStopOdometerValue} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Save Arrival</button>
+              <div className="trip-window-footer px-4 pb-4">
+                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button
+                  type="button"
+                  onClick={submitRouteStopOdometer}
+                  disabled={!routeStopOdometerValue || stopEvaluation.status === 'invalid' || stopEvaluation.status === 'blocked' || (stopEvaluation.status === 'confirm' && !odometerAck)}
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  Save Arrival
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ===== ROUTE STOP SIGNATURE PROMPT ===== */}
       {routeStopSignaturePrompt && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <Check size={28} className="text-emerald-600" />
+        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+          <div className="trip-window-panel trip-window-panel-signature">
+            <div className="trip-window-body p-4">
+              <div className="text-center mb-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                  <Check size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-xl     font-semibold text-slate-900">Confirm Signature</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</p>
+                <h3 className="text-lg font-bold text-slate-900">Confirm Signature</h3>
+                <p className="text-sm text-slate-500 mt-0.5">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</p>
               </div>
-              <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-5 mb-4">
-              <button type="button" onClick={() => setRouteStopSignatureConfirmed(!routeStopSignatureConfirmed)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${routeStopSignatureConfirmed ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-white'}`}>
-                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${routeStopSignatureConfirmed ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
-                  {routeStopSignatureConfirmed && <Check size={12} className="text-white" />}
-                </div>
+              <button type="button" onClick={() => setRouteStopSignatureConfirmed(!routeStopSignatureConfirmed)} className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer text-left ${routeStopSignatureConfirmed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${routeStopSignatureConfirmed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                  {routeStopSignatureConfirmed && <Check size={10} className="text-white" />}
+                </span>
                 <span className="text-sm text-slate-600 font-medium">Client signature obtained</span>
               </button>
             </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
+            <div className="trip-window-footer px-4 pb-4">
+              <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
             </div>
           </div>
         </div>
@@ -5305,65 +5515,54 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== ARRIVAL CONFIRM MODAL ===== */}
       {showArrivalConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <MapPin size={28} className="text-emerald-600" />
+        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+          <div className="trip-window-panel">
+            <div className="trip-window-body p-4">
+              <div className="text-center mb-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                  <MapPin size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-xl     font-semibold text-slate-900">Arrived at Pickup</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{showArrivalConfirm.patient}</p>
+                <h3 className="text-lg font-bold text-slate-900">Arrived at Pickup</h3>
+                <p className="text-sm text-slate-500 mt-0.5">{showArrivalConfirm.patient}</p>
               </div>
-              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
 
-            <div className="bg-slate-50 rounded-xl p-5 mb-4 space-y-3">
-              <div>
-                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Odometer at Arrival (mi)</label>
-                <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
-                  className="w-full mt-1.5 p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none"
-                />
-              </div>
-              {showArrivalConfirm.bookingId && (
-                <div className="flex justify-between">
-                  <span className="text-xs text-slate-500 font-semibold uppercase">Booking</span>
-                  <span className="text-sm font-semibold text-slate-900">{showArrivalConfirm.bookingId}</span>
+              <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                <div>
+                  <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival (mi)</label>
+                  <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none"
+                  />
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-xs text-slate-500 font-semibold uppercase">Client</span>
-                <span className="text-sm font-semibold text-slate-900">{showArrivalConfirm.patient}</span>
-              </div>
-              {showArrivalConfirm.pickupPhone && (() => {
-                const contact = getContactsForTrip(showArrivalConfirm).find(c => cleanPhone(c.phone) === cleanPhone(showArrivalConfirm.pickupPhone));
-                const label = contact ? contact.label : 'Contact';
-                return (
+                {showArrivalConfirm.bookingId && (
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 font-semibold uppercase">{label}</span>
-                    <button type="button" onClick={() => handleCall(showArrivalConfirm.pickupPhone, `${label}: ${showArrivalConfirm.patient}`)} className="text-sm font-medium text-blue-600 flex items-center gap-1 hover:underline cursor-pointer">
-                      <Phone size={16} /> {formatPhoneDisplay(showArrivalConfirm.pickupPhone)}
-                    </button>
+                    <span className="text-xs text-slate-500 font-semibold uppercase">Booking</span>
+                    <span className="text-sm font-semibold text-slate-900">{showArrivalConfirm.bookingId}</span>
                   </div>
-                );
-              })()}
-              {showArrivalConfirm.notes && (
-                <div className="pt-3 border-t border-slate-200">
-                  <p className="text-xs text-slate-500 font-semibold uppercase mb-1.5">Notes</p>
-                  <p className="text-sm text-slate-700">{showArrivalConfirm.notes}</p>
-                </div>
-              )}
-              <div className="pt-3 border-t border-slate-200 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3">
-                  <Info size={16} className="shrink-0" />
-                  <span className="font-medium">Confirm arrival details before proceeding.</span>
-                </div>
+                )}
+                {showArrivalConfirm.pickupPhone && (() => {
+                  const contact = getContactsForTrip(showArrivalConfirm).find(c => cleanPhone(c.phone) === cleanPhone(showArrivalConfirm.pickupPhone));
+                  const label = contact ? contact.label : 'Contact';
+                  return (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-semibold uppercase">{label}</span>
+                      <button type="button" onClick={() => handleCall(showArrivalConfirm.pickupPhone, `${label}: ${showArrivalConfirm.patient}`)} className="text-sm font-medium text-blue-600 flex items-center gap-1 hover:underline cursor-pointer">
+                        <Phone size={14} /> {formatPhoneDisplay(showArrivalConfirm.pickupPhone)}
+                      </button>
+                    </div>
+                  );
+                })()}
+                {showArrivalConfirm.notes && (
+                  <div className="pt-2 border-t border-slate-200">
+                    <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Notes</p>
+                    <p className="text-sm text-slate-700">{showArrivalConfirm.notes}</p>
+                  </div>
+                )}
               </div>
+              <p className="mt-2 text-center text-xs font-semibold text-slate-500">Confirm arrival details before proceeding.</p>
             </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmArrival} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
+            <div className="trip-window-footer px-4 pb-4">
+              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmArrival} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
             </div>
           </div>
         </div>
@@ -5371,140 +5570,107 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== SIGNATURE CONFIRM MODAL (Before Heading to Dropoff) ===== */}
       {showSignatureConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative border border-white/20 pointer-events-auto" style={{ zIndex: 10 }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className="w-16 h-16 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <Check size={28} className="text-emerald-600" />
+        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+          <div className="trip-window-panel trip-window-panel-signature">
+            <div className="trip-window-body p-4">
+              <div className="text-center mb-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                  <Check size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-xl     font-semibold text-slate-900">Begin Transport</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{showSignatureConfirm.patient}</p>
+                <h3 className="text-lg font-bold text-slate-900">Begin Transport</h3>
+                <p className="text-sm text-slate-500 mt-0.5">{showSignatureConfirm.patient}</p>
               </div>
-              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
+              <p className="text-center text-xs font-semibold text-slate-500 mb-2">Obtain the client signature before heading to dropoff.</p>
+              <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer text-left ${signatureConfirmed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${signatureConfirmed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                  {signatureConfirmed && <Check size={10} className="text-white" />}
+                </span>
+                <span className="text-sm text-slate-600 font-medium">Client signature obtained</span>
+              </button>
             </div>
-
-            <div className="bg-slate-50 rounded-xl p-5 mb-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-xl px-4 py-3">
-                <Info size={16} className="shrink-0" />
-                <span className="font-medium">Obtain client signature before heading to dropoff.</span>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-1.5">Signature Required</p>
-                <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${signatureConfirmed ? 'border-green-200 bg-green-50' : 'border-blue-100 bg-white'}`}>
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${signatureConfirmed ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
-                    {signatureConfirmed && <Check size={12} className="text-white" />}
-                  </div>
-                  <span className="text-sm text-slate-600 font-medium">Client signature obtained</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
+            <div className="trip-window-footer px-4 pb-4">
+              <button type="button" onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+              <button type="button" onClick={confirmSignatureAndBegin} disabled={!signatureConfirmed} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm & Begin</button>
             </div>
           </div>
         </div>
       )}
 
       {/* ===== COMPLETE TRIP MODAL ===== */}
-      {showCompleteModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 120 }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl relative border border-white/20 pointer-events-auto max-h-[85dvh] flex flex-col" style={{ zIndex: 10 }}>
-            <div className="overflow-y-auto hide-scrollbar flex-1 -mx-2 px-2 pb-2">
-              <div className="text-center mb-3 mt-1">
-                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-sm">
-                  <Check size={20} className="text-emerald-600" />
+      {showCompleteModal && (() => {
+        const completionEvaluation = runOdometerGuard({
+          raw: completeOdometer,
+          pickupOdometer: showCompleteModal.pickupOdometer ?? null,
+        });
+        const completionBlocked = completionEvaluation.status === 'invalid' || completionEvaluation.status === 'blocked'
+          || (completionEvaluation.status === 'confirm' && !completeAck);
+        return (
+          <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+            <div className="trip-window-panel">
+              <div className="trip-window-body p-4">
+                <div className="text-center mb-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                    <Check size={18} className="text-emerald-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">Complete Trip</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">{showCompleteModal.patient}{showCompleteModal.bookingId ? ` - ${showCompleteModal.bookingId}` : ''}</p>
                 </div>
-                <h3 className="text-xl     font-semibold text-slate-900">Complete Trip</h3>
-                <p className="text-sm text-slate-500 mt-1 font-medium">{showCompleteModal.patient} - {showCompleteModal.bookingId || ''}</p>
-              </div>
 
-              <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-2.5">
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-xs text-emerald-600 font-semibold uppercase">Pickup Odometer</span>
-                  <span className="text-sm font-semibold text-emerald-700">{showCompleteModal.pickupOdometer?.toLocaleString() || '-'} mi</span>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Pickup Details</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div>
+                    <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Departed Pickup Time</label>
+                    <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} onChange={(e) => updateCompletionDeparture(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Pickup Odometer</label>
+                    <input type="text" readOnly value={showCompleteModal.pickupOdometer ? `${showCompleteModal.pickupOdometer.toLocaleString()} mi` : '—'} title="Verified at pickup arrival"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm text-center text-slate-600 cursor-default outline-none" />
+                  </div>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-xs text-slate-500 font-semibold uppercase">Pickup Arrival</span>
-                  <span className="text-sm font-semibold text-slate-900">{getCompletionPickupBoundary(showCompleteModal) ? new Date(getCompletionPickupBoundary(showCompleteModal)).toLocaleTimeString() : '-'}</span>
+
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Dropoff Details</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Arrival Dropoff Time</label>
+                    <input type="time" value={arrivalDropoffTime} min={departedTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-micro font-semibold uppercase tracking-wide text-rose-600 mb-1">Final Odometer (mi)</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      autoFocus
+                      value={completeOdometer}
+                      onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
+                      placeholder="Final reading"
+                      className={`w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Departed Pickup Time</label>
-                  <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} onChange={(e) => updateCompletionDeparture(e.target.value)}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1" />
-                </div>
-                <div>
-                  <label className="text-micro font-semibold uppercase tracking-wide text-slate-500">Arrival Dropoff Time</label>
-                  <input type="time" value={arrivalDropoffTime} min={departedTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1" />
-                </div>
-                <div>
-                  <label className="text-micro font-semibold uppercase tracking-wide text-rose-600">Final Odometer (mi)</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={completeOdometer}
-                    onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
-                    placeholder="Enter final odometer"
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-blue-500 outline-none mt-1.5"
-                    autoFocus
-                  />
-                  {!completeOdometer && (
-                    <p className="mt-2 text-center text-xs font-semibold text-slate-500">
-                      Enter a final odometer reading to enable completion.
-                    </p>
-                  )}
-                </div>
+
+                {completionEvaluation.status === 'ok' && completionEvaluation.distance !== null && (
+                  <p className="text-center text-sm font-semibold text-blue-600 mt-2.5">Distance: {completionEvaluation.distance.toLocaleString()} mi</p>
+                )}
+                <OdometerGuardFeedback compact evaluation={completionEvaluation} ack={completeAck} onAckChange={setCompleteAck} />
                 {completeError && (
-                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-semibold text-rose-700">
-                    {completeError}
-                  </p>
+                  <p className="mt-2 text-center text-xs font-semibold text-rose-600">{completeError}</p>
                 )}
-                {completeTimeNotice && !completeError && (
-                  <p className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-center text-xs font-semibold text-blue-700">
-                    {completeTimeNotice}
-                  </p>
+                {!completeError && completeTimeNotice && (
+                  <p className="mt-2 text-center text-xs font-semibold text-blue-600">{completeTimeNotice}</p>
                 )}
-                {showCompleteModal.pickupOdometer && completeOdometer && (
-                  <div className="text-center text-sm text-blue-600 font-medium">
-                    Distance: {(parseInt(completeOdometer) - (showCompleteModal.pickupOdometer || 0)).toLocaleString()} mi
-                  </div>
-                )}
-                <div className="pt-2 border-t border-slate-100 mt-1">
-                  <p className="text-xs font-semibold text-slate-500 text-center mb-2">Rate this trip (optional)</p>
-                  <div className="flex justify-center gap-1">
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setCompleteRating(star === completeRating ? 0 : star)}
-                        onMouseEnter={() => setCompleteRatingHover(star)}
-                        onMouseLeave={() => setCompleteRatingHover(0)}
-                        className="p-0.5 transition-transform hover:scale-110"
-                      >
-                        <svg
-                          width="28" height="28" viewBox="0 0 24 24" fill={(completeRatingHover || completeRating) >= star ? '#f59e0b' : 'none'}
-                          stroke={(completeRatingHover || completeRating) >= star ? '#f59e0b' : '#cbd5e1'}
-                          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                        >
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                        </svg>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
-            </div>
 
-            <div className="flex gap-3 mt-2 shrink-0 pt-2">
-              <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteRating(0); }} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={submitComplete} disabled={!completeOdometer || Number(completeOdometer) <= 0} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
+              <div className="trip-window-footer px-4 pb-4">
+                <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onClick={submitComplete} disabled={!completeOdometer || completionBlocked} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ===== TRIP RECEIPT ===== */}
       {/* ===== FULL-SCREEN TRIP DETAILS ===== */}
@@ -6859,8 +7025,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== EMERGENCY TRANSFER MODAL ===== */}
       {transferPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
+          <div className="trip-window-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="trip-window-body p-6">
             <div className="flex items-start justify-between mb-5">
               <div className="flex-1 text-center">
                 <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
@@ -6902,14 +7069,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                 <button type="button" onClick={() => setPasswordPrompt({ type: 'transfer_send' })} disabled={!transferTargetDriverId} className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-sm disabled:opacity-40 transition-all cursor-pointer">Send</button>
               </div>
             </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
+          <div className="trip-window-panel" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+            <div className="trip-window-body p-6">
             {/* Header with step indicator */}
             <div className="flex items-center gap-0.5 mb-4">
               <div className="h-1 flex-1 rounded-full bg-emerald-400" />
@@ -6977,6 +7146,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                   {passwordVerifying ? 'Confirming...' : passwordPrompt.type === 'route_stop_exception' ? `Confirm ${passwordPrompt.status}` : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save' : passwordPrompt.type === 'transfer_send' ? 'Confirm Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Confirm Accept' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Confirm Decline' : 'Confirm Cancel'}
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>
