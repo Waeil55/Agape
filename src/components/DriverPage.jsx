@@ -13,7 +13,7 @@ import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/rout
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
 import {
-  Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle,
+  Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle,
   AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
   ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward,
   Home, Settings, LogOut,
@@ -897,7 +897,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     return null;
   });
   const [showMoreOptions, setShowMoreOptions] = useState(null);
-  const [sendingQuickSms, setSendingQuickSms] = useState(false);
+  const [quickSmsMenuTrip, setQuickSmsMenuTrip] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const [showToast, setShowToast] = useState(null);
   const toastTimeoutRef = useRef(null);
@@ -916,6 +916,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   }, []);
   const [selectedLegsForAction, setSelectedLegsForAction] = useState(new Set());
   const [isGpsTracking, setIsGpsTracking] = useState(false);
+  const [gpsNoticeDismissed, setGpsNoticeDismissed] = useState(false);
+
+  // One-shot probe: if location works now, restart the stream cleanly;
+  // otherwise tell the driver exactly what to fix instead of failing silently.
+  const retryGpsStream = () => {
+    if (!navigator.geolocation) return;
+    impact('medium');
+    navigator.geolocation.getCurrentPosition(
+      () => window.location.reload(),
+      () => setShowToast({ type: 'warning', message: 'Location still unavailable. Allow Location access for Agape Care in your device Settings.' }),
+      { timeout: 8000, enableHighAccuracy: true }
+    );
+  };
   const [showSequencerModal, setShowSequencerModal] = useState(false);
   const [sequencerTripFilter, setSequencerTripFilter] = useState(null);
   const [routePlanSequencerStops, setRoutePlanSequencerStops] = useState(null);
@@ -1466,6 +1479,62 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   useEffect(() => {
     return () => { if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current); };
   }, []);
+
+  // ── HARDWARE/GESTURE BACK CLOSES TRIP WINDOWS (native behavior) ──
+  // When any trip window opens we push one history entry; Android back then
+  // closes the window instead of leaving the app. Closing a window through
+  // its own buttons pops the sentinel so back never needs a double press.
+  const anyTripWindowOpen = Boolean(
+    showOdometerPrompt
+    || showArrivalConfirm
+    || showSignatureConfirm
+    || routeStopOdometerPrompt
+    || routeStopSignaturePrompt
+    || showCompleteModal
+    || scheduleEditorTrip
+    || showContactSelector
+    || quickSmsMenuTrip
+    || showMoreOptions
+    || transferPrompt
+    || passwordPrompt
+  );
+  const tripWindowBackSentinelRef = useRef(false);
+  useEffect(() => {
+    const closeAllTripWindows = () => {
+      setShowOdometerPrompt(null);
+      setShowArrivalConfirm(null);
+      setShowSignatureConfirm(null);
+      setRouteStopOdometerPrompt(null);
+      setRouteStopSignaturePrompt(null);
+      setShowCompleteModal(null);
+      setScheduleEditorTrip(null);
+      setShowContactSelector(null);
+      setQuickSmsMenuTrip(null);
+      setShowMoreOptions(null);
+      setTransferPrompt(null);
+      setPasswordPrompt(null);
+      setPasswordValue('');
+      setPasswordError('');
+    };
+    if (anyTripWindowOpen && !tripWindowBackSentinelRef.current) {
+      try { window.history.pushState({ agapeTripWindow: true }, ''); tripWindowBackSentinelRef.current = true; } catch { /* history unavailable */ }
+    }
+    const handlePop = () => {
+      if (tripWindowBackSentinelRef.current) {
+        tripWindowBackSentinelRef.current = false;
+        closeAllTripWindows();
+      }
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => {
+      window.removeEventListener('popstate', handlePop);
+      // Window closed via UI: consume the sentinel entry so Back won't skip.
+      if (tripWindowBackSentinelRef.current && typeof window.history.state?.agapeTripWindow === 'boolean') {
+        tripWindowBackSentinelRef.current = false;
+        try { window.history.back(); } catch { /* noop */ }
+      }
+    };
+  }, [anyTripWindowOpen]);
 
   // Analytics calculation
   useEffect(() => {
@@ -2754,10 +2823,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     handleCall(primary.phone, `${primary.label}: ${primary.name}`);
   };
 
+  // Single messaging entry point: every "SMS" button opens the Quick SMS
+  // menu (Write Manually + 7 templates). No second SMS button exists.
   const handleSmartSMS = (trip) => {
-    const primary = getPrimaryContactForTrip(trip);
-    if (!primary) return;
-    sendSMS(primary.phone, primary.name);
+    setQuickSmsMenuTrip(trip);
   };
 
   const openContactSelector = (trip) => {
@@ -3798,27 +3867,21 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     }
   };
 
-  const getQuickSmsText = async (trip, destination) => {
-    const patientName = (trip.patient || '').split(' ')[0] || 'there';
-    const greeting = `Hi ${patientName}, this is Agape Care transportation. I'm on my way.`;
-    let etaText = '';
-    try {
-      const pos = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
-      });
-      const origin = `${pos.coords.latitude},${pos.coords.longitude}`;
-      const duration = await getTravelDuration(origin, destination);
-      if (duration?.durationText) {
-        etaText = ` My ETA is ${duration.durationText}.`;
-      }
-    } catch {
-      try {
-        const destEnc = encodeURIComponent(destination || '');
-        const mapsLink = `https://www.google.com/maps/dir/?api=1&destination=${destEnc}`;
-        etaText = ` Check my ETA: ${mapsLink}`;
-      } catch (e) { console.warn('[geo SMS]', e); }
-    }
-    return greeting + etaText;
+  // ── QUICK SMS TEMPLATES ────────────────────────────────────────────────
+  // Exact wording per fleet messaging standard. [Client Name] is filled
+  // automatically; the company introduction is inserted only for the first
+  // message to a client (tracked per device in localStorage).
+  const buildQuickSmsText = (template, patientName, isFirstContact) => {
+    const firstName = String(patientName || '').trim().split(/\s+/)[0] || 'there';
+    return `Hi ${firstName},${isFirstContact ? ' this is Agape Care Medical Transportation.' : ''} ${template.body}`;
+  };
+
+  const smsContactStorageKey = (phone) => `agape_sms_contact_${String(phone || '').replace(/[^0-9+]/g, '')}`;
+  const hasMessagedClientBefore = (phone) => {
+    try { return !!window.localStorage.getItem(smsContactStorageKey(phone)); } catch { return false; }
+  };
+  const markClientAsMessaged = (phone) => {
+    try { window.localStorage.setItem(smsContactStorageKey(phone), new Date().toISOString()); } catch { /* storage unavailable */ }
   };
 
   const renderTripWorkPage = (trip) => {
@@ -4039,20 +4102,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         </div>
       </div>
     {showMoreOptions?.id === trip.id && (() => {
-      const onClose = () => { setSendingQuickSms(false); setShowMoreOptions(null); };
-      const pickupAddr = pickupAddress;
-      const dropoffAddr = dropoffAddress;
-      const handleQuickSms = async () => {
-        setSendingQuickSms(true);
-        const primary = getPrimaryContactForTrip(trip);
-        const destination = ['In Transit', 'Navigating Dropoff', 'In Progress'].includes(trip.status) ? dropoffAddr : pickupAddr;
-        const body = await getQuickSmsText(trip, destination);
-        if (primary) await sendSMSWithBody(primary.phone, body);
-        setSendingQuickSms(false);
-        onClose();
-      };
+      const onClose = () => { setShowMoreOptions(null); };
       const moreActions = [
-        { label: 'Quick SMS', icon: sendingQuickSms ? <div className="w-4 h-4 border-2 border-blue-400 border-t-blue-600 rounded-full animate-spin" /> : <MessageCircle size={16} />, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', onClick: handleQuickSms, disabled: sendingQuickSms },
         { label: 'Cancel', icon: <XCircle size={16} />, color: 'text-rose-600 bg-rose-50 hover:bg-rose-100', onClick: () => { onClose(); handleCancel(trip); } },
         { label: 'No Show', icon: <AlertCircle size={16} />, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', onClick: () => { onClose(); handleNoShow(trip); } },
         { label: 'Reroute', icon: <Route size={16} />, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100', onClick: () => { onClose(); handleReroute(trip); } },
@@ -4061,7 +4112,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       ];
       return (
         <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-white rounded-3xl rounded-b-none w-full max-w-lg pb-6 px-4 pt-2 animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex justify-center mb-3">
               <span className="w-10 h-1 rounded-full bg-slate-300" />
@@ -4226,6 +4277,20 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
               </select>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===== GPS STATUS RECOVERY ===== */}
+      {driverLocStream?.error && !isGpsTracking && !gpsNoticeDismissed && (
+        <div className="px-3 pt-2">
+          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+            <AlertCircle size={14} className="shrink-0" />
+            <span className="min-w-0 flex-1">Location unavailable — arrival distance checks are disabled.</span>
+            <button type="button" onClick={retryGpsStream} className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-bold shrink-0 active:bg-amber-700 cursor-pointer">Retry</button>
+            <button type="button" onClick={() => setGpsNoticeDismissed(true)} className="p-1 -m-1 text-amber-500 shrink-0 cursor-pointer" aria-label="Dismiss">
+              <X size={14} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -5297,7 +5362,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== SCHEDULE / TYPE EDITOR ===== */}
       {scheduleEditorTrip && scheduleEditDraft && (
-        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
           <div className="trip-window-panel">
             <button type="button" onClick={closeScheduleEditor} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
             <div className="trip-window-body p-5 space-y-4">
@@ -5427,7 +5492,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       {showOdometerPrompt && (() => {
         const arrivalEvaluation = runOdometerGuard({ raw: odometerValue });
         return (
-          <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+          <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
             <div className="trip-window-panel">
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
@@ -5475,7 +5540,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       {routeStopOdometerPrompt && (() => {
         const stopEvaluation = runOdometerGuard({ raw: routeStopOdometerValue });
         return (
-          <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+          <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
             <div className="trip-window-panel">
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
@@ -5521,7 +5586,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== ROUTE STOP SIGNATURE PROMPT ===== */}
       {routeStopSignaturePrompt && (
-        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
           <div className="trip-window-panel trip-window-panel-signature">
             <div className="trip-window-body p-5 flex flex-col justify-center">
               <div className="text-center">
@@ -5551,7 +5616,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== ARRIVAL CONFIRM MODAL ===== */}
       {showArrivalConfirm && (
-        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
           <div className="trip-window-panel">
             <div className="trip-window-body p-4">
               <div className="text-center mb-3">
@@ -5606,7 +5671,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== SIGNATURE CONFIRM MODAL (Before Heading to Dropoff) ===== */}
       {showSignatureConfirm && (
-        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
           <div className="trip-window-panel trip-window-panel-signature">
             <div className="trip-window-body p-5 flex flex-col justify-center">
               <div className="text-center">
@@ -5644,7 +5709,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         const completionBlocked = completionEvaluation.status === 'invalid' || completionEvaluation.status === 'blocked'
           || (completionEvaluation.status === 'confirm' && !completeAck);
         return (
-          <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+          <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
             <div className="trip-window-panel">
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
@@ -7064,7 +7129,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== EMERGENCY TRANSFER MODAL ===== */}
       {transferPrompt && (
-        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
           <div className="trip-window-panel" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => setTransferPrompt(null)} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
             <div className="trip-window-body p-4">
@@ -7111,7 +7176,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
-        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
+        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
           <div className="trip-window-panel" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
             <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
             <div className="trip-window-body p-4">
@@ -7183,13 +7248,97 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         </div>
       )}
 
+      {/* ===== QUICK SMS MENU ===== */}
+      {quickSmsMenuTrip && (() => {
+        const smsTrip = quickSmsMenuTrip;
+        const smsPrimary = getPrimaryContactForTrip(smsTrip);
+        const smsFirstName = String(smsTrip.patient || '').trim().split(/\s+/)[0] || 'there';
+        const smsFirstContact = smsPrimary ? !hasMessagedClientBefore(smsPrimary.phone) : false;
+        const smsTripKey = tripCalendarDateKey(smsTrip.date);
+        const todayKey = localCalendarYmd();
+        const tomorrowKey = localCalendarYmd(new Date(Date.now() + 86400000));
+        const suggestedId = smsTripKey && smsTripKey === todayKey ? 'today' : smsTripKey === tomorrowKey ? 'tomorrow' : null;
+        const quickSmsTemplates = [
+          { id: 'tomorrow', label: 'Tomorrow Trip', body: "just checking if we're still on for your trip tomorrow." },
+          { id: 'today', label: 'Today Trip', body: "just checking if we're still on for your trip today." },
+          { id: 'soon', label: 'On My Way Soon', body: "I'll be on my way shortly. Please confirm that we're still on." },
+          { id: 'way', label: 'On My Way', body: "I'm on my way." },
+          { id: 'ready', label: 'Pickup / Ready Time', body: "do you know what time you'll be done and ready for pickup?" },
+          { id: 'checkin', label: 'Checking In', body: 'just checking in regarding your trip. Please let me know if everything is still good for today.' },
+          { id: 'arrived', label: "I've Arrived", body: "I've arrived. Please let me know when you're ready." },
+        ];
+        const closeQuickSms = () => setQuickSmsMenuTrip(null);
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={closeQuickSms}>
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative bg-white rounded-3xl rounded-b-none w-full max-w-lg pb-6 px-4 pt-2 animate-slide-up max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center mb-3">
+                <span className="w-10 h-1 rounded-full bg-slate-300" />
+              </div>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-base font-bold text-slate-900">SMS</h3>
+                <button type="button" onClick={closeQuickSms} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 mb-3">
+                To: {smsPrimary ? `${smsPrimary.label}: ${smsPrimary.name}` : 'No primary contact'}
+              </p>
+              {!smsPrimary ? (
+                <p className="text-sm font-medium text-rose-600 py-4 text-center">This trip has no contact number.</p>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { closeQuickSms(); sendSMS(smsPrimary.phone, smsPrimary.name); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all text-sm font-semibold cursor-pointer mb-3"
+                  >
+                    <PenLine size={16} /> Write Manually
+                  </button>
+                  <div className="space-y-1">
+                    {quickSmsTemplates.map((tpl) => {
+                      const preview = buildQuickSmsText(tpl, smsTrip.patient, smsFirstContact);
+                      const suggested = suggestedId === tpl.id;
+                      return (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          onClick={() => {
+                            markClientAsMessaged(smsPrimary.phone);
+                            closeQuickSms();
+                            sendSMSWithBody(smsPrimary.phone, preview);
+                          }}
+                          className="w-full flex items-start gap-3 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition-all text-left cursor-pointer"
+                        >
+                          <MessageCircle size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-900">{tpl.label}</span>
+                              {suggested && (
+                                <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-[10px] font-bold uppercase tracking-wide text-amber-700">Suggested</span>
+                              )}
+                            </span>
+                            <span className="block text-xs font-medium text-slate-500 mt-0.5 break-words">{preview}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] font-medium text-slate-400 mt-3 text-center">Your message opens in the SMS app so you can review it before sending.</p>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ===== SMART CONTACT SELECTOR ===== */}
       {showContactSelector && (() => {
         const contacts = getContactsForTrip(showContactSelector);
         const warning = getContactWarning(showContactSelector, trips);
         const iconMap = { User, Shield, PhoneForwarded, AlertTriangle, Building, MapPin, Headphones, Route };
         return (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end justify-center" style={{ zIndex: 170 }} onClick={() => setShowContactSelector(null)}>
+          <div className="fixed inset-0 bg-black/40 flex items-end justify-center" style={{ zIndex: 170 }} onClick={() => setShowContactSelector(null)}>
             <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl relative overflow-hidden animate-slide-up pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="px-5 py-4 bg-blue-600 text-white">
@@ -7335,7 +7484,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       {/* ===== ROUTE SEQUENCER MODAL ===== */}
       {showSequencerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setShowSequencerModal(false); setSequencerTripFilter(null); setRoutePlanSequencerStops(null); setRoutePlanSequencerSequence(null); setRoutePlanSequencerOrigin(null); }}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/60" />
           <div className="bg-white w-full max-w-7xl max-h-[92vh] min-h-[400px] rounded-3xl shadow-2xl relative z-10 border border-slate-200 animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
             <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm     font-semibold text-slate-900 flex items-center gap-2">
@@ -7390,7 +7539,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         const legs = orderedTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientName.trim().toLowerCase());
         return (
           <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 130 }} onClick={() => setLegsDetailPatient(null)}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-black/40" />
             <div className="bg-white w-full max-w-lg rounded-3xl p-5 relative shadow-2xl max-h-[85vh] overflow-y-auto pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg     font-semibold text-slate-900">{patientName}</h3>

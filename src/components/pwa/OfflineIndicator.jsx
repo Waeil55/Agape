@@ -51,15 +51,16 @@ const OfflineIndicator = () => {
 
   if (!showBanner) return null;
 
+  // In-flow banner (not fixed): it pushes page content down instead of
+  // covering the pinned trip header (client name / trip id).
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-[9997] pointer-events-none"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
+      className="shrink-0 z-[9997]"
       role="status"
       aria-live="polite"
     >
       <div
-        className={`mx-2 sm:mx-4 rounded-xl shadow-lg border px-4 py-3 flex items-center gap-3 pointer-events-auto ${
+        className={`mx-2 mt-2 sm:mx-4 sm:mt-3 rounded-xl shadow-lg border px-4 py-3 flex items-center gap-3 ${
           isOnline
             ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
             : 'bg-rose-50 border-rose-200 text-rose-800'

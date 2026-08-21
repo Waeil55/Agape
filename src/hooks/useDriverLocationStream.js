@@ -38,6 +38,11 @@ export function useDriverLocationStream({
   const driverId = driver?.id || '';
   const batchQueueRef = useRef([]);
   const lastTrailWriteRef = useRef(0);
+  // UI-position throttle: raw GPS samples arrive every 1-2s; pushing each one
+  // into React state re-renders the whole driver page. The stream's internal
+  // ref stays per-sample accurate; consumers get at most ~4s staleness or a
+  // >20m move, which every UI use (distance checks, route building) tolerates.
+  const uiPositionRef = useRef({ at: 0, lat: null, lng: null });
 
   const flushLatestPosition = useCallback(async (reason = 'interval') => {
     if (!enabled || !driverId || !latestPositionRef.current || flushingRef.current) return;
@@ -119,7 +124,14 @@ export function useDriverLocationStream({
         clientTimeMs: Date.now(),
       };
       latestPositionRef.current = sample;
-      onPositionChange?.({ lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy });
+      const ui = uiPositionRef.current;
+      const movedMiles = ui.lat != null && sample.lat && sample.lng
+        ? haversineMiles({ lat: ui.lat, lng: ui.lng }, { lat: sample.lat, lng: sample.lng })
+        : Infinity;
+      if (ui.at === 0 || Date.now() - ui.at >= 4000 || movedMiles > 0.012) {
+        uiPositionRef.current = { at: Date.now(), lat: sample.lat, lng: sample.lng };
+        onPositionChange?.({ lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy });
+      }
       onTrackingChange?.(true);
       setError('');
 

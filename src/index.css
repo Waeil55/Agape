@@ -431,7 +431,22 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 .animate-slide-up {
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Native-feel scroll: offscreen cards skip layout/paint entirely, so long
+   trip lists scroll smoothly on low-end phones. */
+.agape-card-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 132px;
+}
+
+/* Instant tap response everywhere: no click delay, no ghost highlights. */
+button,
+a,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 @keyframes fadeIn {

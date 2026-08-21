@@ -392,6 +392,19 @@ const App = () => {
   const loginAttemptRef = useRef(0);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
+
+  // Warm the driver/admin page chunks while the user is on the login screen
+  // so the post-login transition is instant (native-app feel).
+  useEffect(() => {
+    if (isAuthenticated) return undefined;
+    const warm = () => { import('./components/DriverPage').catch(() => {}); };
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback && window.cancelIdleCallback(id);
+    }
+    const t = setTimeout(warm, 1500);
+    return () => clearTimeout(t);
+  }, [isAuthenticated]);
   
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -2999,6 +3012,8 @@ const App = () => {
   return (
     <>
       <div className="h-full flex-1 flex flex-col bg-[var(--bg-app)] overflow-hidden w-full">
+      {/* Connectivity first: pushes content down instead of covering it */}
+      <OfflineIndicator />
       {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">
@@ -3297,8 +3312,6 @@ const App = () => {
           <PWAUpdatePrompt />
         </>
       )}
-      {/* Connectivity status renders app-wide, including the login screen. */}
-      <OfflineIndicator />
     </div>
     </>
   );
