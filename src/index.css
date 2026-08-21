@@ -2319,7 +2319,20 @@ html.trip-window-open body {
 html.trip-window-kb-open .trip-window-overlay {
   justify-content: flex-end;
   align-items: flex-end;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
+}
+
+/* Touch hardening: no double-tap-zoom delay or ghost highlights inside
+   trip windows, and no scroll chaining from the overlay to the page. */
+.trip-window-overlay button,
+.trip-window-overlay select,
+.trip-window-overlay input,
+.trip-window-overlay label {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.trip-window-overlay {
+  overscroll-behavior: none;
 }
 
 /* Signature windows get extra breathing room for a comfortable confirm. */

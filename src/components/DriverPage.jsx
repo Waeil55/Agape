@@ -981,6 +981,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const tripsScrollRef = useRef(null);
   const workflowSyncRef = useRef({});
   const pullStartY = useRef(null);
+  // Mutex against rapid double-taps firing an async trip action twice
+  // (duplicate arrivals, duplicate completions, duplicate odometer syncs).
+  const tripActionInFlightRef = useRef(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -1388,6 +1391,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     let settleTimer = 0;
     let observedPanel = null;
     let fullHeight = window.innerHeight;
+    let lastShiftWritten = null;
     const syncWindowShift = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
@@ -1403,23 +1407,39 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         const visibleBottom = Math.min(window.innerHeight, visualViewport.offsetTop + visualViewport.height);
         const keyboardOpen = fullHeight - visibleBottom > 120;
         document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
+        // When the browser itself shrinks the layout viewport (Android
+        // resizes-content), flex-end docking already puts the window above
+        // the keyboard — any extra transform lift would move the painted
+        // window away from its touch targets, so keep the transform at zero.
+        // The measured lift is only for viewports that do NOT resize (iOS).
+        const contentResized = fullHeight - window.innerHeight > 120;
         let shift = 0;
-        if (panel && keyboardOpen) {
+        if (panel && keyboardOpen && !contentResized) {
           const rect = panel.getBoundingClientRect();
-          shift = Math.max(0, Math.ceil(rect.bottom - visibleBottom + 8));
+          shift = Math.max(0, Math.ceil(rect.bottom - visibleBottom + 30));
         }
-        document.documentElement.style.setProperty('--agape-kb-shift', `${shift}px`);
+        if (shift !== lastShiftWritten) {
+          lastShiftWritten = shift;
+          document.documentElement.style.setProperty('--agape-kb-shift', `${shift}px`);
+        }
       });
     };
     const scheduleSettlePass = () => {
       if (settleTimer) clearTimeout(settleTimer);
       settleTimer = window.setTimeout(syncWindowShift, 220);
     };
+    // Rotation changes the portrait/landscape baseline; without this reset
+    // the stale taller baseline keeps the keyboard heuristic stuck ON.
+    const resetBaseline = () => { fullHeight = window.innerHeight; syncWindowShift(); };
     const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncWindowShift) : null;
     syncWindowShift();
     visualViewport.addEventListener('resize', syncWindowShift);
     visualViewport.addEventListener('scroll', syncWindowShift);
     window.addEventListener('resize', syncWindowShift);
+    window.addEventListener('orientationchange', resetBaseline);
+    if (window.screen && window.screen.orientation && window.screen.orientation.addEventListener) {
+      window.screen.orientation.addEventListener('change', resetBaseline);
+    }
     document.addEventListener('focusin', scheduleSettlePass, true);
     document.addEventListener('focusout', scheduleSettlePass, true);
     return () => {
@@ -1429,6 +1449,10 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       visualViewport.removeEventListener('resize', syncWindowShift);
       visualViewport.removeEventListener('scroll', syncWindowShift);
       window.removeEventListener('resize', syncWindowShift);
+      window.removeEventListener('orientationchange', resetBaseline);
+      if (window.screen && window.screen.orientation && window.screen.orientation.removeEventListener) {
+        window.screen.orientation.removeEventListener('change', resetBaseline);
+      }
       document.removeEventListener('focusin', scheduleSettlePass, true);
       document.removeEventListener('focusout', scheduleSettlePass, true);
       document.documentElement.classList.remove('trip-window-open');
@@ -2894,6 +2918,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
   const submitOdometer = async () => {
     if (!showOdometerPrompt || !odometerValue) return;
+    if (tripActionInFlightRef.current) return;
     const evaluation = runOdometerGuard({ raw: odometerValue });
     if (evaluation.status === 'empty' || evaluation.status === 'invalid' || evaluation.status === 'blocked') {
       setOdometerError(evaluation.errors[0] || 'Enter the current odometer reading.');
@@ -2903,6 +2928,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       setOdometerError('Review the warning and confirm the reading before continuing.');
       return;
     }
+    tripActionInFlightRef.current = true;
+    try {
     const odo = evaluation.value;
     setOdometerError('');
     // Record pickup arrival + departure timestamps using canonical fields
@@ -2990,6 +3017,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     setLastOdometer(odo);
     setShowOdometerPrompt(null);
     setOdometerValue('');
+    } finally {
+      tripActionInFlightRef.current = false;
+    }
   };
 
   const handleArriveDropoff = (trip) => {
@@ -3014,6 +3044,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
   const confirmArrival = async () => {
     if (!showArrivalConfirm) return;
+    if (tripActionInFlightRef.current) return;
     const arrivalEvaluation = runOdometerGuard({ raw: arrivalOdometer });
     if (arrivalEvaluation.status === 'empty' || arrivalEvaluation.status === 'invalid' || arrivalEvaluation.status === 'blocked') {
       setShowToast({ type: 'warning', message: arrivalEvaluation.errors[0] || 'Enter the current odometer reading before confirming arrival.' });
@@ -3023,6 +3054,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       setShowToast({ type: 'warning', message: 'Review the odometer warning and confirm the reading first.' });
       return;
     }
+    tripActionInFlightRef.current = true;
+    try {
     const odo = arrivalEvaluation.value;
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
@@ -3107,6 +3140,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     setLastOdometer(odo);
     setShowArrivalConfirm(null);
     setArrivalOdometer('');
+    } finally {
+      tripActionInFlightRef.current = false;
+    }
   };
 
   const confirmSignatureAndBegin = () => {
@@ -5261,17 +5297,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== SCHEDULE / TYPE EDITOR ===== */}
       {scheduleEditorTrip && scheduleEditDraft && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6" style={{ zIndex: 120 }}>
-          <div className="w-full sm:max-w-lg bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh]" style={{ zIndex: 10 }}>
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
-              <div className="min-w-0">
-                <h3 className="text-base font-semibold text-slate-950">Update Trip Time</h3>
-                <p className="text-xs font-semibold text-slate-500 truncate">{scheduleEditorTrip.patient} #{scheduleEditorTrip.bookingId || scheduleEditorTrip.id}</p>
+        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
+          <div className="trip-window-panel">
+            <button type="button" onClick={closeScheduleEditor} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
+            <div className="trip-window-body p-5 space-y-4">
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Update Trip Time</h3>
+                <p className="text-sm text-slate-500 mt-0.5">{scheduleEditorTrip.patient} #{scheduleEditorTrip.bookingId || scheduleEditorTrip.id}</p>
               </div>
-              <button type="button" onClick={closeScheduleEditor} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer shrink-0"><X size={17} /></button>
-            </div>
-
-            <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'time', label: 'Set Time', hint: 'Exact pickup time' },
@@ -5382,9 +5415,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
               </p>
             </div>
 
-            <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
-              <button type="button" onClick={closeScheduleEditor} className="flex-1 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold cursor-pointer">Cancel</button>
-              <button type="button" onClick={saveScheduleEdit} className="flex-1 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer">Save</button>
+            <div className="trip-window-footer px-4 pb-4">
+              <button type="button" onClick={closeScheduleEditor} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+              <button type="button" onClick={saveScheduleEdit} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Save</button>
             </div>
           </div>
         </div>
@@ -7031,50 +7064,46 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== EMERGENCY TRANSFER MODAL ===== */}
       {transferPrompt && (
-        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
+        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
           <div className="trip-window-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="trip-window-body p-6">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex-1 text-center">
-                <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <Forward size={24} className="text-orange-600" />
+            <button type="button" onClick={() => setTransferPrompt(null)} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
+            <div className="trip-window-body p-4">
+              <div className="text-center mb-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
+                  <Forward size={18} className="text-orange-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900">Emergency Transfer</h3>
-                <p className="text-xs font-semibold text-slate-500 mt-1">
+                <h3 className="text-lg font-bold text-slate-900">Emergency Transfer</h3>
+                <p className="text-sm text-slate-500 mt-0.5">
                   Send this {transferPrompt.type === 'route' ? 'route plan' : 'trip'} to another driver for acceptance.
                 </p>
               </div>
-              <button type="button" onClick={() => setTransferPrompt(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Send To Driver</label>
-                <select value={transferTargetDriverId} onChange={(e) => setTransferTargetDriverId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm focus:border-amber-500 outline-none">
-                  <option value="">Select driver</option>
-                  {transferTargetDrivers.map((driver) => (
-                    <option key={driver.id} value={driver.id}>{driver.name || driver.email || driver.id}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Reason</label>
-                <select value={transferReason} onChange={(e) => setTransferReason(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm focus:border-amber-500 outline-none">
-                  <option value="">Select reason</option>
-                  <option value="Traffic delay">Traffic delay</option>
-                  <option value="Vehicle issue">Vehicle issue</option>
-                  <option value="Emergency">Emergency</option>
-                  <option value="Running late">Running late</option>
-                  <option value="Other driver closer">Other driver closer</option>
-                </select>
-              </div>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                <p className="text-xs font-semibold text-amber-800">You must confirm with your password to send. The receiving driver must also accept with password.</p>
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setTransferPrompt(null)} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onClick={() => setPasswordPrompt({ type: 'transfer_send' })} disabled={!transferTargetDriverId} className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-sm disabled:opacity-40 transition-all cursor-pointer">Send</button>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Send To Driver</label>
+                  <select value={transferTargetDriverId} onChange={(e) => setTransferTargetDriverId(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-amber-500 outline-none">
+                    <option value="">Select driver</option>
+                    {transferTargetDrivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>{driver.name || driver.email || driver.id}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Reason</label>
+                  <select value={transferReason} onChange={(e) => setTransferReason(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-amber-500 outline-none">
+                    <option value="">Select reason</option>
+                    <option value="Traffic delay">Traffic delay</option>
+                    <option value="Vehicle issue">Vehicle issue</option>
+                    <option value="Emergency">Emergency</option>
+                    <option value="Running late">Running late</option>
+                    <option value="Other driver closer">Other driver closer</option>
+                  </select>
+                </div>
+                <p className="text-xs font-semibold text-amber-700 text-center">Password confirmation required by both drivers.</p>
               </div>
             </div>
+            <div className="trip-window-footer px-4 pb-4">
+              <button type="button" onClick={() => setTransferPrompt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+              <button type="button" onClick={() => setPasswordPrompt({ type: 'transfer_send' })} disabled={!transferTargetDriverId} className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Send</button>
             </div>
           </div>
         </div>
@@ -7082,22 +7111,22 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
 
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
-        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
+        <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
           <div className="trip-window-panel" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
-            <div className="trip-window-body p-6">
-            {/* Header with step indicator */}
-            <div className="flex items-center gap-0.5 mb-4">
-              <div className="h-1 flex-1 rounded-full bg-emerald-400" />
-              <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-400' : 'bg-rose-400'}`} />
-            </div>
-            <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-4 text-center">Step 2 of 2</p>
-            <div className="flex items-start justify-between mb-5">
-              <div className="text-center flex-1">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-100' : 'bg-rose-100'}`}>
-                  <Lock size={24} className={passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'text-blue-600' : 'text-rose-600'} />
+            <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
+            <div className="trip-window-body p-4">
+              {/* Header with step indicator */}
+              <div className="flex items-center gap-0.5 mb-2">
+                <div className="h-1 flex-1 rounded-full bg-emerald-400" />
+                <div className={`h-1 flex-1 rounded-full ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-400' : 'bg-rose-400'}`} />
+              </div>
+              <p className="text-micro font-semibold uppercase tracking-wide text-slate-400 text-center">Step 2 of 2</p>
+              <div className="text-center mt-1.5">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-1.5 ${passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-100' : 'bg-rose-100'}`}>
+                  <Lock size={18} className={passwordPrompt.type === 'restore' || passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' || String(passwordPrompt.type || '').includes('transfer') ? 'text-blue-600' : 'text-rose-600'} />
                 </div>
-                <h3 className="text-lg     font-semibold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'transfer_send' ? 'Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
-                <p className="text-xs text-slate-500 mt-1">
+                <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'transfer_send' ? 'Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
+                <p className="text-sm text-slate-500 mt-0.5">
                   {(role === 'admin' || role === 'dispatcher') 
                     ? `Confirm administrative action for ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip?.patient || 'this trip'}.`
                     : (passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip?.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`)}
@@ -7106,53 +7135,49 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                   <p className="text-xs text-rose-500 font-semibold mt-1">{passwordPrompt.selectedLegIds.length} leg{passwordPrompt.selectedLegIds.length !== 1 ? 's' : ''} will be affected</p>
                 )}
               </div>
-              <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 ml-2 shrink-0 cursor-pointer"><X size={16} className="text-slate-500" /></button>
-            </div>
-            <div className="space-y-4">
-              {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && !String(passwordPrompt.type || '').includes('transfer') && (
-                <div>
-                  <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Reason</label>
-                  <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm focus:border-rose-500 outline-none">
-                    <option value="">Select reason (optional)</option>
-                    <option value="Client Cancelled">Client Cancelled</option>
-                    <option value="Facility Cancelled">Facility Cancelled</option>
-                    <option value="No Answer">No Answer</option>
-                    <option value="No Show">No Show</option>
-                    <option value="Transportation Issue">Transportation Issue</option>
-                    <option value="Weather">Weather</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              )}
-              {!(role === 'admin' || role === 'dispatcher') ? (
-                <div>
-                  <label className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">Password</label>
-                  <input
-                    type="password"
-                    value={passwordValue}
-                    onChange={(e) => setPasswordValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
-                    placeholder="Enter password"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-rose-500 outline-none"
-                    autoFocus
-                  />
-                  {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
-                </div>
-              ) : (
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center text-xs text-blue-700 font-medium">
-                  Administrative access: password input bypassed.
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
-                  Back
-                </button>
-                <button type="button" onClick={verifyPasswordAndProceed} disabled={(!(role === 'admin' || role === 'dispatcher') && !passwordValue) || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-semibold text-sm disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
-                  {passwordVerifying ? 'Confirming...' : passwordPrompt.type === 'route_stop_exception' ? `Confirm ${passwordPrompt.status}` : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save' : passwordPrompt.type === 'transfer_send' ? 'Confirm Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Confirm Accept' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Confirm Decline' : 'Confirm Cancel'}
-                </button>
+              <div className="space-y-3 mt-3">
+                {passwordPrompt.type !== 'restore' && passwordPrompt.type !== 'edittrip' && passwordPrompt.type !== 'edittripcomplete' && !String(passwordPrompt.type || '').includes('transfer') && (
+                  <div>
+                    <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Reason</label>
+                    <select value={passwordPrompt.reason || ''} onChange={(e) => setPasswordPrompt(prev => ({ ...prev, reason: e.target.value }))}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-medium text-sm text-center focus:border-rose-500 outline-none">
+                      <option value="">Select reason (optional)</option>
+                      <option value="Client Cancelled">Client Cancelled</option>
+                      <option value="Facility Cancelled">Facility Cancelled</option>
+                      <option value="No Answer">No Answer</option>
+                      <option value="No Show">No Show</option>
+                      <option value="Transportation Issue">Transportation Issue</option>
+                      <option value="Weather">Weather</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                )}
+                {!(role === 'admin' || role === 'dispatcher') ? (
+                  <div>
+                    <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Password</label>
+                    <input
+                      type="password"
+                      value={passwordValue}
+                      onChange={(e) => setPasswordValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
+                      placeholder="Enter password"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-rose-500 outline-none"
+                      autoFocus
+                    />
+                    {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
+                  </div>
+                ) : (
+                  <p className="text-xs text-blue-700 font-semibold text-center">Administrative access: password input bypassed.</p>
+                )}
               </div>
             </div>
+            <div className="trip-window-footer px-4 pb-4">
+              <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
+                Back
+              </button>
+              <button type="button" onClick={verifyPasswordAndProceed} disabled={(!(role === 'admin' || role === 'dispatcher') && !passwordValue) || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-semibold disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                {passwordVerifying ? 'Confirming...' : passwordPrompt.type === 'route_stop_exception' ? `Confirm ${passwordPrompt.status}` : passwordPrompt.type === 'noshow' ? 'Confirm No Show' : passwordPrompt.type === 'reroute' ? 'Confirm Reroute' : passwordPrompt.type === 'restore' ? 'Confirm Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Confirm & Save' : passwordPrompt.type === 'transfer_send' ? 'Confirm Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Confirm Accept' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Confirm Decline' : 'Confirm Cancel'}
+              </button>
             </div>
           </div>
         </div>

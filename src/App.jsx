@@ -2221,6 +2221,9 @@ const App = () => {
 
   const handleCompleteTrip = (tripId, driverId, odometer) => {
     const trip = trips.find(t => t.id === tripId);
+    if (!trip) return;
+    // Idempotency: a duplicated completion call must never double-write.
+    if (trip.status === 'Completed' && trip.completedAt) return;
     if (!trip?.pickupOdometer || !trip?.arrivalTime || !trip?.departedPickupTime || !trip?.arrivalDropoffTime || (!trip?.paperSignatureConfirmed && !trip?.unableToSign)) {
       addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${trip?.patient || tripId} before all required steps were finished.`, 'rose');
       return;
@@ -3292,9 +3295,10 @@ const App = () => {
           {/* PWA Components */}
           <PWAInstallPrompt />
           <PWAUpdatePrompt />
-          <OfflineIndicator />
         </>
       )}
+      {/* Connectivity status renders app-wide, including the login screen. */}
+      <OfflineIndicator />
     </div>
     </>
   );
