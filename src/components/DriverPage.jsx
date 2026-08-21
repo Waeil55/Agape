@@ -5490,15 +5490,18 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       {routeStopSignaturePrompt && (
         <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
           <div className="trip-window-panel trip-window-panel-signature">
-            <div className="trip-window-body p-4">
-              <div className="text-center mb-3">
+            <div className="trip-window-body p-5 flex flex-col justify-center">
+              <div className="text-center">
                 <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
                   <Check size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Confirm Signature</h3>
-                <p className="text-sm text-slate-500 mt-0.5">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</p>
+                <p className="text-micro font-semibold uppercase tracking-wider text-slate-400">Confirm Signature</p>
+                <h3 className="text-2xl font-bold text-slate-900 mt-1 leading-tight break-words">{routeStopSignaturePrompt.name || `Stop ${routeStopSignaturePrompt.sequenceIndex}`}</h3>
+                {routeStopSignaturePrompt.bookingId && (
+                  <span className="inline-block mt-2 px-3 py-1 bg-slate-100 rounded-full text-xs font-semibold text-slate-600">Trip #{routeStopSignaturePrompt.bookingId}</span>
+                )}
               </div>
-              <button type="button" onClick={() => setRouteStopSignatureConfirmed(!routeStopSignatureConfirmed)} className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer text-left ${routeStopSignatureConfirmed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+              <button type="button" onClick={() => setRouteStopSignatureConfirmed(!routeStopSignatureConfirmed)} className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer text-left mt-4 ${routeStopSignatureConfirmed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
                 <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${routeStopSignatureConfirmed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
                   {routeStopSignatureConfirmed && <Check size={10} className="text-white" />}
                 </span>
@@ -5572,16 +5575,19 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       {showSignatureConfirm && (
         <div className="trip-window-overlay bg-black/40 backdrop-blur-sm" style={{ zIndex: 120 }}>
           <div className="trip-window-panel trip-window-panel-signature">
-            <div className="trip-window-body p-4">
-              <div className="text-center mb-3">
+            <div className="trip-window-body p-5 flex flex-col justify-center">
+              <div className="text-center">
                 <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
                   <Check size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Begin Transport</h3>
-                <p className="text-sm text-slate-500 mt-0.5">{showSignatureConfirm.patient}</p>
+                <p className="text-micro font-semibold uppercase tracking-wider text-slate-400">Begin Transport</p>
+                <h3 className="text-2xl font-bold text-slate-900 mt-1 leading-tight break-words">{showSignatureConfirm.patient || 'Client'}</h3>
+                {showSignatureConfirm.bookingId && (
+                  <span className="inline-block mt-2 px-3 py-1 bg-slate-100 rounded-full text-xs font-semibold text-slate-600">Trip #{showSignatureConfirm.bookingId}</span>
+                )}
               </div>
-              <p className="text-center text-xs font-semibold text-slate-500 mb-2">Obtain the client signature before heading to dropoff.</p>
-              <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer text-left ${signatureConfirmed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+              <p className="text-center text-xs font-semibold text-slate-500 mt-4">Obtain the client signature before heading to dropoff.</p>
+              <button type="button" onClick={() => setSignatureConfirmed(!signatureConfirmed)} className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer text-left mt-2 ${signatureConfirmed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
                 <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${signatureConfirmed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
                   {signatureConfirmed && <Check size={10} className="text-white" />}
                 </span>
