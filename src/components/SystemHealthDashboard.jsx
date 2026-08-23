@@ -122,7 +122,7 @@ export default function SystemHealthDashboard({ trips = [], drivers = [], logs =
 
     const missed = trips.filter(t => t.status === 'No Show' || t.status === 'Cancelled');
     if (missed.length > 0) {
-      recent.push({ type: 'error', message: `${missed.length} missed/cancelled trips`, time: 'Today' });
+      recent.push({ type: 'error', message: `${missed.length} historical missed/cancelled trips`, time: 'All records' });
     }
 
     const offlineDrivers = drivers.filter(d => d.status === 'Offline' && d.wasRecentlyActive);
