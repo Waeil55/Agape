@@ -1876,14 +1876,9 @@ button:disabled,
   background: var(--enterprise-blue-strong) !important;
 }
 
-/* ===== GLOBAL GRADIENT OVERRIDES =====
-   Force all gradient backgrounds to solid enterprise blue.
-   Components should use bg-blue-600 instead of bg-gradient-to-r from-blue-600 to-blue-700. */
-.bg-gradient-to-r,
-.bg-gradient-to-br,
-.bg-gradient-to-bl,
-.bg-gradient-to-l,
-.bg-gradient-to-t,
+/* ===== STRONG BRAND GRADIENT OVERRIDES =====
+   Keep primary blue gradients solid without flattening soft status and
+   information surfaces that depend on their own accessible text contrast. */
 .from-blue-600,
 .from-blue-700,
 .from-indigo-600,
