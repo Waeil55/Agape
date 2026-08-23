@@ -18,12 +18,12 @@ export const TRIP_STATUSES = {
 };
 
 export const TRIP_STATUS_COLORS = {
-  'Assigned': '#2563EB',
-  'Accepted': '#3B82F6',
-  'En Route': '#3B82F6',
+  'Assigned': '#3468E8',
+  'Accepted': '#4776E8',
+  'En Route': '#4776E8',
   'Arrived': '#F59E0B',
-  'Pickup Complete': '#3B82F6',
-  'Transporting': '#3B82F6',
+  'Pickup Complete': '#4776E8',
+  'Transporting': '#4776E8',
   'Arrived Destination': '#F59E0B',
   'Completed': '#10B981',
   'Cancelled': '#EF4444',

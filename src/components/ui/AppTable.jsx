@@ -12,7 +12,7 @@ export function AppTable({ children, className = '', ...props }) {
 
 export function AppTableHead({ children, className = '', ...props }) {
   return (
-    <thead className={`bg-[var(--brand-navy)] text-white ${className}`} {...props}>
+    <thead className={`bg-[var(--brand-primary)] text-white ${className}`} {...props}>
       {children}
     </thead>
   );

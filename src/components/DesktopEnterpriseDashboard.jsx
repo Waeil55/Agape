@@ -519,7 +519,7 @@ const DesktopEnterpriseDashboard = ({
   };
 
   const renderEnterpriseTopBar = () => (
-    <header className="enterprise-topbar sticky top-0 z-30 hidden h-20 items-center gap-4 border-b border-white/10 bg-[var(--brand-navy)] px-6 text-white md:flex shadow-sm">
+    <header className="enterprise-topbar sticky top-0 z-30 hidden h-20 items-center gap-4 border-b border-white/10 bg-[var(--brand-primary)] px-6 text-white md:flex shadow-sm">
       <div className="flex min-w-[200px] items-center gap-3 shrink-0">
         <div className="flex h-11 w-11 items-center justify-center rounded-[1.2rem] border border-slate-200 bg-white shadow-sm p-2">
           <img src="/agape.png" alt="Agape Care" className="h-full w-full object-contain" />
@@ -542,7 +542,7 @@ const DesktopEnterpriseDashboard = ({
                 aria-label={item.label}
                 className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
                   item.active
-                    ? 'bg-white text-[var(--brand-navy)] shadow-md'
+                    ? 'bg-white text-[var(--brand-primary)] shadow-md'
                     : 'text-blue-100 hover:text-white hover:bg-white/10'
                 }`}
                 title={item.label}
@@ -620,7 +620,7 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="enterprise-mobile-topbar bg-[var(--brand-navy)] text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="enterprise-mobile-topbar bg-[var(--brand-primary)] text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
       </div>

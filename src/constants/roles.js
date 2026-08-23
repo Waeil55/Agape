@@ -23,12 +23,12 @@ export const ROLE_LABELS = {
 };
 
 export const ROLE_COLORS = {
-  admin: '#2563EB',
-  dispatcher: '#3B82F6',
+  admin: '#3468E8',
+  dispatcher: '#4776E8',
   driver: '#10B981',
   billing: '#EF4444',
   qa_auditor: '#F59E0B',
-  fleet_manager: '#3B82F6',
+  fleet_manager: '#4776E8',
   supervisor: '#64748B',
 };
 
