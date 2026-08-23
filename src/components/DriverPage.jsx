@@ -797,14 +797,16 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
     // selection on every login; drivers can still choose it for the current session.
     return savedFilter && savedFilter !== 'all' ? savedFilter : 'completed';
   });
-  const [historySearch, setHistorySearch] = useState(() => localStorage.getItem(`agape_drvHistSearch_${userKey}`) || '');
+  // Search is intentionally session-only: a stale persisted term silently hid
+  // trips after relogin and looked like missing history.
+  const [historySearch, setHistorySearch] = useState('');
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
 
   useEffect(() => {
     if (!isEmbedded) localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
     localStorage.setItem(`agape_drvHistFilter_${userKey}`, historyFilter);
-    localStorage.setItem(`agape_drvHistSearch_${userKey}`, historySearch);
-  }, [activeNav, historyFilter, historySearch, userKey, isEmbedded]);
+    localStorage.removeItem(`agape_drvHistSearch_${userKey}`);
+  }, [activeNav, historyFilter, userKey, isEmbedded]);
 
   useEffect(() => {
     if (!isEmbedded) return;
@@ -6176,6 +6178,12 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
               className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400" />
             {historySearch && <button onClick={() => { setHistorySearch(''); setHistoryExpandedId(null); }} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>}
             </div>
+          </div>
+
+          <div className="px-4 pt-1 pb-0.5">
+            <p className="text-[10px] font-semibold text-slate-400" data-testid="history-sync-line">
+              {driverScopedTrips.length} trips synced · {historyWindowTrips.length} in history window ({formatHistoryCompactDayLabel(historyWindowStart)}–{formatHistoryCompactDayLabel(historyWindowEnd)})
+            </p>
           </div>
 
           <div className="agape-mobile-list">
