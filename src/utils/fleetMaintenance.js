@@ -5,6 +5,8 @@ export const DEFAULT_MAINTENANCE_POLICY = Object.freeze({
   filterDueSoonDays: 30,
 });
 
+import { tripCalendarDateKey } from './tripDate';
+
 const numberOrNull = (value) => {
   const normalizedValue = String(value ?? '').replace(/,/g, '').trim();
   if (!normalizedValue) return null;
@@ -22,13 +24,23 @@ const dateOrNull = (value) => {
 };
 
 const dateKey = (value) => {
-  const date = dateOrNull(value);
-  return date ? date.toISOString().slice(0, 10) : '';
+  // Shared parser: pure dates stay verbatim; timestamped instants convert to
+  // the LOCAL calendar day so evening events never land on "tomorrow" (UTC).
+  return tripCalendarDateKey(value) || '';
+};
+
+// Calendar-date space: parse to LOCAL noon so month arithmetic and key
+// round-trips are stable across DST and never shift a stored date by a day.
+const calendarDate = (value) => {
+  const key = tripCalendarDateKey(value);
+  if (!key) return dateOrNull(value);
+  const d = new Date(`${key}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? dateOrNull(value) : d;
 };
 
 const addMonths = (value, months) => {
   const date = new Date(value.getTime());
-  date.setUTCMonth(date.getUTCMonth() + months);
+  date.setMonth(date.getMonth() + months);
   return date;
 };
 
@@ -89,9 +101,9 @@ export function getVehicleMaintenanceStatus(vehicle = {}, trips = [], drivers = 
 
   const filterIntervalMonths = Math.max(1, numberOrNull(vehicle.filterChangeIntervalMonths) || defaults.filterChangeIntervalMonths);
   const filterDueSoonDays = Math.max(1, numberOrNull(vehicle.filterDueSoonDays) || defaults.filterDueSoonDays);
-  const filterBaseline = dateOrNull(vehicle.lastFilterChangeDate || vehicle.filterServiceDate);
+  const filterBaseline = calendarDate(vehicle.lastFilterChangeDate || vehicle.filterServiceDate);
   const filterNext = filterBaseline ? addMonths(filterBaseline, filterIntervalMonths) : null;
-  const today = dateOrNull(now) || new Date();
+  const today = calendarDate(now) || new Date();
   const filterDaysRemaining = filterNext ? Math.ceil((filterNext.getTime() - today.getTime()) / DAY_MS) : null;
   const filterStatus = !filterBaseline
     ? 'setup_required'

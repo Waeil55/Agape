@@ -283,6 +283,10 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
     // belongs to this vehicle — never guessed, averaged, or invented.
     let odometer = maintenanceNumber(vehicle.odometer);
     let odometerEvidenceFields = null;
+    // Maintenance service dates must be the driver's LOCAL calendar day, never
+    // the server's UTC day — an evening reset would otherwise be recorded as
+    // "tomorrow" and skew every due-date calculation built on it.
+    let maintenanceServiceDateKey = "";
     if (odometer === null) {
       const claimedReading = maintenanceNumber(data?.odometer);
       const evidenceTripId = String(data?.sourceTripId || "").trim();
@@ -323,6 +327,10 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
           );
         }
         odometer = verifiedReading;
+        const evidenceServiceDate = String(evidence.date || "").trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(evidenceServiceDate)) {
+          maintenanceServiceDateKey = evidenceServiceDate;
+        }
         odometerEvidenceFields = {
           odometer,
           odometerUpdatedAt: nowIso,
@@ -354,12 +362,18 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
       updatedAtServer: now,
       ...(odometerEvidenceFields || {}),
     };
+    const requestedServiceDateKey = /^\d{4}-\d{2}-\d{2}$/.test(String(data?.serviceDateKey || "").trim())
+      ? String(data.serviceDateKey).trim()
+      : "";
+    // Priority: the verified evidence trip's service date, then the caller's
+    // local day, then (legacy fallback) the server UTC day.
+    const serviceDateKey = maintenanceServiceDateKey || requestedServiceDateKey || nowIso.slice(0, 10);
     if (maintenanceType === "oil") {
       vehicleUpdate.lastOilChangeOdometer = odometer;
-      vehicleUpdate.lastOilChangeDate = nowIso.slice(0, 10);
+      vehicleUpdate.lastOilChangeDate = serviceDateKey;
       vehicleUpdate.nextOilChangeOdometer = admin.firestore.FieldValue.delete();
     } else {
-      vehicleUpdate.lastFilterChangeDate = nowIso.slice(0, 10);
+      vehicleUpdate.lastFilterChangeDate = serviceDateKey;
     }
 
     transaction.update(vehicleRef, vehicleUpdate);

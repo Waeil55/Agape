@@ -6,6 +6,7 @@ import { aiAnalyzeDriver } from '../config/ai';
 import { geocodeAddress } from '../config/maps';
 import { POLICY_MODES } from '../utils/timeTracking';
 import { getVehicleMaintenanceStatus, normalizeMaintenancePolicy, summarizeFleetMaintenance } from '../utils/fleetMaintenance';
+import { localCalendarYmd } from '../utils/tripDate';
 import { functions, httpsCallable } from '../config/firebase';
 
 const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], addAuditLog, currentUser, trips = [], onAssignTrip, onUploadForDriver, requestAuthAction, vehicles = [], setVehicles, mode = 'all', createIntent = null, onCreateIntentHandled, appSettings = {}, onUpdateAppSettings }) => {
@@ -192,11 +193,12 @@ const [form, setForm] = useState({
     const label = type === 'oil' ? 'oil change' : 'annual filter change';
     const execute = async () => {
       const timestamp = new Date().toISOString();
+      const serviceDateKey = localCalendarYmd();
       const record = { id: `MNT-${Date.now()}`, type, servicedAt: timestamp, odometer: service.odometer, recordedAt: timestamp, recordedBy: currentUser };
       const saved = await setVehicles((items) => items.map((item) => item.id === vehicle.id ? {
         ...item,
         odometer: Math.max(Number(item.odometer || 0), service.odometer),
-        ...(type === 'oil' ? { lastOilChangeOdometer: service.odometer, lastOilChangeDate: timestamp.slice(0, 10), nextOilChangeOdometer: null } : { lastFilterChangeDate: timestamp.slice(0, 10) }),
+        ...(type === 'oil' ? { lastOilChangeOdometer: service.odometer, lastOilChangeDate: serviceDateKey, nextOilChangeOdometer: null } : { lastFilterChangeDate: serviceDateKey }),
         maintenanceHistory: [record, ...(item.maintenanceHistory || [])].slice(0, 100),
         updatedAt: timestamp,
       } : item));

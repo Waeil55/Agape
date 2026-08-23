@@ -679,7 +679,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       setMaintenanceResetting(type);
       try {
         const recordMaintenance = httpsCallable(functions, 'recordDriverVehicleMaintenance');
-        const payload = { vehicleId: assignedVehicleRecord.id, type };
+        const payload = { vehicleId: assignedVehicleRecord.id, type, serviceDateKey: localCalendarYmd() };
         // Attach verifiable mileage evidence: the resolved reading plus the
         // exact trip it came from, so the server can confirm both instead of
         // requiring a manually maintained vehicle.odometer field.
