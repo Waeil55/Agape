@@ -24,4 +24,10 @@ describe('global operational search', () => {
     const trips = Array.from({ length: 30 }, (_, id) => ({ id: `t-${id}`, patient: `Shared ${id}` }));
     expect(buildGlobalSearchResults({ query: 'shared', trips, limit: 8 })).toHaveLength(8);
   });
+
+  it('ranks the driver profile above trips that only match its assignment name', () => {
+    const driver = { id: 'd-1', name: 'waeil2' };
+    const trips = Array.from({ length: 20 }, (_, id) => ({ id: `t-${id}`, patient: `Passenger ${id}`, driverName: 'waeil2' }));
+    expect(buildGlobalSearchResults({ query: 'waeil2', drivers: [driver], trips, limit: 10 })[0].type).toBe('driver');
+  });
 });

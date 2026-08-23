@@ -7,20 +7,31 @@ const textMatches = (values, query) => values.some((value) => String(value || ''
 export const buildGlobalSearchResults = ({ query, trips = [], trashedTrips = [], drivers = [], vehicles = [], limit = 16 }) => {
   const normalized = String(query || '').trim().toLowerCase();
   if (normalized.length < 2) return [];
-  const results = [];
-  trips.forEach((trip) => {
-    if (results.length < limit && tripMatchesSearch(trip, normalized)) results.push({ type: 'trip', record: trip });
+  const candidates = [];
+  const relevance = (values, exactBoost, startsBoost, fallback) => {
+    const normalizedValues = values.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
+    if (normalizedValues.some((value) => value === normalized)) return exactBoost;
+    if (normalizedValues.some((value) => value.startsWith(normalized))) return startsBoost;
+    return fallback;
+  };
+  trips.forEach((trip, index) => {
+    if (tripMatchesSearch(trip, normalized)) candidates.push({ type: 'trip', record: trip, index, score: relevance([trip.bookingId, trip.id], 130, 120, relevance([trip.patient, trip.memberName, trip.clientName], 115, 105, 50)) });
   });
-  trashedTrips.forEach((trip) => {
-    if (results.length < limit && tripMatchesSearch(trip, normalized)) results.push({ type: 'archive', record: trip });
+  trashedTrips.forEach((trip, index) => {
+    if (tripMatchesSearch(trip, normalized)) candidates.push({ type: 'archive', record: trip, index, score: relevance([trip.bookingId, trip.id], 125, 115, relevance([trip.patient, trip.memberName, trip.clientName], 110, 100, 45)) });
   });
-  drivers.forEach((driver) => {
-    if (results.length < limit && textMatches([driver.name, driver.email, driver.phone, driver.vehicle, driver.currentZone], normalized)) results.push({ type: 'driver', record: driver });
+  drivers.forEach((driver, index) => {
+    const values = [driver.name, driver.email, driver.phone, driver.vehicle, driver.currentZone];
+    if (textMatches(values, normalized)) candidates.push({ type: 'driver', record: driver, index, score: relevance([driver.name, driver.email], 122, 112, 80) });
   });
-  vehicles.forEach((vehicle) => {
-    if (results.length < limit && textMatches([vehicle.name, vehicle.make, vehicle.model, vehicle.plate, vehicle.vin, vehicle.unitNumber], normalized)) results.push({ type: 'vehicle', record: vehicle });
+  vehicles.forEach((vehicle, index) => {
+    const values = [vehicle.name, vehicle.make, vehicle.model, vehicle.plate, vehicle.vin, vehicle.unitNumber];
+    if (textMatches(values, normalized)) candidates.push({ type: 'vehicle', record: vehicle, index, score: relevance([vehicle.plate, vehicle.vin, vehicle.unitNumber, vehicle.name], 124, 114, 75) });
   });
-  return results;
+  return candidates
+    .sort((left, right) => right.score - left.score || left.type.localeCompare(right.type) || left.index - right.index)
+    .slice(0, limit)
+    .map(({ type, record }) => ({ type, record }));
 };
 
 const META = {
