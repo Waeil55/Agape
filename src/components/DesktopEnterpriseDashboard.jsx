@@ -14,6 +14,7 @@ import { openMapLink } from '../utils/nativeActions';
 import { timeToMinutes, isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { tripMatchesSearch } from '../utils/search';
+import { toValidDate } from '../utils/safeDate';
 import { useChat } from '../hooks/useChat';
 const ArchivesPage = lazy(() => import('./ArchivesPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
@@ -47,10 +48,11 @@ const LazyFallback = () => (
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, retryKey: 0 };
+    this.state = { hasError: false, error: null, retryKey: 0, componentStack: '' };
   }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(err, info) {
+    this.setState({ componentStack: String(info?.componentStack || '') });
     console.error('[DesktopDashboard ErrorBoundary]', err, info?.componentStack || '');
     try {
       sessionStorage.setItem('agape_last_ui_error', JSON.stringify({
@@ -64,6 +66,7 @@ class ErrorBoundary extends React.Component {
     this.setState(current => ({
       hasError: false,
       error: null,
+      componentStack: '',
       retryKey: current.retryKey + 1,
     }));
   };
@@ -77,6 +80,11 @@ class ErrorBoundary extends React.Component {
         <p className="mt-1 max-w-lg text-xs text-slate-500">
           {this.state.error?.message || 'This section encountered an unexpected data error.'}
         </p>
+        {import.meta.env.DEV && this.state.componentStack && (
+          <pre className="mt-3 max-h-40 max-w-2xl overflow-auto rounded-xl border border-rose-200 bg-rose-50 p-3 text-left text-[10px] text-rose-700">
+            {this.state.componentStack}
+          </pre>
+        )}
         <button type="button" onClick={this.handleRetry}
           className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700">
           <RefreshCw size={14} /> Reload this section
@@ -142,6 +150,17 @@ const formatPhoneDisplay = (phone) => {
   return '';
 };
 
+const formatActivityTimestamp = (value) => {
+  if (!value) return '';
+  const date = toValidDate(value);
+  if (date) {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    }).format(date);
+  }
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+};
+
 const openAddressInMaps = (address = '') => {
   if (!address) return;
   const query = encodeURIComponent(address);
@@ -169,7 +188,7 @@ const DesktopEnterpriseDashboard = ({
   smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
   smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
   showOptimizeModal, setShowOptimizeModal, showUploadModal, setShowUploadModal,
-  uploadAssignDriver, setUploadAssignDriver, bulkAssignModal, setBulkAssignModal,
+  uploadAssignDriver, setUploadAssignDriver, onTripsCreated, bulkAssignModal, setBulkAssignModal,
   showDispatcherArchive, setShowDispatcherArchive,
   addToast, addAuditLog, persistState, hasPermission, requestAuthAction,
   triggerSmartAssign, triggerFleetOptimization, assignTripToDriver,
@@ -787,7 +806,7 @@ const DesktopEnterpriseDashboard = ({
         {rightPanelTab === 'alerts' && (
           <div className="space-y-3">
             {logs.slice(0, 20).map((log, i) => (
-              <div key={log.timestamp || log.id || `log-${i}`} className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm mb-1.5 hover:shadow-md transition-all duration-200 group">
+              <div key={log.id || `${formatActivityTimestamp(log.timestamp)}-${i}`} className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm mb-1.5 hover:shadow-md transition-all duration-200 group">
                 <div className="flex items-start gap-2.5">
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
                     log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
@@ -799,7 +818,7 @@ const DesktopEnterpriseDashboard = ({
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-slate-700">{log.t}</p>
                     <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{log.d}</p>
-                    {log.timestamp && <p className="text-xs text-slate-600 mt-1">{log.timestamp}</p>}
+                    {formatActivityTimestamp(log.timestamp) && <p className="text-xs text-slate-600 mt-1">{formatActivityTimestamp(log.timestamp)}</p>}
                   </div>
                 </div>
               </div>
@@ -1363,51 +1382,7 @@ const DesktopEnterpriseDashboard = ({
                   uploadContext={activePanel}
                   drivers={drivers}
                   preSelectDriver={uploadAssignDriver}
-                   onTripsCreated={async (newTrips) => {
-                    try {
-                    setTrips(prev => {
-                      const makeKey = (t) => {
-                        const bk = t?.bookingId;
-                        if (bk && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bk)) return `bk::${bk}`;
-                        const parts = [
-                          (t?.patient || '').trim().toLowerCase(),
-                          (t?.date || '').trim(),
-                          (t?.time || '').trim(),
-                          (t?.pickup || '').trim().toLowerCase().replace(/\s+/g, ' '),
-                          (t?.dropoff || '').trim().toLowerCase().replace(/\s+/g, ' '),
-                        ];
-                        return `cmp::${parts.join('|')}`;
-                      };
-                      const existingKeys = new Map();
-                      prev.forEach((et, idx) => { existingKeys.set(makeKey(et), idx); });
-                      
-                      const updatedTrips = [...prev];
-                      newTrips.forEach(nt => {
-                        const key = makeKey(nt);
-                        if (existingKeys.has(key)) {
-                          const idx = existingKeys.get(key);
-                          const existingTrip = updatedTrips[idx];
-                          const mergedTrip = { ...existingTrip };
-                          Object.keys(nt).forEach(k => {
-                            // Only overwrite if the new value is meaningful, or if it's explicitly overriding
-                            if (nt[k] !== '' && nt[k] !== null && nt[k] !== undefined) {
-                              mergedTrip[k] = nt[k];
-                            }
-                          });
-                          // Ensure we keep the original Firestore ID
-                          mergedTrip.id = existingTrip.id;
-                          updatedTrips[idx] = mergedTrip;
-                        } else {
-                          updatedTrips.push(nt);
-                          existingKeys.set(key, updatedTrips.length - 1);
-                        }
-                      });
-                      return updatedTrips;
-                    });
-                    setShowUploadModal(false);
-                    addToast('Trips Imported', `${newTrips.length} trip(s) imported successfully.`, 'success');
-                    } catch (err) { console.error('[onTripsCreated]', err); addToast('Import Failed', err.message || 'Unexpected error.', 'danger'); }
-                  }}
+                  onTripsCreated={onTripsCreated}
                 />
               </Suspense></ErrorBoundary>
             </div>

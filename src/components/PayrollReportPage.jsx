@@ -5,8 +5,9 @@ import {
   FileText, TrendingUp, Filter, RefreshCw, Home, Navigation, Zap, Eye
 } from 'lucide-react';
 import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, GAP_CLASSIFICATIONS } from '../utils/timeTracking';
-import { localCalendarYmd, isoToLocalDateKey } from '../utils/tripDate';
+import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
+import { eventMatchesPayrollServiceDate, tripMatchesPayrollServiceDate } from '../utils/portalSelectors';
 
 const fmt = (min) => {
   if (!min && min !== 0) return '--';
@@ -54,18 +55,15 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
   const reportData = useMemo(() => {
     return filtered.map(driver => {
       const driverTrips = trips.filter(t => {
-        const dateKey = t.date || isoToLocalDateKey(t.arrivalTime || t.startedAt || t.completedAt);
-        const matchDate = !selectedDate || dateKey === selectedDate;
+        const matchDate = tripMatchesPayrollServiceDate(t, selectedDate);
         const matchDriver = t.driverId === driver.id || (t.driverEmail && t.driverEmail.toLowerCase() === (driver.email || '').toLowerCase());
         return matchDate && matchDriver;
       });
       const driverKeys = new Set([driver.id, driver.driverId, driver.uid, driver.email].filter(Boolean).map((value) => String(value).trim().toLowerCase()));
       const immutableDeclarations = timeTrackingDeclarations.filter((event) => [event?.driverId, event?.driverEmail, event?.email, event?.userId]
         .filter(Boolean).map((value) => String(value).trim().toLowerCase()).some((value) => driverKeys.has(value)));
-      const clockEvts = [...(driver.clockEvents || []), ...immutableDeclarations].filter(e => {
-        const d = isoToLocalDateKey(e.timestamp || e.at || e.time);
-        return !selectedDate || d === selectedDate;
-      });
+      const clockEvts = [...(driver.clockEvents || []), ...immutableDeclarations]
+        .filter((event) => eventMatchesPayrollServiceDate(event, selectedDate));
       const timeData = buildTimeEvents(driverTrips, driver, clockEvts, policyMode, {
         date: selectedDate,
         breadcrumbs: getDriverTelemetryBreadcrumbs(driverTelemetry, driver, selectedDate),
@@ -84,7 +82,21 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
     abuse: reportData.filter(r => r.timeData.abuse?.suspicious).length,
   }), [reportData]);
 
+  const hasUnscopedSourceRecords = useMemo(() => {
+    if (!selectedDate) return false;
+    const invalidTrip = trips.some((trip) => {
+      const hasDeclaredServiceDate = trip?.date !== undefined && trip?.date !== null && trip?.date !== '';
+      const sourceDate = hasDeclaredServiceDate
+        ? trip.date
+        : (trip?.arrivalTime ?? trip?.startedAt ?? trip?.completedAt);
+      return !tripCalendarDateKey(sourceDate);
+    });
+    if (invalidTrip) return true;
+    return timeTrackingDeclarations.some((event) => !tripCalendarDateKey(event?.timestamp ?? event?.at ?? event?.time));
+  }, [selectedDate, timeTrackingDeclarations, trips]);
+
   const exportCSV = useCallback(() => {
+    if (hasUnscopedSourceRecords) return;
     const rows = [['Driver', 'Email', 'Date', 'Policy', 'Approval', 'Clock In', 'Clock Out', 'Billable Hrs', 'Break Min', 'Trips', 'Verified Personal Min', 'Review Gaps', 'Regular Pay', 'Overtime Pay', 'Total Pay', 'Integrity Signals']];
     reportData.forEach(({ driver, payroll, timeData }) => {
       const pt = payroll.payTime;
@@ -105,17 +117,17 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `payroll_${selectedDate}.csv`; a.click();
-  }, [reportData, selectedDate, policyMode]);
+  }, [hasUnscopedSourceRecords, reportData, selectedDate, policyMode]);
 
   const toggle = (id) => setExpandedDriver(prev => prev === id ? null : id);
   const toggleSect = (id, sect) => setExpandedSection(prev => ({ ...prev, [`${id}_${sect}`]: !prev[`${id}_${sect}`] }));
 
   return (
-    <div className="min-h-0 flex-1 text-slate-900">
+    <div className="min-h-0 flex-1 text-slate-900 pb-24 max-md:[&_button]:min-h-11">
       {/* Header */}
       <div className="px-3 sm:px-4 pt-4 pb-3 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between mb-1">
-          <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold transition-colors">
+          <button onClick={exportCSV} disabled={hasUnscopedSourceRecords} title={hasUnscopedSourceRecords ? 'Export blocked: one or more source records has no valid service date.' : 'Export payroll CSV'} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:bg-slate-300">
             <Download size={13} /> Export CSV
           </button>
         </div>
@@ -142,11 +154,11 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
       {/* Summary Cards */}
       <div className="px-3 sm:px-4 pb-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[
-          { label: 'Billable', value: fmt(totals.billableMin), icon: <Clock size={14} />, color: 'text-indigo-300' },
-          { label: 'Total Pay', value: fmtCurrency(totals.totalPay), icon: <DollarSign size={14} />, color: 'text-emerald-300' },
-          { label: 'Trips', value: totals.trips, icon: <Navigation size={14} />, color: 'text-blue-300' },
-          { label: 'Gap Events', value: totals.gaps, icon: <TrendingUp size={14} />, color: 'text-amber-300' },
-          { label: 'Abuse Flags', value: totals.abuse, icon: <Shield size={14} />, color: totals.abuse > 0 ? 'text-red-300' : 'text-slate-400' },
+          { label: 'Billable', value: fmt(totals.billableMin), icon: <Clock size={14} />, color: 'text-indigo-700' },
+          { label: 'Total Pay', value: fmtCurrency(totals.totalPay), icon: <DollarSign size={14} />, color: 'text-emerald-700' },
+          { label: 'Trips', value: totals.trips, icon: <Navigation size={14} />, color: 'text-blue-700' },
+          { label: 'Gap Events', value: totals.gaps, icon: <TrendingUp size={14} />, color: 'text-amber-700' },
+          { label: 'Abuse Flags', value: totals.abuse, icon: <Shield size={14} />, color: totals.abuse > 0 ? 'text-red-700' : 'text-slate-600' },
         ].map(c => (
           <div key={c.label} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
             <div className={`flex items-center gap-1 text-xs mb-1 ${c.color}`}>{c.icon}<span>{c.label}</span></div>

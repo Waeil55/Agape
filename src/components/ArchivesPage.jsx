@@ -433,7 +433,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   );
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-slate-100 overflow-hidden">
+    <div aria-label="Archived trips" className="flex flex-col flex-1 min-h-0 bg-slate-100 overflow-hidden">
       <div className="bg-white border-b border-slate-200 px-3 py-1.5 flex flex-col lg:flex-row lg:items-center shrink-0 gap-1.5 sticky top-0 z-20">
         <div className="flex items-center gap-1.5 flex-wrap">
           <div className="flex items-center gap-1 bg-slate-100 rounded px-2 py-1 min-w-[140px] max-w-[240px]">
@@ -458,7 +458,8 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
         {grouped.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500">
             <Archive size={40} className="mb-3 opacity-40" />
-            <p className="text-sm font-medium">No archived trips found</p>
+              <p className="text-sm font-medium">No archived trips found</p>
+              <p className="mt-1 text-xs text-slate-500">Try clearing the search or changing the date range.</p>
           </div>
         ) : (
           grouped.map(([dateLabel, dayTrips]) => {

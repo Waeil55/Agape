@@ -16,9 +16,10 @@
 
 import { openDB } from 'idb';
 import { localCalendarYmd } from './tripDate';
+import { DEFAULT_TENANT_ID, normalizeTenantId } from './tenantScope';
 
 const DB_NAME = 'agape_fleet_os';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // Object stores
 const STORES = {
@@ -31,8 +32,29 @@ const STORES = {
   LOGS: 'logs',
   PHONE_NUMBERS: 'phoneNumbers',
   SYNC_QUEUE: 'syncQueue',   // Pending writes for background retry
+  DEAD_LETTER_QUEUE: 'deadLetterQueue',
   META: 'meta',              // Metadata: last sync time, schema version, etc.
 };
+
+const snapshotKey = (tenantId = DEFAULT_TENANT_ID) => `tenant::${normalizeTenantId(tenantId)}`;
+
+export function normalizeSyncOwnership(value = {}) {
+  const tenantId = typeof value.tenantId === 'string' ? value.tenantId.trim().toLowerCase() : '';
+  const userId = typeof value.userId === 'string' ? value.userId.trim() : '';
+  if (!tenantId) throw new TypeError('tenantId is required for queued sync operations');
+  if (!userId) throw new TypeError('userId is required for queued sync operations');
+  return { tenantId: normalizeTenantId(tenantId), userId };
+}
+
+export function syncOperationBelongsTo(operation, ownership) {
+  try {
+    const actual = normalizeSyncOwnership(operation);
+    const expected = normalizeSyncOwnership(ownership);
+    return actual.tenantId === expected.tenantId && actual.userId === expected.userId;
+  } catch {
+    return false;
+  }
+}
 
 let dbInstance = null;
 let dbPromise = null;
@@ -89,8 +111,8 @@ export async function getDB() {
       if (!db.objectStoreNames.contains('retryQueue')) {
         db.createObjectStore('retryQueue', { keyPath: 'id' });
       }
-      if (!db.objectStoreNames.contains('deadLetterQueue')) {
-        db.createObjectStore('deadLetterQueue', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORES.DEAD_LETTER_QUEUE)) {
+        db.createObjectStore(STORES.DEAD_LETTER_QUEUE, { keyPath: 'id' });
       }
     },
   });
@@ -112,10 +134,11 @@ export async function getDB() {
  * Read the full app state snapshot from IndexedDB.
  * Returns null if nothing stored (first visit).
  */
-export async function readAppData() {
+export async function readAppData(tenantId = DEFAULT_TENANT_ID) {
   try {
     const db = await getDB();
-    const data = await db.get(STORES.APP_DATA, 'current');
+    const data = await db.get(STORES.APP_DATA, snapshotKey(tenantId))
+      || await db.get(STORES.APP_DATA, 'current');
     return data || null;
   } catch (err) {
     console.warn('[localDB] readAppData failed:', err);
@@ -228,10 +251,10 @@ export async function readSyncQueue() {
  * Save the full app state snapshot to IndexedDB.
  * This is the primary local persistence method.
  */
-export async function saveAppData(data) {
-  try {
-    const db = await getDB();
-    const tx = db.transaction([
+export async function saveAppData(data, { tenantId = DEFAULT_TENANT_ID } = {}) {
+  const activeTenantId = normalizeTenantId(tenantId);
+  const db = await getDB();
+  const tx = db.transaction([
       STORES.APP_DATA,
       STORES.TRIPS,
       STORES.TRASHED_TRIPS,
@@ -241,104 +264,110 @@ export async function saveAppData(data) {
       STORES.LOGS,
       STORES.PHONE_NUMBERS,
       STORES.META,
-    ], 'readwrite');
+  ], 'readwrite');
 
-    // Save full snapshot
-    tx.objectStore(STORES.APP_DATA).put(data, 'current');
+  // Tenant-keyed snapshots prevent one signed-in organization from reading
+  // another organization's last local view on a shared device.
+  await tx.objectStore(STORES.APP_DATA).put(data, snapshotKey(activeTenantId));
 
     // Save individual collections for granular access
     if (data.trips) {
       const tripStore = tx.objectStore(STORES.TRIPS);
       for (const trip of data.trips) {
-        if (trip?.id) tripStore.put(trip);
+        if (trip?.id) await tripStore.put(trip);
       }
     }
     if (data.trashedTrips) {
       const trashStore = tx.objectStore(STORES.TRASHED_TRIPS);
       for (const trip of data.trashedTrips) {
-        if (trip?.id) trashStore.put(trip);
+        if (trip?.id) await trashStore.put(trip);
       }
     }
     if (data.drivers) {
       const driverStore = tx.objectStore(STORES.DRIVERS);
       for (const driver of data.drivers) {
-        if (driver?.id) driverStore.put(driver);
+        if (driver?.id) await driverStore.put(driver);
       }
     }
     if (data.dispatchers) {
       const dispStore = tx.objectStore(STORES.DISPATCHERS);
       for (const disp of data.dispatchers) {
-        if (disp?.id) dispStore.put(disp);
+        if (disp?.id) await dispStore.put(disp);
       }
     }
     if (data.vehicles) {
       const vehStore = tx.objectStore(STORES.VEHICLES);
       for (const veh of data.vehicles) {
-        if (veh?.id) vehStore.put(veh);
+        if (veh?.id) await vehStore.put(veh);
       }
     }
     if (data.logs) {
       const logStore = tx.objectStore(STORES.LOGS);
       for (const log of data.logs) {
-        if (log?.id) logStore.put(log);
+        if (log?.id) await logStore.put(log);
       }
     }
     if (data.phoneNumbers) {
-      tx.objectStore(STORES.PHONE_NUMBERS).put(data.phoneNumbers, 'current');
+      await tx.objectStore(STORES.PHONE_NUMBERS).put(data.phoneNumbers, 'current');
     }
 
     // Update sync timestamp
-    tx.objectStore(STORES.META).put(
+    await tx.objectStore(STORES.META).put(
       { value: new Date().toISOString() },
-      'lastSync'
+      `lastSync::${activeTenantId}`
     );
 
-    await tx.done;
-  } catch (err) {
-    console.warn('[localDB] saveAppData failed:', err);
-  }
+  await tx.done;
 }
 
 /**
  * Save a specific field to IndexedDB (lightweight write).
  */
-export async function saveField(field, value) {
-  try {
-    const db = await getDB();
-    const storeMap = {
+export async function saveField(field, value, { previousValue, tenantId = DEFAULT_TENANT_ID } = {}) {
+  const activeTenantId = normalizeTenantId(tenantId);
+  const db = await getDB();
+  const storeMap = {
       trips: STORES.TRIPS,
       trashedTrips: STORES.TRASHED_TRIPS,
       drivers: STORES.DRIVERS,
       dispatchers: STORES.DISPATCHERS,
       vehicles: STORES.VEHICLES,
       logs: STORES.LOGS,
-    };
+  };
+  const granularStore = storeMap[field];
+  const stores = [STORES.APP_DATA];
+  if (granularStore) stores.push(granularStore);
+  if (field === 'phoneNumbers') stores.push(STORES.PHONE_NUMBERS);
 
-    if (storeMap[field] && Array.isArray(value)) {
-      const tx = db.transaction(storeMap[field], 'readwrite');
-      const store = tx.objectStore(storeMap[field]);
-      // Clear and repopulate
-      await store.clear();
-      for (const item of value) {
-        if (item?.id) store.put(item);
-      }
-      await tx.done;
-    } else if (field === 'phoneNumbers') {
-      const db2 = await getDB();
-      await db2.put(STORES.PHONE_NUMBERS, value, 'current');
-    }
+  const existingSnapshot = (typeof db.get === 'function'
+    ? await db.get(STORES.APP_DATA, snapshotKey(activeTenantId))
+      || await db.get(STORES.APP_DATA, 'current')
+    : null)
+    || {};
+  const priorRecords = Array.isArray(previousValue)
+    ? previousValue
+    : (granularStore ? await db.getAll(granularStore) : []);
+  const tx = db.transaction([...new Set(stores)], 'readwrite');
 
-    // Update the full snapshot too
-    const snapshot = await readAppData();
-    if (snapshot) {
-      snapshot[field] = value;
-      snapshot._lastLocalWrite = new Date().toISOString();
-      const db3 = await getDB();
-      await db3.put(STORES.APP_DATA, snapshot, 'current');
+  if (granularStore && Array.isArray(value)) {
+    const store = tx.objectStore(granularStore);
+    const nextIds = new Set(value.filter((item) => item?.id).map((item) => String(item.id)));
+    for (const item of value) {
+      if (item?.id) await store.put(item);
     }
-  } catch (err) {
-    console.warn(`[localDB] saveField(${field}) failed:`, err);
+    for (const item of priorRecords) {
+      if (item?.id && !nextIds.has(String(item.id))) await store.delete(item.id);
+    }
+  } else if (field === 'phoneNumbers') {
+    await tx.objectStore(STORES.PHONE_NUMBERS).put(value, 'current');
   }
+
+  await tx.objectStore(STORES.APP_DATA).put({
+    ...existingSnapshot,
+    [field]: value,
+    _lastLocalWrite: new Date().toISOString(),
+  }, snapshotKey(activeTenantId));
+  await tx.done;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -350,44 +379,48 @@ export async function saveField(field, value) {
  * Used when Firestore write fails (offline, permission error, etc.)
  */
 export async function queueSyncOperation(operation) {
-  try {
-    const db = await getDB();
-    await db.add(STORES.SYNC_QUEUE, {
+  const ownership = normalizeSyncOwnership(operation);
+  const db = await getDB();
+  return db.add(STORES.SYNC_QUEUE, {
       ...operation,
+      ...ownership,
       status: 'pending',
       attempts: 0,
       createdAt: new Date().toISOString(),
       lastAttemptAt: null,
       nextRetryAt: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.warn('[localDB] queueSyncOperation failed:', err);
-  }
+  });
 }
 
 /**
  * Get all pending sync operations, sorted by creation time.
  */
-export async function getPendingSyncOperations() {
-  try {
-    const db = await getDB();
-    const all = await db.getAllFromIndex(STORES.SYNC_QUEUE, 'status', 'pending');
-    return all.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  } catch {
-    return [];
-  }
+export async function getPendingSyncOperations(ownership) {
+  const normalizedOwnership = normalizeSyncOwnership(ownership);
+  const db = await getDB();
+  const all = await db.getAllFromIndex(STORES.SYNC_QUEUE, 'status', 'pending');
+  return all
+    .filter((operation) => {
+      try {
+        return syncOperationBelongsTo(operation, normalizedOwnership)
+          || !normalizeSyncOwnership(operation);
+      } catch {
+        // Return legacy ownerless entries only so the processor can move them
+        // to the dead-letter store without ever sending them to Firebase.
+        return true;
+      }
+    })
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
 /**
  * Mark a sync operation as completed (remove from queue).
  */
 export async function completeSyncOperation(id) {
-  try {
-    const db = await getDB();
-    await db.delete(STORES.SYNC_QUEUE, id);
-  } catch (err) {
-    console.warn('[localDB] completeSyncOperation failed:', err);
-  }
+  const db = await getDB();
+  const tx = db.transaction(STORES.SYNC_QUEUE, 'readwrite');
+  await tx.objectStore(STORES.SYNC_QUEUE).delete(id);
+  await tx.done;
 }
 
 /**
@@ -395,26 +428,132 @@ export async function completeSyncOperation(id) {
  * Backoff: 5s → 15s → 45s → 2min → 5min → 15min (max)
  */
 export async function failSyncOperation(id, error) {
-  try {
-    const db = await getDB();
-    const op = await db.get(STORES.SYNC_QUEUE, id);
-    if (!op) return;
+  const db = await getDB();
+  const tx = db.transaction(STORES.SYNC_QUEUE, 'readwrite');
+  const store = tx.objectStore(STORES.SYNC_QUEUE);
+  const op = await store.get(id);
+  if (!op) return;
 
     const attempts = op.attempts + 1;
     const backoffMs = Math.min(5000 * Math.pow(3, attempts - 1), 15 * 60 * 1000);
     const nextRetry = new Date(Date.now() + backoffMs).toISOString();
 
-    await db.put(STORES.SYNC_QUEUE, {
+  await store.put({
       ...op,
       status: 'pending',
       attempts,
       error: error?.message || String(error),
       lastAttemptAt: new Date().toISOString(),
       nextRetryAt: nextRetry,
-    });
-  } catch (err) {
-    console.warn('[localDB] failSyncOperation failed:', err);
+  });
+  await tx.done;
+}
+
+export async function deadLetterSyncOperation(id, error, reason = 'permanent_failure') {
+  const db = await getDB();
+  const tx = db.transaction([STORES.SYNC_QUEUE, STORES.DEAD_LETTER_QUEUE], 'readwrite');
+  const queueStore = tx.objectStore(STORES.SYNC_QUEUE);
+  const operation = await queueStore.get(id);
+  if (!operation) return;
+  await tx.objectStore(STORES.DEAD_LETTER_QUEUE).put({
+    ...operation,
+    status: 'dead_letter',
+    deadLetterReason: reason,
+    error: error?.message || String(error),
+    errorCode: error?.code || 'unknown',
+    failedAt: new Date().toISOString(),
+  });
+  await queueStore.delete(id);
+  await tx.done;
+}
+
+export async function getSyncQueueStatus(ownership) {
+  const normalizedOwnership = normalizeSyncOwnership(ownership);
+  const db = await getDB();
+  const [queued, deadLetters] = await Promise.all([
+    db.getAll(STORES.SYNC_QUEUE),
+    db.getAll(STORES.DEAD_LETTER_QUEUE),
+  ]);
+  const pending = queued.filter((op) => op.status === 'pending' && syncOperationBelongsTo(op, normalizedOwnership));
+  const deadLetter = deadLetters.filter((op) => syncOperationBelongsTo(op, normalizedOwnership));
+  const oldestPendingAt = pending
+    .map((op) => op.createdAt).filter(Boolean).sort()[0] || null;
+  const lastDeadLetterAt = deadLetter
+    .map((op) => op.failedAt).filter(Boolean).sort().at(-1) || null;
+  return {
+    pending: pending.length,
+    deadLetter: deadLetter.length,
+    total: pending.length + deadLetter.length,
+    oldestPendingAt,
+    lastDeadLetterAt,
+  };
+}
+
+export async function saveFieldWithSyncOperations(field, value, operations, ownership) {
+  const normalizedOwnership = normalizeSyncOwnership(ownership);
+  const storeMap = {
+    trips: STORES.TRIPS,
+    trashedTrips: STORES.TRASHED_TRIPS,
+    drivers: STORES.DRIVERS,
+    dispatchers: STORES.DISPATCHERS,
+    vehicles: STORES.VEHICLES,
+    logs: STORES.LOGS,
+  };
+  const granularStore = storeMap[field];
+  const isPhoneNumbers = field === 'phoneNumbers';
+  if ((!granularStore || !Array.isArray(value)) && !isPhoneNumbers) {
+    throw new TypeError(`Atomic offline persistence is not supported for field: ${field}`);
   }
+  const db = await getDB();
+  const existingSnapshot = (typeof db.get === 'function'
+    ? await db.get(STORES.APP_DATA, snapshotKey(normalizedOwnership.tenantId))
+    : null) || {};
+  const priorRecords = granularStore ? await db.getAll(granularStore) : [];
+  const transactionStores = [STORES.APP_DATA, STORES.SYNC_QUEUE];
+  if (granularStore) transactionStores.push(granularStore);
+  if (isPhoneNumbers) transactionStores.push(STORES.PHONE_NUMBERS);
+  const tx = db.transaction(transactionStores, 'readwrite');
+  const recordStore = granularStore ? tx.objectStore(granularStore) : null;
+  const queueStore = tx.objectStore(STORES.SYNC_QUEUE);
+  const nextIds = new Set(Array.isArray(value) ? value.filter((item) => item?.id).map((item) => String(item.id)) : []);
+  const queuedOperationIds = [];
+
+  if (recordStore) {
+    for (const item of value) {
+      if (item?.id) await recordStore.put(item);
+    }
+    for (const item of priorRecords) {
+      if (item?.id && !nextIds.has(String(item.id))) await recordStore.delete(item.id);
+    }
+  } else if (isPhoneNumbers) {
+    await tx.objectStore(STORES.PHONE_NUMBERS).put(value, 'current');
+  }
+  for (const operation of operations || []) {
+    const operationOwnership = operation.tenantId || operation.userId
+      ? normalizeSyncOwnership(operation)
+      : normalizedOwnership;
+    if (operationOwnership.tenantId !== normalizedOwnership.tenantId
+      || operationOwnership.userId !== normalizedOwnership.userId) {
+      throw new TypeError('Queued operation ownership does not match the active session');
+    }
+    const id = await queueStore.add({
+      ...operation,
+      ...normalizedOwnership,
+      status: 'pending',
+      attempts: 0,
+      createdAt: new Date().toISOString(),
+      lastAttemptAt: null,
+      nextRetryAt: new Date().toISOString(),
+    });
+    queuedOperationIds.push(id);
+  }
+  await tx.objectStore(STORES.APP_DATA).put({
+    ...existingSnapshot,
+    [field]: value,
+    _lastLocalWrite: new Date().toISOString(),
+  }, snapshotKey(normalizedOwnership.tenantId));
+  await tx.done;
+  return { queuedOperationIds };
 }
 
 /**
@@ -439,7 +578,7 @@ export async function clearSyncQueue() {
 export async function clearAllLocalData() {
   try {
     const db = await getDB();
-    const allStores = [...Object.values(STORES), 'eventSourcing', 'retryQueue', 'deadLetterQueue'];
+    const allStores = [...new Set([...Object.values(STORES), 'eventSourcing', 'retryQueue'])];
     const existingStores = allStores.filter(s => db.objectStoreNames.contains(s));
     const tx = db.transaction(existingStores, 'readwrite');
     for (const store of existingStores) {
@@ -489,10 +628,15 @@ export default {
   readSyncQueue,
   saveAppData,
   saveField,
+  saveFieldWithSyncOperations,
   queueSyncOperation,
   getPendingSyncOperations,
+  getSyncQueueStatus,
   completeSyncOperation,
   failSyncOperation,
+  deadLetterSyncOperation,
+  normalizeSyncOwnership,
+  syncOperationBelongsTo,
   clearSyncQueue,
   clearAllLocalData,
   pruneOldTrips,

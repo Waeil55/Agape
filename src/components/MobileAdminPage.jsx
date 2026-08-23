@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useDeferredValue, useMemo, useState, useRef, useEffect } from 'react';
 import {
   Activity, BellRing, Briefcase, CheckCircle2, CircleDot, Clock3, KeyRound,
   LayoutDashboard, Loader2, Mail, Phone, RadioTower, Search, ShieldCheck,
@@ -12,6 +12,10 @@ import {
   AdminIconButton, AdminAvatar, AdminSearch, AdminEmpty,
 } from './admin/AdminKit';
 import DriversVehiclesPage from './DriversVehiclesPage';
+import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
+import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
+
+export const MOBILE_ADMIN_LIST_PAGE_SIZE = 40;
 
 const ACTIVE_TRIP_STATUSES = new Set([
   'Assigned', 'In Progress', 'In Mission', 'En Route', 'Navigating Pickup',
@@ -220,11 +224,23 @@ const MobileAdminPage = ({
   appSettings = {},
   onUpdateAppSettings,
   updateAppSettings,
+  isLoading = false,
+  readOnly = false,
 }) => {
   const [pwResetMsg, setPwResetMsg] = useState({});
   const [activeTab, setActiveTab] = useState('overview');
   const [driverQuery, setDriverQuery] = useState('');
   const [peopleQuery, setPeopleQuery] = useState('');
+  const [driverLimit, setDriverLimit] = useState(MOBILE_ADMIN_LIST_PAGE_SIZE);
+  const [peopleLimit, setPeopleLimit] = useState(MOBILE_ADMIN_LIST_PAGE_SIZE);
+  const deferredDriverQuery = useDeferredValue(driverQuery);
+  const deferredPeopleQuery = useDeferredValue(peopleQuery);
+  const driverIndex = useMemo(() => buildDriverIndex(drivers), [drivers]);
+  const serviceDate = localCalendarYmd();
+  const serviceTrips = useMemo(
+    () => trips.filter((trip) => tripMatchesServiceDate(trip, serviceDate)),
+    [trips, serviceDate],
+  );
 
   const allUsers = useMemo(() => (
     [
@@ -233,8 +249,8 @@ const MobileAdminPage = ({
     ].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
   ), [dispatchers, drivers]);
 
-  const openTrips = useMemo(() => trips.filter(t => !TERMINAL_TRIP_STATUSES.has(t.status)), [trips]);
-  const activeTrips = useMemo(() => trips.filter(t => ACTIVE_TRIP_STATUSES.has(t.status)), [trips]);
+  const openTrips = useMemo(() => serviceTrips.filter(t => !TERMINAL_TRIP_STATUSES.has(t.status)), [serviceTrips]);
+  const activeTrips = useMemo(() => serviceTrips.filter(t => ACTIVE_TRIP_STATUSES.has(t.status)), [serviceTrips]);
   const unassignedTrips = useMemo(() => openTrips.filter(t => !t.driverId || t.status === 'Unassigned'), [openTrips]);
   const attentionTrips = useMemo(() => {
     const ranked = [...openTrips].sort((a, b) => {
@@ -247,17 +263,13 @@ const MobileAdminPage = ({
 
   const activeTripsByDriver = useMemo(() => {
     const map = new Map();
-    trips.forEach((trip) => {
+    serviceTrips.forEach((trip) => {
       if (!ACTIVE_TRIP_STATUSES.has(trip.status)) return;
-      const driver = drivers.find((entry) => (
-        entry.id === trip.driverId ||
-        entry.name === trip.driverName ||
-        String(entry.email || '').trim().toLowerCase() === String(trip.driverEmail || '').trim().toLowerCase()
-      ));
+      const driver = findDriverInIndex(driverIndex, trip);
       if (driver && !map.has(driver.id)) map.set(driver.id, trip);
     });
     return map;
-  }, [drivers, trips]);
+  }, [driverIndex, serviceTrips]);
 
   const driverStatusCounts = useMemo(() => {
     let online = 0;
@@ -283,20 +295,25 @@ const MobileAdminPage = ({
   ), [drivers, activeTripsByDriver]);
 
   const filteredDrivers = useMemo(() => {
-    const q = driverQuery.trim().toLowerCase();
+    const q = deferredDriverQuery.trim().toLowerCase();
     if (!q) return sortedDrivers;
     return sortedDrivers.filter(driver => recordMatchesSearch(driver, q, [
       'name', 'email', 'phone', 'vehicle', 'currentZone',
     ]));
-  }, [driverQuery, sortedDrivers]);
+  }, [deferredDriverQuery, sortedDrivers]);
 
   const filteredUsers = useMemo(() => {
-    const q = peopleQuery.trim().toLowerCase();
+    const q = deferredPeopleQuery.trim().toLowerCase();
     if (!q) return allUsers;
     return allUsers.filter(user => recordMatchesSearch(user, q, [
       'name', 'email', 'phone', 'vehicle', '_role',
     ]));
-  }, [allUsers, peopleQuery]);
+  }, [allUsers, deferredPeopleQuery]);
+  const visibleDrivers = useMemo(() => filteredDrivers.slice(0, driverLimit), [driverLimit, filteredDrivers]);
+  const visibleUsers = useMemo(() => filteredUsers.slice(0, peopleLimit), [filteredUsers, peopleLimit]);
+
+  useEffect(() => setDriverLimit(MOBILE_ADMIN_LIST_PAGE_SIZE), [deferredDriverQuery]);
+  useEffect(() => setPeopleLimit(MOBILE_ADMIN_LIST_PAGE_SIZE), [deferredPeopleQuery]);
 
   const timeoutRefs = useRef([]);
   useEffect(() => () => timeoutRefs.current.forEach(clearTimeout), []);
@@ -366,7 +383,9 @@ const MobileAdminPage = ({
         </AdminBadge>
       }
     >
-      <div className="mobile-admin-page">
+      <div className="mobile-admin-page bg-slate-50 pb-24">
+        {isLoading && <AdminEmpty title="Loading workspace" description="Refreshing today’s operational data…" />}
+        {readOnly && <div role="status" className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">Read-only mode: operational changes are temporarily disabled.</div>}
         {activeTab === 'overview' && (
           <>
             <div className="mobile-admin-hero">
@@ -417,10 +436,13 @@ const MobileAdminPage = ({
           <>
             <AdminSearch icon={Search} value={driverQuery} onChange={setDriverQuery} placeholder="Search drivers, vehicle, zone..." />
             <div className="mobile-admin-list">
-              {filteredDrivers.map(driver => (
+              {visibleDrivers.map(driver => (
                 <MobileDriverCard key={driver.id || driver.email || driver.name} driver={driver} activeTrip={activeTripsByDriver.get(driver.id)} />
               ))}
               {filteredDrivers.length === 0 && <AdminEmpty icon={Truck} title="No matching drivers" hint="Try another name, vehicle, or zone" />}
+              {visibleDrivers.length < filteredDrivers.length && (
+                <AdminButton variant="secondary" onClick={() => setDriverLimit(limit => limit + MOBILE_ADMIN_LIST_PAGE_SIZE)}>Load more drivers</AdminButton>
+              )}
             </div>
           </>
         )}
@@ -440,7 +462,7 @@ const MobileAdminPage = ({
           <>
             <AdminSearch icon={Search} value={peopleQuery} onChange={setPeopleQuery} placeholder="Search people, role, phone..." />
             <div className="mobile-admin-list">
-              {filteredUsers.map((user, index) => (
+              {visibleUsers.map((user, index) => (
                 <MobilePersonCard
                   key={`${user._source}-${user.id || user.email || index}`}
                   user={user}
@@ -452,6 +474,9 @@ const MobileAdminPage = ({
                 />
               ))}
               {filteredUsers.length === 0 && <AdminEmpty icon={Users} title="No matching people" hint="Try another name, role, phone, or email" />}
+              {visibleUsers.length < filteredUsers.length && (
+                <AdminButton variant="secondary" onClick={() => setPeopleLimit(limit => limit + MOBILE_ADMIN_LIST_PAGE_SIZE)}>Load more people</AdminButton>
+              )}
             </div>
           </>
         )}
@@ -470,4 +495,4 @@ const MobileAdminPage = ({
   );
 };
 
-export default MobileAdminPage;
+export default React.memo(MobileAdminPage);

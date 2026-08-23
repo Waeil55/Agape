@@ -1263,7 +1263,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const uniqueDates = [...new Set(mappedTrips.map(t => t.date).filter(Boolean))].sort();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 max-md:[&_button]:min-h-11">
       {step === 'upload' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">
           <div className="max-w-2xl mx-auto">

@@ -9,8 +9,9 @@ import { makeCall } from '../../utils/nativeActions';
 import { storage, storageRef, uploadBytesResumable, getDownloadURL } from '../../config/firebase';
 import { isAllowedChatAttachment, isMessageSeen } from '../../utils/chatLifecycle';
 import { recordMatchesSearch } from '../../utils/search';
+import { purgeLegacyChatStorage } from '../../utils/sensitiveSessionStorage';
 
-export const formatDisplayName = (user) => {
+const formatDisplayName = (user) => {
   if (!user) return 'User';
   let raw = user.name || user.username || user.email || 'User';
   if (raw.includes('@')) {
@@ -22,7 +23,7 @@ export const formatDisplayName = (user) => {
     .join(' ');
 };
 
-export const ChatPage = ({ onBack, onThreadActive }) => {
+const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
   const {
     currentUser,
     channels,
@@ -48,7 +49,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     loadOlderMessages,
     hasOlderMessages,
     loadingOlderMessages
-  } = useChat({ alerts: false });
+  } = chatModel;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [conversationFilter, setConversationFilter] = useState('all');
@@ -69,13 +70,20 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [groupName, setGroupName] = useState('');
   const [forwardingMessage, setForwardingMessage] = useState(null);
-  const [outbox, setOutbox] = useState(() => { try { return JSON.parse(localStorage.getItem('agape_chat_outbox') || '[]'); } catch { return []; } });
+  const [outbox, setOutbox] = useState([]);
   const [typingClock, setTypingClock] = useState(() => Date.now());
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimerRef = useRef(null);
   const sendRequestIdRef = useRef(null);
   const suppressNextScrollRef = useRef(false);
+  const sessionActiveRef = useRef(true);
+
+  useEffect(() => {
+    purgeLegacyChatStorage();
+    sessionActiveRef.current = true;
+    return () => { sessionActiveRef.current = false; };
+  }, []);
 
   // Notify parent of active thread state change
   useEffect(() => {
@@ -90,17 +98,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeChannelId]);
 
-  useEffect(() => {
-    if (!activeChannelId) { setComposerText(''); return; }
-    setComposerText(localStorage.getItem(`agape_chat_draft_${activeChannelId}`) || '');
-  }, [activeChannelId]);
-
-  useEffect(() => {
-    if (!activeChannelId) return;
-    const key = `agape_chat_draft_${activeChannelId}`;
-    if (composerText) localStorage.setItem(key, composerText);
-    else localStorage.removeItem(key);
-  }, [activeChannelId, composerText]);
+  useEffect(() => { setComposerText(''); }, [activeChannelId]);
 
   useEffect(() => () => {
     clearTimeout(typingTimerRef.current);
@@ -136,6 +134,7 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       if (!sendRequestIdRef.current) sendRequestIdRef.current = crypto.randomUUID();
       const reply = replyTo ? { id: replyTo.id, senderName: replyTo.senderName, text: (replyTo.text || 'Attachment').slice(0, 180) } : null;
       await sendMessage(text || (attachments.length ? '' : '👍'), attachments, sendRequestIdRef.current, reply);
+      if (!sessionActiveRef.current) return;
       if (!textToSend) setComposerText('');
       setPendingFiles([]);
       setUploadProgress(0);
@@ -144,11 +143,12 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       setTyping(false);
     } catch (error) {
       console.error('Message send failed:', error);
+      if (!sessionActiveRef.current) return;
       const queued = { id: sendRequestIdRef.current || crypto.randomUUID(), channelId: activeChannelId, text, attachments: uploadedAttachments, replyTo: replyTo ? { id: replyTo.id, senderName: replyTo.senderName, text: (replyTo.text || 'Attachment').slice(0, 180) } : null, queuedAt: Date.now() };
-      setOutbox(current => { const next = [...current.filter(item => item.id !== queued.id), queued]; localStorage.setItem('agape_chat_outbox', JSON.stringify(next)); return next; });
-      setSendError('Message queued safely. Retry when your connection returns.');
+      setOutbox(current => [...current.filter(item => item.id !== queued.id), queued]);
+      setSendError('Message kept in memory for this open session. Retry when your connection returns.');
     } finally {
-      setIsSending(false);
+      if (sessionActiveRef.current) setIsSending(false);
     }
   };
 
@@ -161,7 +161,8 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       try { await sendMessage(item.text, item.attachments || [], item.id, item.replyTo || null); }
       catch { remaining.push(item); }
     }
-    setOutbox(remaining); localStorage.setItem('agape_chat_outbox', JSON.stringify(remaining));
+    if (!sessionActiveRef.current) return;
+    setOutbox(remaining);
     setSendError(remaining.some(item => item.channelId === activeChannelId) ? 'Some queued messages still need a connection.' : '');
     setIsSending(false);
   };
@@ -552,4 +553,16 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
       {forwardingMessage && <div className="fixed inset-0 z-[330] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-6" onClick={() => setForwardingMessage(null)}><div className="max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={event => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Forward</p><h3 className="text-base font-black text-slate-950">Choose a conversation</h3></div><button onClick={() => setForwardingMessage(null)} className="h-8 w-8 rounded-full bg-slate-100"><X size={15} className="mx-auto" /></button></div><div className="space-y-2">{channels.filter(channel => channel.id !== activeChannelId).map(channel => { const contact = getOtherParticipant(channel); return <button key={channel.id} onClick={async () => { await forwardMessage(forwardingMessage, channel.id); setForwardingMessage(null); }} className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left hover:border-blue-200 hover:bg-blue-50"><img src={getAvatarUrl(contact)} alt="" className="h-9 w-9 rounded-full" /><span className="text-sm font-bold text-slate-800">{formatDisplayName(contact)}</span></button>; })}</div></div></div>}
     </div>
   );
+};
+
+export const ChatPage = ({ onBack, onThreadActive }) => {
+  const chatModel = useChat({ alerts: false });
+  const sessionIdentity = chatModel.currentUser?.id || chatModel.currentUser?.uid || chatModel.currentUser?.email || 'signed-out';
+  const safeDraftChannel = chatModel.draftChannel?.participants?.includes(sessionIdentity)
+    ? chatModel.draftChannel
+    : null;
+  const safeModel = safeDraftChannel === chatModel.draftChannel
+    ? chatModel
+    : { ...chatModel, draftChannel: null };
+  return <ChatSession key={sessionIdentity} chatModel={safeModel} onBack={onBack} onThreadActive={onThreadActive} />;
 };

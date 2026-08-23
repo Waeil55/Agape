@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from 'react';
 import {
   BrainCircuit, Play, ChevronRight, X, Navigation, Map as MapIcon,
   Route, Repeat, AlertTriangle, Zap, ChevronDown, ChevronUp,
@@ -9,7 +9,8 @@ import { openMapLink } from '../utils/nativeActions';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
-import { generateAiText } from '../services/secureAi';
+import LiveRouteMap from './LiveRouteMap';
+import { purgeLegacyRoutePlanStorage } from '../utils/sensitiveSessionStorage';
 
 const timeToMinutes = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return 1440;
@@ -47,7 +48,6 @@ const formatDuration = (minutes) => {
   return `${h}h ${m}m`;
 };
 
-const sanitizeStorageKey = (value) => String(value || 'anon').replace(/[^a-zA-Z0-9@._-]/g, '_');
 const cleanRouteAddress = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 const stopSignature = (stop) => `${cleanRouteAddress(stop?.label).toLowerCase()}|${stop?.tripId || ''}|${stop?.stopType || ''}`;
 const stopTypeRank = (stopType) => (stopType === 'PU' ? 0 : stopType === 'DO' ? 1 : 2);
@@ -128,16 +128,6 @@ const normalizeImportedStop = (item, index) => {
   };
 };
 
-const readSavedRoutePlan = (storageKey, driverPosition) => {
-  try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
-    if (Array.isArray(saved) && saved.length > 0) {
-      return normalizeStopOrder(saved, driverPosition);
-    }
-  } catch {}
-  return normalizeStopOrder([createBlankStop('A')], driverPosition);
-};
-
 const copyRouteText = async (text) => {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -151,7 +141,62 @@ const copyRouteText = async (text) => {
   document.body.removeChild(textArea);
 };
 
-const RoutePlanSection = ({
+const RouteStopRow = React.memo(({
+  stop, index, totalStops, onMoveUp, onMoveDown, onDelete,
+  onTextChange, onDragStart, onDragEnter, onDragEnd,
+}) => (
+  <div
+    className={`flex items-center w-full rounded-xl border bg-white px-2 py-2 shadow-sm transition ${index === 0 ? 'border-blue-100' : 'border-slate-100 hover:border-slate-200'}`}
+    draggable={index > 0}
+    onDragStart={() => onDragStart(index)}
+    onDragEnter={() => onDragEnter(index)}
+    onDragEnd={onDragEnd}
+    onDragOver={(event) => event.preventDefault()}
+  >
+    <div className="flex items-center w-[58px] shrink-0 pr-2">
+      <div className="w-8 flex justify-center">
+        {index > 0 && (
+          <div className="flex flex-col gap-0.5 text-slate-400">
+            <button onClick={() => onMoveUp(index)} className="cursor-pointer hover:bg-slate-100 rounded p-0.5 transition-colors disabled:opacity-30" disabled={index <= 1} aria-label={`Move stop ${stop.letter} up`}>
+              <ArrowUp size={14} className="text-slate-500" />
+            </button>
+            <button onClick={() => onMoveDown(index)} className="cursor-pointer hover:bg-slate-100 rounded p-0.5 transition-colors disabled:opacity-30" disabled={index === totalStops - 1} aria-label={`Move stop ${stop.letter} down`}>
+              <ArrowDown size={14} className="text-slate-500" />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="w-6 flex justify-center items-center">
+        {stop.type === 'origin' ? (
+          <div className="w-[22px] h-[22px] border border-blue-200 rounded-full bg-blue-50 flex items-center justify-center"><span className="text-xs font-semibold text-blue-700 leading-none">O</span></div>
+        ) : (
+          <div className="w-[22px] h-[22px] border border-slate-300 rounded-full bg-white flex items-center justify-center"><span className="text-xs font-semibold text-slate-800 leading-none">{stop.letter}</span></div>
+        )}
+      </div>
+    </div>
+    <div className="flex-1 min-w-0">
+      {(stop.clientName || stop.stopTime || stop.stopType) && (
+        <div className="flex items-center gap-1 mb-0.5 min-w-0">
+          {stop.stopType && stop.stopType !== 'ORIGIN' && <span className={`text-[10px] font-semibold px-1 rounded ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{stop.stopType}</span>}
+          {stop.clientName && <span className="text-[10px] font-semibold text-slate-800 truncate">{stop.clientName}</span>}
+          {stop.stopTime && <span className="text-[10px] font-semibold text-slate-500">{to12hr(stop.stopTime)}</span>}
+        </div>
+      )}
+      <PlacesAutocompleteInput
+        value={stop.type === 'origin' && stop.source === 'gps' && coordinateLabelPattern.test(cleanRouteAddress(stop.label)) ? 'Current GPS location' : stop.label}
+        onChange={(value) => onTextChange(index, value)}
+        placeholder={index === 0 ? 'Starting point or current location' : `Stop ${stop.letter} address`}
+        className="text-[11px] font-normal text-slate-600 placeholder:text-slate-400 truncate bg-transparent outline-none w-full"
+      />
+    </div>
+    <div className="w-8 flex justify-end shrink-0 pl-2">
+      {index > 0 && <button onClick={() => onDelete(index)} className="cursor-pointer hover:bg-rose-50 p-1 rounded-full transition-colors" aria-label={`Delete stop ${stop.letter}`}><Trash2 size={14} className="text-slate-400" /></button>}
+    </div>
+  </div>
+));
+RouteStopRow.displayName = 'RouteStopRow';
+
+const RoutePlanSession = ({
   routePlanStops = null,
   onSetRoutePlanStops = null,
   appSettings = {},
@@ -160,16 +205,23 @@ const RoutePlanSection = ({
   currentUser = 'driver',
   driverPosition = null,
 }) => {
-  const storageKey = `agape_routePlan_${sanitizeStorageKey(currentUser)}`;
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
-  const [stops, setStops] = useState(() => readSavedRoutePlan(storageKey, driverPosition));
+  const [stops, setStops] = useState(() => normalizeStopOrder([createBlankStop('A')], driverPosition));
   const [routeSummary, setRouteSummary] = useState({ duration: '0 min', distance: '--', legs: [] });
   const [isCalculating, setIsCalculating] = useState(false);
-  const [expanded, setExpanded] = useState(() => localStorage.getItem(`${storageKey}:expanded`) !== '0');
+  const [expanded, setExpanded] = useState(true);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [routeNotice, setRouteNotice] = useState('');
+  const routeRequestVersionRef = useRef(0);
+  const routeSessionActiveRef = useRef(true);
+
+  useEffect(() => {
+    purgeLegacyRoutePlanStorage();
+    routeSessionActiveRef.current = true;
+    return () => { routeSessionActiveRef.current = false; };
+  }, []);
 
   const getCurrentAddress = useCallback(() => {
     return new Promise((resolve) => {
@@ -182,6 +234,7 @@ const RoutePlanSection = ({
               `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY()}`
             );
             const data = await res.json();
+            if (!routeSessionActiveRef.current) return;
             if (data.results?.[0]) resolve(data.results[0].formatted_address);
             else resolve(`${latitude}, ${longitude}`);
           } catch { resolve(`${pos.coords.latitude}, ${pos.coords.longitude}`); }
@@ -216,9 +269,11 @@ const RoutePlanSection = ({
     updateStops(newStops.length > 1 ? newStops : [newStops[0], createBlankStop('A')]);
   };
 
-  const handleTextChange = (index, newText) => {
-    setStops(prev => normalizeStopOrder(prev.map((s, i) => i === index ? { ...s, label: newText, source: s.source || 'manual' } : s), driverPosition));
-  };
+  const handleTextChange = useCallback((index, newText) => {
+    setStops(prev => prev.map((stop, stopIndex) => (
+      stopIndex === index ? { ...stop, label: newText, source: stop.source || 'manual' } : stop
+    )));
+  }, []);
 
   const handleAddStop = () => {
     setStops(prev => normalizeStopOrder([...prev, createBlankStop(String.fromCharCode(64 + prev.length))], driverPosition));
@@ -306,13 +361,6 @@ const RoutePlanSection = ({
   }, [stops]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(stops));
-      localStorage.setItem(`${storageKey}:expanded`, expanded ? '1' : '0');
-    } catch {}
-  }, [storageKey, stops, expanded]);
-
-  useEffect(() => {
     if (!routePlanStops || routePlanStops.length === 0) return;
     const imported = routePlanStops.map(normalizeImportedStop).filter(stop => cleanRouteAddress(stop.label));
     imported.sort((a, b) => {
@@ -346,6 +394,7 @@ const RoutePlanSection = ({
 
   useEffect(() => {
     if (!expanded) return;
+    const requestVersion = ++routeRequestVersionRef.current;
     const calculateTripTime = async () => {
       if (!routeValidation.ready || routeValidation.labels.length < 2) {
         setRouteSummary({ duration: '0 min', distance: '--', legs: [] });
@@ -386,21 +435,22 @@ const RoutePlanSection = ({
             }
           });
         });
+        if (requestVersion !== routeRequestVersionRef.current) return;
         setRouteSummary(summary);
       } catch {
-        try {
-          const prompt = `Calculate driving time from "${origin}" to "${destination}"${waypoints.length ? ` with stops at "${waypoints.join(', ')}"` : ''}. Reply only with the time like '45 min'.`;
-          const duration = await generateAiText(prompt, { temperature: 0, maxOutputTokens: 64 });
-          setRouteSummary({ duration: duration || 'Unavailable', distance: '--', legs: [] });
-        } catch {
-          setRouteSummary({ duration: 'Unavailable', distance: '--', legs: [] });
-        }
+        // Route timing is operational data. If Google cannot verify it, show an
+        // explicit unavailable state instead of inventing a duration.
+        if (requestVersion !== routeRequestVersionRef.current) return;
+        setRouteSummary({ duration: 'Unavailable', distance: '--', legs: [] });
       } finally {
-        setIsCalculating(false);
+        if (requestVersion === routeRequestVersionRef.current) setIsCalculating(false);
       }
     };
     const id = setTimeout(calculateTripTime, 900);
-    return () => clearTimeout(id);
+    return () => {
+      clearTimeout(id);
+      if (requestVersion === routeRequestVersionRef.current) routeRequestVersionRef.current += 1;
+    };
   }, [routeValidation, expanded]);
 
   const handleSmartSort = () => {
@@ -592,68 +642,25 @@ const RoutePlanSection = ({
             </div>
           )}
 
+          {routeValidation.routeStops.length > 0 && (
+            <LiveRouteMap ordered={stops} driverPosition={driverPosition} className="mb-3" />
+          )}
+
           <div className="w-full font-sans space-y-1.5">
             {stops.map((stop, index) => (
-              <React.Fragment key={stop.id}>
-                <div
-                  className={`flex items-center w-full rounded-xl border bg-white px-2 py-2 shadow-sm transition ${index === 0 ? 'border-blue-100' : 'border-slate-100 hover:border-slate-200'}`}
-                  draggable={index > 0}
-                  onDragStart={() => handleDragStart(index)}
-                  onDragEnter={() => handleDragEnter(index)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={(e) => e.preventDefault()}
-                >
-                  <div className="flex items-center w-[58px] shrink-0 pr-2">
-                    <div className="w-8 flex justify-center">
-                      {index > 0 && (
-                        <div className="flex flex-col gap-0.5 text-slate-400">
-                          <button onClick={() => handleMoveUp(index)} className="cursor-pointer hover:bg-slate-100 rounded p-0.5 transition-colors disabled:opacity-30" disabled={index <= 1}>
-                            <ArrowUp size={14} className="text-slate-500" />
-                          </button>
-                          <button onClick={() => handleMoveDown(index)} className="cursor-pointer hover:bg-slate-100 rounded p-0.5 transition-colors disabled:opacity-30" disabled={index === stops.length - 1}>
-                            <ArrowDown size={14} className="text-slate-500" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="w-6 flex justify-center items-center">
-                      {stop.type === 'origin' ? (
-                        <div className="w-[22px] h-[22px] border border-blue-200 rounded-full bg-blue-50 flex items-center justify-center">
-                          <span className="text-xs font-semibold text-blue-700 leading-none">O</span>
-                        </div>
-                      ) : (
-                        <div className="w-[22px] h-[22px] border border-slate-300 rounded-full bg-white flex items-center justify-center">
-                          <span className="text-xs font-semibold text-slate-800 leading-none">{stop.letter}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {(stop.clientName || stop.stopTime || stop.stopType) && (
-                      <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                        {stop.stopType && stop.stopType !== 'ORIGIN' && (
-                          <span className={`text-[7px] font-semibold px-1 py-[0px] rounded ${stop.stopType === 'PU' ? 'bg-blue-100 text-blue-700' : stop.stopType === 'DO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                            {stop.stopType}
-                          </span>
-                        )}
-                        {stop.clientName && <span className="text-[7px] font-semibold text-slate-800 truncate">{stop.clientName}</span>}
-                        {stop.stopTime && <span className="text-[7px] font-semibold text-slate-400">{to12hr(stop.stopTime)}</span>}
-                      </div>
-                    )}
-                    <PlacesAutocompleteInput
-                      value={stop.type === 'origin' && stop.source === 'gps' && coordinateLabelPattern.test(cleanRouteAddress(stop.label)) ? 'Current GPS location' : stop.label}
-                      onChange={(v) => handleTextChange(index, v)}
-                      placeholder={index === 0 ? 'Starting point or current location' : `Stop ${stop.letter} address`}
-                      className="text-[7px] font-normal text-slate-400 placeholder:text-slate-300 truncate bg-transparent outline-none w-full"
-                    />
-                  </div>
-                  <div className="w-8 flex justify-end shrink-0 pl-2">
-                    {index > 0 && <button onClick={() => handleDelete(index)} className="cursor-pointer hover:bg-rose-50 p-1 rounded-full transition-colors">
-                      <Trash2 size={14} className="text-slate-400" />
-                    </button>}
-                  </div>
-                </div>
-              </React.Fragment>
+              <RouteStopRow
+                key={stop.id}
+                stop={stop}
+                index={index}
+                totalStops={stops.length}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
+                onDelete={handleDelete}
+                onTextChange={handleTextChange}
+                onDragStart={handleDragStart}
+                onDragEnter={handleDragEnter}
+                onDragEnd={handleDragEnd}
+              />
             ))}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
@@ -722,6 +729,14 @@ const RoutePlanSection = ({
   );
 };
 
+export const RoutePlanSection = (props) => {
+  const identity = props.currentUser;
+  const sessionIdentity = typeof identity === 'object'
+    ? (identity?.id || identity?.uid || identity?.email || 'signed-out')
+    : (identity || 'signed-out');
+  return <RoutePlanSession key={sessionIdentity} {...props} />;
+};
+
 const DriverToolsPage = ({
   trips, activeTrips, aiSequence, aiSuggestions, aiRideShare, conflicts,
   aiOptimizing, guidedMode, guidedStepIndex, guidedSteps,
@@ -733,16 +748,22 @@ const DriverToolsPage = ({
   requestAuthAction = () => {},
   routePlanStops = null,
   onSetRoutePlanStops = null,
-  onSendToSequencer = null
+  onSendToSequencer = null,
+  isLoading = false,
+  readOnly = false
 }) => {
   const [expandedSection, setExpandedSection] = useState('route');
+  const quickNavId = useId();
+  const etasId = useId();
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section);
   };
 
   return (
-    <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2 space-y-2">
+    <div className="flex-1 overflow-y-auto overscroll-contain pb-24 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2 space-y-2">
+      {isLoading && <div role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">Loading route tools…</div>}
+      {readOnly && <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-800">Route tools are read-only in this session.</div>}
       {/* Guided Mode Progress Header */}
       {guidedMode && aiSequence && aiSequence.length > 0 && guidedStepIndex < aiSequence.length && (() => {
         const currentTripId = aiSequence[guidedStepIndex];
@@ -907,6 +928,8 @@ const DriverToolsPage = ({
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <button
             onClick={() => toggleSection('quicknav')}
+            aria-expanded={expandedSection === 'quicknav'}
+            aria-controls={quickNavId}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
           >
             <div className="flex items-center gap-2">
@@ -917,7 +940,7 @@ const DriverToolsPage = ({
             {expandedSection === 'quicknav' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
           </button>
           {expandedSection === 'quicknav' && (
-            <div className="border-t border-slate-100 divide-y divide-slate-100">
+            <div id={quickNavId} className="border-t border-slate-100 divide-y divide-slate-100">
               {activeTrips.map(trip => (
                 <div key={trip.id} className="px-4 py-3">
                   <div className="flex items-center justify-between mb-2">
@@ -964,6 +987,8 @@ const DriverToolsPage = ({
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <button
             onClick={() => toggleSection('etas')}
+            aria-expanded={expandedSection === 'etas'}
+            aria-controls={etasId}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
           >
             <div className="flex items-center gap-2">
@@ -973,7 +998,7 @@ const DriverToolsPage = ({
             {expandedSection === 'etas' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
           </button>
           {expandedSection === 'etas' && (
-            <div className="border-t border-slate-100 divide-y divide-slate-100">
+            <div id={etasId} className="border-t border-slate-100 divide-y divide-slate-100">
               {activeTrips.map(trip => {
                 const eta = etas[trip.id];
                 if (eta === undefined) return null;
@@ -999,4 +1024,11 @@ const DriverToolsPage = ({
   );
 };
 
-export default DriverToolsPage;
+const areDriverToolsPropsEqual = (previous, next) => {
+  const previousKeys = Object.keys(previous);
+  const nextKeys = Object.keys(next);
+  return previousKeys.length === nextKeys.length
+    && previousKeys.every((key) => Object.is(previous[key], next[key]));
+};
+
+export default React.memo(DriverToolsPage, areDriverToolsPropsEqual);

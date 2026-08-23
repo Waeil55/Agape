@@ -92,8 +92,8 @@ const PWAInstallPrompt = () => {
               <Wifi size={18} className="text-green-600" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-900">Works Offline</p>
-              <p className="text-xs text-slate-500">Access your data even without internet</p>
+              <p className="text-sm font-semibold text-slate-900">Supported offline work</p>
+              <p className="text-xs text-slate-500">Eligible changes queue safely and sync when connectivity returns</p>
             </div>
           </div>
 
@@ -102,8 +102,8 @@ const PWAInstallPrompt = () => {
               <Shield size={18} className="text-purple-600" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-900">Secure & Private</p>
-              <p className="text-xs text-slate-500">Your data stays on your device</p>
+              <p className="text-sm font-semibold text-slate-900">Secure access</p>
+              <p className="text-xs text-slate-500">Cloud records remain protected by account and role permissions</p>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
 import {
   Truck, Users, Clock, ShieldCheck,
   ArrowRight, CheckCircle2, AlertTriangle,
@@ -502,11 +502,25 @@ const App = () => {
     return () => syncQueueProcessor.stop();
   }, []);
 
+  // The offline outbox is inert until Firebase has verified both the user and
+  // tenant. Clearing this context on sign-out prevents cross-account replay on
+  // shared tablets and dispatch workstations.
+  useEffect(() => {
+    const userId = auth.currentUser?.uid;
+    if (!isAuthenticated || !userId) {
+      syncQueueProcessor.setAuthContext(null);
+      return undefined;
+    }
+    syncQueueProcessor.setAuthContext({ tenantId, userId });
+    void syncQueueProcessor.processNow();
+    return () => syncQueueProcessor.setAuthContext(null);
+  }, [isAuthenticated, tenantId]);
+
   // ALL DATA COMES FROM FIRESTORE — single source of truth
   const {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, error: dataError,
-    setTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles,
+    setTrips, archiveTripsById, persistUploadedTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
   } = useFirestoreAppData({ tenantId, resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
@@ -871,7 +885,7 @@ const App = () => {
       const filtered = recentDocs
         .filter((item) => !item.date || item.date >= cutoffKey)
         .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
-      setDriverTelemetry(filtered);
+      startTransition(() => setDriverTelemetry(filtered));
     }, (err) => {
       console.error('Driver telemetry listener failed:', err);
     });
@@ -888,13 +902,14 @@ const App = () => {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 45);
       const cutoffMs = cutoff.getTime();
-      setTimeTrackingDeclarations(snapshot.docs
+      const recentDeclarations = snapshot.docs
         .map((itemDoc) => ({ id: itemDoc.id, ...itemDoc.data() }))
         .filter((event) => {
           const value = event.timestamp || event.createdAt;
           const date = value?.toDate ? value.toDate() : value?.seconds ? new Date(value.seconds * 1000) : new Date(value || 0);
           return Number.isFinite(date.getTime()) && date.getTime() >= cutoffMs;
-        }));
+        });
+      startTransition(() => setTimeTrackingDeclarations(recentDeclarations));
     }, (error) => console.error('Time tracking declaration listener failed:', error));
     return () => unsubscribe();
   }, [currentUser, isAuthenticated, realtimeReliability.resubscribeKey, role]);
@@ -1726,8 +1741,8 @@ const App = () => {
       addAuditLog('Scope Blocked', `${currentUser} attempted to archive an out-of-scope trip.`, 'rose');
       return;
     }
-    requestAuthAction('archive_trip', () => {
-      executeDeleteTrip(tripId);
+    requestAuthAction('archive_trip', async () => {
+      await executeDeleteTrip(tripId);
     });
   };
 
@@ -1979,30 +1994,32 @@ const App = () => {
     return true;
   }, [currentUser, role, currentUserDriverProfile, dedupTrips, drivers, canControlDriver, addAuditLog, addToast, setTrips]);
 
-  const executeDeleteTrip = (tripId) => {
-    // CRITICAL FIX: Use refs instead of closures to avoid stale data from Firestore sync
-    let tripToDelete = null;
-    
-    setTrips(currentTrips => {
-      tripToDelete = currentTrips.find(t => t.id === tripId);
-      if (!tripToDelete) return currentTrips;
-      return currentTrips.filter(t => t.id !== tripId);
-    });
-    
-    setTimeout(() => {
-      if (tripToDelete) {
-        setTrashedTrips(currentTrashed => {
-          if (currentTrashed.find(t => t.id === tripId)) return currentTrashed;
-          return [tripToDelete, ...currentTrashed];
-        });
-        
-        // Writes directly to Firestore via setTrips/setTrashedTrips
-        const _changed = Object.keys(tripToDelete).map(k => ({ field: k, before: tripToDelete[k], after: undefined }));
-        addAuditLog('Trip Archived', `${currentUser} archived trip ${tripId} (${tripToDelete.patient}).`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'active', after: 'archived' }] });
+  const handleUploadedTrips = useCallback(async (newTrips) => {
+    try {
+      const result = await persistUploadedTrips(newTrips);
+      addAuditLog('Trips Imported', `${currentUser} imported ${result.importedCount} trip(s).`, 'emerald');
+      addToast('Trips Imported', `${result.importedCount} trip(s) imported successfully.`, 'success');
+      setShowUploadModal(false);
+      return result;
+    } catch (error) {
+      addToast('Import Not Saved', error.message || 'The import could not be confirmed.', 'danger');
+      throw error;
+    }
+  }, [addAuditLog, addToast, currentUser, persistUploadedTrips]);
+
+  const executeDeleteTrip = async (tripId) => {
+    try {
+      const result = await archiveTripsById([tripId]);
+      const archivedTrip = result.archivedTrips?.[0];
+      setSelectedTasks(prev => prev.filter(id => id !== tripId));
+      if (archivedTrip) {
+        addAuditLog('Trip Archived', `${currentUser} archived trip ${tripId} (${archivedTrip.patient}).`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'active', after: 'archived' }] });
       }
-    }, 0);
-    
-    setSelectedTasks(prev => prev.filter(id => id !== tripId));
+      return result;
+    } catch (error) {
+      addToast('Archive Not Saved', error.message || 'The trip could not be archived.', 'danger');
+      throw error;
+    }
   };
 
   const requestBulkDelete = (tripIds, onSuccess) => {
@@ -2010,26 +2027,15 @@ const App = () => {
       addAuditLog('Permission Denied', `${currentUser} attempted bulk archive without authorization.`, 'rose');
       return;
     }
-    requestAuthAction('archive_trips', () => {
-      let tripsToDelete = [];
-      setTrips(currentTrips => {
-        tripsToDelete = currentTrips.filter(t => tripIds.includes(t.id));
-        if (tripsToDelete.length === 0) return currentTrips;
-        return currentTrips.filter(t => !tripIds.includes(t.id));
-      });
-      
-      setTimeout(() => {
-        if (tripsToDelete.length > 0) {
-          setTrashedTrips(currentTrashed => {
-            const newTrashed = tripsToDelete.filter(td => !currentTrashed.some(ct => ct.id === td.id));
-            return [...newTrashed, ...currentTrashed];
-          });
-          
-          setSelectedTasks([]);
-          if (onSuccess) onSuccess();
-          addAuditLog('Bulk Trip Archived', `${currentUser} archived ${tripsToDelete.length} trips.`, 'rose');
-        }
-      }, 0);
+    requestAuthAction('archive_trips', async () => {
+      try {
+        const result = await archiveTripsById(tripIds);
+        setSelectedTasks([]);
+        if (onSuccess) onSuccess();
+        addAuditLog('Bulk Trip Archived', `${currentUser} archived ${result.archivedCount} trips.`, 'rose');
+      } catch (error) {
+        addToast('Archive Not Saved', error.message || 'The selected trips could not be archived.', 'danger');
+      }
     });
   };
 
@@ -2627,11 +2633,11 @@ const App = () => {
       updatedAtLocal: updatedAtIso,
     });
 
-    setDriverTelemetry((prev) => {
+    startTransition(() => setDriverTelemetry((prev) => {
       const others = prev.filter((item) => item.id !== docId);
       return [nextTelemetryDoc, ...others]
         .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
-    });
+    }));
 
     try {
       await setDoc(doc(db, 'driverTelemetry', docId), nextTelemetryDoc, { merge: true });
@@ -2667,6 +2673,32 @@ const App = () => {
     }
   };
 
+  const handleDriverTripUpdate = useCallback((tripId, status, extraData = {}) => {
+    const previousTrip = trips.find((trip) => trip.id === tripId);
+    if (role === 'driver') {
+      void upsertDriverTrip(tripId, { status, ...extraData });
+    } else {
+      void setTrips((previous) => previous.map((trip) => (
+        trip.id === tripId ? { ...trip, status, ...extraData } : trip
+      )));
+    }
+    if (!previousTrip) return;
+    const nextTrip = { ...previousTrip, status, ...extraData };
+    const diffs = Object.keys(nextTrip)
+      .filter((key) => String(previousTrip[key]) !== String(nextTrip[key]))
+      .map((key) => ({ field: key, before: previousTrip[key], after: nextTrip[key] }));
+    if (diffs.length === 0) return;
+    addAuditLog(
+      'Driver Update',
+      `${currentUser} updated trip ${tripId} (${previousTrip.patient || 'Unknown'}) to ${status}`,
+      'blue',
+      {
+        entity: 'trip', id: tripId, diffs,
+        summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; '),
+      },
+    );
+  }, [addAuditLog, currentUser, role, setTrips, trips, upsertDriverTrip]);
+
   const renderLoginScreen = () => {
     const handleRoleSelect = (roleKey) => {
       loginPortalRoleRef.current = roleKey;
@@ -2683,10 +2715,37 @@ const App = () => {
     };
 
     return (
-      <div className="flex-1 bg-blue-600 flex flex-col justify-start lg:justify-center items-center px-4 py-6 relative overflow-y-auto font-outfit" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(90,148,175,0.45)),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[length:auto,48px_48px,48px_48px]" />
-        
-        <div className="w-full max-w-lg bg-white border border-slate-200/50 rounded-[2.5rem] overflow-hidden shadow-2xl p-6 sm:p-8 relative z-10">
+      <div className="agape-login flex-1 relative overflow-y-auto px-4 py-6" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
+        <div className="agape-login-backdrop absolute inset-0" aria-hidden="true" />
+        <div className="agape-login-stage relative z-10 mx-auto grid min-h-full w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <aside className="agape-login-story hidden min-h-[620px] flex-col justify-between rounded-xl border border-white/10 p-10 text-white lg:flex">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" /> Live operations network
+              </div>
+              <h2 className="mt-8 max-w-xl text-5xl font-semibold leading-[1.03] tracking-[-0.045em] text-white">
+                Every ride.<br />One calm command center.
+              </h2>
+              <p className="mt-5 max-w-lg text-base font-medium leading-relaxed text-blue-100/85">
+                Dispatch, drivers, fleet, reporting and field workflows connected in one secure transportation workspace.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Realtime', detail: 'Fleet visibility', Icon: Activity },
+                { label: 'Protected', detail: 'Role access', Icon: ShieldCheck },
+                { label: 'Responsive', detail: 'Field ready', Icon: Zap },
+              ].map(({ label, detail, Icon }) => (
+                <div key={label} className="rounded-xl border border-white/10 bg-white/[0.07] p-4">
+                  <Icon size={18} className="text-blue-200" />
+                  <p className="mt-4 text-sm font-semibold text-white">{label}</p>
+                  <p className="mt-1 text-xs font-medium text-blue-100/65">{detail}</p>
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          <div className="agape-login-panel w-full max-w-lg justify-self-center overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
           <div className="flex flex-col items-center mb-6 text-center">
             <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
@@ -2715,7 +2774,7 @@ const App = () => {
                   };
                   return (
                     <button key={r.key} onClick={() => handleRoleSelect(r.key)} 
-                      className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-blue-200 active:scale-[0.98] transition-all duration-300 group text-left shadow-sm min-h-[84px]">
+                      className="agape-login-role group flex min-h-[76px] items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200 hover:bg-blue-50/40 hover:shadow-md active:scale-[0.98]">
                       <div className={`${colorMap[r.color]} rounded-xl text-white shadow-lg shrink-0 transition-transform group-hover:scale-105 flex items-center justify-center w-12 h-12`}>
                         <Icon size={22} strokeWidth={2.5} />
                       </div>
@@ -2771,9 +2830,10 @@ const App = () => {
               </div>
             </form>
           )}
+          </div>
         </div>
-        
-        <div className="mt-5 flex flex-col items-center gap-3 relative z-10">
+
+        <div className="agape-login-footer relative z-10 mt-5 flex flex-col items-center gap-3">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-[0.3em] text-center opacity-60">
             Agape Care Cloud Infrastructure<br />
             Certified Enterprise Environment
@@ -3139,7 +3199,8 @@ const App = () => {
             const driverId = myDriver.id;
             const myTrips = currentUserDriverTrips;
             const myDrivers = myDriver ? [myDriver] : [];
-            return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} drivers={myDrivers} trips={myTrips}
+            return <Suspense fallback={<LazyFallback />}><DriverPage currentUser={currentUser} role={role} tenantId={tenantId} drivers={myDrivers} trips={myTrips}
+              tripsLoading={dataLoading}
               vehicles={vehicles}
               setVehicles={setVehicles}
               driverTelemetry={driverTelemetry}
@@ -3165,27 +3226,7 @@ const App = () => {
                 }
               }}
               onUpdateDriverLocation={handleUpdateDriverLocation}
-              onUpdateTrip={(tripId, status, extraData = {}) => {
-                const prevTrip = trips.find(t => t.id === tripId);
-                if (role === 'driver') {
-                  upsertDriverTrip(tripId, { status, ...extraData });
-                } else {
-                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
-                }
-                if (prevTrip) {
-                  const newTrip = { ...prevTrip, status, ...extraData };
-                  const changed = [];
-                  Object.keys(newTrip).forEach((k) => {
-                    const a = prevTrip[k];
-                    const b = newTrip[k];
-                    if (String(a) !== String(b)) changed.push({ field: k, before: a, after: b });
-                  });
-                  if (changed.length > 0) {
-                    const details = changed.map(c => `${c.field}: ${c.before ?? '—'} → ${c.after ?? '—'}`).join('; ');
-                    addAuditLog('Driver Update', `${currentUser} (Driver) updated trip ${tripId} (${prevTrip?.patient || 'Unknown'})`, 'blue', { entity: 'trip', id: tripId, diffs: changed, summary: details });
-                  }
-                }
-              }}
+              onUpdateTrip={handleDriverTripUpdate}
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onUpdateClockEvents={handleUpdateClockEvents}
               onUpdateHourlyRate={handleUpdateHourlyRate}
@@ -3241,6 +3282,7 @@ const App = () => {
               setShowUploadModal={setShowUploadModal}
               uploadAssignDriver={uploadAssignDriver}
               setUploadAssignDriver={setUploadAssignDriver}
+              onTripsCreated={handleUploadedTrips}
               bulkAssignModal={bulkAssignModal}
               setBulkAssignModal={setBulkAssignModal}
               showDispatcherArchive={showDispatcherArchive}
@@ -3282,29 +3324,7 @@ const App = () => {
                   }
                 }
               }}
-              onUpdateDriverTrip={(tripId, status, extraData = {}) => {
-                const prevTrip = trips.find(t => t.id === tripId);
-                if (role === 'driver') {
-                  upsertDriverTrip(tripId, { status, ...extraData });
-                } else {
-                  setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status, ...extraData } : t));
-                }
-                if (prevTrip) {
-                  const nextTrip = { ...prevTrip, status, ...extraData };
-                  const diffs = [];
-                  Object.keys(nextTrip).forEach((key) => {
-                    if (String(prevTrip?.[key]) !== String(nextTrip?.[key])) {
-                      diffs.push({ field: key, before: prevTrip?.[key], after: nextTrip?.[key] });
-                    }
-                  });
-                  addAuditLog(
-                    'Worker Driver Update',
-                    `${currentUser} updated trip ${tripId} (${prevTrip?.patient || 'Unknown'}) to ${status}`,
-                    'blue',
-                    { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
-                  );
-                }
-              }}
+              onUpdateDriverTrip={handleDriverTripUpdate}
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onCompleteTrip={handleCompleteTrip}
               onLogout={handleLogout}

@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { db, doc, getDocFromServer, setDoc } from '../config/firebase';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
-import { timeToMinutes } from '../utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey } from '../utils/tripDate';
 import { recordMatchesSearch } from '../utils/search';
 import {
   ROUTE_ASSIGNMENT_STATUS,
@@ -55,6 +55,7 @@ const getTripUrgency = (timeStr, status) => {
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_FILTERS = ['All', ...DAYS_OF_WEEK];
+const ALL_DAY_FILTER = 'All';
 const VEHICLE_CAPACITY = 4;
 
 const DAY_MAP = {
@@ -69,14 +70,22 @@ const tripDayAbbr = (dateStr) => {
 };
 
 // Convert trips array to client-pool format
-const tripsToClients = (trips, selectedDay) => {
+export const tripMatchesRouteServiceDate = (trip, selectedDate) => (
+  Boolean(selectedDate) && tripCalendarDateKey(trip?.date) === selectedDate
+);
+
+export const canManageSharedRoutes = (role) => role === 'admin' || role === 'dispatcher';
+
+export const tripsToClients = (trips, selectedDay) => {
   return (trips || [])
     .filter(t => {
       if (!t || !t.patient) return false;
       if (isTerminalTripStatus(t.status)) return false;
       // Filter: match selected day OR all trips if no date
       const tripDay = tripDayAbbr(t.date);
-      if (tripDay && selectedDay && selectedDay !== 'All' && tripDay !== selectedDay) return false;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(selectedDay || '')) {
+        if (!tripMatchesRouteServiceDate(t, selectedDay)) return false;
+      } else if (tripDay && selectedDay && selectedDay !== 'All' && tripDay !== selectedDay) return false;
       return true;
     })
     .map(t => ({
@@ -156,8 +165,9 @@ const buildImportedRouteSequence = (initialStops, initialSequence) => {
 export default function RouteSequencerApp({ trips = [], drivers = [], currentUser, role, onApplyRoute, onRouteSaved, initialStops = null, initialSequence = null, initialOrigin = null }) {
   const today = new Date();
   const todayAbbr = DAY_MAP[today.getDay()];
+  const canMutateSharedRoutes = canManageSharedRoutes(role);
   const initialTripById = useMemo(() => new Map((trips || []).map((trip) => [trip.id, trip])), [trips]);
-  const [currentDay, setCurrentDay] = useState(() => role === 'driver' ? 'All' : (localStorage.getItem('agape_seqCurrentDay') || todayAbbr));
+  const [currentDay, setCurrentDay] = useState(() => role === 'driver' ? todayAbbr : (localStorage.getItem('agape_seqCurrentDay') || todayAbbr));
   const [mobileView, setMobileView] = useState(() => initialStops ? 'sequence' : 'pool');
   const [sequence, setSequence] = useState(() => buildImportedRouteSequence(initialStops, initialSequence));
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -317,7 +327,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
 
   useEffect(() => {
     if (role === 'driver' && !localStorage.getItem('agape_seqCurrentDay')) {
-      setCurrentDay('All');
+      setCurrentDay(todayAbbr);
     }
   }, [role]);
 
@@ -326,9 +336,9 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
     if ((dayCounts[currentDay] || 0) > 0) return;
     const fallbackDay = DAYS_OF_WEEK.find((day) => dayCounts[day] > 0);
     if (fallbackDay) {
-      setCurrentDay(role === 'driver' ? 'All' : fallbackDay);
+      setCurrentDay(role === 'driver' ? todayAbbr : fallbackDay);
     } else if (allLiveClients.length > 0) {
-      setCurrentDay('All');
+      setCurrentDay(ALL_DAY_FILTER);
     }
   }, [currentDay, dayCounts, role, allLiveClients.length]);
 
@@ -849,7 +859,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
   };
 
   return (
-    <div className="h-full min-h-0 w-full max-w-full bg-slate-100 font-sans text-slate-700 flex flex-col overflow-hidden">
+    <div className="h-full min-h-0 w-full max-w-full bg-slate-100 font-sans text-slate-700 flex flex-col overflow-hidden max-md:[&_button]:min-h-11">
 
       {/* ===== HEADER ===== */}
       <div className="bg-white border-b border-slate-200 px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 flex flex-col lg:flex-row items-start lg:items-center justify-between flex-shrink-0 gap-3">
@@ -878,7 +888,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             ))}
           </div>
 
-          {sequence.length > 0 && (
+          {canMutateSharedRoutes && sequence.length > 0 && (
             <button
               onClick={() => setShowSaveModal(true)}
               className="min-h-9 flex items-center gap-1 px-2.5 sm:gap-1.5 sm:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-xs font-bold rounded-xl shadow-md transition-all flex-shrink-0"
@@ -1042,7 +1052,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   </p>
                   {allLiveClients.length > 0 && currentDay !== 'All' && (
                     <button
-                      onClick={() => setCurrentDay('All')}
+                      onClick={() => setCurrentDay(ALL_DAY_FILTER)}
                       className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-sm"
                     >
                       <Route className="w-3.5 h-3.5" /> Open All Live Trips
@@ -1367,7 +1377,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       </div>
 
       {/* ===== SAVE MODAL ===== */}
-      {showSaveModal && (
+      {showSaveModal && canMutateSharedRoutes && (
         <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/20 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
@@ -1558,7 +1568,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 disabled={isSaving || saveSuccess}
                 className="min-h-11 px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all bg-amber-500 hover:bg-amber-600 shadow-amber-200 disabled:opacity-70"
               >
-                {saveSuccessMode === 'today' ? 'Saved Override' : isSaving && saveType === 'today' ? 'Saving Override...' : role === 'driver' ? 'Save Today Route' : 'Save Override'}
+                {saveSuccessMode === 'today' ? 'Saved Override' : isSaving && saveType === 'today' ? 'Saving Override...' : 'Save Override'}
               </button>
             </div>
           </div>
@@ -1618,7 +1628,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mt-1 border-t border-slate-100 pt-3">
-                      {reassigningId === tpl.id ? (
+                      {canMutateSharedRoutes && reassigningId === tpl.id ? (
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
                           <select
                             value={tpl.assignedDriver || ''}

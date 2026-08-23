@@ -7,7 +7,7 @@ export function toValidDate(value) {
     else if (typeof value?.seconds === 'number') date = new Date(value.seconds * 1000);
     else if (typeof value === 'string') {
       const raw = value.trim();
-      const usDate = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+      const usDate = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
       const isoDate = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
       if (usDate) date = new Date(Number(usDate[3]), Number(usDate[1]) - 1, Number(usDate[2]), 12, 0, 0, 0);
       else if (isoDate) date = new Date(Number(isoDate[1]), Number(isoDate[2]) - 1, Number(isoDate[3]), 12, 0, 0, 0);

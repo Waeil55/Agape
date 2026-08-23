@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
+import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
 import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
 import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
@@ -36,12 +37,13 @@ import {
   generatePendingClockOut,
   buildTimeEvents,
 } from '../utils/timeTracking';
-import { impact } from '../utils/haptics';
+import { impact, selection } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
+import { SkeletonTripCard } from './ui/Skeleton';
 import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
@@ -53,6 +55,7 @@ import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
 import { queueSyncOperation } from '../utils/localDB';
 import { buildDriverDailyAnalytics } from '../utils/driverAnalytics';
+import { normalizeTenantId } from '../utils/tenantScope';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -90,6 +93,13 @@ const formatTimeInput = (v) => {
   }
   const m = String(v).match(/(\d{1,2}):(\d{2})/);
   return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v;
+};
+
+const mergeDriverEtaMeasurements = (previous, measurements) => {
+  if (!measurements.length) return previous;
+  const next = { ...previous };
+  measurements.forEach(([tripId, minutes]) => { next[tripId] = minutes; });
+  return next;
 };
 
 const getCompletionPickupBoundary = (trip) => latestWorkflowTimestamp(
@@ -628,7 +638,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = [], setVehicles, driverTelemetry = [], timeTrackingDeclarations = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], setVehicles, driverTelemetry = [], timeTrackingDeclarations = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
 
@@ -1015,6 +1025,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const routePlanningUserKeyRef = useRef(userKey);
+  useEffect(() => {
+    if (routePlanningUserKeyRef.current === userKey) return;
+    routePlanningUserKeyRef.current = userKey;
+    setSelectedTrips([]);
+    setRoutePlanStops(null);
+    setAiSequence(null);
+    setAiSuggestions([]);
+    setAiRideShare([]);
+    setGuidedMode(false);
+    setGuidedStepIndex(0);
+    setGuidedSteps([]);
+    setSequencerTripFilter(null);
+    setRoutePlanSequencerStops(null);
+    setRoutePlanSequencerSequence(null);
+    setRoutePlanSequencerOrigin(null);
+    setRouteTemplates([]);
+    setAssignedSequence(null);
+    setShowAssignedRouteDetails(false);
+    setActiveWorkTripId(defaultTripId || null);
+    setExpandedTripId(defaultTripId || null);
+  }, [defaultTripId, setActiveWorkTripId, setExpandedTripId, userKey]);
+
   const handlePullTouchStart = useCallback((e) => {
     pullStartY.current = e.touches[0].clientY;
   }, []);
@@ -1151,6 +1184,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   const queueRef = useRef([]);
   const etasRef = useRef({});
   const positionRef = useRef(null);
+  const activeTripsRef = useRef([]);
   const addressCoordsCache = useRef({});
   const geofenceAlerted = useRef(new Set());
   const boundaryReconciliationRef = useRef(new Set());
@@ -1618,6 +1652,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   };
 
   const activeTrips = useMemo(() => myTrips.filter(t => !isWorkflowTerminalTrip(t)), [myTrips]);
+  activeTripsRef.current = activeTrips;
   const activeWorkTrip = activeWorkTripId
     ? driverScopedTrips.find((trip) => trip.id === activeWorkTripId) || null
     : null;
@@ -1720,8 +1755,9 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   })), [activeTrips, guidedMode, guidedSteps, guidedStepIndex, driverScopedTrips, aiSequence, activeSortKeyOverrides]);
 
   const todayKey = localCalendarYmd();
-  const todayTrips = useMemo(() => orderedTrips.filter(t => tripCalendarDateKey(t.date) === todayKey), [orderedTrips, todayKey]);
-  const tomorrowTrips = useMemo(() => orderedTrips.filter(t => tripCalendarDateKey(t.date) !== todayKey), [orderedTrips, todayKey]);
+  const serviceDateBuckets = useMemo(() => buildDriverServiceDateBuckets(orderedTrips, todayKey), [orderedTrips, todayKey]);
+  const todayTrips = serviceDateBuckets.todayTrips;
+  const tomorrowTrips = serviceDateBuckets.tomorrowTrips;
 
   // Notify urgent trips (once per trip)
   useEffect(() => {
@@ -2063,6 +2099,8 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         collection: 'timeTrackingDeclarations',
         docId: declarationId,
         data: declaration,
+        tenantId: normalizeTenantId(tenantId),
+        userId: auth.currentUser?.uid || '',
       });
       return;
     }
@@ -2070,7 +2108,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       ...declaration,
       createdAt: serverTimestamp(),
     }, { merge: true });
-  }, [currentUser, driverId, me?.email]);
+  }, [currentUser, driverId, me?.email, tenantId]);
 
   const submitTimeCorrectionRequest = useCallback(async () => {
     const reason = String(correctionDraft?.reason || '').trim();
@@ -2416,41 +2454,45 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   }, [activeTrips]);
 
   // Calculate ETAs using Google Maps Distance Matrix
-  const calculateEta = useCallback(async (trip) => {
-    if (!driverPosition || !trip?.pickup) return;
+  const calculateEta = useCallback(async (trip, position) => {
+    if (!position || !trip?.pickup) return null;
     try {
-      const origin = `${driverPosition.lat},${driverPosition.lng}`;
-      const dest = trip.pickup;
       const distMiles = await getDistanceMiles(
-        { lat: driverPosition.lat, lng: driverPosition.lng },
-        trip.pickupLat ? { lat: trip.pickupLat, lng: trip.pickupLng } : dest
+        { lat: position.lat, lng: position.lng },
+        trip.pickupLat ? { lat: trip.pickupLat, lng: trip.pickupLng } : trip.pickup
       );
       if (distMiles !== null) {
-        const avgSpeed = 30;
-        const etaMinutes = (distMiles / avgSpeed) * 60;
-        etasRef.current[trip.id] = etaMinutes;
-        setEtas(prev => ({ ...prev, [trip.id]: etaMinutes }));
+        return [trip.id, (distMiles / 30) * 60];
       }
     } catch (e) { console.warn('[ETA calc]', e); }
-  }, [driverPosition]);
+    return null;
+  }, []);
 
   // Batch update ETAs (limit to first 3 trips, 30s interval to avoid rate limits)
   useEffect(() => {
-    if (!driverPosition || activeTrips.length === 0) return;
-    const timer = setInterval(() => {
-      activeTrips.slice(0, 3).forEach(t => calculateEta(t));
-    }, 30000);
-    activeTrips.slice(0, 3).forEach(t => calculateEta(t));
+    if (!(activeNav !== 'tools' && activeNav !== 'settings') || activeTrips.length === 0) return undefined;
+    const refreshEtas = async () => {
+      const pos = positionRef.current;
+      if (!pos?.lat || !pos?.lng) return;
+      const measurements = (await Promise.all(
+        activeTripsRef.current.slice(0, 3).map((trip) => calculateEta(trip, pos)),
+      )).filter(Boolean);
+      if (!measurements.length) return;
+      measurements.forEach(([tripId, minutes]) => { etasRef.current[tripId] = minutes; });
+      setEtas((previous) => mergeDriverEtaMeasurements(previous, measurements));
+    };
+    const timer = setInterval(() => void refreshEtas(), 30000);
+    void refreshEtas();
     return () => clearInterval(timer);
-  }, [driverPosition, activeTrips.length]);
+  }, [activeNav, activeTrips.length, calculateEta]);
 
   // Geofence proximity detection — check every 15s if near pickup/dropoff
   useEffect(() => {
-    if (!driverPosition || activeTrips.length === 0) return;
+    if (activeNav === 'settings' || activeTrips.length === 0) return undefined;
     const timer = setInterval(() => {
-      const pos = driverPosition;
+      const pos = positionRef.current;
       if (!pos?.lat || !pos?.lng) return;
-      activeTrips.forEach(trip => {
+      activeTripsRef.current.forEach(trip => {
         const tripKey = trip.id;
         const alreadyNotified = geofenceAlerted.current.has(tripKey);
         const pickupCoords = trip.pickup ? addressCoordsCache.current[trip.pickup] : null;
@@ -2480,7 +2522,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       });
     }, 15000);
     return () => clearInterval(timer);
-  }, [driverPosition, activeTrips]);
+  }, [activeNav, activeTrips.length]);
 
   const filteredHistory = useMemo(() => selectedHistoryDayTrips.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
@@ -4154,24 +4196,14 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
   };
 
   const navItems = useMemo(() => {
-    const items = [
+    return [
       { id: 'trips', label: 'Trips', icon: Home },
       { id: 'tools', label: 'Tools', icon: Zap },
-
       { id: 'chat', label: unreadCount ? `Chat (${unreadCount > 99 ? '99+' : unreadCount})` : 'Chat', icon: MessageCircle, badge: unreadCount },
       { id: 'history', label: 'History', icon: Clock },
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
-    const isTripStarted = activeWorkTrip && !['Assigned', 'Unassigned'].includes(activeWorkTrip.status);
-    if (activeWorkTripId && activeWorkTrip && isTripStarted) {
-      const patientName = activeWorkTrip.patient || 'Active';
-      const nameParts = patientName.trim().split(/\s+/);
-      const firstName = nameParts[0] || patientName;
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-      items.splice(1, 0, { id: 'active-trip', label: firstName, sublabel: lastName, icon: Truck });
-    }
-    return items;
-  }, [activeWorkTripId, activeWorkTrip, unreadCount]);
+  }, [unreadCount]);
 
   const navApp = appSettings.navigationApp || 'google';
 
@@ -4200,6 +4232,25 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
         <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center transition-all" style={{ height: isRefreshing ? 40 : pullDistance }}>
           <div className={`w-6 h-6 border-2 border-slate-300 border-t-blue-600 rounded-full ${isRefreshing ? 'animate-spin' : ''}`} style={!isRefreshing ? { transform: `rotate(${pullDistance * 3}deg)` } : {}} />
         </div>
+      )}
+      {activeWorkTrip && activeNav !== 'active-trip' && (
+        <button
+          type="button"
+          onClick={() => {
+            selection();
+            setActiveWorkTripId(activeWorkTrip.id);
+            setActiveNav('active-trip');
+          }}
+          aria-label={`Resume active trip for ${activeWorkTrip.patient || 'passenger'}`}
+          className="mx-3 mt-2 flex min-h-12 shrink-0 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 text-left shadow-sm transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><Truck size={17} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-blue-600">Active transport</span>
+            <span className="block truncate text-sm font-semibold text-slate-900">Resume active trip for {activeWorkTrip.patient || 'passenger'}</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0 text-blue-600" />
+        </button>
       )}
       {(activeNav === 'trips' || (activeNav === 'active-trip' && !activeWorkTrip)) && expandedTripId && !activeWorkTrip && (
         <div
@@ -4620,7 +4671,13 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
           </div>
 
           {/* Trip Cards */}
-          {orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
+          {tripsLoading && orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
+            <div className="space-y-2 mt-2 px-1">
+              <SkeletonTripCard />
+              <SkeletonTripCard />
+              <SkeletonTripCard />
+            </div>
+          ) : orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-10 text-center mt-2">
               <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
@@ -4892,7 +4949,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                   <div className={`rounded-xl border ${borderColor} ${bgColor} p-3`}>
                     <div className="flex items-center gap-0.5 mb-2">
                       {workflowSteps.map((ws, idx) => (
-                        <div key={ws.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
+                        <div key={ws.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? `${activeBarColor} animate-pulse` : 'bg-slate-200'}`} />
                       ))}
                     </div>
                     <div className="flex items-center justify-between mb-2">
@@ -4996,7 +5053,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
               })}
             </div>
           ) : (
-            <div className="space-y-1 pb-2">
+            <div className="agape-stagger space-y-1 pb-2">
               {todayTrips.map((trip, idx) => {
                 const showWcHeader = isWillCall(trip) && (idx === 0 || !isWillCall(todayTrips[idx - 1])) && willCallTrips.length > 0;
                 const tripIsInOut = isInOutTrip(trip);
@@ -5117,7 +5174,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                           <div className={`rounded-xl border ${borderColor} ${bgColor} p-3 w-full`}>
                             <div className="flex items-center gap-0.5 mb-2">
                               {workflowSteps.map((step, idx) => (
-                                <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? activeBarColor : 'bg-slate-200'}`} />
+                                <div key={step.key} className={`h-1 flex-1 rounded-full transition-all duration-500 ${idx < currentStepIdx ? doneBarColor : idx === currentStepIdx ? `${activeBarColor} animate-pulse` : 'bg-slate-200'}`} />
                               ))}
                               {canUndo && (
                                 <button
@@ -5202,7 +5259,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                 />
               </button>
               {tomorrowExpanded && (
-                <div className="space-y-1 mt-1 pb-2">
+                <div className="agape-stagger space-y-1 mt-1 pb-2">
                   {tomorrowTrips.map((trip, idx) => {
                     const tripIsInOut = isInOutTrip(trip);
                     const showInOutHeader = tripIsInOut && (idx === 0 || !isInOutTrip(tomorrowTrips[idx - 1]));
@@ -7455,25 +7512,43 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && !isChatThreadOpen && (
         <nav className="bottom-nav md:hidden">
-          <div className="flex h-full items-center justify-between gap-1 px-3">
+          <div className="relative flex h-full items-center justify-between gap-1 px-3">
+              {(() => {
+                const activeIndex = navItems.findIndex((item) => item.id === activeNav);
+                return (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-y-1.5 rounded-full bg-blue-50"
+                    style={{
+                      left: '0.75rem',
+                      width: `calc((100% - 1.5rem) / ${Math.max(1, navItems.length)})`,
+                      transform: `translateX(${Math.max(0, activeIndex) * 100}%)`,
+                      transition: 'transform var(--dur-base) var(--ease-out-expo)',
+                    }}
+                  />
+                );
+              })()}
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActiveTab = activeNav === item.id;
                 return (
                   <button key={item.id} onClick={() => {
                     if (item.id === 'active-trip') {
+                      selection();
                       setActiveWorkTripId(activeWorkTripId);
                       setActiveNav('active-trip');
                       return;
                     }
+                    selection();
                     setActiveNav(item.id);
                   }}
-                    className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1.5 py-1 touch-manipulation transition-all duration-200 min-h-[56px] ${
+                    aria-current={isActiveTab ? 'page' : undefined}
+                    className={`relative z-10 flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1.5 py-1 touch-manipulation transition-colors duration-200 min-h-[56px] ${
                       isActiveTab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
                     }`}>
                     <div className="relative">
-                      <Icon size={24} strokeWidth={isActiveTab ? 1.8 : 1.3}
-                        className={`transition-all duration-200 ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}
+                      <Icon key={`${item.id}-${isActiveTab}`} size={24} strokeWidth={isActiveTab ? 1.8 : 1.3}
+                        className={`transition-colors duration-200 ${isActiveTab ? 'anim-pop text-blue-600' : 'text-slate-400'}`}
                       />
                       {item.badge > 0 && (
                         <span key={item.badge} className="messenger-nav-badge absolute -right-2.5 -top-2 badge-messenger badge-pop badge-pulse">
@@ -7491,7 +7566,7 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
                         </span>
                       </div>
                     ) : (
-                      <span className={`max-w-full truncate text-[11px] font-normal tracking-wide transition-all leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
+                      <span className={`max-w-full truncate text-[11px] font-semibold tracking-wide transition-colors leading-none ${isActiveTab ? 'text-blue-600' : 'text-slate-400'}`}>
                         {item.label}
                       </span>
                     )}

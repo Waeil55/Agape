@@ -64,7 +64,7 @@ export default function AppBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded font-bold ${sizeClasses} ${variantClasses} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full font-semibold ${sizeClasses} ${variantClasses} ${className}`}
       {...props}
     >
       {dot && (

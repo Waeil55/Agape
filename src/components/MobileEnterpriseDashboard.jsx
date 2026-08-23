@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense, Component } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense, Component } from 'react';
 import {
   Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle, Home
 } from 'lucide-react';
@@ -44,8 +44,86 @@ const MobileFallback = () => (
   </div>
 );
 
-const MobileEnterpriseDashboard = (props) => {
+export const MOBILE_PRIMARY_NAV = Object.freeze([
+  { id: 'trips', label: 'Trips', icon: Home },
+  { id: 'map', label: 'Map', icon: Map },
+  { id: 'chat', label: 'Chat', icon: MessageCircle },
+  { id: 'reports', label: 'Reports', icon: BarChart2 },
+  { id: 'menu', label: 'More', icon: Menu },
+]);
+
+const NAV_BOTTOM_CLEARANCE = 'calc(76px + env(safe-area-inset-bottom, 0px))';
+
+const scheduleIdleWork = (callback) => {
+  if (typeof window === 'undefined') return () => {};
+  if (typeof window.requestIdleCallback === 'function') {
+    const id = window.requestIdleCallback(callback, { timeout: 1200 });
+    return () => window.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(callback, 32);
+  return () => window.clearTimeout(id);
+};
+
+const readStoredToolsDriverId = () => {
+  try { return window.localStorage.getItem('agape_toolsDriverId') || ''; } catch { return ''; }
+};
+
+const writeStoredToolsDriverId = (driverId) => {
+  try {
+    if (driverId) window.localStorage.setItem('agape_toolsDriverId', driverId);
+    else window.localStorage.removeItem('agape_toolsDriverId');
+  } catch {}
+};
+
+export const SubViewWrapper = ({ title, onBack, children, fullHeight = false, renderTopBar }) => (
+  <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
+    {renderTopBar(title, true, onBack)}
+    <div
+      className={`flex-1 ${fullHeight ? 'relative overflow-hidden' : 'overflow-y-auto overscroll-contain px-4 py-4 pb-24'}`}
+      style={{ paddingBottom: fullHeight ? undefined : NAV_BOTTOM_CLEARANCE }}
+    >
+      {children}
+    </div>
+  </div>
+);
+
+export const MobileBottomNavigation = React.memo(({ currentView, subView, onNavigate }) => {
   const { unreadCount } = useChat({ alerts: true });
+  return (
+    <nav className="bottom-nav" aria-label="Primary navigation">
+      <div className="relative flex h-full items-center justify-around gap-1 px-2">
+        {MOBILE_PRIMARY_NAV.map((item) => {
+          const Icon = item.icon;
+          const isActive = item.id === 'menu'
+            ? currentView === 'menu' || Boolean(subView)
+            : currentView === item.id && !subView;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onNavigate(item.id)}
+              aria-current={isActive ? 'page' : undefined}
+              className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
+            >
+              <span className="relative inline-flex">
+                <Icon size={23} strokeWidth={isActive ? 2 : 1.55} aria-hidden="true" />
+                {item.id === 'chat' && unreadCount > 0 && (
+                  <span className="absolute -right-3 -top-2 min-w-[18px] rounded-full bg-blue-600 px-1 text-center text-[10px] font-bold leading-[18px] text-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
+              <span className="mt-1 max-w-full truncate text-[10px] font-semibold leading-none">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+});
+MobileBottomNavigation.displayName = 'MobileBottomNavigation';
+
+const MobileEnterpriseDashboard = (props) => {
   const { trips = [], drivers = [], currentUser, role } = props;
   const [currentView, setCurrentView] = useState('trips');
   const [subView, setSubView] = useState(null);
@@ -54,7 +132,7 @@ const MobileEnterpriseDashboard = (props) => {
   const [tripWorkflowActive, setTripWorkflowActive] = useState(false);
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [toolsDriverId, setToolsDriverId] = useState(() => localStorage.getItem('agape_toolsDriverId') || '');
+  const [toolsDriverId, setToolsDriverId] = useState('');
   const [toolSelectedTrips, setToolSelectedTrips] = useState([]);
   const [toolAiSequence, setToolAiSequence] = useState(null);
   const [toolAiSuggestions, setToolAiSuggestions] = useState([]);
@@ -75,9 +153,13 @@ const MobileEnterpriseDashboard = (props) => {
     if (!VALID_VIEWS.includes(currentView)) setCurrentView('map');
   }, [currentView]);
 
-  useEffect(() => {
-    if (toolsDriverId) localStorage.setItem('agape_toolsDriverId', toolsDriverId);
-  }, [toolsDriverId]);
+  useEffect(() => scheduleIdleWork(() => {
+    setToolsDriverId(readStoredToolsDriverId());
+  }), []);
+
+  useEffect(() => scheduleIdleWork(() => {
+    writeStoredToolsDriverId(toolsDriverId);
+  }), [toolsDriverId]);
 
   useEffect(() => {
     setToolSelectedTrips([]);
@@ -88,18 +170,45 @@ const MobileEnterpriseDashboard = (props) => {
     setToolRoutePlanStops(null);
   }, [toolsDriverId]);
 
+  const toolsDriver = useMemo(
+    () => (toolsDriverId ? driverWorkDrivers.find((driver) => driver.id === toolsDriverId) || null : null),
+    [driverWorkDrivers, toolsDriverId],
+  );
+  const toolsTrips = useMemo(() => {
+    if (!toolsDriver) return [];
+    const driverEmail = String(toolsDriver.email || '').trim().toLowerCase();
+    return driverWorkTrips.filter((trip) => (
+      trip.driverId === toolsDriver.id
+      || trip.driverName === toolsDriver.name
+      || (driverEmail && String(trip.driverEmail || '').trim().toLowerCase() === driverEmail)
+    ));
+  }, [driverWorkTrips, toolsDriver]);
+  const toolsActiveTrips = useMemo(
+    () => toolsTrips.filter((trip) => !['Completed', 'Canceled', 'Cancelled', 'Archived'].includes(trip.status)),
+    [toolsTrips],
+  );
+  const toolSelectedTripIdSet = useMemo(() => new Set(toolSelectedTrips), [toolSelectedTrips]);
+
   useEffect(() => {
-    const selectedDriver = driverWorkDrivers.find(driver => driver.id === toolsDriverId);
-    const activeIds = selectedDriver ? driverWorkTrips.filter(trip => (
-      (trip.driverId === selectedDriver.id || trip.driverName === selectedDriver.name ||
-        String(trip.driverEmail || '').trim().toLowerCase() === String(selectedDriver.email || '').trim().toLowerCase())
-      && !['Completed', 'Canceled', 'Cancelled', 'Archived'].includes(trip.status)
-    )).map(trip => trip.id) : [];
-    setToolSelectedTrips(current => {
-      const stillActive = current.filter(id => activeIds.includes(id));
+    const activeIds = toolsActiveTrips.map((trip) => trip.id);
+    const activeIdSet = new Set(activeIds);
+    setToolSelectedTrips((current) => {
+      const stillActive = current.filter((id) => activeIdSet.has(id));
       return stillActive.length ? stillActive : activeIds;
     });
-  }, [toolsDriverId, driverWorkDrivers, driverWorkTrips]);
+  }, [toolsActiveTrips]);
+  const selectAllToolTrips = () => setToolSelectedTrips((current) => (
+    current.length === toolsActiveTrips.length ? [] : toolsActiveTrips.map((trip) => trip.id)
+  ));
+  const optimizeToolTrips = () => {
+    const candidates = toolsActiveTrips.filter((trip) => toolSelectedTripIdSet.has(trip.id));
+    if (!candidates.length) return;
+    setToolAiOptimizing(true);
+    const ordered = [...candidates].sort((a, b) => String(a.time || a.pickupTime || '').localeCompare(String(b.time || b.pickupTime || '')));
+    setToolAiSequence(ordered.map((trip) => trip.id));
+    setToolAiSuggestions([{ type: 'route', message: `${ordered.length} trips ordered by scheduled pickup time.` }]);
+    setToolAiOptimizing(false);
+  };
 
 
 
@@ -109,12 +218,14 @@ const MobileEnterpriseDashboard = (props) => {
 
   // Top bar with back navigation
   const renderTopBar = (title, showBack = false, onBack = null) => (
-    <div className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[var(--bg-app)]/95 backdrop-blur-md">
+        <div className="driver-page-header shrink-0 z-30 border-b border-slate-200 bg-[var(--bg-app)]">
       <div className="px-3 py-3 flex items-center gap-3">
         {showBack && (
           <button
+            type="button"
             onClick={onBack || (() => setSubView(null))}
-            className="min-w-[36px] min-h-[36px] flex items-center justify-center -ml-1.5 text-slate-500 hover:text-slate-800 rounded-full bg-slate-200/50 touch-manipulation transition-all"
+            aria-label="Back"
+            className="min-w-11 min-h-11 flex items-center justify-center -ml-1.5 text-slate-500 hover:text-slate-800 rounded-full bg-slate-200/50 touch-manipulation transition-colors"
           >
             <ChevronLeft size={20} />
           </button>
@@ -145,24 +256,11 @@ const MobileEnterpriseDashboard = (props) => {
 
   // Common layout wrapper for subviews — always shows bottom nav below
   // paddingBottom ensures scroll content clears the fixed bottom nav pill
-  const NAV_BOTTOM_CLEARANCE = 'calc(76px + env(safe-area-inset-bottom, 0px))';
-  const SubViewWrapper = ({ title, onBack, children, fullHeight = false }) => (
-    <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
-      {renderTopBar(title, true, onBack)}
-      <div
-        className={`flex-1 ${fullHeight ? 'overflow-hidden relative' : 'overflow-y-auto overscroll-contain px-4 py-4'}`}
-        style={{ paddingBottom: fullHeight ? undefined : NAV_BOTTOM_CLEARANCE }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-
   const renderContent = () => {
     // ── Sub-views (from Menu) ─────────────────────────────────────────────────
     if (subView === 'route_planner') {
       return (
-        <SubViewWrapper title="AI Route Planner" fullHeight>
+        <SubViewWrapper title="AI Route Planner" fullHeight renderTopBar={renderTopBar}>
           <ErrorBoundary>
             <Suspense fallback={<MobileFallback />}>
               <RoutePlannerPage
@@ -179,7 +277,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'reports') {
       return (
-        <SubViewWrapper title="Reports & Export">
+        <SubViewWrapper title="Reports & Export" renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -187,7 +285,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'admin') {
       return (
-        <SubViewWrapper title="User Management">
+        <SubViewWrapper title="User Management" renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><AdminPage {...props} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -195,7 +293,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'archives') {
       return (
-        <SubViewWrapper title="Archives">
+        <SubViewWrapper title="Archives" renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -203,7 +301,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'settings') {
       return (
-        <SubViewWrapper title="App Settings">
+        <SubViewWrapper title="App Settings" renderTopBar={renderTopBar}>
           <ErrorBoundary>
             <Suspense fallback={<MobileFallback />}>
               <SettingsPage
@@ -224,7 +322,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'fleet') {
       return (
-        <SubViewWrapper title="Fleet Management">
+        <SubViewWrapper title="Fleet Management" renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><DriversVehiclesPage {...props} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -232,7 +330,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'map') {
       return (
-        <SubViewWrapper title="Live Map" fullHeight>
+        <SubViewWrapper title="Live Map" fullHeight renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><LiveMapPage trips={trips} drivers={drivers} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -240,7 +338,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'payroll') {
       return (
-        <SubViewWrapper title="Payroll">
+        <SubViewWrapper title="Payroll" renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><PayrollReportPage drivers={drivers} trips={trips} driverTelemetry={props.driverTelemetry || []} timeTrackingDeclarations={props.timeTrackingDeclarations || []} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -248,7 +346,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'activity') {
       return (
-        <SubViewWrapper title="Activity Log">
+        <SubViewWrapper title="Activity Log" renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><TimeTrackingAdmin drivers={drivers} trips={trips} driverTelemetry={props.driverTelemetry || []} timeTrackingDeclarations={props.timeTrackingDeclarations || []} role={role} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -289,7 +387,13 @@ const MobileEnterpriseDashboard = (props) => {
           <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom,0px))' }}>
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
-                <MobileMenuPage {...props} setSubView={setSubView} />
+                <MobileMenuPage
+                  {...props}
+                  setSubView={(view) => {
+                    if (view === 'tools') handleNavClick('tools');
+                    else setSubView(view);
+                  }}
+                />
               </Suspense>
             </ErrorBoundary>
           </div>
@@ -298,28 +402,6 @@ const MobileEnterpriseDashboard = (props) => {
     }
 
     if (currentView === 'tools') {
-      const toolsDriver = toolsDriverId ? driverWorkDrivers.find(d => d.id === toolsDriverId) : null;
-      const toolsTrips = toolsDriver
-        ? driverWorkTrips.filter(t => (
-            t.driverId === toolsDriver.id ||
-            t.driverName === toolsDriver.name ||
-            String(t.driverEmail || '').trim().toLowerCase() === String(toolsDriver.email || '').trim().toLowerCase()
-          ))
-        : [];
-      const toolsActiveTrips = toolsTrips.filter(t => !['Completed', 'Canceled', 'Archived'].includes(t.status));
-      const selectAllToolTrips = () => setToolSelectedTrips(current => (
-        current.length === toolsActiveTrips.length ? [] : toolsActiveTrips.map(trip => trip.id)
-      ));
-      const optimizeToolTrips = () => {
-        const candidates = toolsActiveTrips.filter(trip => toolSelectedTrips.includes(trip.id));
-        if (!candidates.length) return;
-        setToolAiOptimizing(true);
-        const ordered = [...candidates].sort((a, b) => String(a.time || a.pickupTime || '').localeCompare(String(b.time || b.pickupTime || '')));
-        setToolAiSequence(ordered.map(trip => trip.id));
-        setToolAiSuggestions([{ type: 'route', message: `${ordered.length} trips ordered by scheduled pickup time.` }]);
-        setToolAiOptimizing(false);
-      };
-
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
           {renderTopBar('Route Tools')}
@@ -329,7 +411,7 @@ const MobileEnterpriseDashboard = (props) => {
               <select
                 value={toolsDriverId}
                 onChange={e => setToolsDriverId(e.target.value)}
-                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all"
+                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
               >
                 <option value="">Select a driver…</option>
                 {driverWorkDrivers.map(d => (
@@ -407,7 +489,7 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'welltrans') {
       return (
-        <SubViewWrapper title="WellTrans Sync" fullHeight>
+        <SubViewWrapper title="WellTrans Sync" fullHeight renderTopBar={renderTopBar}>
           <ErrorBoundary><Suspense fallback={<MobileFallback />}><WellTransSyncPage trips={trips} drivers={drivers} vehicles={props.vehicles || []} role={role} onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
@@ -548,64 +630,7 @@ const MobileEnterpriseDashboard = (props) => {
 
       {/* ── BOTTOM NAVIGATION ────────────────────────────────────────── */}
       {showNav && (
-        <nav className="bottom-nav">
-          <div className="flex h-full items-center justify-around gap-1">
-
-            <button onClick={() => handleNavClick('trips')} className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}>
-              <Home size={24} strokeWidth={currentView === 'trips' && !subView ? 1.8 : 1.3} />
-              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'trips' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Trips</span>
-            </button>
-
-
-            {/* Map */}
-            <button
-              onClick={() => handleNavClick('map')}
-              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
-            >
-              <Map size={24} strokeWidth={currentView === 'map' && !subView ? 1.8 : 1.3} />
-              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'map' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Map</span>
-            </button>
-
-            {/* Chat */}
-            <button
-              onClick={() => handleNavClick('chat')}
-              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
-            >
-              <MessageCircle size={24} strokeWidth={currentView === 'chat' && !subView ? 1.8 : 1.3} />
-              {unreadCount > 0 && <span className="absolute top-0 right-[22%] min-w-[17px] h-[17px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-black leading-[17px]">{unreadCount > 99 ? '99+' : unreadCount}</span>}
-              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'chat' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Chat</span>
-            </button>
-
-            {/* Reports */}
-            <button
-              onClick={() => handleNavClick('reports')}
-              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
-            >
-              <BarChart2 size={24} strokeWidth={currentView === 'reports' && !subView ? 1.8 : 1.3} />
-              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'reports' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Reports</span>
-            </button>
-
-
-
-            {/* Tools */}
-            <button
-              onClick={() => handleNavClick('tools')}
-              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${currentView === 'tools' && !subView ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
-            >
-              <Zap size={24} strokeWidth={currentView === 'tools' && !subView ? 1.8 : 1.3} />
-              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${currentView === 'tools' && !subView ? 'text-blue-600' : 'text-slate-400'}`}>Tools</span>
-            </button>
-
-            {/* More / Menu */}
-            <button
-              onClick={() => handleNavClick('menu')}
-              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 touch-manipulation transition-all duration-200 min-h-[56px] ${(currentView === 'menu' || subView) ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'}`}
-            >
-              <Menu size={24} strokeWidth={(currentView === 'menu' || subView) ? 1.8 : 1.3} />
-              <span className={`max-w-full truncate text-[11px] font-normal leading-none mt-1 ${(currentView === 'menu' || subView) ? 'text-blue-600' : 'text-slate-400'}`}>More</span>
-            </button>
-          </div>
-        </nav>
+        <MobileBottomNavigation currentView={currentView} subView={subView} onNavigate={handleNavClick} />
       )}
 
       {showUploadModal && (
@@ -664,4 +689,4 @@ const MobileEnterpriseDashboard = (props) => {
   );
 };
 
-export default MobileEnterpriseDashboard;
+export default React.memo(MobileEnterpriseDashboard);

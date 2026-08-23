@@ -306,10 +306,9 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
   };
 
   return (
-    <div className="min-h-0 flex-1 bg-slate-50">
+    <div className="min-h-0 flex-1 bg-slate-50 max-md:[&_button]:min-h-11">
       <div className="max-w-[1600px] mx-auto px-3 sm:px-5 py-5 pb-24">
-        <section className="relative overflow-hidden rounded-3xl bg-blue-600 p-5 sm:p-7 mb-5 text-slate-900 shadow-xl shadow-blue-600/10">
-          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl" />
+        <section className="relative overflow-hidden rounded-3xl bg-blue-600 p-5 sm:p-7 mb-5 text-white shadow-xl shadow-blue-600/10">
           <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div className="flex items-center gap-4">
             {onBack && (
@@ -320,8 +319,8 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-lg shadow-blue-950/40"><Timer size={24} className="text-blue-600" /></div>
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-200">Workforce Operations</p>
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">Time & Payroll Control Center</h1>
-              <p className="mt-1 text-sm text-slate-700">Exact event-ledger calculations, correction controls, and payroll readiness.</p>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">Time & Payroll Control Center</h1>
+              <p className="mt-1 text-sm text-blue-100">Exact event-ledger calculations, correction controls, and payroll readiness.</p>
             </div>
           </div>
             <div className="flex flex-wrap items-center gap-2">

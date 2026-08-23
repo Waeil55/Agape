@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Route, MapPin, Clock, Users, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2,
   GripVertical, ChevronRight, Search, Flag, Plus, Trash2,
@@ -7,6 +7,7 @@ import {
   LogIn, LogOut, Filter, Save
 } from 'lucide-react';
 import { timeToMinutes } from '../utils/tripDate';
+import { tripMatchesRoutePlannerServiceDate } from '../utils/portalSelectors';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
 import { tripMatchesSearch } from '../utils/search';
 
@@ -23,8 +24,6 @@ const to12hr = (t) => {
 const getStopLetter = (i) => String.fromCharCode(65 + i);
 const isLate = (time) => { if (!time || time === 'Will Call') return false; const n = new Date(); const m = timeToMinutes(time); const s = new Date(); s.setHours(Math.floor(m / 60), m % 60, 0, 0); return n > s; };
 const makeStopId = (tripId, type) => `${tripId}_${type}`;
-const STORAGE_KEY = 'agape_routePlanner_v3';
-const SAVED_PLANS_KEY = 'agape_routePlanner_savedPlans_v1';
 const TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show']);
 
 const statusColors = {
@@ -44,46 +43,25 @@ const getTodayDateString = () => {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
-const getTripDateKey = (trip) => {
-  const raw = trip?.date || trip?.scheduledDate || trip?.scheduleDate || trip?.tripDate || trip?.serviceDate || trip?.appointmentDate || '';
-  if (!raw) return '';
-  const normalized = String(raw).trim();
-  const match = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (match) return match[1];
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
-};
-
 const isActivePlanningStatus = (status) => !TERMINAL_STATUSES.has(status || '');
 
 const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendToSequencer }) => {
-  const [stops, setStops] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
-  });
+  const [stops, setStops] = useState([]);
   const [routeName, setRouteName] = useState('');
-  const [selectedDriver, setSelectedDriver] = useState(() => localStorage.getItem('agape_rp_driver') || '');
-  const [dateStr, setDateStr] = useState(() => localStorage.getItem('agape_rp_date') || getTodayDateString());
+  const [selectedDriver, setSelectedDriver] = useState('');
+  const [dateStr, setDateStr] = useState(getTodayDateString());
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const [optimizing, setOptimizing] = useState(false);
   const [navMode, setNavMode] = useState(false);
   const [navStep, setNavStep] = useState(0);
-  const [completed, setCompleted] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('agape_rp_completed_v3') || '[]')); } catch { return new Set(); } });
+  const [completed, setCompleted] = useState(() => new Set());
   const [searchQ, setSearchQ] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [aiMsg, setAiMsg] = useState('');
   const [dark, setDark] = useState(false);
-  const [savedPlans, setSavedPlans] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SAVED_PLANS_KEY) || '[]'); } catch { return []; }
-  });
+  const [savedPlans, setSavedPlans] = useState([]);
   const [showSavedPlans, setShowSavedPlans] = useState(false);
-
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(stops)); }, [stops]);
-  useEffect(() => { localStorage.setItem('agape_rp_completed_v3', JSON.stringify([...completed])); }, [completed]);
-  useEffect(() => { localStorage.setItem('agape_rp_driver', selectedDriver); }, [selectedDriver]);
-  useEffect(() => { localStorage.setItem('agape_rp_date', dateStr); }, [dateStr]);
-  useEffect(() => { localStorage.setItem(SAVED_PLANS_KEY, JSON.stringify(savedPlans)); }, [savedPlans]);
 
   const tripStopTypes = useMemo(() => {
     const map = {};
@@ -99,11 +77,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
     return (trips || [])
       .filter((trip) => trip?.patient)
       .filter((trip) => isActivePlanningStatus(trip.status))
-      .filter((trip) => {
-        const tripDate = getTripDateKey(trip);
-        if (!tripDate) return true;
-        return tripDate === selectedDate;
-      });
+      .filter((trip) => tripMatchesRoutePlannerServiceDate(trip, selectedDate));
   }, [trips, dateStr]);
 
   const filteredTrips = useMemo(() => {
@@ -511,7 +485,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendT
 
   // ─── MAIN LAYOUT (Schedule + Route Builder) ───
   return (
-    <div className={`flex-1 flex min-h-0 overflow-hidden flex-col md:flex-row ${bg}`}>
+    <div className={`flex-1 flex min-h-0 overflow-hidden flex-col max-md:[&_button]:min-h-11 md:flex-row ${bg}`}>
       {/* === LEFT: Schedule / Trip List === */}
       <div className={`w-full max-h-[42dvh] shrink-0 border-b md:w-72 md:max-h-none md:border-b-0 md:border-r xl:w-80 ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
         <div className={`sticky top-0 px-3 py-3 border-b ${dark ? 'border-slate-700 bg-slate-900/95' : 'border-slate-100 bg-white/95'} shrink-0 backdrop-blur-sm`}>

@@ -3,37 +3,77 @@ import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 
 let loadingPromise = null;
 let loaded = false;
+export const GOOGLE_MAPS_AUTH_FAILURE_EVENT = 'agape:google-maps-auth-failure';
+
+const registerAuthFailureBridge = () => {
+  if (typeof window === 'undefined' || window.gm_authFailure?.agapeBridge) return;
+  const previous = window.gm_authFailure;
+  const bridge = () => {
+    window.dispatchEvent(new Event(GOOGLE_MAPS_AUTH_FAILURE_EVENT));
+    if (typeof previous === 'function') previous();
+  };
+  bridge.agapeBridge = true;
+  window.gm_authFailure = bridge;
+};
 
 export function loadGoogleMapsApi() {
-  return new Promise((resolve, reject) => {
-    if (window.google && window.google.maps) { resolve(window.google.maps); return; }
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.reject(new Error('Google Maps requires a browser environment'));
+  }
+  registerAuthFailureBridge();
+  if (window.google?.maps) {
+    loaded = true;
+    return Promise.resolve(window.google.maps);
+  }
+  if (loadingPromise) return loadingPromise;
+  if (!GOOGLE_MAPS_API_KEY()) return Promise.reject(new Error('Google Maps API key not configured'));
+
+  loadingPromise = new Promise((resolve, reject) => {
+    const callbackName = '__agapeGoogleMapsReady';
+    const clearCallback = () => {
+      try { delete window[callbackName]; } catch { window[callbackName] = undefined; }
+    };
+    const finish = () => {
+      if (!window.google?.maps) {
+        loadingPromise = null;
+        clearCallback();
+        reject(new Error('Google Maps failed to initialize'));
+        return;
+      }
+      loaded = true;
+      clearCallback();
+      resolve(window.google.maps);
+    };
+    const fail = () => {
+      loadingPromise = null;
+      loaded = false;
+      clearCallback();
+      reject(new Error('Google Maps script failed to load'));
+    };
+    window[callbackName] = finish;
+
     const existing = document.getElementById('agape-gm-api');
     if (existing) {
-      if (window.google && window.google.maps) { resolve(window.google.maps); return; }
-      existing.addEventListener('load', () => {
-        if (window.google && window.google.maps) resolve(window.google.maps);
-        else reject(new Error('Google Maps failed to initialize'));
-      }, { once: true });
-      existing.addEventListener('error', () => reject(new Error('Google Maps script failed to load')), { once: true });
+      existing.addEventListener('error', fail, { once: true });
       return;
     }
-    if (!GOOGLE_MAPS_API_KEY()) { reject(new Error('Google Maps API key not configured')); return; }
+
     const script = document.createElement('script');
     script.id = 'agape-gm-api';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY()}&libraries=places,directions,geometry,drawing&v=weekly`;
-    script.async = true;
-    script.defer = true;
-    loadingPromise = new Promise((res, rej) => {
-      script.onload = () => {
-        loaded = true;
-        if (window.google && window.google.maps) res(window.google.maps);
-        else rej(new Error('Google Maps failed to initialize'));
-      };
-      script.onerror = () => { loadingPromise = null; loaded = false; rej(new Error('Google Maps script failed to load')); };
+    const params = new URLSearchParams({
+      key: GOOGLE_MAPS_API_KEY(),
+      libraries: 'places,marker',
+      loading: 'async',
+      callback: callbackName,
+      v: 'weekly',
     });
+    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
+    script.async = true;
+    script.onerror = fail;
     document.head.appendChild(script);
-    loadingPromise.then(resolve).catch(reject);
   });
+
+  return loadingPromise;
 }
 
 export default function useGoogleMaps() {

@@ -518,6 +518,33 @@ body {
   contain-intrinsic-size: auto 132px;
 }
 
+/* Agape Prime: press-scale feedback on trip cards (transform-only). */
+.agape-card-cv,
+.agape-trip-list-card {
+  transition: transform var(--dur-fast) var(--ease-out-expo);
+  will-change: transform;
+}
+.agape-card-cv:has(.agape-press-target:active),
+.agape-trip-list-card:has(.agape-trip-card-summary:active) {
+  transform: scale(0.982);
+}
+
+/* Agape Prime: brand gradient hairline under the driver header. */
+.driver-page-header {
+  position: relative;
+}
+.driver-page-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brand-navy) 0%, #2563eb 45%, rgba(79, 70, 229, 0.35) 100%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
 /* Instant tap response everywhere: no click delay, no ghost highlights. */
 button,
 a,
@@ -5534,6 +5561,420 @@ html, body {
 @media (min-width: 1280px) {
   .agape-messenger-sidebar {
     width: 380px;
+  }
+}
+
+/* ===================================================================
+   AGAPE PRIME 2026 — final shared visual language
+   Calm healthcare operations surfaces, crisp information hierarchy and
+   native-feeling interaction without expensive compositing.
+   =================================================================== */
+
+:root,
+[data-theme="light"] {
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --prime-ink: #0f172a;
+  --prime-muted: #64748b;
+  --prime-canvas: #f4f7fb;
+  --prime-panel: #ffffff;
+  --prime-line: #e2e8f0;
+  --prime-brand: #2563eb;
+  --prime-brand-strong: #1d4ed8;
+  --prime-brand-soft: #eff6ff;
+  --prime-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 14px 38px rgb(15 23 42 / 6%);
+  --prime-shadow-raised: 0 8px 20px rgb(15 23 42 / 7%), 0 28px 70px rgb(15 23 42 / 10%);
+}
+
+body {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  letter-spacing: -0.006em;
+  background:
+    radial-gradient(circle at 12% -10%, rgb(37 99 235 / 7%), transparent 28rem),
+    var(--prime-canvas);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+[role="button"],
+input,
+select,
+textarea {
+  outline: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 18%);
+}
+
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.98);
+}
+
+::selection {
+  color: #172554;
+  background: #bfdbfe;
+}
+
+.admin-app,
+.ui-page {
+  background:
+    radial-gradient(circle at 92% 0%, rgb(37 99 235 / 5%), transparent 25rem),
+    var(--prime-canvas);
+}
+
+.adm-sidebar {
+  border-right-color: #e5ebf3;
+  background: #ffffff;
+  box-shadow: 10px 0 30px rgb(15 23 42 / 2.5%);
+}
+
+.adm-brand {
+  min-height: 76px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.adm-brand-name,
+.adm-topbar-title,
+.ui-page-title {
+  color: var(--prime-ink);
+  letter-spacing: -0.025em;
+}
+
+.adm-nav-link {
+  min-height: 42px;
+  margin-block: 2px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.adm-nav-link:hover {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.adm-nav-link.is-active {
+  border-color: #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff, #f8fbff);
+  color: #1d4ed8;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.adm-topbar {
+  min-height: 70px;
+  border-bottom-color: #e5ebf3;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 2%);
+}
+
+.adm-subnav {
+  border-bottom-color: #e5ebf3;
+  background: #fbfdff;
+}
+
+.adm-content {
+  background: transparent;
+}
+
+.adm-card,
+.ui-section,
+.ui-metric,
+.ui-state-panel {
+  border: 1px solid var(--prime-line);
+  border-radius: 12px;
+  background: var(--prime-panel);
+  box-shadow: var(--prime-shadow);
+}
+
+.adm-card:hover,
+.ui-metric:hover {
+  border-color: #cbd5e1;
+}
+
+.ui-page {
+  gap: 20px;
+}
+
+.ui-page-header {
+  min-height: 80px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ui-eyebrow {
+  color: #2563eb;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ui-page-description,
+.ui-metric-detail,
+.ui-section-header p {
+  color: var(--prime-muted);
+}
+
+.ui-toolbar {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
+}
+
+.ui-metric-value {
+  color: var(--prime-ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.driver-page-header {
+  border-bottom-color: #e2e8f0 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 3%);
+}
+
+.driver-page-header::after {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #60a5fa 30%, #2563eb 70%, transparent);
+  opacity: 0.55;
+}
+
+.agape-trip-list-card,
+.agape-card-cv {
+  border-color: #e2e8f0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 8px 24px rgb(15 23 42 / 4%) !important;
+}
+
+.bottom-nav,
+.adm-bottomnav {
+  border: 1px solid rgb(226 232 240 / 92%) !important;
+  background: rgb(255 255 255 / 98%) !important;
+  box-shadow: 0 12px 36px rgb(15 23 42 / 14%), 0 2px 8px rgb(15 23 42 / 5%) !important;
+}
+
+.bottom-nav button,
+.adm-bottomnav button {
+  min-height: 48px;
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+table thead {
+  background: #f8fafc;
+  color: #475569;
+}
+
+table tbody tr {
+  transition: background-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+
+table tbody tr[data-agape-selected="true"] {
+  background: #eff6ff;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+input,
+select,
+textarea,
+.adm-input,
+.adm-select {
+  border-color: #dce4ee;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.adm-input:focus,
+.adm-select:focus {
+  border-color: #60a5fa;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+}
+
+@media (min-width: 768px) {
+  .adm-content,
+  .ui-page {
+    padding: clamp(20px, 2vw, 32px);
+  }
+
+  .adm-card,
+  .ui-section,
+  .ui-metric {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
+  }
+}
+
+@media (max-width: 767px) {
+  body {
+    background: var(--prime-canvas);
+  }
+
+  .ui-page,
+  .adm-content {
+    padding-inline: 12px;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .ui-page-header {
+    min-height: 0;
+    padding-block: 8px 14px;
+  }
+
+  .adm-card,
+  .ui-section,
+  .ui-metric,
+  .ui-state-panel,
+  .agape-trip-list-card,
+  .agape-card-cv {
+    box-shadow: 0 1px 3px rgb(15 23 42 / 5%) !important;
+  }
+}
+
+.agape-login {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #10234c;
+}
+
+.agape-login-backdrop {
+  background:
+    radial-gradient(circle at 14% 12%, rgb(96 165 250 / 32%), transparent 28rem),
+    radial-gradient(circle at 92% 88%, rgb(59 130 246 / 26%), transparent 26rem),
+    linear-gradient(145deg, #0b1734 0%, #112a5a 52%, #1d4ed8 150%);
+}
+
+.agape-login-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.agape-login-story {
+  background:
+    radial-gradient(circle at 100% 0%, rgb(96 165 250 / 16%), transparent 20rem),
+    rgb(15 35 76 / 52%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+}
+
+.agape-login-panel {
+  box-shadow: 0 30px 90px rgb(2 6 23 / 34%), 0 2px 12px rgb(2 6 23 / 12%);
+}
+
+.agape-login-role:hover > :first-child {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 1023px) {
+  .agape-login {
+    justify-content: flex-start;
+    background: #e8f0ff;
+  }
+
+  .agape-login-backdrop {
+    background:
+      radial-gradient(circle at 50% -10%, rgb(255 255 255 / 82%), transparent 24rem),
+      linear-gradient(180deg, #dbe7ff 0%, #7ba7f8 130%);
+  }
+
+  .agape-login-stage {
+    display: flex;
+    min-height: 0;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .agape-login-panel {
+    max-width: 30rem;
+  }
+
+  .agape-login-footer {
+    color: #334155;
+  }
+}
+
+@media (max-width: 420px) {
+  .agape-login {
+    padding-inline: 12px !important;
+    padding-block: max(var(--sat), 12px) max(var(--sab), 12px) !important;
+  }
+
+  .agape-login-panel {
+    padding: 20px;
+  }
+
+  .agape-login-role {
+    min-height: 68px;
+    padding: 12px;
+  }
+
+  .agape-login-footer {
+    display: none;
+  }
+}
+
+/* ===== FINAL MOBILE RENDER PERFORMANCE POLICY =====
+   This must stay last. Mobile GPUs should composite only purposeful motion. */
+@media (pointer: coarse), (max-width: 900px) {
+  [class*="backdrop-blur"],
+  .glass,
+  .glass-premium,
+  .glass-card,
+  .premium-glass {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  [class~="transition-all"] {
+    transition-property: color, background-color, border-color, opacity !important;
+    transition-duration: var(--dur-fast) !important;
+  }
+
+  .animate-gradient-mesh,
+  .premium-loading-logo,
+  .animate-float,
+  .animate-pulse-soft {
+    animation: none !important;
+  }
+
+  .agape-stagger > *:nth-child(n + 7) {
+    animation: none !important;
   }
 }
 

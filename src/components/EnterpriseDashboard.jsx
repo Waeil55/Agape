@@ -1,24 +1,23 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
+import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 
 const DesktopEnterpriseDashboard = lazy(() => import('./DesktopEnterpriseDashboard'));
 const MobileEnterpriseDashboard = lazy(() => import('./MobileEnterpriseDashboard'));
 
+const DashboardFallback = () => (
+  <div className="flex h-full items-center justify-center" role="status" aria-label="Loading workspace">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+  </div>
+);
+
 const EnterpriseDashboard = (props) => {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const Fallback = () => <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
 
   return (
-    <Suspense fallback={<Fallback />}>
+    <Suspense fallback={<DashboardFallback />}>
       {isMobile ? <MobileEnterpriseDashboard {...props} /> : <DesktopEnterpriseDashboard {...props} />}
     </Suspense>
   );
 };
 
-export default EnterpriseDashboard;
+export default React.memo(EnterpriseDashboard);

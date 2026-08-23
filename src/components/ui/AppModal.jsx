@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 
 const SIZES = {
@@ -24,14 +24,19 @@ export default function AppModal({
   closeOnBackdrop = true,
   showClose = true,
 }) {
+  const panelRef = useRef(null);
+  const titleId = useId();
+
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!open) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement;
+    document.body.style.overflow = 'hidden';
+    const focusTimer = window.setTimeout(() => panelRef.current?.focus(), 0);
     return () => {
-      document.body.style.overflow = '';
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus?.();
     };
   }, [open]);
 
@@ -55,12 +60,20 @@ export default function AppModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={closeOnBackdrop ? onClose : undefined}
       />
-      <div className={`relative w-full ${sizeClasses} bg-white rounded-3xl shadow-2xl border border-white/20 max-h-[90vh] flex flex-col ${className}`}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={title ? undefined : 'Dialog'}
+        tabIndex={-1}
+        className={`relative flex max-h-[90vh] w-full ${sizeClasses} flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl outline-none ${className}`}
+      >
         {(title || showClose) && (
           <div className="flex items-center justify-between px-6 pt-5 pb-3">
             <div>
               {title && (
-                <h2 className="text-base font-black text-slate-900">{title}</h2>
+                <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>
               )}
               {subtitle && (
                 <p className="text-[11px] font-medium text-slate-500 mt-0.5">{subtitle}</p>
@@ -68,7 +81,9 @@ export default function AppModal({
             </div>
             {showClose && (
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Close dialog"
                 className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
               >
                 <X size={16} className="text-slate-500" />

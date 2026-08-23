@@ -1,24 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { tripMatchesCalendarDay, timeToMinutes } from '../utils/tripDate';
-import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive } from 'lucide-react';
+import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
+import { getManifestUrgency } from '../utils/portalSelectors';
+import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { isNativeShell } from '../utils/platform';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
 
-const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show'];
-
-const getManifestUrgency = (trip) => {
-  const timeValue = timeToMinutes(trip?.time);
-  const now = new Date();
-  const scheduled = new Date();
-  scheduled.setHours(Math.floor(timeValue / 60), timeValue % 60, 0, 0);
-  if (now > scheduled && !TERMINAL_STATUSES.includes(trip?.status)) return 'late';
-  const diff = scheduled - now;
-  if (diff > 0 && diff < 30 * 60 * 1000) return 'soon';
-  return 'normal';
-};
+const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
 
 const getManifestStatusClass = (status) => {
   if (status === 'Unassigned') return 'bg-rose-100 text-rose-700';
@@ -79,6 +69,18 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [renderLimit, setRenderLimit] = useState(150);
   const [showReassignModal, setShowReassignModal] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  const activeFilterCount = [
+    sortBy !== 'time',
+    statusFilter !== 'all',
+    driverFilter !== 'all',
+    serviceFilter !== 'all',
+    showAllDates,
+    attentionOnly,
+    layoutMode !== 'grouped',
+    groupBy !== 'driver',
+  ].filter(Boolean).length;
 
   const handleBulkAssign = (driverId) => {
     if (assignMode === 'mission') {
@@ -445,7 +447,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6">
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 pb-24 max-md:[&_button]:min-h-11">
       {/* Assignment Success Feedback */}
       {assignmentFeedback && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in">
@@ -456,6 +458,31 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       )}
       {/* HEADER CONTROLS */}
       <div className="card p-4 sm:p-6 space-y-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:hidden">
+          <button
+            type="button"
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="mobile-manifest-filters"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 text-left text-sm font-bold text-slate-700"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <SlidersHorizontal size={17} className="shrink-0 text-blue-600" />
+              <span className="truncate">Filters · {manifestDate}</span>
+              {activeFilterCount > 0 && <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">{activeFilterCount}</span>}
+            </span>
+            <ChevronDown size={16} className={`shrink-0 transition-transform ${mobileFiltersOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreateForm(true)}
+            className="rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white shadow-sm shadow-emerald-500/20"
+          >
+            <Plus size={16} className="inline" /> New
+          </button>
+        </div>
+
+        <div id="mobile-manifest-filters" className={`${mobileFiltersOpen ? 'space-y-4' : 'hidden'} sm:block sm:space-y-4`}>
         {/* First Row: Main Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
@@ -549,10 +576,11 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             >
               {attentionOnly ? '⚠ Attention' : 'Full Queue'}
             </button>
-            <button onClick={() => setShowCreateForm(true)} className="flex-1 px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-sm uppercase">
+            <button onClick={() => setShowCreateForm(true)} className="hidden flex-1 px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-sm uppercase sm:block">
               <Plus size={14} className="inline mr-1" /> New
             </button>
           </div>
+        </div>
         </div>
 
         {/* Bulk Actions - Only show when items selected */}
@@ -580,7 +608,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         {[
           { label: 'Trips', value: manifestSummary.total, tone: 'text-slate-900 bg-white border-slate-200' },
           { label: 'Late', value: manifestSummary.late, tone: manifestSummary.late > 0 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-50 border-slate-200' },
@@ -588,7 +616,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           { label: 'Open', value: manifestSummary.unassigned, tone: manifestSummary.unassigned > 0 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-50 border-slate-200' },
           { label: 'Assigned', value: manifestSummary.assigned, tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
         ].map((metric) => (
-          <div key={metric.label} className={`rounded-xl border px-4 py-3 shadow-sm ${metric.tone}`}>
+          <div key={metric.label} className={`rounded-xl border px-4 py-3 shadow-sm ${metric.label === 'Trips' ? 'col-span-2 xl:col-span-1' : ''} ${metric.tone}`}>
             <p className="text-[10px] font-semibold uppercase tracking-widest">{metric.label}</p>
             <p className="mt-1 text-2xl font-black">{metric.value}</p>
           </div>
@@ -652,16 +680,16 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
       {/* CREATE MODAL */}
       {showCreateForm && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-8 overflow-y-auto">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCreateForm(false)} />
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20 animate-in my-auto">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-slate-950/60" onClick={() => setShowCreateForm(false)} />
+          <div className="relative z-10 my-0 max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-none border border-slate-200 rounded-t-3xl bg-white p-5 shadow-2xl sm:my-auto sm:rounded-3xl sm:p-8">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3"><Plus size={28} className="text-emerald-500" /> New Manifest Entry</h3>
               <button onClick={() => setShowCreateForm(false)} className="p-2.5 bg-slate-100 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={20} /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Name</label>
                   <input type="text" required value={newTrip.patient} onChange={(e) => setNewTrip({...newTrip, patient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
@@ -681,7 +709,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Service Type</label>
                   <input type="text" required placeholder="AM1" value={newTrip.type} onChange={(e) => setNewTrip({...newTrip, type: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Address</label>
                   <PlacesAutocompleteInput
                     value={newTrip.pickup}
@@ -691,7 +719,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                     required
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Dropoff Address</label>
                   <PlacesAutocompleteInput
                     value={newTrip.dropoff}
@@ -730,9 +758,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
       {/* ASSIGN MODAL */}
       {showAssign && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowAssign(false)} />
-          <div className="bg-white w-full max-w-md rounded-xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-slate-950/60" onClick={() => setShowAssign(false)} />
+          <div className="relative z-10 flex max-h-[85dvh] w-full max-w-md flex-col rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-3xl">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 {assignMode === 'mission' ? (
@@ -778,9 +806,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
       {/* REASSIGN MODAL */}
       {showReassignModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowReassignModal(false)} />
-          <div className="bg-white w-full max-w-md rounded-xl p-4 shadow-2xl relative z-10 border border-white/20 max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-slate-950/60" onClick={() => setShowReassignModal(false)} />
+          <div className="relative z-10 flex max-h-[85dvh] w-full max-w-md flex-col rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-3xl">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <UserCheck size={20} className="text-amber-600" /> Reassign
@@ -821,9 +849,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         const patientName = legsDetailPatient;
         const legs = filteredTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientName.trim().toLowerCase());
         return (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onClick={() => setLegsDetailPatient(null)}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="bg-white w-full max-w-lg rounded-xl p-5 relative z-10 shadow-2xl border border-white/20 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[130] flex items-end justify-center sm:items-center sm:p-4" onClick={() => setLegsDetailPatient(null)}>
+            <div className="absolute inset-0 bg-slate-950/60" />
+            <div className="relative z-10 max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-slate-900">{patientName}</h3>
                 <button onClick={() => setLegsDetailPatient(null)} className="p-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200" aria-label="Close"><X size={16} /></button>

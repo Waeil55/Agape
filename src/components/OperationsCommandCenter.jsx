@@ -19,6 +19,8 @@ import { aiPrioritizeTrips } from '../config/ai';
 import { getDriverLiveStatus } from '../constants/statuses';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
+import { toValidDate } from '../utils/safeDate';
+import { scopeOperationsTripsByDate } from '../utils/portalSelectors';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -53,6 +55,7 @@ const MANIFEST_GROUP_OPTIONS = [
 const DENSITY_OPTIONS = [
   { value: 'minimal', label: '1 Line' },
 ];
+
 const MANIFEST_TABLE_COLUMNS = [
   { label: 'Trip #', sortKey: 'tripId' },
   { label: 'Schedule', sortKey: 'time' },
@@ -119,6 +122,16 @@ const formatPhoneDisplay = (phone) => {
     return `+1 ${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
   }
   return '';
+};
+
+const formatActivityTimestamp = (value) => {
+  const date = toValidDate(value);
+  if (date) {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    }).format(date);
+  }
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 };
 
 const SYNTHETIC_REFERENCE_PATTERNS = [
@@ -503,12 +516,15 @@ const OperationsCommandCenter = ({
     const d = new Date(dateStr + 'T12:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
-  const todayTrips = trips.filter(t => { const dk = tripCalendarDateKey(t.date); return dk === undefined || dk === selectedDate; });
-  const unassignedTrips = todayTrips.filter(t => t.status === 'Unassigned');
-  const inProgressTrips = todayTrips.filter(t => ACTIVE_PROGRESS_STATUSES.includes(t.status));
-  const completedToday = todayTrips.filter(t => t.status === 'Completed');
-  const lateTrips = todayTrips.filter(t => isTripLate(t.time) && !TERMINAL_STATUSES.includes(t.status));
-  const willCallTrips = todayTrips.filter(t => t.time === 'Will Call');
+  const todayTrips = useMemo(
+    () => scopeOperationsTripsByDate(trips, selectedDate).scopedTrips,
+    [trips, selectedDate],
+  );
+  const unassignedTrips = useMemo(() => todayTrips.filter(t => t.status === 'Unassigned'), [todayTrips]);
+  const inProgressTrips = useMemo(() => todayTrips.filter(t => ACTIVE_PROGRESS_STATUSES.includes(t.status)), [todayTrips]);
+  const completedToday = useMemo(() => todayTrips.filter(t => t.status === 'Completed'), [todayTrips]);
+  const lateTrips = useMemo(() => todayTrips.filter(t => isTripLate(t.time) && !TERMINAL_STATUSES.includes(t.status)), [todayTrips]);
+  const willCallTrips = useMemo(() => todayTrips.filter(t => t.time === 'Will Call'), [todayTrips]);
   useEffect(() => {
     if (sortBy !== 'ai') { setAiSortOrder(null); return; }
     const filtered = inProgressTrips.filter(t => !TERMINAL_STATUSES.includes(t.status)).slice(0, 100);
@@ -543,16 +559,29 @@ const OperationsCommandCenter = ({
       localStorage.removeItem('agape_opsExpandedDriver');
     }
   }, [filterStatus, filterUrgency, sortBy, sortDirection, timeSortBottomInactive, driverFilter, serviceFilter, manifestLimit, fleetLimit, expandedDriver, showIntelligence, manifestView, manifestGroupBy, manifestDensity, showOnlyAttention]);
-  const availableDrivers = drivers.filter(d => d.status === 'Available');
-  const busyDrivers = drivers.filter(d => d.status !== 'Available');
+  const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
+  const { activeTripCountByDriver, activeTripsByDriver } = useMemo(() => {
+    const activeTripCountByDriver = new Map();
+    const activeTripsByDriver = new Map();
+    inProgressTrips.forEach((trip) => {
+      if (!trip.driverId) return;
+      activeTripCountByDriver.set(trip.driverId, (activeTripCountByDriver.get(trip.driverId) || 0) + 1);
+      const assigned = activeTripsByDriver.get(trip.driverId) || [];
+      assigned.push(trip);
+      activeTripsByDriver.set(trip.driverId, assigned);
+    });
+    return { activeTripCountByDriver, activeTripsByDriver };
+  }, [inProgressTrips]);
+  const availableDrivers = useMemo(() => drivers.filter(d => d.status === 'Available'), [drivers]);
+  const busyDrivers = useMemo(() => drivers.filter(d => d.status !== 'Available'), [drivers]);
   const driverOptions = useMemo(
     () => [...drivers].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))),
     [drivers]
   );
   const fleetDrivers = useMemo(() => {
     const sorted = [...drivers].sort((a, b) => {
-      const aTrips = inProgressTrips.filter((trip) => trip.driverId === a.id).length;
-      const bTrips = inProgressTrips.filter((trip) => trip.driverId === b.id).length;
+      const aTrips = activeTripCountByDriver.get(a.id) || 0;
+      const bTrips = activeTripCountByDriver.get(b.id) || 0;
       if (bTrips !== aTrips) return bTrips - aTrips;
       return String(a.name || '').localeCompare(String(b.name || ''));
     });
@@ -560,7 +589,7 @@ const OperationsCommandCenter = ({
       return sorted.filter((driver) => driver.id === driverFilter);
     }
     return sorted;
-  }, [driverFilter, drivers, inProgressTrips]);
+  }, [activeTripCountByDriver, driverFilter, drivers]);
   const serviceOptions = useMemo(
     () => [...new Set(todayTrips.map((trip) => trip.type || trip.serviceType).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b))),
     [todayTrips]
@@ -581,11 +610,11 @@ const OperationsCommandCenter = ({
     });
   }, []);
 
-  const searchedTrips = searchQuery
+  const searchedTrips = useMemo(() => searchQuery
     ? todayTrips.filter(t => tripMatchesSearch(t, searchQuery, [
-        drivers.find(driver => driver.id === t.driverId)?.phone,
+        driverById.get(t.driverId)?.phone,
       ]))
-    : todayTrips;
+    : todayTrips, [driverById, searchQuery, todayTrips]);
 
   const routeTripMap = useMemo(() => {
     const map = {};
@@ -640,7 +669,7 @@ const OperationsCommandCenter = ({
     }
     const originalOrder = new Map(result.map((trip, index) => [trip.id, index]));
     const driverNameForTrip = (trip) => {
-      const driver = drivers.find((entry) => entry.id === trip.driverId);
+      const driver = driverById.get(trip.driverId);
       return String(driver?.name || trip.driverName || (trip.driverId ? 'Assigned Driver' : 'Awaiting assignment')).toLowerCase();
     };
     const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), undefined, { numeric: true, sensitivity: 'base' });
@@ -702,8 +731,8 @@ const OperationsCommandCenter = ({
         return compareTimeThenClient(a, b);
       }
       if (sortBy === 'vehicle') {
-        const aVehicle = String(drivers.find((d) => d.id === a.driverId)?.vehicle || a.driverName || '').toLowerCase();
-        const bVehicle = String(drivers.find((d) => d.id === b.driverId)?.vehicle || b.driverName || '').toLowerCase();
+        const aVehicle = String(driverById.get(a.driverId)?.vehicle || a.driverName || '').toLowerCase();
+        const bVehicle = String(driverById.get(b.driverId)?.vehicle || b.driverName || '').toLowerCase();
         const diff = compareText(aVehicle, bVehicle);
         if (diff !== 0) return sortDirection === 'desc' ? -diff : diff;
         return compareTimeThenClient(a, b);
@@ -730,7 +759,7 @@ const OperationsCommandCenter = ({
       return (originalOrder.get(a.id) || 0) - (originalOrder.get(b.id) || 0);
     });
     return result;
-  }, [searchedTrips, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, drivers, routeTripMap, sortKeyOverrides]);
+  }, [searchedTrips, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, driverById, routeTripMap, sortKeyOverrides]);
 
   useEffect(() => {
     setManifestLimit(150);
@@ -741,7 +770,7 @@ const OperationsCommandCenter = ({
   }, [driverFilter, operationsTab]);
 
   const getDriverTrips = (driverId) => {
-    return inProgressTrips.filter(t => t.driverId === driverId);
+    return activeTripsByDriver.get(driverId) || [];
   };
 
   useEffect(() => {
@@ -1745,7 +1774,7 @@ const OperationsCommandCenter = ({
             <div className="text-center py-10 text-xs text-slate-400">No recent driver activity logs</div>
           ) : (
             logs.slice(0, 30).map((log, i) => (
-              <div key={log.timestamp || log.id || `log-${i}`} className="p-3 bg-white border border-slate-200/75 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+              <div key={`${typeof log.id === 'string' || typeof log.id === 'number' ? log.id : formatActivityTimestamp(log.timestamp)}-${i}`} className="p-3 bg-white border border-slate-200/75 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
                 <div className="flex items-start gap-2.5">
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ring-1 ring-slate-200 ${
                     log.c === 'rose' ? 'bg-rose-500 ring-rose-500/20' :
@@ -1757,7 +1786,7 @@ const OperationsCommandCenter = ({
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] font-semibold text-slate-800 leading-snug">{log.t}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">{log.d}</p>
-                    {log.timestamp && <p className="text-[10px] text-slate-400 mt-1 font-medium">{log.timestamp}</p>}
+                    {formatActivityTimestamp(log.timestamp) && <p className="text-[10px] text-slate-400 mt-1 font-medium">{formatActivityTimestamp(log.timestamp)}</p>}
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 
 import {
   MapPin, Navigation, Clock, User, PhoneCall,
@@ -84,6 +84,47 @@ const getSiteIcon = (name) => {
   return <Building size={14} />;
 };
 
+export const areTaskCardValuesEqual = (left, right) => {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => areTaskCardValuesEqual(value, right[index]));
+  }
+  const leftPrototype = Object.getPrototypeOf(left);
+  const rightPrototype = Object.getPrototypeOf(right);
+  if ((leftPrototype !== Object.prototype && leftPrototype !== null)
+    || (rightPrototype !== Object.prototype && rightPrototype !== null)) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key)
+      && areTaskCardValuesEqual(left[key], right[key]));
+};
+
+const actionShapeCache = new Map();
+
+export const getTaskCardActionShape = (actions = {}) => {
+  const entries = Object.keys(actions).sort().map((key) => [
+    key,
+    typeof actions[key] === 'function' ? 'function' : JSON.stringify(actions[key]),
+  ]);
+  const signature = JSON.stringify(entries);
+  if (!actionShapeCache.has(signature)) actionShapeCache.set(signature, signature);
+  return actionShapeCache.get(signature);
+};
+
+export const createTaskCardActionsBridge = (shape, getCurrentProps) => {
+  let entries = [];
+  try { entries = JSON.parse(shape); } catch { return {}; }
+  return Object.fromEntries(entries.map(([key, type]) => [
+    key,
+    type === 'function'
+      ? (...args) => getCurrentProps()?.actions?.[key]?.(...args)
+      : getCurrentProps()?.actions?.[key],
+  ]));
+};
+
 const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions }) => {
   const isExpanded = expandedId === task.id;
   const isAnotherExpanded = expandedId !== null && expandedId !== undefined && expandedId !== task.id;
@@ -120,12 +161,10 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const pickupSiteName = (task.pickup?.site || task.pickupSite || '').trim();
 
   useEffect(() => {
-    if (isExpanded) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
+    if (!isExpanded) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
   }, [isExpanded]);
 
   const handleCopy = (text, id) => {
@@ -136,16 +175,17 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
 
   return (
     <div
+      style={isExpanded ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '220px' }}
       className={`agape-card-cv relative bg-white rounded-xl mb-2
         ${isExpanded ? 'shadow-lg ring-2 ring-blue-500/10' : 'shadow-sm border border-slate-200/60 hover:shadow-md hover:border-slate-200'}
-        ${isAnotherExpanded ? 'opacity-35 scale-[0.98] blur-[1px] pointer-events-none' : ''}
+        ${isAnotherExpanded ? 'opacity-35 scale-[0.98] pointer-events-none' : ''}
         ${!isExpanded && timeUrgency.type === 'critical' ? 'border-rose-300 shadow-rose-100/50 bg-rose-50/50' : ''}
         ${!isExpanded && timeUrgency.type === 'warning' ? 'border-orange-300/60' : ''}
       `}
     >
       {/* Collapsed Header */}
       <div
-        className={`relative cursor-pointer select-none transition-colors ${isExpanded ? 'shrink-0' : ''} ${
+        className={`agape-press-target relative cursor-pointer select-none transition-colors ${isExpanded ? 'shrink-0' : ''} ${
           !isExpanded && timeUrgency.type === 'critical' ? 'bg-rose-50/80 hover:bg-rose-50' :
           !isExpanded && timeUrgency.type === 'warning' ? 'bg-orange-50/20 hover:bg-orange-50/40' :
           'hover:bg-slate-50/50'
@@ -173,7 +213,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 title="Update time, Will Call, IN/OUT, or urgent deadline"
               >
                 <Clock size={timeUrgency.type === 'critical' ? 16 : 14} className={`shrink-0 ${
-                  timeUrgency.type === 'critical' ? 'text-rose-600 animate-pulse' :
+                  timeUrgency.type === 'critical' ? 'text-rose-600' :
                   timeUrgency.type === 'warning' ? 'text-orange-500' :
                   isExpanded ? 'text-blue-600' : 'text-slate-400'
                 }`} strokeWidth={timeUrgency.type === 'normal' ? 2.5 : 3} />
@@ -289,7 +329,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
       {isExpanded && (
         <>
           {/* Backdrop */}
-          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity duration-300" onClick={() => onToggle(task.id)} />
+          <div className="fixed inset-0 bg-slate-900/30 z-40 transition-opacity duration-200" onClick={() => onToggle(task.id)} />
           {/* Modal Card */}
           <div className="fixed z-50 bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()} style={{ top: 'calc(env(safe-area-inset-top) + 8px)', left: '2%', right: '2%', bottom: 'calc(env(safe-area-inset-bottom) + 86px)' }}>
             {/* Header Bar */}
@@ -550,5 +590,16 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   );
 };
 
-export default TaskCard;
+export const areTaskCardPropsEqual = (previous, next) => {
+  if (previous.expandedId === previous.task?.id) return false;
+  return previous.expandedId === next.expandedId
+    && previous.isSelected === next.isSelected
+    && previous.onToggle === next.onToggle
+    && previous.onSelect === next.onSelect
+    && previous.actions === next.actions
+    && previous.timeEpochMinute === next.timeEpochMinute
+    && areTaskCardValuesEqual(previous.task, next.task);
+};
+
+export default memo(TaskCard, areTaskCardPropsEqual);
 export { StatusBadge, getTimeUrgency, getSiteIcon };

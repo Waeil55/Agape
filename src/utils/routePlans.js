@@ -1,3 +1,5 @@
+import { tripCalendarDateKey } from './tripDate';
+
 export const ROUTE_ASSIGNMENT_STATUS = Object.freeze({
   ASSIGNED: 'assigned',
   ACCEPTED: 'accepted',
@@ -48,11 +50,7 @@ const TERMINAL_TRIP_STATUSES = new Set(['Completed', 'Cancelled', 'No Show']);
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
 export const getLocalDateKey = (value = new Date()) => {
-  const date = typeof value === 'string' ? new Date(`${value}T00:00:00`) : new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return tripCalendarDateKey(value);
 };
 
 export const getDayAbbr = (value = new Date()) => {
@@ -74,14 +72,16 @@ export const normalizeRouteRecord = (route, value = new Date()) => {
   const todayKey = getLocalDateKey(now);
   const todayAbbr = getDayAbbr(now);
   const type = route.type || 'recurring';
-  const assignmentDate = route.assignmentDate || null;
+  const assignmentDate = tripCalendarDateKey(route.assignmentDate) || null;
   const expiresAtMs = route.expiresAt ? Date.parse(route.expiresAt) : null;
   const rawStatus = route.assignmentStatus || null;
   const isRecurring = type === 'recurring';
   const isTodayAssignment = type === 'today';
-  const hasValidDate = assignmentDate === todayKey;
+  const hasValidDate = Boolean(assignmentDate);
+  const isCurrentAssignment = assignmentDate === todayKey;
+  const isFutureAssignment = isTodayAssignment && hasValidDate && assignmentDate > todayKey;
   const isExpiredByStatus = INACTIVE_ASSIGNMENT_STATUSES.has(rawStatus);
-  const isExpiredByDate = isTodayAssignment && (!assignmentDate || !hasValidDate);
+  const isExpiredByDate = isTodayAssignment && (!hasValidDate || assignmentDate < todayKey);
   const isExpiredByTime = isTodayAssignment && Number.isFinite(expiresAtMs) && expiresAtMs < now.getTime();
   const isExpired = isTodayAssignment && (isExpiredByStatus || isExpiredByDate || isExpiredByTime);
   const sequence = Array.isArray(route.sequence) ? route.sequence.filter(Boolean) : [];
@@ -98,11 +98,12 @@ export const normalizeRouteRecord = (route, value = new Date()) => {
     assignedDriver: route.assignedDriver || null,
     isRecurring,
     isTodayAssignment,
-    appliesToday: isRecurring ? (route.days || []).includes(todayAbbr) : hasValidDate,
-    isActiveToday: isTodayAssignment && hasValidDate && !INACTIVE_ASSIGNMENT_STATUSES.has(statusKey) && !isExpiredByTime,
+    appliesToday: isRecurring ? (route.days || []).includes(todayAbbr) : isCurrentAssignment,
+    isActiveToday: isTodayAssignment && isCurrentAssignment && !INACTIVE_ASSIGNMENT_STATUSES.has(statusKey) && !isExpiredByTime,
+    isFutureAssignment,
     isExpired,
     statusKey,
-    statusLabel: ROUTE_STATUS_LABELS[statusKey] || ROUTE_STATUS_LABELS[ROUTE_ASSIGNMENT_STATUS.ASSIGNED],
+    statusLabel: isFutureAssignment ? 'Scheduled' : (ROUTE_STATUS_LABELS[statusKey] || ROUTE_STATUS_LABELS[ROUTE_ASSIGNMENT_STATUS.ASSIGNED]),
     statusBadgeClass: ROUTE_STATUS_BADGES[statusKey] || ROUTE_STATUS_BADGES[ROUTE_ASSIGNMENT_STATUS.ASSIGNED],
   };
 };
@@ -114,6 +115,8 @@ export const getValidRouteStops = (route, trips = []) => {
 
 export const routeHasAssignedTripsForDriver = (route, driver, trips = []) => {
   if (!route || !driver?.id) return false;
+  const assignmentDateKey = tripCalendarDateKey(route.assignmentDate);
+  if (route.type === 'today' && !assignmentDateKey) return false;
   const tripIds = new Set((trips || []).map((trip) => trip.id));
   if ((route.sequence || []).some((stop) => (
     stop?.source === 'route-plan'
@@ -124,7 +127,7 @@ export const routeHasAssignedTripsForDriver = (route, driver, trips = []) => {
     const trip = trips.find((item) => item.id === stop.clientId);
     if (!trip) return false;
     if (isTerminalTripStatus(trip.status)) return false;
-    if (route.assignmentDate && trip.date && trip.date !== route.assignmentDate) return false;
+    if (assignmentDateKey && tripCalendarDateKey(trip.date) !== assignmentDateKey) return false;
     const tripDriverEmail = normalizeEmail(trip.driverEmail);
     return trip.driverId === driver.id || (driverEmail && tripDriverEmail === driverEmail);
   });

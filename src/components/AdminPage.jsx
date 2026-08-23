@@ -1,24 +1,23 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
+import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 
 const DesktopAdminPage = lazy(() => import('./DesktopAdminPage'));
 const MobileAdminPage = lazy(() => import('./MobileAdminPage'));
 
+const AdminFallback = () => (
+  <div className="flex h-32 items-center justify-center" role="status" aria-label="Loading administration">
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+  </div>
+);
+
 const AdminPage = (props) => {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const Fallback = () => <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
 
   return (
-    <Suspense fallback={<Fallback />}>
+    <Suspense fallback={<AdminFallback />}>
       {isMobile ? <MobileAdminPage {...props} /> : <DesktopAdminPage {...props} />}
     </Suspense>
   );
 };
 
-export default AdminPage;
+export default React.memo(AdminPage);

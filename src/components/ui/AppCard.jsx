@@ -30,12 +30,20 @@ export default function AppCard({
 }) {
   const baseClasses = VARIANTS[variant] || VARIANTS.default;
   const paddingClasses = PADDINGS[padding] || PADDINGS.md;
-  const hoverClasses = hover ? 'hover:shadow-md transition-shadow cursor-pointer active:scale-[0.99]' : '';
+  const hoverClasses = hover ? 'cursor-pointer transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300 hover:shadow-md active:scale-[0.99]' : '';
 
   return (
     <div
       className={`${baseClasses} ${paddingClasses} ${hoverClasses} ${className}`}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick(event);
+        }
+      } : undefined}
       {...props}
     >
       {children}

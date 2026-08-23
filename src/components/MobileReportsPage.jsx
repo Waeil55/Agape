@@ -1,13 +1,17 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useDeferredValue, useState, useMemo, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, 
   XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Upload, FileText,
   Download, Repeat
 } from 'lucide-react';
-import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
+import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
+import { forEachWithConcurrency } from '../utils/boundedConcurrency';
+
+export const MOBILE_REPORT_PAGE_SIZE = 40;
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
   <div className="grid grid-cols-[112px_1fr] gap-3 py-1.5 items-start">
@@ -87,7 +91,7 @@ const normalizeStatus = (status) => {
   return 'other';
 };
 
-const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUploadModal }) => {
+const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUploadModal, isLoading = false, readOnly = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [allDates, setAllDates] = useState(false);
@@ -99,20 +103,23 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
   const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('All Drivers');
+  const [renderLimit, setRenderLimit] = useState(MOBILE_REPORT_PAGE_SIZE);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const driverIndex = useMemo(() => buildDriverIndex(drivers), [drivers]);
 
   const uniqueDrivers = useMemo(() => ['All Drivers', ...new Set(
-    trips.filter(t => allDates || tripCalendarDateKey(t.date) === dateStr).map(t => {
-      const d = drivers.find(d => d.id === t.driverId);
+    trips.filter(t => allDates || tripMatchesServiceDate(t, dateStr)).map(t => {
+      const d = findDriverInIndex(driverIndex, t);
       return d ? d.name : (t.driverName || '');
     }).filter(Boolean)
-  )], [trips, drivers, dateStr, allDates]);
+  )], [trips, driverIndex, dateStr, allDates]);
 
   const filteredTrips = useMemo(() => {
-    let filtered = trips.filter(t => allDates || tripCalendarDateKey(t.date) === dateStr);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    let filtered = trips.filter(t => allDates || tripMatchesServiceDate(t, dateStr));
+    if (deferredSearchQuery) {
+      const q = deferredSearchQuery.toLowerCase();
       filtered = filtered.filter(t => {
-        const driver = drivers.find(item => item.id === t.driverId);
+        const driver = findDriverInIndex(driverIndex, t);
         return tripMatchesSearch(t, q, [driver?.name, driver?.phone]);
       });
     }
@@ -124,13 +131,16 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     }
     if (driverFilter !== 'All Drivers') {
       filtered = filtered.filter(t => {
-        const d = drivers.find(d => d.id === t.driverId);
+        const d = findDriverInIndex(driverIndex, t);
         const name = d ? d.name : (t.driverName || '');
         return name === driverFilter;
       });
     }
     return filtered.sort((a, b) => compareTripsByCompletionAscending(a, b, sortKeyOverrides));
-  }, [trips, dateStr, allDates, searchQuery, statusFilter, driverFilter, drivers, sortKeyOverrides]);
+  }, [trips, dateStr, allDates, deferredSearchQuery, statusFilter, driverFilter, driverIndex, sortKeyOverrides]);
+  const visibleTrips = useMemo(() => filteredTrips.slice(0, renderLimit), [filteredTrips, renderLimit]);
+
+  useEffect(() => setRenderLimit(MOBILE_REPORT_PAGE_SIZE), [dateStr, allDates, deferredSearchQuery, statusFilter, driverFilter]);
 
   useEffect(() => {
     if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
@@ -146,7 +156,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     setDateStr(localCalendarYmd(d));
   };
 
-  const getDriverRecord = (driverId) => drivers.find(d => d.id === driverId);
+  const getDriverRecord = (driverId) => findDriverInIndex(driverIndex, { driverId });
   const formatClock = (value) => value ? String(value) : '-';
   const calcMiles = (pickupOdo, dropoffOdo, storedDist) => {
     if (storedDist) return Number(storedDist).toFixed(1);
@@ -242,10 +252,10 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const inputCls = "w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg font-semibold text-[11px] focus:border-blue-600 outline-none transition-all";
 
   return (
-    <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain">
+    <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain bg-slate-50 pb-24">
       {/* PAGE HEADER */}
       <div className="shrink-0 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
-        {editMessage && <div className={`rounded-lg px-3 py-2 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
+        {editMessage && <div role={editMessage.includes('not saved') ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
       </div>
 
       {/* DATE & FILTERS BAR */}
@@ -339,11 +349,12 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             <span className="agape-mobile-chip agape-mobile-chip-success">{filteredTrips.filter(t => t.reviewed).length}/{filteredTrips.length} reviewed</span>
           </div>
           <button 
+            disabled={readOnly || isLoading}
             className="agape-mobile-review-btn"
-            onClick={() => {
-              filteredTrips.forEach(t => {
-                if (!t.reviewed && onUpdateTrip) onUpdateTrip(t.id, { reviewed: true });
-              });
+            onClick={async () => {
+              const pendingTrips = filteredTrips.filter((trip) => !trip.reviewed);
+              if (!onUpdateTrip || pendingTrips.length === 0) return;
+              await forEachWithConcurrency(pendingTrips, (trip) => onUpdateTrip(trip.id, { reviewed: true }), 4);
             }}
           >
             <Check className="w-4 h-4" />
@@ -352,7 +363,10 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         </div>
 
         <div className="agape-mobile-list">
-          {filteredTrips.map(trip => {
+          {isLoading && (
+            <div role="status" className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm font-semibold text-slate-600">Loading reports…</div>
+          )}
+          {visibleTrips.map(trip => {
             const driver = getDriverRecord(trip.driverId);
             const isEditing = editingTripId === trip.id;
             const isExpanded = expandedTripId === trip.id || isEditing;
@@ -363,44 +377,38 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             
             return (
               <div key={trip.id} className={`agape-trip-list-card agape-trip-${tone}`}>
-                <div
-                  className="agape-trip-card-summary"
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={isExpanded}
-                  onClick={() => {
-                    if (!isEditing) setExpandedTripId(current => current === trip.id ? null : trip.id);
-                  }}
-                  onKeyDown={(event) => {
-                    if (!isEditing && (event.key === 'Enter' || event.key === ' ')) {
-                      event.preventDefault();
-                      setExpandedTripId(current => current === trip.id ? null : trip.id);
-                    }
-                  }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <h2 className="agape-trip-title">{isEditing ? ie.patient : (trip.patient || 'UNKNOWN')}</h2>
-                    <p className="agape-trip-id">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</p>
-                  </div>
-                  <div className="agape-trip-right">
-                    <div className="flex flex-col items-end">
-                      <span className={`text-[15px] font-semibold ${tone === 'danger' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                        {formatClock(isEditing ? ie.time : trip.time)}
-                      </span>
-                      <span className="text-[12px] text-slate-500 mt-0.5 font-medium">
-                        Driver: {driver ? driver.name : (trip.driverName || '-')}
-                      </span>
+                <div className="agape-trip-card-summary">
+                  <button
+                    type="button"
+                    className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left"
+                    aria-expanded={isExpanded}
+                    disabled={isEditing}
+                    onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <h2 className="agape-trip-title">{isEditing ? ie.patient : (trip.patient || 'UNKNOWN')}</h2>
+                      <p className="agape-trip-id">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</p>
                     </div>
-                    <span className={`agape-trip-status-dot agape-trip-status-${tone}`} title={displayStatus} aria-label={displayStatus}>
-                      <StatusIcon className="w-4 h-4" />
-                    </span>
-                    {!isEditing && (
-                      <button type="button" onClick={(event) => { event.stopPropagation(); startInlineEdit(trip); }} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                    )}
-                    {!isEditing && (isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />)}
-                  </div>
+                    <div className="agape-trip-right">
+                      <div className="flex flex-col items-end">
+                        <span className={`text-[15px] font-semibold ${tone === 'danger' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                          {formatClock(isEditing ? ie.time : trip.time)}
+                        </span>
+                        <span className="text-[12px] text-slate-500 mt-0.5 font-medium">
+                          Driver: {driver ? driver.name : (trip.driverName || '-')}
+                        </span>
+                      </div>
+                      <span className={`agape-trip-status-dot agape-trip-status-${tone}`} title={displayStatus} aria-label={displayStatus}>
+                        <StatusIcon className="w-4 h-4" />
+                      </span>
+                      {!isEditing && (isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />)}
+                    </div>
+                  </button>
+                  {!isEditing && !readOnly && (
+                    <button type="button" onClick={() => startInlineEdit(trip)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
 
                 {isExpanded && (
@@ -539,6 +547,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         <>
                           <button
                             onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { reviewed: !trip.reviewed })}
+                            disabled={readOnly}
                             className={`col-span-2 flex items-center justify-center gap-2 border rounded-xl py-3 shadow-sm font-bold text-sm transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
                           >
                             <CheckCircle2 className={`w-4 h-4 ${trip.reviewed ? 'text-slate-500' : 'text-white'}`} />
@@ -552,7 +561,16 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
               </div>
             );
           })}
-          {filteredTrips.length === 0 && (
+          {visibleTrips.length < filteredTrips.length && (
+            <button
+              type="button"
+              onClick={() => setRenderLimit((limit) => limit + MOBILE_REPORT_PAGE_SIZE)}
+              className="mx-auto mb-6 flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 shadow-sm"
+            >
+              Load more reports
+            </button>
+          )}
+          {!isLoading && filteredTrips.length === 0 && (
             <div className="text-center py-8 text-slate-400 text-xs font-semibold">
               No trips found for this date/search.
             </div>

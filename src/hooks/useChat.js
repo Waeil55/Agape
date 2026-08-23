@@ -25,11 +25,14 @@ export const useChat = ({ alerts = true } = {}) => {
 
   // 1. Subscribe to Current User Profile
   useEffect(() => {
+    let unsubscribeUserProfile = () => {};
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      unsubscribeUserProfile();
+      unsubscribeUserProfile = () => {};
       if (user) {
         // Subscribe to user doc
         const userDocRef = doc(db, 'users', user.uid);
-        const unsubUser = onSnapshot(userDocRef, (snap) => {
+        unsubscribeUserProfile = onSnapshot(userDocRef, (snap) => {
           if (snap.exists()) {
             setCurrentUser({ id: user.uid, ...snap.data() });
           } else {
@@ -42,7 +45,6 @@ export const useChat = ({ alerts = true } = {}) => {
             });
           }
         });
-        return () => unsubUser();
       } else {
         setCurrentUser(null);
         setChannels([]);
@@ -53,12 +55,15 @@ export const useChat = ({ alerts = true } = {}) => {
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeUserProfile();
+      unsubscribeAuth();
+    };
   }, []);
 
   // 2. Subscribe to Users Directory (for starting new chats)
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || alerts) return;
 
     const usersRef = collection(db, 'users');
     const unsubUsers = onSnapshot(usersRef, (snap) => {
@@ -75,7 +80,7 @@ export const useChat = ({ alerts = true } = {}) => {
     });
 
     return () => unsubUsers();
-  }, [currentUser]);
+  }, [currentUser, alerts]);
 
   // 3. Subscribe to Channels List
   useEffect(() => {

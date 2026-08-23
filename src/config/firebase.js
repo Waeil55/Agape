@@ -1,4 +1,4 @@
-import { initializeApp, deleteApp } from 'firebase/app';
+import { initializeApp, deleteApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, increment, writeBatch, setDoc, getDoc, getDocFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
 import { initializeAuth, getAuth, browserSessionPersistence, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
@@ -23,7 +23,8 @@ const firebaseConfig = {
   measurementId: env.VITE_FIREBASE_MEASUREMENT_ID || ""
 };
 
-const app = initializeApp(firebaseConfig);
+const appWasInitialized = getApps().length > 0;
+const app = appWasInitialized ? getApp() : initializeApp(firebaseConfig);
 const appCheck = (() => {
   const siteKey = String(env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY || '').trim();
   if (!siteKey || typeof window === 'undefined') return null;
@@ -38,7 +39,12 @@ const appCheck = (() => {
   }
 })();
 let db;
-try {
+if (appWasInitialized) {
+  // During development hot reloads the default Firebase app already owns a
+  // configured Firestore instance. Reuse it so its cache and listeners remain
+  // stable instead of attempting a conflicting second initialization.
+  db = getFirestore(app);
+} else try {
   // Persistent local cache: the app opens instantly from on-device data and
   // streams live changes in the background, so every device converges on the
   // same global state fast — including offline starts. Multi-tab manager

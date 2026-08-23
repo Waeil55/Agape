@@ -6,6 +6,7 @@ import {
 import { isTripLate, localCalendarYmd, timeToMinutes, tripCalendarDateKey } from '../utils/tripDate';
 import { analyzeActivityLogs } from '../config/ai';
 import { getDistanceMiles } from '../config/maps';
+import { buildDriverLoads, buildHotspots } from '../utils/portalSelectors';
 
 const CLOSED_STATUSES = new Set(['Completed', 'Cancelled', 'No Show']);
 const ACTIVE_ROUTE_STATUSES = new Set([
@@ -22,7 +23,7 @@ const toneClasses = {
   slate: { text: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200', fill: 'bg-slate-500' },
 };
 
-const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const isTodayTrip = (t) => tripCalendarDateKey(t?.date) === localCalendarYmd();
 const isWillCall = (t) => String(t?.time || '').trim().toUpperCase() === 'WILL CALL';
 const minutesUntil = (trip) => {
@@ -160,30 +161,10 @@ const CommandIntelligencePanel = ({
   ].filter(Boolean);
 
   // Driver load with AI-enhanced proximity scores
-  const expectedLoad = Math.max(1, Math.ceil(heuristic.active.length / Math.max(drivers.length, 1)));
-  const driverLoads = drivers.map(d => {
-    const assigned = heuristic.active.filter(t => t.driverId === d.id || t.driverEmail === d.email);
-    const nextTrip = assigned.map(t => ({ t, o: minutesUntil(t) })).filter(x => x.o !== null).sort((a, b) => a.o - b.o)[0]?.t;
-    const utilization = clamp(Math.round((assigned.length / expectedLoad) * 70) + (d.status !== 'Available' ? 15 : 0), 0, 100);
-    const tone = assigned.length > expectedLoad + 1 ? 'rose' : d.status === 'Available' ? 'emerald' : 'blue';
-    return {
-      id: d.id, name: d.name || d.email || 'Driver', status: d.status || 'Unknown',
-      vehicle: d.vehicle || 'No vehicle', assignedCount: assigned.length, utilization, tone, nextTrip,
-    };
-  }).sort((a, b) => b.assignedCount - a.assignedCount || b.utilization - a.utilization).slice(0, 5);
+  const driverLoads = buildDriverLoads(heuristic.active, drivers);
 
   // Hotspot zones via AI
-  const zones = new Map();
-  heuristic.active.forEach(t => {
-    const raw = String(t.pickup || t.dropoff || '').trim();
-    const zone = raw.split(',').map(p => p.trim()).filter(Boolean)[0]?.replace(/\b\d{1,6}\b/g, '').trim().slice(0, 28) || 'Unknown';
-    const cur = zones.get(zone) || { zone, count: 0, late: 0, unassigned: 0 };
-    cur.count += 1;
-    if (heuristic.late.includes(t)) cur.late += 1;
-    if (t.status === 'Unassigned') cur.unassigned += 1;
-    zones.set(zone, cur);
-  });
-  const hotspots = [...zones.values()].sort((a, b) => (b.late * 3 + b.unassigned * 2 + b.count) - (a.late * 3 + a.unassigned * 2 + a.count)).slice(0, 3);
+  const hotspots = buildHotspots(heuristic.active, heuristic.late);
 
   const actionMap = { late: onFocusLate, upcoming: onFocusUpcoming, unassigned: onFocusUnassigned, capacity: onFocusFleet };
 

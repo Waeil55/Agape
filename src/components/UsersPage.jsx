@@ -176,7 +176,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   }, [logs, role]);
 
   return (
-    <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 ${activityFeedOnly ? 'h-full' : ''}`}>
+    <div aria-label="People and access management" className={`flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 ${activityFeedOnly ? 'h-full' : ''}`}>
       {!activityFeedOnly && (
       <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
@@ -595,7 +595,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
 
       {/* Add User Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm max-w-md w-full mx-0 sm:mx-4">
             <div className="p-4 sm:p-8">
               <div className="flex justify-between items-center mb-4 sm:mb-6">

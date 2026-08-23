@@ -19,18 +19,18 @@ const reportUnhandled = (kind) => (event) => {
 window.addEventListener('unhandledrejection', reportUnhandled('unhandled-rejection'));
 window.addEventListener('error', reportUnhandled('unhandled-error'));
 
-// Global table row selection logic for desktop view
+// Global table row selection logic for desktop view. Keep one direct reference
+// instead of rescanning every table after every pointer interaction.
+let selectedTableRow = null;
 document.addEventListener('click', (e) => {
   const tr = e.target.closest('table tbody tr');
   if (tr) {
-    document.querySelectorAll('table tbody tr[data-agape-selected="true"]').forEach(el => {
-      if (el !== tr) el.removeAttribute('data-agape-selected');
-    });
+    if (selectedTableRow && selectedTableRow !== tr) selectedTableRow.removeAttribute('data-agape-selected');
+    selectedTableRow = tr;
     tr.setAttribute('data-agape-selected', 'true');
   } else if (!e.target.closest('table')) {
-    document.querySelectorAll('table tbody tr[data-agape-selected="true"]').forEach(el => {
-      el.removeAttribute('data-agape-selected');
-    });
+    selectedTableRow?.removeAttribute('data-agape-selected');
+    selectedTableRow = null;
   }
 }, true);
 
@@ -42,9 +42,8 @@ document.addEventListener('keydown', (e) => {
       return;
     }
 
-    const selectedRows = document.querySelectorAll('table tbody tr[data-agape-selected="true"]');
-    if (selectedRows.length > 0) {
-      const current = selectedRows[0];
+    if (selectedTableRow?.isConnected) {
+      const current = selectedTableRow;
       let target = null;
       
       if (e.key === 'ArrowUp') {
@@ -57,6 +56,7 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault(); // Prevent page scrolling
         current.removeAttribute('data-agape-selected');
         target.setAttribute('data-agape-selected', 'true');
+        selectedTableRow = target;
         target.scrollIntoView({ block: 'nearest' });
       }
     }

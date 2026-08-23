@@ -446,14 +446,14 @@ const [form, setForm] = useState({
   const resolvedTab = mode !== 'all' ? mode : activeTab;
 
   return (
-    <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${mode === 'all' ? 'space-y-5' : ''}`}>
+    <div aria-label="Drivers and vehicles workspace" className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${mode === 'all' ? 'space-y-5' : ''}`}>
       {assignmentError && (
         <div role="alert" className="mx-3 mt-3 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
           <AlertCircle size={14} /> {assignmentError}
         </div>
       )}
       {mode === 'all' && (
-        <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-slate-100/95 py-1 backdrop-blur">
+        <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-slate-100 py-1">
           {[
             { id: 'drivers', label: 'Drivers', icon: User },
             { id: 'vehicles', label: 'Vehicles', icon: Truck }

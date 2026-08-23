@@ -181,7 +181,7 @@ const AdminTripCard = ({
       <button
         type="button"
         onClick={() => onOpenTripDetails?.(trip)}
-        className={`w-full text-left bg-white rounded-xl border shadow-sm active:scale-[0.985] transition-all duration-150 overflow-hidden ${
+        className={`w-full min-h-11 text-left bg-white rounded-xl border shadow-sm active:scale-[0.985] transition-[border-color,box-shadow,transform] duration-150 overflow-hidden ${
           isActive ? "border-amber-200 shadow-amber-100/60" : 
           isTerminal ? "border-slate-100 opacity-80" : 
           trip.status === "Unassigned" ? "border-rose-200 shadow-rose-50" : "border-slate-200"
@@ -205,7 +205,7 @@ const AdminTripCard = ({
                 urgency ? "text-amber-700" : "text-slate-800"
               }`}>{timeLabel}</p>
               {urgency && (
-                <p className={`text-[9px] font-semibold mt-0.5 ${urgency === "Late" ? "text-white/80" : "text-amber-600"}`}>
+                <p className={`text-[10px] font-semibold mt-0.5 ${urgency === "Late" ? "text-white/80" : "text-amber-600"}`}>
                   {urgency}
                 </p>
               )}
@@ -218,7 +218,7 @@ const AdminTripCard = ({
                   {trip.patient || "Unknown Patient"}
                 </p>
                 {trip.urgentTrip && (
-                  <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[8px] font-black uppercase tracking-wide">
+                  <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black uppercase tracking-wide">
                     URGENT
                   </span>
                 )}
@@ -263,7 +263,7 @@ const AdminTripCard = ({
               {driver ? (
                 <>
                   <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                    <span className="text-[9px] font-black text-blue-700">{(driver.name || "D")[0]}</span>
+                    <span className="text-[10px] font-black text-blue-700">{(driver.name || "D")[0]}</span>
                   </div>
                   <span className="text-[11px] font-semibold text-slate-600 truncate">{driver.name}</span>
                 </>
@@ -280,7 +280,7 @@ const AdminTripCard = ({
                 <button
                   type="button"
                   onClick={handleQuickAssign}
-                  className="h-7 px-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1 active:scale-95 transition-all"
+                  className="min-h-11 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-semibold flex items-center gap-1 active:scale-95 transition-colors"
                 >
                   <UserCheck size={11} />
                   {driver ? "Reassign" : "Assign"}
@@ -291,7 +291,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => makeCall?.(trip.patientPhone, trip.patient)}
-                    className="w-7 h-7 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center active:scale-95 transition-all"
+                    className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center active:scale-95 transition-colors"
                     title="Call patient"
                   >
                     <Phone size={12} />
@@ -299,7 +299,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => sendSMS?.(trip.patientPhone, trip.patient)}
-                    className="w-7 h-7 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center active:scale-95 transition-all"
+                    className="w-11 h-11 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center active:scale-95 transition-colors"
                     title="SMS patient"
                   >
                     <MessageSquare size={12} />
@@ -310,7 +310,7 @@ const AdminTripCard = ({
                 <button
                   type="button"
                   onClick={() => setShowActions(true)}
-                  className="w-7 h-7 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center active:scale-95 transition-all"
+                  className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center active:scale-95 transition-colors"
                 >
                   <MoreHorizontal size={14} />
                 </button>
@@ -335,7 +335,7 @@ const AdminTripCard = ({
       {/* Actions Bottom Sheet */}
       {showActions && (
         <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowActions(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-slate-950/60" />
           <div className="relative w-full bg-white rounded-t-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 rounded-full bg-slate-200" />
@@ -359,13 +359,13 @@ const AdminTripCard = ({
                           addToast?.("Trip Assigned", `Assigned to ${d.name}`, "success");
                           setShowActions(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all active:scale-[0.98] text-left ${
+                        className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors active:scale-[0.98] text-left ${
                           d.id === trip.driverId 
                             ? "border-blue-200 bg-blue-50" 
                             : "border-slate-100 bg-white hover:bg-slate-50"
                         }`}
                       >
-                        <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-black text-sm flex items-center justify-center shrink-0">
+                        <div className="w-11 h-11 rounded-xl bg-blue-100 text-blue-700 font-black text-sm flex items-center justify-center shrink-0">
                           {(d.name || "D")[0]}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -386,7 +386,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => markException("No Show")}
-                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 text-[11px] font-semibold active:scale-95 transition-all"
+                    className="min-h-11 flex flex-col items-center gap-1.5 py-3 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 text-[11px] font-semibold active:scale-95 transition-colors"
                   >
                     <XCircle size={18} />
                     No Show
@@ -394,7 +394,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => markException("Cancelled")}
-                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-semibold active:scale-95 transition-all"
+                    className="min-h-11 flex flex-col items-center gap-1.5 py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-semibold active:scale-95 transition-colors"
                   >
                     <Ban size={18} />
                     Cancel
@@ -402,7 +402,7 @@ const AdminTripCard = ({
                   <button
                     type="button"
                     onClick={() => markException("Rerouted")}
-                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold active:scale-95 transition-all"
+                    className="min-h-11 flex flex-col items-center gap-1.5 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold active:scale-95 transition-colors"
                   >
                     <Repeat size={18} />
                     Reroute
@@ -414,7 +414,7 @@ const AdminTripCard = ({
                 <button
                     type="button"
                     onClick={() => { makeCall?.(trip.patientPhone, trip.patient); setShowActions(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold active:scale-95 transition-all"
+                    className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold active:scale-95 transition-colors"
                   >
                     <Phone size={18} /> Call Patient
                   </button>
@@ -424,7 +424,7 @@ const AdminTripCard = ({
                 <button
                   type="button"
                   onClick={() => { sendSMS?.(trip.patientPhone, trip.patient); setShowActions(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold active:scale-95 transition-all"
+                  className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold active:scale-95 transition-colors"
                 >
                   <MessageSquare size={18} /> SMS Patient
                 </button>
@@ -434,7 +434,7 @@ const AdminTripCard = ({
                 <button
                   type="button"
                   onClick={() => { setDraft({ ...trip, pickup: getAddr(trip.pickup), dropoff: getAddr(trip.dropoff) }); setEditing(true); setShowActions(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold active:scale-95 transition-all"
+                  className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold active:scale-95 transition-colors"
                 >
                   <Edit2 size={18} /> Edit Trip
                 </button>
@@ -443,7 +443,7 @@ const AdminTripCard = ({
               <button
                 type="button"
                 onClick={() => { onOpenTripWorkflow?.(trip); setShowActions(false); }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold active:scale-95 transition-all shadow-sm"
+                className="w-full min-h-11 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold active:scale-95 transition-colors shadow-sm"
               >
                 <Play size={16} /> Open Trip Workflow
               </button>
@@ -476,7 +476,7 @@ const DriverRow = ({ driver, trips }) => {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-slate-900 truncate">{driver.name}</p>
-          <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${active ? "bg-amber-100 text-amber-700" : ds.color}`}>
+          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${active ? "bg-amber-100 text-amber-700" : ds.color}`}>
             {activeStatus}
           </span>
         </div>
@@ -487,7 +487,7 @@ const DriverRow = ({ driver, trips }) => {
       </div>
       <div className="shrink-0 text-right">
         <p className="text-base font-black text-slate-900">{todayCount}</p>
-        <p className="text-[9px] font-semibold text-slate-400 uppercase">trips</p>
+        <p className="text-[10px] font-semibold text-slate-500 uppercase">trips</p>
       </div>
     </div>
   );
@@ -560,7 +560,7 @@ const MobileDispatchView = ({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50 overflow-hidden pb-24">
       {/* Header: stats + workspace controls + search */}
       <div className="px-3 pt-3 pb-2 bg-white border-b border-slate-200 sm:px-4 shrink-0">
         {/* Stats row (only when no workspace controls) */}
@@ -574,7 +574,7 @@ const MobileDispatchView = ({
             ].map(s => (
               <div key={s.label} className={`flex-1 rounded-xl px-2 py-2 text-center border ${s.bg} ${s.border}`}>
                 <p className={`text-lg font-black leading-none ${s.color}`}>{s.value}</p>
-                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">{s.label}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">{s.label}</p>
               </div>
             ))}
           </div>
@@ -594,7 +594,7 @@ const MobileDispatchView = ({
                   value={localSearch}
                   onChange={e => setLocalSearch(e.target.value)}
                   placeholder="Search patient, ID, address…"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all"
+                  className="w-full min-h-11 bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                 />
                 {localSearch && (
                   <button type="button" onClick={() => setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -605,7 +605,7 @@ const MobileDispatchView = ({
               <button
                 type="button"
                 onClick={() => { setShowSearch(false); setLocalSearch(""); }}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 transition-all shrink-0"
+                className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 transition-colors shrink-0"
               >
                 <X size={16} />
               </button>
@@ -615,14 +615,14 @@ const MobileDispatchView = ({
               <button
                 type="button"
                 onClick={() => setShowSearch(true)}
-                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm shrink-0"
+                className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shadow-sm shrink-0"
               >
                 <Search size={16} />
               </button>
               <button
                 type="button"
                 onClick={() => setShowTools(true)}
-                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all shadow-sm shrink-0"
+                className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shadow-sm shrink-0"
               >
                 <SlidersHorizontal size={16} />
               </button>
@@ -630,7 +630,7 @@ const MobileDispatchView = ({
               <button
                 type="button"
                 onClick={() => setShowAddTripModal?.(true)}
-                className="h-9 px-3 rounded-xl bg-blue-600 text-white text-[12px] font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm ml-auto"
+                className="min-h-11 px-3 rounded-xl bg-blue-600 text-white text-[12px] font-bold flex items-center gap-1.5 active:scale-95 transition-colors shadow-sm ml-auto"
               >
                 <Plus size={14} /> Add Trip
               </button>
@@ -647,12 +647,12 @@ const MobileDispatchView = ({
               key={c.id}
               type="button"
               onClick={() => setFilter(c.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all active:scale-95 ${
+              className={`min-h-11 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-colors active:scale-95 ${
                 filter === c.id ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
               }`}
             >
               {c.label}
-              <span className={`text-[9px] px-1 py-0.5 rounded-full font-semibold ${filter === c.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"}`}>
+              <span className={`text-[10px] px-1 py-0.5 rounded-full font-semibold ${filter === c.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"}`}>
                 {c.n}
               </span>
             </button>
@@ -680,7 +680,7 @@ const MobileDispatchView = ({
                 <button
                   type="button"
                   onClick={() => setShowAddTripModal?.(true)}
-                  className="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold active:scale-95 transition-all"
+                  className="mt-4 min-h-11 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold active:scale-95 transition-colors"
                 >
                   + Add New Trip
                 </button>
@@ -731,7 +731,7 @@ const MobileDispatchView = ({
       {/* Tools Bottom Sheet */}
       {showTools && (
         <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowTools(false)}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-slate-950/65" />
           <div className="relative w-full bg-white rounded-t-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 rounded-full bg-slate-200" />
@@ -752,7 +752,7 @@ const MobileDispatchView = ({
                   key={item.label}
                   type="button"
                   onClick={item.action}
-                  className={`flex flex-col items-center justify-center gap-2 h-20 rounded-xl border font-black text-xs transition-all active:scale-95 ${item.color}`}
+                  className={`flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border font-black text-xs transition-colors active:scale-95 ${item.color}`}
                 >
                   <item.icon size={20} />
                   <span className="text-center leading-tight px-1">{item.label}</span>

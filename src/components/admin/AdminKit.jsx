@@ -67,7 +67,8 @@ export const AdminShell = ({
                   key={item.id}
                   type="button"
                   onClick={() => onNavigate?.(item.id)}
-                  className={`adm-nav-link ${isActive ? 'is-active' : ''}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`adm-nav-link focus-visible:ring-2 focus-visible:ring-blue-500 ${isActive ? 'is-active' : ''}`}
                 >
                   {Icon && <Icon size={18} className="adm-nav-ico" />}
                   <span className="truncate">{item.label}</span>
@@ -89,7 +90,7 @@ export const AdminShell = ({
 
     {/* Main Column */}
     <div className="adm-main">
-      <header className="adm-topbar">
+      <header className="adm-topbar !border-slate-200 !bg-white" style={{ backdropFilter: 'none' }}>
         <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm md:hidden mr-2">
           <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
         </div>
@@ -118,7 +119,8 @@ export const AdminShell = ({
                       key={item.id}
                       type="button"
                       onClick={() => onNavigate?.(item.id)}
-                      className={`adm-subnav-link ${isActive ? 'is-active' : ''}`}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`adm-subnav-link focus-visible:ring-2 focus-visible:ring-blue-500 ${isActive ? 'is-active' : ''}`}
                     >
                       {Icon && <Icon size={16} className="adm-nav-ico" />}
                       <span className="truncate">{item.label}</span>
@@ -154,7 +156,8 @@ export const AdminShell = ({
             key={item.id}
             type="button"
             onClick={() => onMobileNavigate?.(item.id)}
-            className={`adm-bottomnav-item ${isActive ? 'is-active' : ''}`}
+            aria-current={isActive ? 'page' : undefined}
+            className={`adm-bottomnav-item focus-visible:ring-2 focus-visible:ring-blue-500 ${isActive ? 'is-active' : ''}`}
           >
             {Icon && <Icon size={20} />}
             <span className="label">{item.label}</span>
@@ -175,7 +178,7 @@ export const AdminShell = ({
    ===================================================================== */
 
 export const AdminCard = ({ children, className = '', pad = true, ...rest }) => (
-  <div className={`adm-card ${pad ? 'adm-card-pad' : ''} ${className}`} {...rest}>{children}</div>
+  <div className={`adm-card rounded-xl border border-slate-200 bg-white shadow-sm ${pad ? 'adm-card-pad' : ''} ${className}`} {...rest}>{children}</div>
 );
 
 export const AdminCardHead = ({ icon: Icon, title, action }) => (

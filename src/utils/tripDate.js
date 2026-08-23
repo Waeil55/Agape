@@ -56,6 +56,15 @@ export function tripCalendarDateKey(value) {
     const rest = s.slice(iso[0].length);
     if (!/[T\s]/.test(rest)) {
       // Pure calendar date (no time component): already a local service date.
+      const year = Number(iso[1]);
+      const month = Number(iso[2]);
+      const day = Number(iso[3]);
+      const candidate = new Date(year, month - 1, day);
+      if (
+        candidate.getFullYear() !== year
+        || candidate.getMonth() !== month - 1
+        || candidate.getDate() !== day
+      ) return undefined;
       return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
     }
     // Timestamped instant: convert to the LOCAL calendar day. Slicing the
@@ -70,6 +79,12 @@ export function tripCalendarDateKey(value) {
   const us = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
   if (us) {
     const year = us[3].length === 2 ? `20${us[3]}` : us[3];
+    const candidate = new Date(Number(year), Number(us[1]) - 1, Number(us[2]));
+    if (
+      candidate.getFullYear() !== Number(year)
+      || candidate.getMonth() !== Number(us[1]) - 1
+      || candidate.getDate() !== Number(us[2])
+    ) return undefined;
     return `${year}-${String(us[1]).padStart(2, '0')}-${String(us[2]).padStart(2, '0')}`;
   }
 
@@ -173,4 +188,14 @@ export function tripMatchesCalendarDay(tripDate, dayKey) {
   const key = tripCalendarDateKey(tripDate);
   if (key === undefined) return false;
   return key === dayKey;
+}
+
+/**
+ * Match a trip-like record to an explicit service date. Keeping this helper at
+ * the boundary prevents report and admin views from accidentally comparing a
+ * timestamp string directly with a calendar input value.
+ */
+export function tripMatchesServiceDate(trip, dayKey) {
+  if (!trip || !dayKey) return false;
+  return tripCalendarDateKey(trip.date ?? trip.serviceDate ?? trip.pickupDate) === dayKey;
 }

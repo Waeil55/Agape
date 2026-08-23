@@ -768,9 +768,9 @@ const SettingsPage = ({
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6 lg:overflow-y-auto lg:overscroll-contain">
+    <div aria-label="Settings workspace" className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6 lg:overflow-y-auto lg:overscroll-contain">
       {/* Sidebar */}
-      <div className="w-56 flex-shrink-0 hidden lg:block">
+      <nav aria-label="Settings sections" className="w-56 flex-shrink-0 hidden lg:block">
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm sticky top-4">
           {navItems.map((group, gi) => (
             <div key={gi}>
@@ -793,7 +793,7 @@ const SettingsPage = ({
             </div>
           ))}
         </div>
-      </div>
+      </nav>
 
       {/* Mobile nav */}
       <div className="lg:hidden w-full overflow-x-auto no-scrollbar pb-2 -mx-1 px-1 touch-manipulation">

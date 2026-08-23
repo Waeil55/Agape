@@ -43,7 +43,7 @@ export default function CommandSidebar({
   const completedTrips = todaysTrips.filter(t => t.status === 'Completed');
 
   return (
-    <div className={`w-full transition-all duration-300 shrink-0 border-t border-slate-200 bg-slate-50 flex flex-col z-20 shadow-sm relative font-outfit md:border-t-0 md:border-r md:shadow-2xl md:w-[400px] md:h-full md:max-h-none xl:w-[450px] ${isCollapsed ? 'h-[56px] overflow-hidden' : 'h-[40dvh]'}`}>
+    <div className={`w-full transition-[height,width] duration-300 shrink-0 border-t border-slate-200 bg-slate-50 flex flex-col z-20 shadow-sm relative font-outfit max-md:[&_button]:min-h-11 md:border-t-0 md:border-r md:shadow-2xl md:w-[400px] md:h-full md:max-h-none xl:w-[450px] ${isCollapsed ? 'h-[56px] overflow-hidden' : 'h-[40dvh]'}`}>
       
       {/* TABS HEADER */}
       <div className="bg-white px-3 pt-3 pb-3 border-b border-slate-200 shrink-0 z-10 md:px-4 md:pt-5 md:pb-4">

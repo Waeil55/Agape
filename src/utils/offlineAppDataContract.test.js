@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 describe('offline application data contract', () => {
   it('restores the last local fleet snapshot before realtime Firebase reconnects', () => {
     const hook = readFileSync(new URL('../hooks/useFirestoreAppData.js', import.meta.url), 'utf8');
-    expect(hook).toContain('readAppData().then');
-    expect(hook).toContain('persistLocalSnapshot()');
+    expect(hook).toContain('readAppData(activeTenantId).then');
+    expect(hook).toContain('persistLocalSnapshot(');
     expect(hook).toContain("navigator.onLine === false");
   });
 

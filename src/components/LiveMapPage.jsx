@@ -10,7 +10,7 @@ import {
   Gauge,
   Layers,
   Loader2,
-  Map,
+  Map as MapIcon,
   MapPin,
   Navigation,
   Phone,
@@ -28,7 +28,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { GOOGLE_MAPS_API_KEY, db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
-import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
+import { GOOGLE_MAPS_AUTH_FAILURE_EVENT, loadGoogleMapsApi } from '../hooks/useGoogleMaps';
 import { openMapLink } from '../utils/nativeActions';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import AIInsightsBanner from './AIInsightsBanner';
@@ -285,7 +285,9 @@ const LiveMapPage = ({
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef([]);
+  const markersRef = useRef(new Map());
+  const resizeFrameRef = useRef(null);
+  const nearestTripCandidatesRef = useRef([]);
   const clustererRef = useRef(null);
   const trafficLayerRef = useRef(null);
   const svContainerRef = useRef(null);
@@ -390,6 +392,14 @@ const LiveMapPage = ({
     [todaysTrips]
   );
   const rideShareCandidates = useMemo(() => buildRideShareCandidates(todaysTrips), [todaysTrips]);
+  const nearestTripCandidates = useMemo(() => [
+    ...unassignedTrips,
+    ...(selectedSummary?.upcoming || []),
+  ].filter((trip, index, array) => array.findIndex((item) => item.id === trip.id) === index).slice(0, 10), [selectedSummary?.upcoming, unassignedTrips]);
+  const nearestTripCandidateKey = JSON.stringify(nearestTripCandidates.map((trip) => [
+    trip.id, trip.pickup, trip.pickupLat, trip.pickupLng, trip.updatedAtLocal,
+  ]));
+  nearestTripCandidatesRef.current = nearestTripCandidates;
 
   const fleetStats = useMemo(() => {
     const live = driverSummaries.filter(summary => summary.point).length;
@@ -410,10 +420,7 @@ const LiveMapPage = ({
         return;
       }
       setDistanceLoading(true);
-      const candidates = [
-        ...unassignedTrips,
-        ...(selectedSummary?.upcoming || []),
-      ].filter((trip, index, array) => array.findIndex(item => item.id === trip.id) === index).slice(0, 10);
+      const candidates = nearestTripCandidatesRef.current;
 
       const enriched = await Promise.all(candidates.map(async (trip) => {
         let miles = null;
@@ -440,7 +447,7 @@ const LiveMapPage = ({
     return () => {
       cancelled = true;
     };
-  }, [selectedPoint?.lat, selectedPoint?.lng, selectedSummary?.driver?.id, selectedSummary?.upcoming, unassignedTrips, intelRefreshToken]);
+  }, [selectedPoint?.lat, selectedPoint?.lng, selectedSummary?.driver?.id, nearestTripCandidateKey, intelRefreshToken]);
 
   const selectedDestination = getTripPhase(selectedTrip).destination;
 
@@ -448,6 +455,12 @@ const LiveMapPage = ({
   useEffect(() => {
     if (!hasGoogleMapsConfigured()) { setMapsLoadError(true); return; }
     let cancelled = false;
+    const handleAuthFailure = () => {
+      if (cancelled) return;
+      setMapReady(false);
+      setMapsLoadError(true);
+    };
+    window.addEventListener(GOOGLE_MAPS_AUTH_FAILURE_EVENT, handleAuthFailure);
     loadGoogleMapsApi()
       .then((mapsLib) => {
         if (cancelled || mapRef.current) return;
@@ -478,6 +491,10 @@ const LiveMapPage = ({
       .catch(() => { if (!cancelled) setMapsLoadError(true); });
     return () => {
       cancelled = true;
+      window.removeEventListener(GOOGLE_MAPS_AUTH_FAILURE_EVENT, handleAuthFailure);
+      markersRef.current.forEach((record) => record.marker.setMap(null));
+      markersRef.current.clear();
+      clustererRef.current?.clearMarkers();
       if (mapRef.current) {
         mapRef.current = null;
       }
@@ -521,54 +538,65 @@ const LiveMapPage = ({
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const mapsLib = window.google.maps;
+    const markerRecords = markersRef.current;
+    const activeMarkerKeys = new Set();
 
-    // Clear old markers
-    markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = [];
-
-    // Build driver markers
-    drivers.forEach((driver) => {
+    // Reuse marker instances so selecting a driver or receiving a GPS ping
+    // updates a small object instead of rebuilding the whole Google Maps layer.
+    drivers.forEach((driver, driverIndex) => {
       const point = getDriverPoint(driver);
       if (!point) return;
+      const markerKey = String(driver.id || driver.email || driverIndex);
+      activeMarkerKeys.add(markerKey);
       const initial = String(driver?.name || 'D').charAt(0).toUpperCase();
       const colors = { blue: '#3B82F6', green: '#22C55E', orange: '#F97316', purple: '#A855F7', red: '#EF4444', yellow: '#EAB308', gray: '#64748B', brown: '#78716C' };
-      const colorIdx = drivers.indexOf(driver) % DRIVER_COLORS.length;
+      const colorIdx = driverIndex % DRIVER_COLORS.length;
       const baseColor = colors[DRIVER_COLORS[colorIdx]] || '#64748B';
       const isPulsing = ACTIVE_STATUSES.has(driver.status) || driver.status === 'Delayed';
 
       try {
-        const marker = new mapsLib.Marker({
-          position: point,
-          map: showClusters ? null : mapRef.current,
-          title: driver.name || 'Driver',
-          icon: createMarkerIcon(mapsLib, initial, driver.id === selectedDriverId ? '#3B82F6' : baseColor, driver.id === selectedDriverId, isPulsing),
-          zIndex: driver.id === selectedDriverId ? 100 : 10,
-        });
-
-        marker.addListener('click', () => {
-          setSelectedDriverId(driver.id);
+        let record = markerRecords.get(markerKey);
+        if (!record) {
+          const marker = new mapsLib.Marker({ position: point });
+          record = { marker, driver };
+          marker.addListener('click', () => {
+            const currentDriver = record.driver;
+            setSelectedDriverId(currentDriver.id);
           infoWindowRef.current?.setContent(`
             <div style="font-family:system-ui;color:#e2e8f0;font-size:12px;line-height:1.4;min-width:160px">
-              <div style="font-weight:800;font-size:14px;color:#f8fafc;margin-bottom:2px">${escapeHtml(driver.name || 'Unnamed')}</div>
-              <div style="color:#94a3b8;font-size:11px">${escapeHtml(driver.vehicle || 'No vehicle')}</div>
-              <div style="color:#64748b;font-size:10px;margin-top:4px">${formatAge(driver.lastLocationUpdate || driver.lastUpdate)}</div>
+              <div style="font-weight:800;font-size:14px;color:#f8fafc;margin-bottom:2px">${escapeHtml(currentDriver.name || 'Unnamed')}</div>
+              <div style="color:#94a3b8;font-size:11px">${escapeHtml(currentDriver.vehicle || 'No vehicle')}</div>
+              <div style="color:#64748b;font-size:10px;margin-top:4px">${formatAge(currentDriver.lastLocationUpdate || currentDriver.lastUpdate)}</div>
             </div>
           `);
           infoWindowRef.current?.open(mapRef.current, marker);
-        });
-
-        markersRef.current.push(marker);
+          });
+          markerRecords.set(markerKey, record);
+        }
+        record.driver = driver;
+        record.marker.setPosition(point);
+        record.marker.setTitle(driver.name || 'Driver');
+        record.marker.setIcon(createMarkerIcon(mapsLib, initial, driver.id === selectedDriverId ? '#3B82F6' : baseColor, driver.id === selectedDriverId, isPulsing));
+        record.marker.setZIndex(driver.id === selectedDriverId ? 100 : 10);
+        record.marker.setMap(showClusters ? null : mapRef.current);
       } catch (err) {
         console.error('[LiveMap] Error creating marker for', driver.name, err);
       }
     });
 
+    markerRecords.forEach((record, markerKey) => {
+      if (activeMarkerKeys.has(markerKey)) return;
+      record.marker.setMap(null);
+      markerRecords.delete(markerKey);
+    });
+    const currentMarkers = [...markerRecords.values()].map((record) => record.marker);
+
     if (showClusters) {
       if (!clustererRef.current) {
-        clustererRef.current = new MarkerClusterer({ map: mapRef.current, markers: markersRef.current });
+        clustererRef.current = new MarkerClusterer({ map: mapRef.current, markers: currentMarkers });
       } else {
         clustererRef.current.clearMarkers();
-        clustererRef.current.addMarkers(markersRef.current);
+        clustererRef.current.addMarkers(currentMarkers);
       }
     } else if (clustererRef.current) {
       clustererRef.current.clearMarkers();
@@ -612,9 +640,19 @@ const LiveMapPage = ({
   // Resize handler
   useEffect(() => {
     if (!mapRef.current) return;
-    const handler = () => { if (mapRef.current && window.google?.maps) window.google.maps.event.trigger(mapRef.current, 'resize'); };
+    const handler = () => {
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        if (mapRef.current && window.google?.maps) window.google.maps.event.trigger(mapRef.current, 'resize');
+      });
+    };
     window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    return () => {
+      window.removeEventListener('resize', handler);
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = null;
+    };
   }, [mapReady]);
 
   const startMyGpsTracking = () => {
@@ -674,7 +712,7 @@ const LiveMapPage = ({
   };
 
   return (
-    <div className="h-full w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit">
+    <div className="h-full w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit max-md:[&_button]:min-h-11">
       {/* ===== HUD BAR (36px) ===== */}
       <header className="shrink-0 min-h-10 bg-white border-b border-slate-200 shadow-sm flex flex-wrap items-center gap-2 px-3 py-2 z-30 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-0">
         <div className="hidden items-center gap-2 md:flex">
@@ -737,7 +775,15 @@ const LiveMapPage = ({
         {/* ===== MAP AREA ===== */}
         <div className="flex-1 relative overflow-hidden bg-slate-100">
           {/* Interactive map container */}
-          <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+          <div
+            ref={mapContainerRef}
+            data-live-map="fleet"
+            data-map-ready={mapReady ? 'true' : 'false'}
+            className={`absolute inset-0 w-full h-full ${mapsLoadError ? 'invisible' : ''}`}
+            role="region"
+            aria-label="Live fleet map"
+            aria-hidden={mapsLoadError ? 'true' : undefined}
+          />
 
           {/* Maps loading / error overlay */}
           {!mapsLoadError && !mapReady && (
@@ -751,24 +797,24 @@ const LiveMapPage = ({
           {mapsLoadError && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
               <div className="text-center bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
-                <Map size={48} className="mx-auto text-rose-500 mb-4" />
+                <MapIcon size={48} className="mx-auto text-rose-500 mb-4" />
                 <h3 className="text-xl font-black text-slate-900">Fleet Command Center</h3>
                 <p className="mt-2 max-w-md text-sm font-medium text-slate-500">
-                  {hasGoogleMapsConfigured() ? 'Could not load Google Maps. Check API key.' : 'Configure Google Maps API key to enable the map.'}
+                  {hasGoogleMapsConfigured() ? 'Google Maps is unavailable for this site. Verify API key restrictions and Maps access.' : 'Configure Google Maps API key to enable the map.'}
                 </p>
               </div>
             </div>
           )}
           
           {/* Map Overlays */}
-          <div className="absolute left-3 right-3 top-3 flex flex-wrap gap-2 z-20 md:left-4 md:right-auto md:top-4">
+          {!mapsLoadError && <div className="absolute left-3 right-3 top-3 flex flex-wrap gap-2 z-20 md:left-4 md:right-auto md:top-4">
             <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md backdrop-blur-md border ${showTraffic ? 'bg-amber-500/90 text-white border-amber-400' : 'bg-white/90 text-slate-700 border-slate-200/50 hover:bg-white'}`}>
               🚦 Live Traffic
             </button>
             <button type="button" onClick={() => setShowClusters(c => !c)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md backdrop-blur-md border ${showClusters ? 'bg-indigo-500/90 text-white border-indigo-400' : 'bg-white/90 text-slate-700 border-slate-200/50 hover:bg-white'}`}>
               🌐 Clustering
             </button>
-          </div>
+          </div>}
 
           {/* Street View Split Panel */}
           {streetViewLoc && (
@@ -788,7 +834,7 @@ const LiveMapPage = ({
               onClick={() => setShowTrail(p => !p)}
               className={`absolute right-4 bottom-8 z-20 flex items-center gap-1.5 h-9 px-4 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200 text-xs font-bold shadow-lg transition-colors hover:bg-white ${showTrail ? 'text-blue-600' : 'text-slate-500'}`}
             >
-              {trailLoading ? <Loader2 size={14} className="animate-spin" /> : <Map size={14} />}
+                {trailLoading ? <Loader2 size={14} className="animate-spin" /> : <MapIcon size={14} />}
               {showTrail ? `${driverTrailPoints.length} trail` : 'Show Trail'}
             </button>
           )}

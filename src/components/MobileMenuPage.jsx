@@ -1,5 +1,43 @@
 import React from 'react';
-import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Shield, Truck, MapPin, Activity, CreditCard, RefreshCw } from 'lucide-react';
+import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Shield, Truck, MapPin, Activity, CreditCard, RefreshCw, Zap } from 'lucide-react';
+
+const SHARED_MENU_SECTIONS = [
+  {
+    title: 'Workspace',
+    items: [
+      { id: 'tools', icon: Zap, label: 'Dispatch Tools', desc: 'Optimize routes and driver work', color: 'text-blue-700', bg: 'bg-blue-50' },
+      { id: 'fleet', icon: Truck, label: 'Fleet & Drivers', desc: 'Vehicles, schedules, assignments', color: 'text-blue-600', bg: 'bg-blue-50' },
+      { id: 'payroll', icon: CreditCard, label: 'Payroll', desc: 'Earnings & approvals', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    ],
+  },
+  {
+    title: 'Data & Records',
+    items: [
+      { id: 'map', icon: MapPin, label: 'Live Map', desc: 'Fleet location and route view', color: 'text-sky-600', bg: 'bg-sky-50' },
+      { id: 'reports', icon: FileText, label: 'Reports & Export', desc: 'Trip logs and manifests', color: 'text-amber-600', bg: 'bg-amber-50' },
+      { id: 'archives', icon: Clock, label: 'Archives', desc: 'Past transportation records', color: 'text-rose-600', bg: 'bg-rose-50' },
+      { id: 'activity', icon: Activity, label: 'Activity Log', desc: 'Audit trail and time records', color: 'text-violet-600', bg: 'bg-violet-50' },
+    ],
+  },
+  {
+    title: 'Preferences',
+    items: [
+      { id: 'settings', icon: Settings, label: 'App Settings', desc: 'Navigation, display and notifications', color: 'text-slate-600', bg: 'bg-slate-100' },
+    ],
+  },
+];
+
+export const DISPATCH_MENU_SECTIONS = Object.freeze(SHARED_MENU_SECTIONS);
+export const ADMIN_MENU_SECTIONS = Object.freeze([
+  {
+    title: 'Organization',
+    items: [
+      { id: 'admin', icon: Users, label: 'People & Access', desc: 'Roles, users and account controls', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+      { id: 'welltrans', icon: RefreshCw, label: 'WellTrans Review', desc: 'Broker review and reconciliation', color: 'text-cyan-700', bg: 'bg-cyan-50' },
+    ],
+  },
+  ...SHARED_MENU_SECTIONS,
+]);
 
 const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
   const getInitials = (email) => {
@@ -7,32 +45,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
     return email.split('@')[0].slice(0, 2).toUpperCase();
   };
 
-  const SECTIONS = [
-    {
-      title: "Organization",
-      items: [
-        { id: 'admin', icon: Users, label: 'User Management', desc: 'Dispatchers & Admins', color: 'text-indigo-600', bg: 'bg-indigo-50', adminOnly: true },
-        { id: 'welltrans', icon: RefreshCw, label: 'WellTrans Sync', desc: 'Broker automation center', color: 'text-cyan-700', bg: 'bg-cyan-50', adminOnly: true },
-        { id: 'fleet', icon: Truck, label: 'Fleet & Drivers', desc: 'Vehicles, schedules, assignments', color: 'text-blue-600', bg: 'bg-blue-50' },
-        { id: 'payroll', icon: CreditCard, label: 'Payroll', desc: 'Earnings & approvals', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-      ]
-    },
-    {
-      title: "Data & Records",
-      items: [
-        { id: 'map', icon: MapPin, label: 'Live Map', desc: 'Fleet location and route view', color: 'text-sky-600', bg: 'bg-sky-50' },
-        { id: 'reports', icon: FileText, label: 'Reports & Export', desc: 'Trip logs and manifests', color: 'text-amber-600', bg: 'bg-amber-50' },
-        { id: 'archives', icon: Clock, label: 'Archives', desc: 'Past records', color: 'text-rose-600', bg: 'bg-rose-50' },
-        { id: 'activity', icon: Activity, label: 'Activity Log', desc: 'Audit trail & changes', color: 'text-violet-600', bg: 'bg-violet-50' },
-      ]
-    },
-    {
-      title: "Preferences",
-      items: [
-        { id: 'settings', icon: Settings, label: 'App Settings', desc: 'Theme & notifications', color: 'text-slate-600', bg: 'bg-slate-100' },
-      ]
-    }
-  ];
+  const sections = role === 'admin' ? ADMIN_MENU_SECTIONS : DISPATCH_MENU_SECTIONS;
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto overscroll-contain bg-slate-50 pb-24 [content-visibility:auto]">
@@ -57,20 +70,16 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
 
       {/* Menu Links */}
       <div className="space-y-5 px-3 py-5">
-        {SECTIONS.map((section, idx) => {
-          const visibleItems = section.items.filter((item) => role === 'admin' || !item.adminOnly);
-          if (visibleItems.length === 0) return null;
-
-          return (
+        {sections.map((section, idx) => (
             <section key={idx} className="space-y-2" aria-labelledby={`mobile-menu-section-${idx}`}>
               <h3 id={`mobile-menu-section-${idx}`} className="px-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{section.title}</h3>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                {visibleItems.map((item, i) => (
+                {section.items.map((item, i) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setSubView(item.id)}
-                    className={`flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 active:bg-slate-100 ${i !== visibleItems.length - 1 ? 'border-b border-slate-100' : ''}`}
+                    className={`flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 active:bg-slate-100 ${i !== section.items.length - 1 ? 'border-b border-slate-100' : ''}`}
                   >
                     <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${item.bg}`}>
                       <item.icon size={19} className={item.color} aria-hidden="true" />
@@ -84,8 +93,7 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
                 ))}
               </div>
             </section>
-          );
-        })}
+        ))}
       </div>
 
       {/* Logout */}
@@ -103,4 +111,4 @@ const MobileMenuPage = ({ currentUser, role, onLogout, setSubView }) => {
   );
 };
 
-export default MobileMenuPage;
+export default React.memo(MobileMenuPage);
