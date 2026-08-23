@@ -153,6 +153,83 @@
   --admin-hover-mid: rgba(15, 23, 42, 0.06);
 }
 
+/* ===================================================================
+   MOTION SYSTEM (Agape Prime) — durations, easings, keyframes.
+   Transform/opacity only; never animate layout properties.
+   =================================================================== */
+:root {
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 340ms;
+  --dur-sheet: 420ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Elevation ladder (light theme) */
+  --elev-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --elev-2: 0 2px 6px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --elev-3: 0 4px 12px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.08);
+  --elev-4: 0 8px 20px rgba(15, 23, 42, 0.08), 0 28px 64px rgba(15, 23, 42, 0.12);
+
+  /* Refined enterprise brand accents */
+  --brand-navy: #0F1E3D;
+  --brand-navy-soft: #16294f;
+  --gradient-hero: linear-gradient(135deg, var(--brand-navy) 0%, #1D3A8A 55%, #2563EB 100%);
+  --gradient-accent: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
+}
+
+@keyframes agape-fade-up {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes agape-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes agape-sheet-in {
+  from { opacity: 0; transform: translate3d(0, 48px, 0) scale(0.98); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes agape-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes agape-pop {
+  0% { transform: scale(0.92); opacity: 0.6; }
+  60% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.anim-fade-up {
+  animation: agape-fade-up var(--dur-slow) var(--ease-out-expo) both;
+}
+.anim-fade-in {
+  animation: agape-fade-in var(--dur-base) var(--ease-standard) both;
+}
+.anim-pop {
+  animation: agape-pop var(--dur-base) var(--ease-spring) both;
+}
+/* Staggered list entrance: apply to the parent, children animate in order. */
+.agape-stagger > * {
+  animation: agape-fade-up var(--dur-slow) var(--ease-out-expo) both;
+}
+.agape-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.agape-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.agape-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.agape-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.agape-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.agape-stagger > *:nth-child(6) { animation-delay: 150ms; }
+.agape-stagger > *:nth-child(7) { animation-delay: 180ms; }
+.agape-stagger > *:nth-child(n+8) { animation-delay: 210ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-in, .anim-pop, .agape-stagger > * {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* ===== DARK THEME (Ultra-Modern Space) ===== */
 [data-theme="dark"] {
   --bg-app: #050505;
@@ -1419,6 +1496,24 @@ input,
 select,
 textarea {
   text-wrap: pretty;
+}
+
+/* Agape Prime: skeleton shimmer */
+.ui-skeleton {
+  background: linear-gradient(
+    100deg,
+    #eef2f7 40%,
+    #f8fafc 50%,
+    #eef2f7 60%
+  );
+  background-size: 200% 100%;
+  animation: agape-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton {
+    animation-duration: 1ms;
+  }
 }
 
 .ui-page {
