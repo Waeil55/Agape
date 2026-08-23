@@ -2,7 +2,7 @@
   "appId": "com.agapecare.fleet",
   "appName": "Agape Care",
   "webDir": "dist",
-  "backgroundColor": "#3468E8",
+  "backgroundColor": "#1F3B70",
   "server": {
     "androidScheme": "https"
   },

@@ -64,7 +64,7 @@ export default function DriverAvatar({ driver, size = 'md', showUpload = false, 
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#3468E8] text-white rounded-full flex items-center justify-center shadow-md hover:bg-[#2858C7] transition-colors cursor-pointer"
+            className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1F3B70] text-white rounded-full flex items-center justify-center shadow-md hover:bg-[#162C56] transition-colors cursor-pointer"
           >
             {uploading ? <Loader2 size={10} className="animate-spin" /> : <Camera size={10} />}
           </button>
