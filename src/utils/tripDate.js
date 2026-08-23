@@ -53,10 +53,21 @@ export function tripCalendarDateKey(value) {
 
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) {
-    return `${iso[1]}-${String(iso[2]).padStart(2, '0')}-${String(iso[3]).padStart(2, '0')}`;
+    const rest = s.slice(iso[0].length);
+    if (!/[T\s]/.test(rest)) {
+      // Pure calendar date (no time component): already a local service date.
+      return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+    }
+    // Timestamped instant: convert to the LOCAL calendar day. Slicing the
+    // UTC date part made evening completions (after 20:00 EDT / midnight UTC)
+    // land on "tomorrow" and vanish from date-bounded views like History.
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      return localYmd(d);
+    }
   }
 
-  const us = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  const us = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
   if (us) {
     const year = us[3].length === 2 ? `20${us[3]}` : us[3];
     return `${year}-${String(us[1]).padStart(2, '0')}-${String(us[2]).padStart(2, '0')}`;
