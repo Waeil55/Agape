@@ -600,9 +600,16 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         await deleteDocsById(DISPATCHER_PROFILE_COLLECTION, removedIds);
       } else if (field === 'vehicles') {
         const now = new Date().toISOString();
-        const docs = (dataRef.current.vehicles || []).filter((v) => v?.id).map((v) => ({
-          id: String(v.id), data: sanitizeForFirestore(attachTenantScope({ ...v, updatedAtLocal: v.updatedAtLocal || now }, activeTenantId)),
-        }));
+        // Odometer fields are owned by the dedicated monotonic writer
+        // (syncVehicleOdometerFromTrip). Stripping them from generic list
+        // saves prevents a stale device snapshot from erasing a newer
+        // reading written by another driver or device.
+        const ODOMETER_OWNED_FIELDS = ['odometer', 'odometerUpdatedAt', 'odometerSourceTripId'];
+        const docs = (dataRef.current.vehicles || []).filter((v) => v?.id).map((v) => {
+          const payload = { ...v, updatedAtLocal: v.updatedAtLocal || now };
+          ODOMETER_OWNED_FIELDS.forEach((key) => { delete payload[key]; });
+          return { id: String(v.id), data: sanitizeForFirestore(attachTenantScope(payload, activeTenantId)) };
+        });
         for (let i = 0; i < docs.length; i += 450) {
           const batch = writeBatch(db);
           docs.slice(i, i + 450).forEach(({ id, data }) => {

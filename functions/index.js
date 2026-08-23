@@ -277,9 +277,64 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
       }
     }
 
-    const odometer = maintenanceNumber(vehicle.odometer);
+    // Resolve the authoritative current odometer. The vehicle record wins;
+    // when it carries no usable reading, a driver-supplied reading may be
+    // accepted ONLY when it is verbatim present on a trip that provably
+    // belongs to this vehicle — never guessed, averaged, or invented.
+    let odometer = maintenanceNumber(vehicle.odometer);
+    let odometerEvidenceFields = null;
+    if (odometer === null) {
+      const claimedReading = maintenanceNumber(data?.odometer);
+      const evidenceTripId = String(data?.sourceTripId || "").trim();
+      if (claimedReading !== null && claimedReading > 0 && claimedReading <= 10000000 && evidenceTripId) {
+        const evidenceSnapshot = await transaction.get(db.doc(`trips/${evidenceTripId}`));
+        if (!evidenceSnapshot.exists) {
+          throw new functions.https.HttpsError("failed-precondition", "The cited mileage evidence no longer exists. Refresh and try again.");
+        }
+        const evidence = evidenceSnapshot.data() || {};
+        const evidenceVehicleIds = [evidence.vehicleId, evidence.completedVehicleId, evidence.assignedVehicleId]
+          .map((value) => String(value || "").trim());
+        const evidenceVehicleNames = [evidence.completedVehicle, evidence.vehicle, evidence.vehicleName]
+          .map((value) => String(value || "").trim().toLowerCase());
+        const vehicleNameLower = String(vehicle.name || "").trim().toLowerCase();
+        const evidenceBelongsToVehicle = evidenceVehicleIds.includes(vehicleId)
+          || (vehicleNameLower && evidenceVehicleNames.includes(vehicleNameLower));
+        if (!evidenceBelongsToVehicle) {
+          throw new functions.https.HttpsError("failed-precondition", "The mileage evidence does not belong to this vehicle.");
+        }
+        const evidenceReadings = [
+          evidence.dropoffOdometer,
+          evidence.endOdometer,
+          evidence.endMileage,
+          evidence.odometer,
+          evidence.pickupOdometer,
+        ].map(maintenanceNumber);
+        const verifiedReading = evidenceReadings.find(
+          (reading) => reading !== null && reading > 0 && reading <= 10000000 && reading === claimedReading,
+        );
+        if (verifiedReading === undefined) {
+          throw new functions.https.HttpsError("failed-precondition", "The submitted mileage could not be verified against the cited trip record.");
+        }
+        const priorCycleStart = maintenanceNumber(vehicle.lastOilChangeOdometer);
+        if (priorCycleStart !== null && verifiedReading < priorCycleStart) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            `The verified mileage (${verifiedReading}) is below the last oil cycle start (${priorCycleStart}). Correct the trip readings first.`,
+          );
+        }
+        odometer = verifiedReading;
+        odometerEvidenceFields = {
+          odometer,
+          odometerUpdatedAt: nowIso,
+          odometerSourceTripId: evidenceTripId,
+        };
+      }
+    }
     if (odometer === null || odometer > 10000000) {
-      throw new functions.https.HttpsError("failed-precondition", "The vehicle odometer is unavailable or invalid.");
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "No verified mileage is on file for this vehicle yet. Complete a trip with odometer readings first, or ask dispatch to set the vehicle's current mileage.",
+      );
     }
 
     const maintenanceRecord = {
@@ -297,6 +352,7 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
       maintenanceHistory: history,
       updatedAt: nowIso,
       updatedAtServer: now,
+      ...(odometerEvidenceFields || {}),
     };
     if (maintenanceType === "oil") {
       vehicleUpdate.lastOilChangeOdometer = odometer;
@@ -335,6 +391,22 @@ exports.recordDriverVehicleMaintenance = functions.https.onCall(async (data, con
       message: error?.message || String(error),
       stack: String(error?.stack || "").slice(0, 4000),
     });
+    // Durable diagnostics: Cloud Functions log access has been unreliable for
+    // this project, so persist the failure where the ops console can read it.
+    try {
+      await admin.firestore().collection("system_error_logs").add({
+        route: "recordDriverVehicleMaintenance",
+        requestId,
+        code: String(error?.code || "unknown"),
+        message: String(error?.message || "").slice(0, 1000),
+        actorUid: context.auth?.uid || null,
+        vehicleId: String(data?.vehicleId || ""),
+        maintenanceType: String(data?.type || ""),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (_diagnosticWriteError) {
+      // Diagnostics must never mask or replace the original failure.
+    }
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError(
       "internal",

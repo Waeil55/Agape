@@ -39,18 +39,23 @@ const appCheck = (() => {
 })();
 let db;
 try {
+  // Persistent local cache: the app opens instantly from on-device data and
+  // streams live changes in the background, so every device converges on the
+  // same global state fast — including offline starts. Multi-tab manager
+  // keeps the PWA, admin console, and any duplicate tabs consistent.
   db = initializeFirestore(app, {
-    localCache: memoryLocalCache(),
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    experimentalAutoDetectLongPolling: true,
   });
 } catch (err) {
-  console.warn('Memory cache failed, using default Firestore:', err.message);
-  db = getFirestore(app);
+  console.warn('Persistent cache unavailable, using memory cache:', err.message);
+  try {
+    db = initializeFirestore(app, { localCache: memoryLocalCache() });
+  } catch (err2) {
+    console.warn('Memory cache failed, using default Firestore:', err2.message);
+    db = getFirestore(app);
+  }
 }
-
-// If you need offline persistence across page reloads, switch to persistentLocalCache:
-//   initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
-// Note: persistentLocalCache can cause FIRESTORE INTERNAL ASSERTION FAILED errors
-// with many onSnapshot listeners (targetId > 1000). memoryLocalCache avoids this entirely.
 
 let auth;
 try {

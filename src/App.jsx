@@ -1744,25 +1744,67 @@ const App = () => {
   // Publishes a verified odometer reading to the vehicle record so the value
   // is global for that vehicle across every driver and device. The update is
   // monotonic (never lowers a reading) and keeps an audit trail of which trip
-  // produced it.
+  // produced it. The Firestore write is dedicated (merge of only these three
+  // fields) so a concurrent full-list vehicle save on another device can
+  // never erase a newer reading with its older copy.
   const syncVehicleOdometerFromTrip = (tripLike, odometerValue, eventAtIso) => {
     const reading = Number(String(odometerValue ?? '').replace(/,/g, ''));
-    if (!tripLike || !Number.isFinite(reading) || reading <= 0) return;
+    if (!tripLike || !Number.isFinite(reading) || reading <= 0 || reading > 10000000) return;
     const readingDriver = driversRef.current.find(driver => driver.id === tripLike.driverId)
       || driversRef.current.find(driver => normalizeEmail(driver.email) === normalizeEmail(tripLike.driverEmail));
     const tripVehicleName = resolveTripVehicle(tripLike, readingDriver) || '';
-    if (!tripVehicleName) return;
-    setVehicles(prev => prev.map((vehicle) => {
-      const matches = (readingDriver?.vehicleId && vehicle.id === readingDriver.vehicleId)
-        || String(vehicle.name || '').trim().toLowerCase() === String(tripVehicleName).trim().toLowerCase();
-      if (!matches || Number(vehicle.odometer || 0) >= reading) return vehicle;
-      return {
-        ...vehicle,
-        odometer: reading,
-        odometerUpdatedAt: eventAtIso || new Date().toISOString(),
-        odometerSourceTripId: tripLike.id,
-      };
-    })).catch((error) => console.error('Vehicle odometer synchronization failed:', error));
+    const targetKey = String(
+      readingDriver?.vehicleId
+      || tripLike.vehicleId
+      || tripLike.completedVehicleId
+      || tripLike.assignedVehicleId
+      || tripVehicleName
+      || ''
+    ).trim().toLowerCase();
+    if (!targetKey) return;
+
+    const applyLocal = (vehicles) => {
+      let changed = false;
+      const next = vehicles.map((vehicle) => {
+        const matches = targetKey === String(vehicle.id || '').trim().toLowerCase()
+          || targetKey === String(vehicle.name || '').trim().toLowerCase()
+          || (tripVehicleName && String(vehicle.name || '').trim().toLowerCase() === String(tripVehicleName).trim().toLowerCase());
+        if (!matches || Number(String(vehicle.odometer ?? '').replace(/,/g, '') || 0) >= reading) return vehicle;
+        changed = true;
+        return {
+          ...vehicle,
+          odometer: reading,
+          odometerUpdatedAt: eventAtIso || new Date().toISOString(),
+          odometerSourceTripId: tripLike.id,
+        };
+      });
+      return changed ? next : vehicles;
+    };
+
+    // Dedicated monotonic Firestore write — independent of list saves.
+    (async () => {
+      try {
+        const candidates = [doc(db, 'fleetVehicles', targetKey)];
+        if (tripVehicleName) candidates.push(doc(db, 'fleetVehicles', String(tripVehicleName).trim()));
+        for (const ref of candidates) {
+          try {
+            const snap = await getDoc(ref);
+            if (!snap.exists()) continue;
+            const current = Number(String(snap.data()?.odometer ?? '').replace(/,/g, '') || 0);
+            if (current >= reading) return;
+            await setDoc(ref, {
+              odometer: reading,
+              odometerUpdatedAt: eventAtIso || new Date().toISOString(),
+              odometerSourceTripId: String(tripLike.id || ''),
+              updatedAt: new Date().toISOString(),
+            }, { merge: true });
+            return;
+          } catch (err) { console.warn('[odometer-sync] candidate failed:', err?.code, err?.message); }
+        }
+      } catch (err) { console.error('[odometer-sync] failed:', err); }
+    })();
+
+    setVehicles(applyLocal).catch((error) => console.error('Vehicle odometer synchronization failed:', error));
   };
 
   const updateTrip = (tripIdOrObject, partialFields = null) => {

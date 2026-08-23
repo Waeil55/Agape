@@ -679,16 +679,29 @@ const DriverPage = ({ currentUser, role, drivers = [], trips = [], vehicles = []
       setMaintenanceResetting(type);
       try {
         const recordMaintenance = httpsCallable(functions, 'recordDriverVehicleMaintenance');
-        const response = await recordMaintenance({ vehicleId: assignedVehicleRecord.id, type });
+        const payload = { vehicleId: assignedVehicleRecord.id, type };
+        // Attach verifiable mileage evidence: the resolved reading plus the
+        // exact trip it came from, so the server can confirm both instead of
+        // requiring a manually maintained vehicle.odometer field.
+        if (currentVehicleOdometer > 0 && vehicleOdometerState.sourceTripId) {
+          payload.odometer = Math.round(currentVehicleOdometer);
+          payload.sourceTripId = vehicleOdometerState.sourceTripId;
+        }
+        const response = await recordMaintenance(payload);
         if (!response.data?.success) throw new Error('The server did not confirm the maintenance record.');
         onAddAuditLog?.('Driver Vehicle Service Recorded', `${me?.name || currentUser} reset the ${serviceName} for ${assignedVehicleRecord.name} at ${Number(response.data.odometer).toLocaleString()} miles.`, 'emerald', { entity: 'vehicle', id: assignedVehicleRecord.id, maintenanceType: type, odometer: response.data.odometer, source: 'driver-settings' });
         setShowToast({ type: 'success', message: `${type === 'oil' ? 'Oil mileage' : 'Filter'} service cycle saved successfully.` });
+      } catch (error) {
+        const code = String(error?.code || '').replace(/^functions\//, '');
+        const detail = String(error?.message || '').trim() || 'The service record could not be saved. No vehicle data was changed.';
+        console.error('[maintenance-reset]', code, detail);
+        setShowToast({ type: 'error', message: code && !detail.includes(code) ? `${detail} (${code})` : detail });
       } finally {
         setMaintenanceResetting('');
       }
     };
     if (requestAuthAction) requestAuthAction(`Reset ${serviceName} for ${assignedVehicleRecord.name}`, execute);
-  }, [assignedVehicleRecord, currentUser, maintenanceResetting, me?.name, onAddAuditLog, requestAuthAction, vehicleMaintenance]);
+  }, [assignedVehicleRecord, currentUser, currentVehicleOdometer, maintenanceResetting, me?.name, onAddAuditLog, requestAuthAction, vehicleMaintenance, vehicleOdometerState]);
   // Time-tracking reconciliation runs early in this component. Resolve the
   // policy beside the authoritative driver profile so every hook sees an
   // initialized value (and production minification cannot expose a TDZ crash).
