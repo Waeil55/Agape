@@ -615,6 +615,18 @@ const DesktopEnterpriseDashboard = ({
 
         <button
           type="button"
+          onClick={() => setCommandPaletteOpen(true)}
+          className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 text-white transition hover:bg-white/15 shadow-sm"
+          title="Search trips, drivers, vehicles, and commands"
+          aria-label="Search all operational records"
+        >
+          <Search size={16} />
+          <span className="hidden text-xs font-bold lg:inline">Search</span>
+          <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-100 xl:inline">Ctrl K</kbd>
+        </button>
+
+        <button
+          type="button"
           onClick={() => {
             if (showRightPanel && rightPanelTab === 'alerts') {
               setShowRightPanel(false);
