@@ -26,6 +26,11 @@ describe('mobile premium interaction contract', () => {
     expect(driverSource).toContain('aria-current={isActiveTab');
   });
 
+  it('prevents the primary bottom bar from colliding with nested Admin tabs', () => {
+    const enterpriseSource = readComponent('./MobileEnterpriseDashboard.jsx');
+    expect(enterpriseSource).toContain("subView !== 'admin'");
+  });
+
   it('gives the login credential back control an accessible name', () => {
     const appSource = readComponent('../App.jsx');
 

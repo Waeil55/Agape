@@ -538,7 +538,7 @@ const MobileEnterpriseDashboard = (props) => {
   // Show the bottom nav everywhere EXCEPT:
   // 1. When a trip detail overlay is open (full-screen DriverPage)
   // 2. When a chat thread is open inside chat view (thread takes full screen)
-  const showNav = !tripDetails && !isChatThreadOpen;
+  const showNav = !tripDetails && !isChatThreadOpen && subView !== 'admin';
 
 
 
