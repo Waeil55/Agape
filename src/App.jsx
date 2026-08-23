@@ -2718,6 +2718,15 @@ const App = () => {
       <div className="agape-login flex-1 relative overflow-y-auto px-4 py-6" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
         <div className="agape-login-backdrop absolute inset-0" aria-hidden="true" />
         <div className="agape-login-stage relative z-10 mx-auto grid min-h-full w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="agape-login-mobile-intro lg:hidden">
+            <div className="agape-login-live-pill">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+              Live operations network
+            </div>
+            <p className="agape-login-mobile-title">One calm command center.</p>
+            <p className="agape-login-mobile-copy">Secure access for dispatch, fleet and field teams.</p>
+          </div>
+
           <aside className="agape-login-story hidden min-h-[620px] flex-col justify-between rounded-xl border border-white/10 p-10 text-white lg:flex">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]">
@@ -2746,12 +2755,12 @@ const App = () => {
           </aside>
 
           <div className="agape-login-panel w-full max-w-lg justify-self-center overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
-          <div className="flex flex-col items-center mb-6 text-center">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
+          <div className="agape-login-brand flex flex-col items-center mb-6 text-center">
+            <div className="agape-login-logo w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
             </div>
-            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+            <h1 className="agape-login-title text-4xl sm:text-5xl font-semibold tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
+            <div className="agape-login-badge flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
               <ShieldCheck size={14} className="text-blue-600" />
               <p className="text-xs font-semibold text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
             </div>
@@ -2773,14 +2782,14 @@ const App = () => {
                     emerald: 'bg-emerald-600 shadow-emerald-600/20'
                   };
                   return (
-                    <button key={r.key} onClick={() => handleRoleSelect(r.key)} 
+                    <button key={r.key} data-login-role={r.key} onClick={() => handleRoleSelect(r.key)}
                       className="agape-login-role group flex min-h-[76px] items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200 hover:bg-blue-50/40 hover:shadow-md active:scale-[0.98]">
                       <div className={`${colorMap[r.color]} rounded-xl text-white shadow-lg shrink-0 transition-transform group-hover:scale-105 flex items-center justify-center w-12 h-12`}>
                         <Icon size={22} strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
-                        <span className="block text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
-                        <span className="block text-sm font-medium text-slate-500 mt-0.5">{r.sub}</span>
+                        <span className="agape-login-role-title block text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
+                        <span className="agape-login-role-copy block text-sm font-medium text-slate-500 mt-0.5">{r.sub}</span>
                       </div>
                       <ArrowRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
                     </button>

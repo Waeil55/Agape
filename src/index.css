@@ -104,6 +104,11 @@
   --brand-primary-light: #DBEAFE;
   --brand-primary-subtle: #E3EEFF;
   --brand-accent: #3B82F6;
+  --brand-navy: #10234C;
+  --brand-navy-deep: #0B1734;
+  --brand-navy-soft: #193568;
+  --brand-cobalt: #3764E8;
+  --gradient-table-head: linear-gradient(110deg, var(--brand-navy-deep) 0%, var(--brand-navy) 58%, var(--brand-navy-soft) 100%);
 
   /* Status */
   --success: #10B981;
@@ -173,8 +178,8 @@
   --elev-4: 0 8px 20px rgba(15, 23, 42, 0.08), 0 28px 64px rgba(15, 23, 42, 0.12);
 
   /* Refined enterprise brand accents */
-  --brand-navy: #0F1E3D;
-  --brand-navy-soft: #16294f;
+  --brand-navy: #10234C;
+  --brand-navy-soft: #193568;
   --gradient-hero: linear-gradient(135deg, var(--brand-navy) 0%, #1D3A8A 55%, #2563EB 100%);
   --gradient-accent: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
 }
@@ -5785,9 +5790,19 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-table thead {
-  background: #f8fafc;
-  color: #475569;
+table thead,
+table thead[class],
+table thead tr,
+table thead tr[class] {
+  background: var(--gradient-table-head) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 10%);
+}
+
+table thead th,
+table thead th[class],
+table thead th * {
+  color: #ffffff !important;
 }
 
 table tbody tr {
@@ -5897,6 +5912,43 @@ textarea:focus,
   box-shadow: 0 30px 90px rgb(2 6 23 / 34%), 0 2px 12px rgb(2 6 23 / 12%);
 }
 
+.agape-login-mobile-intro {
+  width: min(100%, 30rem);
+  color: #ffffff;
+  text-align: center;
+}
+
+.agape-login-live-pill {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 9%);
+  padding: 0.4rem 0.75rem;
+  color: #dbeafe;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.agape-login-mobile-title {
+  margin-top: 0.75rem;
+  font-size: clamp(1.5rem, 7vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.agape-login-mobile-copy {
+  margin-top: 0.4rem;
+  color: #bfdbfe;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .agape-login-role:hover > :first-child {
   transform: translateY(-1px);
 }
@@ -5904,28 +5956,33 @@ textarea:focus,
 @media (max-width: 1023px) {
   .agape-login {
     justify-content: flex-start;
-    background: #e8f0ff;
+    background: var(--brand-navy-deep);
   }
 
   .agape-login-backdrop {
     background:
-      radial-gradient(circle at 50% -10%, rgb(255 255 255 / 82%), transparent 24rem),
-      linear-gradient(180deg, #dbe7ff 0%, #7ba7f8 130%);
+      radial-gradient(circle at 12% 0%, rgb(96 165 250 / 24%), transparent 20rem),
+      radial-gradient(circle at 100% 100%, rgb(55 100 232 / 30%), transparent 24rem),
+      linear-gradient(155deg, var(--brand-navy-deep) 0%, var(--brand-navy) 60%, #1f4692 145%);
   }
 
   .agape-login-stage {
     display: flex;
+    flex-direction: column;
     min-height: 0;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
+    gap: 1rem;
   }
 
   .agape-login-panel {
     max-width: 30rem;
+    border-color: rgb(255 255 255 / 28%);
+    box-shadow: 0 22px 60px rgb(2 6 23 / 34%), 0 2px 10px rgb(2 6 23 / 16%);
   }
 
   .agape-login-footer {
-    color: #334155;
+    color: #bfdbfe;
   }
 }
 
@@ -5936,17 +5993,99 @@ textarea:focus,
   }
 
   .agape-login-panel {
-    padding: 20px;
+    padding: 18px;
+  }
+
+  .agape-login-brand {
+    margin-bottom: 18px;
+  }
+
+  .agape-login-logo {
+    width: 58px;
+    height: 58px;
+    margin-bottom: 10px;
+  }
+
+  .agape-login-title {
+    margin-bottom: 6px;
+    font-size: 2rem;
+  }
+
+  .agape-login-badge {
+    padding: 0.35rem 0.65rem;
   }
 
   .agape-login-role {
-    min-height: 68px;
-    padding: 12px;
+    min-height: 64px;
+    padding: 10px 12px;
   }
 
   .agape-login-footer {
     display: none;
   }
+}
+
+@media (max-width: 360px) {
+  .agape-login-stage {
+    gap: 0.7rem;
+  }
+
+  .agape-login-mobile-title {
+    margin-top: 0.5rem;
+    font-size: 1.5rem;
+  }
+
+  .agape-login-mobile-copy {
+    display: none;
+  }
+
+  .agape-login-panel {
+    padding: 16px;
+  }
+
+  .agape-login-brand {
+    margin-bottom: 14px;
+  }
+
+  .agape-login-logo {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 6px;
+  }
+
+  .agape-login-title {
+    font-size: 1.75rem;
+  }
+
+  .agape-login-role {
+    min-height: 60px;
+    gap: 0.75rem;
+    padding: 8px 10px;
+  }
+
+  .agape-login-role > :first-child {
+    width: 44px;
+    height: 44px;
+  }
+
+  .agape-login-role-title {
+    font-size: 1rem;
+  }
+
+  .agape-login-role-copy {
+    font-size: 0.75rem;
+  }
+}
+
+.enterprise-topbar,
+.enterprise-mobile-topbar {
+  background:
+    radial-gradient(circle at 18% -80%, rgb(96 165 250 / 22%), transparent 24rem),
+    linear-gradient(100deg, var(--brand-navy-deep) 0%, var(--brand-navy) 62%, var(--brand-navy-soft) 100%) !important;
+}
+
+.enterprise-topbar {
+  box-shadow: 0 8px 28px rgb(2 6 23 / 18%) !important;
 }
 
 /* ===== DRIVER NATIVE WORKSPACES ===== */

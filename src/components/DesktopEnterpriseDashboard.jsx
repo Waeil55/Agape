@@ -519,19 +519,19 @@ const DesktopEnterpriseDashboard = ({
   };
 
   const renderEnterpriseTopBar = () => (
-    <header className="sticky top-0 z-30 hidden h-20 items-center gap-4 border-b border-slate-200/40 bg-white px-6 backdrop-blur-[12px] md:flex shadow-sm">
+    <header className="enterprise-topbar sticky top-0 z-30 hidden h-20 items-center gap-4 border-b border-white/10 bg-[var(--brand-navy)] px-6 text-white md:flex shadow-sm">
       <div className="flex min-w-[200px] items-center gap-3 shrink-0">
         <div className="flex h-11 w-11 items-center justify-center rounded-[1.2rem] border border-slate-200 bg-white shadow-sm p-2">
           <img src="/agape.png" alt="Agape Care" className="h-full w-full object-contain" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-base font-black text-slate-900 leading-none">Agape Care</p>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 mt-1">Enterprise Fleet OS</p>
+          <p className="truncate text-base font-black text-white leading-none">Agape Care</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200 mt-1">Enterprise Fleet OS</p>
         </div>
       </div>
 
       <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar flex justify-center">
-        <div className="flex min-w-max items-center gap-0.5 rounded-full bg-[#e8eff6] p-1 border border-slate-200/20">
+        <div className="flex min-w-max items-center gap-0.5 rounded-full bg-white/10 p-1 border border-white/10">
           {topNavItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -542,8 +542,8 @@ const DesktopEnterpriseDashboard = ({
                 aria-label={item.label}
                 className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
                   item.active
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                    ? 'bg-white text-[var(--brand-navy)] shadow-md'
+                    : 'text-blue-100 hover:text-white hover:bg-white/10'
                 }`}
                 title={item.label}
               >
@@ -594,7 +594,7 @@ const DesktopEnterpriseDashboard = ({
               openRightPanel('alerts');
             }
           }}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-700 shadow-sm"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/15 shadow-sm"
           title="Notifications"
         >
           <Bell size={16} />
@@ -604,14 +604,14 @@ const DesktopEnterpriseDashboard = ({
         <button
           onClick={() => setActivePanel('settings')}
           title={displayLoginId}
-          className="flex h-10 min-w-[108px] items-center gap-2 rounded-full border border-slate-200 bg-white px-2 text-left shadow-sm transition hover:bg-slate-50"
+          className="flex h-10 min-w-[108px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 text-left shadow-sm transition hover:bg-white/15"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold uppercase text-white shadow-sm shrink-0">
             {(currentUser || 'U')[0]}
           </div>
           <div className="min-w-0 pr-1.5">
-            <p className="truncate text-xs font-semibold text-slate-900 leading-none">{displayLoginId || 'Account'}</p>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mt-1">{role}</p>
+            <p className="truncate text-xs font-semibold text-white leading-none">{displayLoginId || 'Account'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-200 mt-1">{role}</p>
           </div>
         </button>
       </div>
@@ -620,7 +620,7 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="bg-blue-600 text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="enterprise-mobile-topbar bg-[var(--brand-navy)] text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
       </div>
