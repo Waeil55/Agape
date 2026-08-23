@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense, Component } from 'react';
 import {
-  Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle, Home
+  Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle, Home, Search
 } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 import { useChat } from '../hooks/useChat';
@@ -35,6 +35,7 @@ const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
+const GlobalEntitySearch = lazy(() => import('./GlobalEntitySearch'));
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center h-32">
@@ -133,6 +134,7 @@ const MobileEnterpriseDashboard = (props) => {
   });
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [toolsDriverId, setToolsDriverId] = useState('');
   const [toolSelectedTrips, setToolSelectedTrips] = useState([]);
   const [toolAiSequence, setToolAiSequence] = useState(null);
@@ -243,6 +245,9 @@ const MobileEnterpriseDashboard = (props) => {
             <p className="text-xs font-medium text-slate-500 truncate">{title}</p>
           </div>
         </div>
+        <button type="button" onClick={() => setGlobalSearchOpen(true)} aria-label="Search all operational records" className="flex min-h-11 min-w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-blue-700 shadow-sm">
+          <Search size={19} />
+        </button>
         {/* Role badge */}
         <div className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
           role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
@@ -634,6 +639,37 @@ const MobileEnterpriseDashboard = (props) => {
       {/* ── BOTTOM NAVIGATION ────────────────────────────────────────── */}
       {showNav && (
         <MobileBottomNavigation currentView={currentView} subView={subView} onNavigate={handleNavClick} />
+      )}
+
+      {globalSearchOpen && (
+        <div className="fixed inset-0 z-[270] flex flex-col bg-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <Suspense fallback={<MobileFallback />}>
+            <GlobalEntitySearch
+              autoFocus
+              trips={trips}
+              trashedTrips={props.trashedTrips || []}
+              drivers={drivers}
+              vehicles={props.vehicles || []}
+              onClose={() => setGlobalSearchOpen(false)}
+              onSelect={(result) => {
+                setGlobalSearchOpen(false);
+                if (result.type === 'trip') {
+                  setCurrentView('trips');
+                  setSubView(null);
+                  setTripDetails(result.record);
+                  setTripWorkflowActive(false);
+                } else if (result.type === 'archive') {
+                  setReportsSection('archive');
+                  setCurrentView('reports');
+                  setSubView(null);
+                } else {
+                  setCurrentView('menu');
+                  setSubView('admin');
+                }
+              }}
+            />
+          </Suspense>
+        </div>
       )}
 
       {showUploadModal && (

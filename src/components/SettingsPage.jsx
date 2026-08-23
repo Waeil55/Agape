@@ -125,10 +125,12 @@ const SettingsPage = ({
   const _updateSettings = onUpdateAppSettings || updateAppSettingsAlias;
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
-  const resolvedInitialSection = ['archives', 'archived'].includes(initialSection) ? 'overview' : initialSection;
+  const personalSectionIds = ['profile', 'appearance', 'accessibility', 'navigation', 'notifications', 'security'];
+  if (role === 'dispatcher') personalSectionIds.unshift('activity');
+  const resolvedInitialSection = personalSectionIds.includes(initialSection) ? initialSection : 'profile';
   const [activeSection, setActiveSection] = useState(() => {
     const stored = localStorage.getItem(`agape_settingsSection_${userKey}`);
-    return resolvedInitialSection || (stored === 'archived' ? 'overview' : stored) || 'overview';
+    return initialSection ? resolvedInitialSection : (personalSectionIds.includes(stored) ? stored : 'profile');
   });
   const [showArchivedTrips, setShowArchivedTrips] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
@@ -185,19 +187,6 @@ const SettingsPage = ({
     } catch (err) { setPwMsg(err.message.replace('Firebase: ', '')); }
   };
 
-  const adminNav = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'users', label: 'User Management', icon: Users },
-    { id: 'activity', label: 'System Activity', icon: Activity },
-    { id: 'health', label: 'System Health', icon: Activity },
-    { id: 'alerts', label: 'Automated Alerts', icon: Bell },
-    { id: 'documents', label: 'Document Expiration', icon: FileText },
-    { id: 'fleet', label: 'Fleet Utilization', icon: Truck },
-    { id: 'permissions', label: 'Roles & Permissions', icon: ShieldCheck },
-    { id: 'system', label: 'System Settings', icon: Settings },
-    { id: 'chat-governance', label: 'Chat Governance', icon: MessageSquare },
-  ];
-
   const personalNav = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -213,8 +202,7 @@ const SettingsPage = ({
   }
 
   const navItems = [
-    ...(role === 'admin' ? [{ group: 'Administration', items: adminNav }] : []),
-    { group: 'Personal', items: personalNav },
+    { group: 'Account & preferences', items: personalNav },
   ];
   const mobileNavItems = navItems.flatMap((group) => group.items);
 

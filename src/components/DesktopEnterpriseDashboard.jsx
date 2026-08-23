@@ -16,6 +16,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 import { tripMatchesSearch } from '../utils/search';
 import { toValidDate } from '../utils/safeDate';
 import { useChat } from '../hooks/useChat';
+import { buildGlobalSearchResults } from './GlobalEntitySearch';
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const OperationsCommandCenter = lazy(() => import('./OperationsCommandCenter'));
 const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
@@ -498,6 +499,32 @@ const DesktopEnterpriseDashboard = ({
   const filteredCommands = useMemo(() => commandQuery
     ? commands.filter(c => c.label.toLowerCase().includes(commandQuery.toLowerCase()))
     : commands, [commands, commandQuery]);
+  const entityResults = useMemo(() => buildGlobalSearchResults({
+    query: commandQuery,
+    trips,
+    trashedTrips,
+    drivers,
+    vehicles,
+    limit: 10,
+  }), [commandQuery, drivers, trashedTrips, trips, vehicles]);
+
+  const openEntityResult = useCallback((result) => {
+    const record = result.record;
+    if (result.type === 'trip') {
+      setActivePanel('operations');
+      setOperationsTab('manifest');
+      setSearchQuery(record.bookingId || record.id || record.patient || '');
+      setTripDetails(record);
+      setShowRightPanel(true);
+      setRightPanelTab('details');
+    } else if (result.type === 'archive') {
+      openReportsWorkspace('archive');
+    } else {
+      setActivePanel('admin');
+    }
+    setCommandPaletteOpen(false);
+    setCommandQuery('');
+  }, [openReportsWorkspace, setSearchQuery]);
 
   const submitAuthAction = async (e) => {
     e.preventDefault();
@@ -1028,7 +1055,22 @@ const DesktopEnterpriseDashboard = ({
               <kbd className="text-xs bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-500">ESC</kbd>
             </div>
           </div>
-          <div className="max-h-72 overflow-y-auto p-1.5">
+          <div className="max-h-[55vh] overflow-y-auto p-1.5">
+            {entityResults.length > 0 && <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Operational records</p>}
+            {entityResults.map((result, idx) => {
+              const record = result.record;
+              const title = result.type === 'driver' ? record.name || record.email : result.type === 'vehicle' ? record.name || record.unitNumber || record.plate || `${record.make || ''} ${record.model || ''}` : record.patient || record.bookingId || record.id;
+              const detail = result.type === 'driver' ? [record.vehicle, record.phone].filter(Boolean).join(' · ') : result.type === 'vehicle' ? [record.plate, record.make, record.model].filter(Boolean).join(' · ') : [record.bookingId || record.id, record.date, record.time, record.status].filter(Boolean).join(' · ');
+              const ResultIcon = result.type === 'driver' ? Users : result.type === 'vehicle' ? CarFront : result.type === 'archive' ? Archive : ClipboardList;
+              return (
+                <button key={`${result.type}-${record.id || record.email || idx}`} onClick={() => openEntityResult(result)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-left transition-colors group">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center"><ResultIcon size={14} /></div>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-900">{title}</span><span className="block truncate text-[11px] font-semibold text-slate-500">{detail}</span></span>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{result.type}</span>
+                </button>
+              );
+            })}
+            {filteredCommands.length > 0 && <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Commands</p>}
             {filteredCommands.map((cmd, idx) => (
               <button
                 key={cmd.id}
@@ -1042,12 +1084,12 @@ const DesktopEnterpriseDashboard = ({
                 <span className="text-xs text-slate-600 font-mono">⌘{idx + 1}</span>
               </button>
             ))}
-            {filteredCommands.length === 0 && (
+            {filteredCommands.length === 0 && entityResults.length === 0 && (
               <div className="px-4 py-6 text-center">
                 <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-2">
                   <Search size={14} className="text-slate-600" />
                 </div>
-                <p className="text-xs text-slate-600">No commands found</p>
+                <p className="text-xs text-slate-600">No commands or records found</p>
               </div>
             )}
           </div>

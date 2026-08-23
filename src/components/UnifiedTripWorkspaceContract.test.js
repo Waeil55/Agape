@@ -52,6 +52,7 @@ describe('unified trip workspace information architecture', () => {
     expect(dashboard).toContain("if (['archives', 'welltrans'].includes(saved)) return 'reports'");
     expect(reports).toContain("if (section === 'archives' || section === 'archived') return 'archive'");
     expect(reports).toContain("if (section === 'welltrans' || section === 'portal-filler') return 'portal'");
-    expect(settings).toContain("stored === 'archived' ? 'overview' : stored");
+    expect(settings).toContain("personalSectionIds.includes(stored) ? stored : 'profile'");
+    expect(settings).not.toContain("{ group: 'Administration', items: adminNav }");
   });
 });

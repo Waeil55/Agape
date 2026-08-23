@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Archive, ClipboardList, Gauge, PanelTopOpen } from 'lucide-react';
+import { Archive, ChevronDown, ClipboardList, Gauge, PanelTopOpen } from 'lucide-react';
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 
 const DesktopReportsPage = lazy(() => import('./DesktopReportsPage'));
@@ -77,11 +77,21 @@ const ReportsPage = (props) => {
     }
     return isMobile ? <MobileReportsPage {...props} /> : <DesktopReportsPage {...props} />;
   };
+  const activeSection = sections.find((item) => item.id === section) || sections[0];
+  const ActiveIcon = activeSection.icon;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Reports workspace">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4" role="tablist" aria-label="Reports and records sections">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+        <label className="relative flex min-h-[64px] items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 sm:hidden">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><ActiveIcon size={18} /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-700">Reports workspace</span><span className="block truncate text-sm font-bold text-slate-950">{activeSection.label}</span><span className="block truncate text-[10px] font-semibold text-slate-600">{activeSection.description}</span></span>
+          <ChevronDown size={17} className="text-blue-700" />
+          <select aria-label="Reports section" value={section} onChange={(event) => setSection(event.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+            {sections.map((item) => <option key={item.id} value={item.id}>{item.label}{Number.isFinite(item.count) ? ` (${item.count})` : ''}</option>)}
+          </select>
+        </label>
+        <div className="hidden gap-2 overflow-x-auto no-scrollbar sm:flex" role="tablist" aria-label="Reports and records sections">
           {sections.map((item) => {
             const Icon = item.icon;
             const active = section === item.id;

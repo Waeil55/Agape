@@ -4,7 +4,7 @@ import {
   UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase,
   MessageCircle, DollarSign, LayoutDashboard, Users, Search,
   RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2,
-  CalendarClock, Wrench,
+  CalendarClock, Wrench, ServerCog,
 } from 'lucide-react';
 import { sendPasswordResetEmail, auth, functions, httpsCallable } from '../config/firebase';
 import AIInsightsBanner from './AIInsightsBanner';
@@ -22,6 +22,7 @@ import TimeTrackingAdmin from './TimeTrackingAdmin';
 import AdminActivityCenter from './admin/AdminActivityCenter';
 import { summarizeFleetMaintenance } from '../utils/fleetMaintenance';
 import { ChatPage } from './chat/ChatPage';
+import SystemControlCenter from './admin/SystemControlCenter';
 import { useChat } from '../hooks/useChat';
 import {
   AdminShell, AdminCard, AdminButton, AdminBadge,
@@ -876,6 +877,13 @@ const DesktopAdminPage = ({
           )}
         >
           <AdminActivityCenter logs={logs} onViewTrip={onViewTrip} />
+        </AdminSectionFrame>
+      ) },
+
+    { id: 'system', title: 'System Control', icon: ServerCog, roles: ['admin'],
+      content: (
+        <AdminSectionFrame eyebrow="Security, compliance & performance" title="System control center">
+          <SystemControlCenter trips={trips} drivers={drivers} vehicles={vehicles} logs={logs} appSettings={appSettings} />
         </AdminSectionFrame>
       ) },
 

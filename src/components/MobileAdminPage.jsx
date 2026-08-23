@@ -2,7 +2,7 @@ import React, { useDeferredValue, useMemo, useState, useRef, useEffect } from 'r
 import {
   Activity, BellRing, Briefcase, CheckCircle2, CircleDot, Clock3, KeyRound,
   LayoutDashboard, Loader2, Mail, Phone, RadioTower, Search, ShieldCheck,
-  TrendingUp, Truck, Users, Wrench,
+  TrendingUp, Truck, Users, Wrench, ServerCog,
 } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
@@ -14,6 +14,7 @@ import {
 import DriversVehiclesPage from './DriversVehiclesPage';
 import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
+import SystemControlCenter from './admin/SystemControlCenter';
 
 export const MOBILE_ADMIN_LIST_PAGE_SIZE = 40;
 
@@ -358,6 +359,7 @@ const MobileAdminPage = ({
     { id: 'fleet', title: 'Maintenance', label: 'Service', icon: Wrench, subtitle: `${vehicles.length} vehicles` },
     { id: 'people', title: 'People', label: 'People', icon: Users, subtitle: `${allUsers.length} profiles` },
     { id: 'activity', title: 'Activity', label: 'Activity', icon: Activity, subtitle: `${logs.length} events` },
+    ...(role === 'admin' ? [{ id: 'system', title: 'System Control', label: 'System', icon: ServerCog, subtitle: 'Health, access, compliance' }] : []),
   ];
 
   const activeSection = sections.find(section => section.id === activeTab) || sections[0];
@@ -489,6 +491,9 @@ const MobileAdminPage = ({
               {logs.length === 0 && <AdminEmpty icon={Activity} title="No activity yet" />}
             </div>
           </AdminCard>
+        )}
+        {activeTab === 'system' && (
+          <SystemControlCenter trips={trips} drivers={drivers} vehicles={vehicles} logs={logs} appSettings={appSettings} />
         )}
       </div>
     </AdminShell>

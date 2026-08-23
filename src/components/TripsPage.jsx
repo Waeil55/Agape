@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation } from 'lucide-react';
+import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { isNativeShell } from '../utils/platform';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
+import TripActionCenter from './trips/TripActionCenter';
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
 
@@ -70,6 +71,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const [renderLimit, setRenderLimit] = useState(150);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [actionTrip, setActionTrip] = useState(null);
 
   const activeFilterCount = [
     sortBy !== 'time',
@@ -448,8 +450,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
               >
                 <Navigation size={14} /> {driver ? 'Drive trip' : 'Assign to drive'}
               </button>
-              <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition" aria-label="Edit"><Edit2 size={14} /></button>
-              <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" aria-label="Delete"><Archive size={14} /></button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setActionTrip(trip); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50" aria-label={`More actions for ${trip.patient || trip.bookingId || 'trip'}`}><MoreHorizontal size={15} /> Actions</button>
             </div>
           </div>
         </div>
@@ -467,6 +468,26 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           </div>
         </div>
       )}
+      <TripActionCenter
+        open={Boolean(actionTrip)}
+        trip={actionTrip}
+        driver={actionTrip ? drivers.find((entry) => entry.id === actionTrip.driverId) : null}
+        role={role}
+        onClose={() => setActionTrip(null)}
+        callbacks={{
+          onDrive: (trip) => {
+            const assigned = drivers.find((entry) => entry.id === trip.driverId);
+            if (assigned) onDriveTrip?.(trip);
+            else { setSelectedTrip(trip); setAssignMode('assign'); setShowAssign(true); }
+          },
+          onAssign: (trip) => { setSelectedTrip(trip); setAssignMode(trip.driverId ? 'reassign' : 'assign'); trip.driverId ? setShowReassignModal(true) : setShowAssign(true); },
+          onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
+          onCall: (trip) => makeCall(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone, trip.patient),
+          onMessage: (trip) => sendSMS(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone, trip.patient),
+          onEdit: openEdit,
+          onArchive: (trip) => onDeleteTrip?.(trip.id),
+        }}
+      />
       {/* HEADER CONTROLS */}
       <div className="card p-4 sm:p-6 space-y-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:hidden">

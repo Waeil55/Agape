@@ -21,6 +21,8 @@ import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
 import { toValidDate } from '../utils/safeDate';
 import { scopeOperationsTripsByDate } from '../utils/portalSelectors';
+import TripActionCenter from './trips/TripActionCenter';
+import { OPERATIONAL_VIEW_PRESETS, getOperationalViewPreset } from '../utils/operationalViews';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -466,6 +468,24 @@ const OperationsCommandCenter = ({
   const actionsMenuRef = useRef(null);
   const [boardActionsMenuTripId, setBoardActionsMenuTripId] = useState(null);
   const boardActionsMenuRef = useRef(null);
+  const [actionCenterTrip, setActionCenterTrip] = useState(null);
+  const [activeSavedView, setActiveSavedView] = useState(() => localStorage.getItem('agape_opsSavedView') || 'all');
+
+  const applySavedView = useCallback((viewId) => {
+    const view = getOperationalViewPreset(viewId);
+    setActiveSavedView(view.id);
+    setOperationsTab('manifest');
+    setFilterStatus(view.status);
+    setFilterUrgency(view.urgency);
+    setDriverFilter(view.driver);
+    setShowOnlyAttention(view.attention);
+    setSortBy(view.sort);
+    setSortDirection('asc');
+    setFilterInOut('all');
+    setServiceFilter('all');
+    setSearchQuery('');
+    localStorage.setItem('agape_opsSavedView', view.id);
+  }, [setOperationsTab, setSearchQuery]);
 
   useEffect(() => {
     if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
@@ -1217,6 +1237,7 @@ const OperationsCommandCenter = ({
             >
               <Navigation size={13} /> {driver ? 'Open Driver Workspace' : 'Assign to Drive'}
             </button>
+            <button type="button" onClick={() => setActionCenterTrip(trip)} className="min-h-8 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100">Actions</button>
             <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="min-h-8 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-100 text-xs">Collapse</button>
           </div>
         </div>
@@ -1345,6 +1366,15 @@ const OperationsCommandCenter = ({
           </button>
         ))}
       </div>
+
+      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+
+      <label className="inline-flex items-center gap-1 shrink-0">
+        <span className="sr-only">Saved operational view</span>
+        <select value={activeSavedView} onChange={(event) => applySavedView(event.target.value)} className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-800 outline-none focus:ring-2 focus:ring-blue-500">
+          {OPERATIONAL_VIEW_PRESETS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
+        </select>
+      </label>
 
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
@@ -2979,6 +3009,23 @@ const OperationsCommandCenter = ({
           onClose={() => setSmsConversationTrip(null)}
         />
       )}
+      <TripActionCenter
+        open={Boolean(actionCenterTrip)}
+        trip={actionCenterTrip}
+        driver={actionCenterTrip ? drivers.find((entry) => entry.id === actionCenterTrip.driverId) : null}
+        role={role}
+        onClose={() => setActionCenterTrip(null)}
+        callbacks={{
+          onView: (trip) => setTripDetails?.(trip),
+          onDrive: (trip) => trip.driverId ? onDriveTrip?.(trip) : setManualAssignTrip(trip),
+          onAssign: (trip) => setManualAssignTrip(trip),
+          onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
+          onCall: (trip) => makeCall?.(getClientPhone(trip), trip.patient),
+          onMessage: (trip) => sendSMS?.(getClientPhone(trip), trip.patient),
+          onEdit: startInlineEdit,
+          onArchive: (trip) => requestDeleteTrip?.(trip.id),
+        }}
+      />
     </div>
   );
 };

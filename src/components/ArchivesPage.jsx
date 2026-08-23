@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Archive, Calendar, RefreshCcw, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Check, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Archive, Calendar, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Check, Edit2, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
+import TripActionCenter from './trips/TripActionCenter';
 
 const today = localCalendarYmd();
 
@@ -128,6 +129,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [activeRow, setActiveRow] = useState(null);
+  const [actionTrip, setActionTrip] = useState(null);
   const inputRef = useRef(null);
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
@@ -423,12 +425,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
           <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'signature' })}</p>
         </div>
       </div>
-      {restoreTrip && (
-        <button onClick={() => restoreTrip(trip.id)}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-200">
-          <RefreshCcw size={12} /> Restore
-        </button>
-      )}
+      <button onClick={() => setActionTrip(trip)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-800 transition-colors hover:bg-blue-100"><MoreHorizontal size={14} /> Trip actions</button>
     </div>
   );
 
@@ -551,12 +548,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
                           <td className="px-3 py-1.5 font-mono text-rose-600">{keyVal('dropoffOdometer')}</td>
                           <td className="px-3 py-1.5 font-mono text-slate-500 text-[11px] uppercase">{keyVal('vehicle')}</td>
                           <td className="px-3 py-1.5 whitespace-nowrap">
-                            {restoreTrip && (
-                              <button onClick={() => restoreTrip(trip.id)}
-                                className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-colors">
-                                <RefreshCcw size={12} /> Restore
-                              </button>
-                            )}
+                            <button onClick={() => setActionTrip(trip)} className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-800 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors"><MoreHorizontal size={12} /> Actions</button>
                           </td>
                         </tr>
                       );
@@ -571,6 +563,18 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
         })
         )}
       </div>
+      <TripActionCenter
+        open={Boolean(actionTrip)}
+        trip={actionTrip}
+        driver={actionTrip ? drivers.find((entry) => entry.id === actionTrip.driverId || entry.email === actionTrip.driverEmail) : null}
+        role={role}
+        onClose={() => setActionTrip(null)}
+        callbacks={{
+          onView: (trip) => setActiveRow(trip.id),
+          onEdit: canEdit ? (trip) => startCellEdit(trip.id, 'patient', trip.patient) : undefined,
+          onRestore: restoreTrip ? (trip) => restoreTrip(trip.id) : undefined,
+        }}
+      />
     </div>
   );
 };
