@@ -34,6 +34,14 @@ const SectionHeader = ({ icon: Icon, title, status }) => (
   </div>
 );
 
+export const formatSystemSyncTime = (value) => {
+  if (!value) return 'Not recorded';
+  const raw = String(value).trim();
+  if (/^\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)$/i.test(raw)) return raw;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not recorded' : parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
 export default function SystemHealthDashboard({ trips = [], drivers = [], logs = [], appSettings = {} }) {
   const todayKey = useMemo(() => localCalendarYmd(), []);
 
@@ -178,7 +186,7 @@ export default function SystemHealthDashboard({ trips = [], drivers = [], logs =
               <span className="text-xs font-semibold text-slate-700">Last Sync</span>
             </div>
             <span className="text-[10px] text-slate-500">
-              {systemStatus.lastSyncTime ? new Date(systemStatus.lastSyncTime).toLocaleTimeString() : 'Never'}
+              {formatSystemSyncTime(systemStatus.lastSyncTime)}
             </span>
           </div>
           <div className="px-4 py-2.5 flex items-center justify-between">
