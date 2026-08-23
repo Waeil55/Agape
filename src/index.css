@@ -71,8 +71,8 @@
 :root,
 [data-theme="light"] {
   /* Prompt palette aliases */
-  --primary: #1F3B70;
-  --primary-hover: #162C56;
+  --primary: #2A52AC;
+  --primary-hover: #1F428F;
   --primary-light: #E7EDFA;
   --background: #F4F7FC;
   --surface: #FFFFFF;
@@ -96,19 +96,19 @@
   --text-secondary: #64748B;
   --text-tertiary: #94A3B8;
   --text-inverse: #FFFFFF;
-  --text-link: #1F3B70;
+  --text-link: #2A52AC;
 
   /* Brand (Agape medical enterprise palette) */
-  --brand-primary: #1F3B70;
-  --brand-primary-hover: #162C56;
+  --brand-primary: #2A52AC;
+  --brand-primary-hover: #1F428F;
   --brand-primary-light: #E7EDFA;
   --brand-primary-subtle: #F3F5FA;
-  --brand-accent: #2B5BB3;
-  --brand-navy: #1F3B70;
-  --brand-navy-deep: #162C56;
-  --brand-navy-soft: #2B5BB3;
-  --brand-blue: #2B5BB3;
-  --gradient-table-head: linear-gradient(110deg, #162C56 0%, var(--brand-primary) 58%, #2B5BB3 100%);
+  --brand-accent: #3969CE;
+  --brand-navy: #2A52AC;
+  --brand-navy-deep: #1F428F;
+  --brand-navy-soft: #3969CE;
+  --brand-blue: #3969CE;
+  --gradient-table-head: linear-gradient(110deg, #1F428F 0%, var(--brand-primary) 58%, #3969CE 100%);
 
   /* Status */
   --success: #10B981;
@@ -120,7 +120,7 @@
   --danger: #EF4444;
   --danger-bg: #FDECEC;
   --danger-border: #F8CACA;
-  --info: #2B5BB3;
+  --info: #3969CE;
   --info-bg: #F3F5FA;
   --info-border: #D8E1F5;
 
@@ -144,7 +144,7 @@
   --glass-blur: 30px;
 
   /* Gradient accents */
-  --gradient-brand: linear-gradient(135deg, #1F3B70 0%, #2B5BB3 100%);
+  --gradient-brand: linear-gradient(135deg, #2A52AC 0%, #3969CE 100%);
   --gradient-success: linear-gradient(135deg, #10B981 0%, #34D399 100%);
   --gradient-warning: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
   --gradient-danger: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
@@ -178,10 +178,10 @@
   --elev-4: 0 8px 20px rgba(15, 23, 42, 0.08), 0 28px 64px rgba(15, 23, 42, 0.12);
 
   /* Refined enterprise brand accents */
-  --brand-navy: #1F3B70;
-  --brand-navy-soft: #2B5BB3;
-  --gradient-hero: linear-gradient(135deg, #162C56 0%, #1F3B70 58%, #2B5BB3 100%);
-  --gradient-accent: linear-gradient(135deg, #1F3B70 0%, #2B5BB3 100%);
+  --brand-navy: #2A52AC;
+  --brand-navy-soft: #3969CE;
+  --gradient-hero: linear-gradient(135deg, #1F428F 0%, #2A52AC 58%, #3969CE 100%);
+  --gradient-accent: linear-gradient(135deg, #2A52AC 0%, #3969CE 100%);
 }
 
 @keyframes agape-fade-up {
@@ -1471,8 +1471,8 @@ table tbody tr:hover {
   --enterprise-surface-hover: #f1f5f9;
   --enterprise-ink: #0f172a;
   --enterprise-muted: #64748b;
-  --enterprise-blue: #1f3b70;
-  --enterprise-blue-strong: #162c56;
+  --enterprise-blue: #2a52ac;
+  --enterprise-blue-strong: #1f428f;
   --enterprise-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.16);
   --enterprise-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
   --enterprise-shell-bg: linear-gradient(180deg, #f7f9fd 0%, #eef4fb 100%);
@@ -2095,7 +2095,7 @@ table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: #1F3B70 !important;
+  background: #2A52AC !important;
 }
 
 table thead th,
@@ -2609,7 +2609,7 @@ html, body {
     --agape-mobile-muted: #64748b;
     --agape-mobile-text: #172033;
     --agape-mobile-border: #e7edf5;
-    --agape-mobile-blue: #1f3b70;
+    --agape-mobile-blue: #2a52ac;
     --agape-mobile-blue-soft: #e7edfa;
     --agape-mobile-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
     --agape-mobile-shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.055);
@@ -5480,7 +5480,7 @@ html, body {
 
 .agape-messenger-row.is-active {
   background: linear-gradient(135deg, #f3f5fa 0%, #ffffff 100%);
-  box-shadow: inset 3px 0 0 #1f3b70;
+  box-shadow: inset 3px 0 0 #2a52ac;
 }
 
 .agape-messenger-row.is-unread:not(.is-active) {
@@ -5589,8 +5589,8 @@ html, body {
   --prime-canvas: #f4f7fb;
   --prime-panel: #ffffff;
   --prime-line: #e2e8f0;
-  --prime-brand: #1f3b70;
-  --prime-brand-strong: #162c56;
+  --prime-brand: #2a52ac;
+  --prime-brand-strong: #1f428f;
   --prime-brand-soft: #f3f5fa;
   --prime-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 14px 38px rgb(15 23 42 / 6%);
   --prime-shadow-raised: 0 8px 20px rgb(15 23 42 / 7%), 0 28px 70px rgb(15 23 42 / 10%);
@@ -5683,8 +5683,8 @@ button:not(:disabled):active,
 .adm-nav-link.is-active {
   border-color: #bfdbfe;
   background: linear-gradient(135deg, #f3f5fa, #ffffff);
-  color: #1f3b70;
-  box-shadow: inset 3px 0 0 #1f3b70;
+  color: #2a52ac;
+  box-shadow: inset 3px 0 0 #2a52ac;
 }
 
 .adm-topbar {
@@ -5729,7 +5729,7 @@ button:not(:disabled):active,
 }
 
 .ui-eyebrow {
-  color: #1f3b70;
+  color: #2a52ac;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -5763,7 +5763,7 @@ button:not(:disabled):active,
 
 .driver-page-header::after {
   height: 1px;
-  background: linear-gradient(90deg, transparent, #8fa6d0 30%, #1f3b70 70%, transparent);
+  background: linear-gradient(90deg, transparent, #9aafe0 30%, #2a52ac 70%, transparent);
   opacity: 0.55;
 }
 
@@ -5811,7 +5811,7 @@ table tbody tr {
 
 table tbody tr[data-agape-selected="true"] {
   background: #f3f5fa;
-  box-shadow: inset 3px 0 0 #1f3b70;
+  box-shadow: inset 3px 0 0 #2a52ac;
 }
 
 input,
@@ -5887,7 +5887,7 @@ textarea:focus,
   background:
     radial-gradient(circle at 14% 12%, rgb(255 255 255 / 13%), transparent 28rem),
     radial-gradient(circle at 92% 88%, rgb(126 162 255 / 20%), transparent 26rem),
-    linear-gradient(145deg, #162C56 0%, #1F3B70 56%, #2B5BB3 135%);
+    linear-gradient(145deg, #1F428F 0%, #2A52AC 56%, #3969CE 135%);
 }
 
 .agape-login-backdrop::before {
@@ -5963,7 +5963,7 @@ textarea:focus,
     background:
       radial-gradient(circle at 12% 0%, rgb(255 255 255 / 13%), transparent 20rem),
       radial-gradient(circle at 100% 100%, rgb(126 162 255 / 24%), transparent 24rem),
-      linear-gradient(155deg, #162C56 0%, var(--brand-primary) 60%, #2B5BB3 135%);
+      linear-gradient(155deg, #1F428F 0%, var(--brand-primary) 60%, #3969CE 135%);
   }
 
   .agape-login-stage {
@@ -6081,7 +6081,7 @@ textarea:focus,
 .enterprise-mobile-topbar {
   background:
     radial-gradient(circle at 18% -80%, rgb(255 255 255 / 17%), transparent 24rem),
-    linear-gradient(100deg, #162C56 0%, var(--brand-primary) 62%, #2B5BB3 100%) !important;
+    linear-gradient(100deg, #1F428F 0%, var(--brand-primary) 62%, #3969CE 100%) !important;
 }
 
 .enterprise-topbar {
@@ -6106,16 +6106,16 @@ textarea:focus,
   background-color: #dce5f8 !important;
 }
 
-.bg-blue-500 { background-color: #2b5bb3 !important; }
-.bg-blue-600 { background-color: #1f3b70 !important; }
-.bg-blue-700 { background-color: #162c56 !important; }
-.bg-blue-800 { background-color: #102142 !important; }
+.bg-blue-500 { background-color: #3969ce !important; }
+.bg-blue-600 { background-color: #2a52ac !important; }
+.bg-blue-700 { background-color: #1f428f !important; }
+.bg-blue-800 { background-color: #18346f !important; }
 
-.text-blue-500 { color: #2b5bb3 !important; }
-.text-blue-600 { color: #1f3b70 !important; }
-.text-blue-700 { color: #162c56 !important; }
+.text-blue-500 { color: #3969ce !important; }
+.text-blue-600 { color: #2a52ac !important; }
+.text-blue-700 { color: #1f428f !important; }
 .text-blue-800,
-.text-blue-900 { color: #102142 !important; }
+.text-blue-900 { color: #18346f !important; }
 
 :root:not([data-theme="dark"]) .border-blue-50,
 [data-theme="light"] .border-blue-50 { border-color: #f0f3f8 !important; }
@@ -6126,13 +6126,13 @@ textarea:focus,
 .border-blue-300 { border-color: #b7c8ee !important; }
 .border-blue-400 { border-color: #8eaaeb !important; }
 .border-blue-500,
-.border-blue-600 { border-color: #1f3b70 !important; }
+.border-blue-600 { border-color: #2a52ac !important; }
 
 .ring-blue-50,
 .ring-blue-100,
-.ring-blue-200 { --tw-ring-color: rgb(31 59 112 / 14%) !important; }
+.ring-blue-200 { --tw-ring-color: rgb(42 82 172 / 14%) !important; }
 .ring-blue-300,
-.ring-blue-600 { --tw-ring-color: rgb(31 59 112 / 28%) !important; }
+.ring-blue-600 { --tw-ring-color: rgb(42 82 172 / 28%) !important; }
 
 /* ===== DRIVER NATIVE WORKSPACES ===== */
 .driver-tools-workspace,

@@ -90,7 +90,7 @@ const LiveRouteMap = ({ ordered = [], driverPosition = null, className = '' }) =
         map: mapRef.current,
         suppressMarkers: false,
         preserveViewport: false,
-        polylineOptions: { strokeColor: '#1F3B70', strokeOpacity: 0.86, strokeWeight: 5 },
+        polylineOptions: { strokeColor: '#2A52AC', strokeOpacity: 0.86, strokeWeight: 5 },
       });
 
       // Observe only startup so we can announce a ready map without leaving it attached.

@@ -8,7 +8,7 @@ export default function Sparkline({
   data = [],
   width = 96,
   height = 32,
-  stroke = 'var(--brand-primary, #1F3B70)',
+  stroke = 'var(--brand-primary, #2A52AC)',
   className = '',
   ariaLabel = 'Trend',
 }) {

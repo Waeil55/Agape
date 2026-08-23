@@ -18,11 +18,11 @@ describe('premium navy visual system contract', () => {
     const dashboard = readSource('./DesktopEnterpriseDashboard.jsx');
     const table = readSource('./ui/AppTable.jsx');
 
-    expect(styles).toContain('--brand-primary: #1F3B70');
-    expect(styles).toContain('linear-gradient(110deg, #162C56');
+    expect(styles).toContain('--brand-primary: #2A52AC');
+    expect(styles).toContain('linear-gradient(110deg, #1F428F');
     expect(styles).toContain('NAVY BRAND HARMONIZATION');
     expect(styles).toContain('background-color: #f3f5fa !important');
-    expect(styles).toContain('.bg-blue-600 { background-color: #1f3b70 !important; }');
+    expect(styles).toContain('.bg-blue-600 { background-color: #2a52ac !important; }');
     expect(dashboard).toContain('bg-[var(--brand-primary)]');
     expect(table).toContain('bg-[var(--brand-primary)]');
   });
@@ -31,8 +31,8 @@ describe('premium navy visual system contract', () => {
     const capacitor = JSON.parse(readSource('../../capacitor.config.json'));
     const manifest = JSON.parse(readSource('../../public/manifest.webmanifest'));
 
-    expect(capacitor.backgroundColor).toBe('#1F3B70');
-    expect(manifest.background_color).toBe('#1F3B70');
-    expect(manifest.theme_color).toBe('#1F3B70');
+    expect(capacitor.backgroundColor).toBe('#2A52AC');
+    expect(manifest.background_color).toBe('#2A52AC');
+    expect(manifest.theme_color).toBe('#2A52AC');
   });
 });

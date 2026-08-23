@@ -549,7 +549,7 @@ const LiveMapPage = ({
       const markerKey = String(driver.id || driver.email || driverIndex);
       activeMarkerKeys.add(markerKey);
       const initial = String(driver?.name || 'D').charAt(0).toUpperCase();
-      const colors = { blue: '#2B5BB3', green: '#22C55E', orange: '#F97316', purple: '#A855F7', red: '#EF4444', yellow: '#EAB308', gray: '#64748B', brown: '#78716C' };
+      const colors = { blue: '#3969CE', green: '#22C55E', orange: '#F97316', purple: '#A855F7', red: '#EF4444', yellow: '#EAB308', gray: '#64748B', brown: '#78716C' };
       const colorIdx = driverIndex % DRIVER_COLORS.length;
       const baseColor = colors[DRIVER_COLORS[colorIdx]] || '#64748B';
       const isPulsing = ACTIVE_STATUSES.has(driver.status) || driver.status === 'Delayed';
@@ -576,7 +576,7 @@ const LiveMapPage = ({
         record.driver = driver;
         record.marker.setPosition(point);
         record.marker.setTitle(driver.name || 'Driver');
-        record.marker.setIcon(createMarkerIcon(mapsLib, initial, driver.id === selectedDriverId ? '#1F3B70' : baseColor, driver.id === selectedDriverId, isPulsing));
+        record.marker.setIcon(createMarkerIcon(mapsLib, initial, driver.id === selectedDriverId ? '#2A52AC' : baseColor, driver.id === selectedDriverId, isPulsing));
         record.marker.setZIndex(driver.id === selectedDriverId ? 100 : 10);
         record.marker.setMap(showClusters ? null : mapRef.current);
       } catch (err) {
