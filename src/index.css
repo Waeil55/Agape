@@ -5949,6 +5949,59 @@ textarea:focus,
   }
 }
 
+/* ===== DRIVER NATIVE WORKSPACES ===== */
+.driver-tools-workspace,
+.driver-settings-workspace {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.agape-messenger-avatar {
+  border-radius: 0.75rem;
+  object-fit: initial;
+}
+
+.agape-chat-sidebar-head {
+  background:
+    radial-gradient(circle at 100% 0%, rgb(37 99 235 / 10%), transparent 46%),
+    #ffffff;
+}
+
+.agape-messenger-row {
+  border: 1px solid transparent;
+}
+
+.agape-messenger-row:hover {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.agape-messenger-row.is-active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  box-shadow: none;
+}
+
+@media (max-width: 767px) {
+  .driver-tools-workspace,
+  .driver-settings-workspace {
+    overscroll-behavior-y: contain;
+  }
+
+  .agape-messenger-sidebar,
+  .agape-messenger-main {
+    background: #f8fafc;
+  }
+
+  .agape-messenger-list {
+    background: #ffffff;
+  }
+
+  .agape-messenger-thread-messages {
+    background: #f8fafc;
+  }
+}
+
 /* ===== FINAL MOBILE RENDER PERFORMANCE POLICY =====
    This must stay last. Mobile GPUs should composite only purposeful motion. */
 @media (pointer: coarse), (max-width: 900px) {

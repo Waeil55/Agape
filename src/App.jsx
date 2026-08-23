@@ -3115,7 +3115,7 @@ const App = () => {
     <>
       <div className="h-full flex-1 flex flex-col bg-[var(--bg-app)] overflow-hidden w-full">
       {/* Connectivity first: pushes content down instead of covering it */}
-      <OfflineIndicator />
+      {role !== 'driver' && <OfflineIndicator />}
       {/* Header removed: DriverPage handles its own UI */}
       {startupIssue && !isLoading && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-amber-800 flex items-center justify-between gap-3">

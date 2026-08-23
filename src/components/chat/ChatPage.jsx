@@ -23,7 +23,45 @@ const formatDisplayName = (user) => {
     .join(' ');
 };
 
-const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
+const CHAT_AVATAR_TONES = [
+  'from-blue-600 to-indigo-600',
+  'from-cyan-600 to-blue-600',
+  'from-emerald-600 to-teal-600',
+  'from-violet-600 to-indigo-600',
+];
+
+const getAvatarInitials = (user) => formatDisplayName(user)
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((word) => word.charAt(0).toUpperCase())
+  .join('') || 'AC';
+
+const getAvatarTone = (user) => {
+  const identity = String(user?.id || user?.email || formatDisplayName(user));
+  const hash = [...identity].reduce((total, character) => total + character.charCodeAt(0), 0);
+  return CHAT_AVATAR_TONES[hash % CHAT_AVATAR_TONES.length];
+};
+
+const ChatAvatar = ({ user, size = 'md', className = '', decorative = false }) => {
+  const sizeClass = size === 'xl' ? 'h-20 w-20 text-xl rounded-xl'
+    : size === 'lg' ? 'h-16 w-16 text-base rounded-xl'
+    : size === 'sm' ? 'h-9 w-9 text-[11px] rounded-xl'
+    : size === 'xs' ? 'h-7 w-7 text-[9px] rounded-lg'
+    : 'agape-messenger-avatar text-xs rounded-xl';
+  return (
+    <span
+      className={`${sizeClass} ${className} inline-flex shrink-0 items-center justify-center bg-gradient-to-br ${getAvatarTone(user)} font-semibold text-white shadow-sm ring-1 ring-white/80`}
+      role={decorative ? undefined : 'img'}
+      aria-label={decorative ? undefined : formatDisplayName(user)}
+      aria-hidden={decorative || undefined}
+    >
+      {getAvatarInitials(user)}
+    </span>
+  );
+};
+
+export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
   const {
     currentUser,
     channels,
@@ -235,18 +273,12 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
     return recordMatchesSearch(u, searchQuery, ['name', 'username', 'email', 'phone']);
   });
 
-  const getAvatarUrl = (user) => {
-    if (!user) return '';
-    const displayName = formatDisplayName(user);
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=0D8ABC&color=fff&size=128&rounded=true&bold=true`;
-  };
-
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          <span className="text-xs font-semibold text-slate-500">Connecting to Team Chat...</span>
+          <span className="text-xs font-semibold text-slate-500">Opening secure messages…</span>
         </div>
       </div>
     );
@@ -254,11 +286,11 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
 
   // Responsive Two-Column Layout (Desktop split, Mobile switch)
   return (
-    <div className="agape-messenger-container h-full flex">
+    <div className="agape-messenger-container flex h-full bg-slate-50">
       {/* Left Column: Chat List (Visible on Desktop always, on Mobile only if no active channel) */}
       <div className={`agape-messenger-sidebar w-full md:w-[340px] xl:w-[380px] flex flex-col h-full border-r border-slate-200 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
-        <div className="agape-chat-sidebar-head px-5 pt-5 pb-3 flex items-center justify-between shrink-0">
+        <div className="agape-chat-sidebar-head flex shrink-0 items-center justify-between px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
           <div className="flex items-center gap-3">
             {onBack && (
               <button
@@ -269,8 +301,8 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
               </button>
             )}
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Team workspace</p>
-              <h1 className="mt-1 text-2xl font-black text-slate-950 leading-none tracking-tight">Messages</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-700">Care team</p>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-950 leading-none tracking-tight">Messages</h1>
               <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{unreadCount > 0 ? `${unreadCount} unread ${unreadCount === 1 ? 'message' : 'messages'}` : 'You’re all caught up'}</p>
             </div>
           </div>
@@ -279,6 +311,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
               onClick={() => setShowNewChatModal(true)}
               className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg shadow-blue-600/15"
               title="Start new chat"
+              aria-label="Start new conversation"
             >
               <Plus size={18} strokeWidth={2.5} />
             </button>
@@ -286,7 +319,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
         </div>
 
         {/* Search Bar */}
-        <div className="agape-messenger-search-bar flex items-center bg-slate-100/80 rounded-xl px-4 py-2.5 mx-4 my-2 shrink-0 border border-slate-200/70">
+        <div className="agape-messenger-search-bar mx-4 my-2 flex min-h-11 shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
           <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
           <input
             type="text"
@@ -296,13 +329,12 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
           />
         </div>
 
-        <div className="agape-chat-filterbar shrink-0 flex items-center gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3">
+        <div className="agape-chat-filterbar flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3" aria-label="Conversation filters">
           {[
             ['all', 'All'],
             ['unread', `Unread${unreadCount ? ` ${unreadCount}` : ''}`],
             ['groups', 'Groups'],
-          ].map(([value, label]) => <button key={value} onClick={() => setConversationFilter(value)} className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${conversationFilter === value ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>)}
-          <button onClick={() => setShowNewChatModal(true)} className="ml-auto whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700">Team directory</button>
+          ].map(([value, label]) => <button key={value} onClick={() => setConversationFilter(value)} aria-pressed={conversationFilter === value} className={`min-h-9 rounded-xl px-3 text-[11px] font-semibold transition ${conversationFilter === value ? 'bg-slate-950 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>)}
         </div>
 
         {/* Channels List */}
@@ -311,14 +343,14 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
             const other = getOtherParticipant(ch);
             if (!other) return null;
             return (
-              <div
+              <button
+                type="button"
                 key={ch.id}
                 onClick={() => setActiveChannelId(ch.id)}
-                className={`agape-messenger-row ${unreadByChannel[ch.id] ? 'is-unread' : ''} flex items-center gap-3 mx-2 my-1 px-3 py-3 cursor-pointer transition rounded-xl ${activeChannelId === ch.id ? 'is-active' : ''}`}
+                className={`agape-messenger-row ${unreadByChannel[ch.id] ? 'is-unread' : ''} mx-2 my-1 flex min-h-[4.5rem] w-[calc(100%_-_1rem)] items-center gap-3 rounded-xl px-3 py-3 text-left transition ${activeChannelId === ch.id ? 'is-active' : ''}`}
               >
                 <div className="agape-messenger-avatar-wrap flex-shrink-0">
-                  <img src={getAvatarUrl(other)} alt={formatDisplayName(other)} className="agape-messenger-avatar" />
-                  <div className="agape-messenger-status-dot" />
+                  <ChatAvatar user={other} />
                 </div>
 
                 <div className="agape-messenger-row-content flex-1 min-w-0">
@@ -331,15 +363,16 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
                     <span className={`truncate ${unreadByChannel[ch.id] ? 'text-slate-900 font-bold' : ''}`}>{ch.lastMessage?.text || 'No messages yet'}</span>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
 
           {filteredChannels.length === 0 && (
-            <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400">
-              <MessageSquare size={36} className="opacity-20 mb-2" />
-              <p className="text-sm font-semibold">No active chats</p>
-              <p className="text-xs mt-1">Tap the "+" button or any active contact to start a conversation.</p>
+            <div className="m-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-slate-500">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><MessageSquare size={23} /></div>
+              <p className="text-sm font-semibold text-slate-800">No conversations yet</p>
+              <p className="mt-1 max-w-[14rem] text-xs leading-5">Start a secure conversation with a dispatcher or care-team member.</p>
+              <button type="button" onClick={() => setShowNewChatModal(true)} className="mt-4 min-h-11 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white">New conversation</button>
             </div>
           )}
         </div>
@@ -361,12 +394,12 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
                 </button>
 
                 <div className="agape-messenger-avatar-wrap">
-                  <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="agape-messenger-avatar" />
-                  <div className="agape-messenger-status-dot" />
+                  <ChatAvatar user={otherContact} />
+                  {isContactOnline && <div className="agape-messenger-status-dot" aria-hidden="true" />}
                 </div>
 
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">{formatDisplayName(otherContact)}</h3>
+                  <h3 className="truncate text-sm font-semibold leading-tight text-slate-950">{formatDisplayName(otherContact)}</h3>
                   <p className={`text-[11px] font-semibold capitalize flex items-center gap-1.5 ${isContactOnline ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-1.5 h-1.5 rounded-full ${isContactOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} /> {presenceLabel} · {otherContact.role || 'Driver'}</p>
                 </div>
               </div>
@@ -393,7 +426,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
 
               {activeChannel.isDraft && messages.length === 0 && !threadQuery && (
                 <div className="m-auto max-w-sm text-center px-6">
-                  <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="w-20 h-20 mx-auto rounded-3xl shadow-xl" />
+                  <ChatAvatar user={otherContact} size="xl" className="mx-auto" />
                   <h4 className="mt-4 text-lg font-black text-slate-950">Start a conversation with {formatDisplayName(otherContact)}</h4>
                   <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">This person will only appear in your chats after you send the first message.</p>
                 </div>
@@ -406,7 +439,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
                 return (
                   <div key={msg.id || index} className={`agape-messenger-bubble-row ${isSent ? 'is-sent' : 'is-received'}`}>
                     {!isSent && isLastInGroup ? (
-                      <img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="agape-messenger-bubble-avatar" />
+                      <ChatAvatar user={otherContact} size="xs" decorative />
                     ) : !isSent ? <span className="w-7 shrink-0" /> : null}
                     <div className={`agape-messenger-bubble-group ${isSent ? 'is-sent' : 'is-received'}`}>
                       <div className="agape-messenger-bubble">
@@ -426,7 +459,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
 
               {visibleMessages.length === 0 && threadQuery && <div className="m-auto text-center"><Search size={28} className="mx-auto text-slate-300" /><p className="mt-2 text-sm font-bold text-slate-500">No matching messages</p></div>}
 
-              {otherTyping && <div className="agape-messenger-bubble-row is-received"><img src={getAvatarUrl(otherContact)} alt="" className="agape-messenger-bubble-avatar" /><div className="agape-messenger-typing" aria-label={`${formatDisplayName(otherContact)} is typing`}><span className="agape-messenger-typing-dot" /><span className="agape-messenger-typing-dot" /><span className="agape-messenger-typing-dot" /></div></div>}
+              {otherTyping && <div className="agape-messenger-bubble-row is-received"><ChatAvatar user={otherContact} size="xs" decorative /><div className="agape-messenger-typing" aria-label={`${formatDisplayName(otherContact)} is typing`}><span className="agape-messenger-typing-dot" /><span className="agape-messenger-typing-dot" /><span className="agape-messenger-typing-dot" /></div></div>}
 
               <div ref={messagesEndRef} />
             </div>
@@ -485,8 +518,8 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
 
       {activeChannel && otherContact && showDetails && (
         <aside className="hidden xl:flex w-[300px] h-full shrink-0 border-l border-slate-200 bg-white flex-col">
-          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Directory</p><h3 className="mt-1 text-sm font-black text-slate-900">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><X size={16} /></button></div>
-          <div className="p-6 text-center border-b border-slate-100"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="w-20 h-20 mx-auto rounded-2xl shadow-lg" /><h4 className="mt-3 text-base font-black text-slate-950">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Available</span></div>
+          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-600">Directory</p><h3 className="mt-1 text-sm font-semibold text-slate-900">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center" aria-label="Close conversation details"><X size={16} /></button></div>
+          <div className="border-b border-slate-100 p-6 text-center"><ChatAvatar user={otherContact} size="xl" className="mx-auto" /><h4 className="mt-3 text-base font-semibold text-slate-950">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${isContactOnline ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}><span className={`h-1.5 w-1.5 rounded-full ${isContactOnline ? 'bg-emerald-500' : 'bg-slate-400'}`} /> {presenceLabel}</span></div>
           <div className="p-4 space-y-2"><button onClick={toggleMute} disabled={activeChannel.isDraft} className="w-full flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-left disabled:opacity-40">{isMuted ? <BellOff size={16} className="text-rose-600" /> : <Bell size={16} className="text-blue-600" />}<div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Notifications</p><p className="text-xs font-bold text-slate-700">{isMuted ? 'Muted' : 'Alerts enabled'}</p></div></button><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Briefcase size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Role</p><p className="text-xs font-bold text-slate-700 capitalize">{otherContact.role || 'Team member'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><Mail size={16} className="text-blue-600" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Email</p><p className="text-xs font-bold text-slate-700 truncate">{otherContact.email || 'Not available'}</p></div></div><div className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"><ShieldCheck size={16} className="text-blue-600" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">Privacy</p><p className="text-xs font-bold text-blue-900">Internal team channel</p></div></div></div>
         </aside>
       )}
@@ -495,8 +528,8 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
         <div className="xl:hidden fixed inset-0 z-[320] bg-black/40 backdrop-blur-sm flex items-end" onClick={() => setShowDetails(false)}>
           <div className="w-full rounded-t-[28px] bg-white p-5 pb-[calc(24px+env(safe-area-inset-bottom,0px))] shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
-            <div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Contact</p><h3 className="mt-1 text-base font-black text-slate-950">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center"><X size={17} /></button></div>
-            <div className="mt-5 flex items-center gap-4 rounded-2xl bg-slate-50 p-4"><img src={getAvatarUrl(otherContact)} alt={formatDisplayName(otherContact)} className="h-16 w-16 rounded-2xl shadow-md" /><div className="min-w-0"><h4 className="text-base font-black text-slate-950 truncate">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Available</span></div></div>
+            <div className="flex items-center justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-600">Contact</p><h3 className="mt-1 text-base font-semibold text-slate-950">Conversation details</h3></div><button onClick={() => setShowDetails(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center" aria-label="Close conversation details"><X size={17} /></button></div>
+            <div className="mt-5 flex items-center gap-4 rounded-xl bg-slate-50 p-4"><ChatAvatar user={otherContact} size="lg" /><div className="min-w-0"><h4 className="truncate text-base font-semibold text-slate-950">{formatDisplayName(otherContact)}</h4><p className="mt-1 text-xs font-semibold text-slate-500 capitalize">{otherContact.role || 'Team member'}</p><span className={`mt-2 inline-flex items-center gap-1.5 text-[10px] font-semibold ${isContactOnline ? 'text-emerald-700' : 'text-slate-500'}`}><span className={`h-1.5 w-1.5 rounded-full ${isContactOnline ? 'bg-emerald-500' : 'bg-slate-400'}`} /> {presenceLabel}</span></div></div>
             <div className="mt-3 grid grid-cols-2 gap-3"><button onClick={() => otherContact.phone && makeCall(otherContact.phone)} disabled={!otherContact.phone} className="h-12 rounded-2xl bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40"><Phone size={16} /> Call</button><a href={otherContact.email ? `mailto:${otherContact.email}` : undefined} className={`h-12 rounded-2xl bg-blue-50 text-blue-700 text-xs font-bold flex items-center justify-center gap-2 ${!otherContact.email ? 'opacity-40 pointer-events-none' : ''}`}><Mail size={16} /> Email</a></div>
           </div>
         </div>
@@ -508,7 +541,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
           <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-sm max-h-[80vh] flex flex-col p-5 shadow-2xl relative animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 shrink-0">
               <h3 className="text-sm font-bold text-slate-900">New Message</h3>
-              <button onClick={() => setShowNewChatModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+              <button onClick={() => setShowNewChatModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200" aria-label="Close new conversation">
                 <X size={16} />
               </button>
             </div>
@@ -531,7 +564,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-2xl text-left transition"
                 >
-                  <img src={getAvatarUrl(u)} alt={formatDisplayName(u)} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                  <ChatAvatar user={u} size="sm" />
                   <div className="min-w-0 flex-1">
                     <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">{formatDisplayName(u)}</h4>
                     <p className="text-[10px] text-slate-500 capitalize">{u.role || 'Driver'}</p>
@@ -550,7 +583,7 @@ const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
           </div>
         </div>
       )}
-      {forwardingMessage && <div className="fixed inset-0 z-[330] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-6" onClick={() => setForwardingMessage(null)}><div className="max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={event => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Forward</p><h3 className="text-base font-black text-slate-950">Choose a conversation</h3></div><button onClick={() => setForwardingMessage(null)} className="h-8 w-8 rounded-full bg-slate-100"><X size={15} className="mx-auto" /></button></div><div className="space-y-2">{channels.filter(channel => channel.id !== activeChannelId).map(channel => { const contact = getOtherParticipant(channel); return <button key={channel.id} onClick={async () => { await forwardMessage(forwardingMessage, channel.id); setForwardingMessage(null); }} className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left hover:border-blue-200 hover:bg-blue-50"><img src={getAvatarUrl(contact)} alt="" className="h-9 w-9 rounded-full" /><span className="text-sm font-bold text-slate-800">{formatDisplayName(contact)}</span></button>; })}</div></div></div>}
+      {forwardingMessage && <div className="fixed inset-0 z-[330] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-6" onClick={() => setForwardingMessage(null)}><div className="max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={event => event.stopPropagation()}><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">Forward</p><h3 className="text-base font-semibold text-slate-950">Choose a conversation</h3></div><button onClick={() => setForwardingMessage(null)} className="h-8 w-8 rounded-full bg-slate-100" aria-label="Close forward dialog"><X size={15} className="mx-auto" /></button></div><div className="space-y-2">{channels.filter(channel => channel.id !== activeChannelId).map(channel => { const contact = getOtherParticipant(channel); return <button key={channel.id} onClick={async () => { await forwardMessage(forwardingMessage, channel.id); setForwardingMessage(null); }} className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left hover:border-blue-200 hover:bg-blue-50"><ChatAvatar user={contact} size="sm" decorative /><span className="text-sm font-bold text-slate-800">{formatDisplayName(contact)}</span></button>; })}</div></div></div>}
     </div>
   );
 };

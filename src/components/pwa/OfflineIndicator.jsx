@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WifiOff, RefreshCw, Check } from 'lucide-react';
 
-const OfflineIndicator = () => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+const OfflineIndicator = ({ compact = false }) => {
+  const [isOnline, setIsOnline] = useState(() => (
+    typeof navigator === 'undefined' ? true : navigator.onLine !== false
+  ));
   const [showBanner, setShowBanner] = useState(false);
-  const [wasOffline, setWasOffline] = useState(false);
+  const [recentlyRestored, setRecentlyRestored] = useState(false);
+  const wasOfflineRef = useRef(!isOnline);
   const hideTimerRef = useRef(null);
 
   useEffect(() => {
@@ -17,19 +20,22 @@ const OfflineIndicator = () => {
 
     const handleOnline = () => {
       setIsOnline(true);
-      if (wasOffline) {
+      if (wasOfflineRef.current) {
+        setRecentlyRestored(true);
         setShowBanner(true);
         clearHideTimer();
         hideTimerRef.current = setTimeout(() => {
           setShowBanner(false);
-          setWasOffline(false);
+          setRecentlyRestored(false);
+          wasOfflineRef.current = false;
         }, 3000);
       }
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      setWasOffline(true);
+      setRecentlyRestored(false);
+      wasOfflineRef.current = true;
       setShowBanner(true);
       clearHideTimer();
     };
@@ -38,7 +44,7 @@ const OfflineIndicator = () => {
     window.addEventListener('offline', handleOffline);
 
     if (!navigator.onLine) {
-      setWasOffline(true);
+      wasOfflineRef.current = true;
       setShowBanner(true);
     }
 
@@ -47,7 +53,23 @@ const OfflineIndicator = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [wasOffline]);
+  }, []);
+
+  if (compact) {
+    const label = !isOnline ? 'Offline' : recentlyRestored ? 'Back online' : 'Online';
+    return (
+      <span
+        className={`inline-flex min-h-5 shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+          isOnline ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+        }`}
+        role="status"
+        aria-live="polite"
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} aria-hidden="true" />
+        {label}
+      </span>
+    );
+  }
 
   if (!showBanner) return null;
 
@@ -55,7 +77,7 @@ const OfflineIndicator = () => {
   // covering the pinned trip header (client name / trip id).
   return (
     <div
-      className="shrink-0 z-[9997]"
+      className="hidden shrink-0 z-[9997] md:block"
       role="status"
       aria-live="polite"
     >

@@ -10,6 +10,7 @@ import { playNotificationSound } from '../utils/notificationSound';
 import { useChat } from '../hooks/useChat';
 const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
 const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
+const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
@@ -54,7 +55,6 @@ import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '.
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
 import { queueSyncOperation } from '../utils/localDB';
-import { buildDriverDailyAnalytics } from '../utils/driverAnalytics';
 import { normalizeTenantId } from '../utils/tenantScope';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
@@ -904,17 +904,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     });
   }, [userKey]);
   const [workNotesOpen, setWorkNotesOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
   const [showTripDetails, setShowTripDetails] = useState(() => {
     if (initialShowDetailsId) {
       return trips.find(t => t.id === initialShowDetailsId) || null;
@@ -962,9 +951,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [sequencerKey, setSequencerKey] = useState(0);
   const [driverPosition, setDriverPosition] = useState(null);
   const [tomorrowExpanded, setTomorrowExpanded] = useState(false);
-  const [analytics, setAnalytics] = useState({ tripsCompleted: 0, totalDistance: 0, totalDriveTime: 0, idleMinutes: 0, drivingPercent: 0, idlePercent: 0, efficiency: 0 });
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
-  const [showAnalytics, setShowAnalytics] = useState(false);
   const [etas, setEtas] = useState({});
   const [backgroundLocation, setBackgroundLocation] = useState(false);
   const [conflicts, setConflicts] = useState([]);
@@ -1584,11 +1571,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       }
     };
   }, [anyTripWindowOpen]);
-
-  // Analytics calculation
-  useEffect(() => {
-    setAnalytics(buildDriverDailyAnalytics(driverScopedTrips, localCalendarYmd()));
-  }, [driverScopedTrips]);
 
   const getTodayStr = () => localCalendarYmd();
 
@@ -3602,7 +3584,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
           }
           setLastOdometer(odo);
-          setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
           if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(() => {}); }
           setExpandedTripId(null);
           setSelectedTrips(prev => prev.filter(id => id !== trip.id));
@@ -3781,7 +3762,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, getTripDropoffLocation(showCompleteModal) || getDriverClockLocation());
     }
     setLastOdometer(odo);
-    setAnalytics(prev => ({ ...prev, tripsCompleted: prev.tripsCompleted + 1 }));
     setShowCompleteModal(null);
     setCompleteOdometer('');
     setCompleteError('');
@@ -4262,28 +4242,28 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         <div
           className="driver-page-header shrink-0 z-30 border-b border-slate-200/70 bg-[var(--bg-app)]/95 backdrop-blur-md"
         >
-          <div className="px-3 py-3 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-              <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
+          <div className="px-3 py-2.5 flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+              <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
-                <p className="text-[15px] font-extrabold text-slate-900 leading-none tracking-tight">Agape Care Driver</p>
+                <p className="truncate text-[15px] font-semibold text-slate-950 leading-none tracking-tight">Agape Care</p>
+                <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-blue-700">Driver</span>
               </div>
-              <div className="mt-1 flex items-center gap-1.5">
-                <p className="text-xs font-medium text-slate-500 truncate">{me?.name || currentUser}</p>
-                {!isOnline && (
-                  <span className="shrink-0 px-1.5 py-0.5 rounded bg-rose-100 text-[10px] font-bold uppercase tracking-wider text-rose-700 border border-rose-200">
-                    Offline
-                  </span>
-                )}
+              <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-500">{me?.name || currentUser}</p>
+                <Suspense fallback={null}><OfflineIndicator compact /></Suspense>
+                <span className={`inline-flex min-h-5 shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${isGpsTracking ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                  <Crosshair size={10} aria-hidden="true" /> {isGpsTracking ? 'GPS active' : 'GPS paused'}
+                </span>
                 <button
                   type="button"
                   onClick={() => setShowDebugPanel(prev => !prev)}
-                  className="text-slate-300 hover:text-slate-500 transition-colors shrink-0"
-                  title="Debug"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  aria-label="Open GPS diagnostics"
                 >
-                  <Crosshair size={11} />
+                  <MoreHorizontal size={12} />
                 </button>
               </div>
             </div>
@@ -4312,7 +4292,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 aria-label="Call Dispatcher"
               >
                 <Phone size={13} />
-                <span className="inline">DISP</span>
+                <span className="hidden sm:inline">DISP</span>
               </button>
               <button
                 type="button"
@@ -4325,7 +4305,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 aria-label="Call Routing"
               >
                 <Phone size={13} />
-                <span className="inline">ROUT</span>
+                <span className="hidden sm:inline">ROUT</span>
               </button>
             </div>
           </div>
@@ -6474,27 +6454,41 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
       {/* ===== SETTINGS PAGE ===== */}
       {activeNav === 'settings' && (
-        <div className="flex-1 overflow-y-auto pb-28 px-3 pt-2">
-          <div className="space-y-4 px-1">
+        <div className="driver-settings-workspace flex-1 overflow-y-auto bg-slate-50 px-3 pb-28 pt-3 sm:px-4 sm:pt-4">
+          <div className="space-y-3">
+            <section className="relative overflow-hidden rounded-xl bg-slate-950 px-4 py-4 text-white shadow-[0_16px_40px_rgba(15,23,42,0.16)]" aria-labelledby="driver-settings-title">
+              <div className="absolute -right-8 -top-12 h-36 w-36 rounded-full bg-blue-500/20" aria-hidden="true" />
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-300">Personal workspace</p>
+                  <h1 id="driver-settings-title" className="mt-1 text-xl font-semibold tracking-tight text-white">Driver settings</h1>
+                  <p className="mt-1 text-xs font-medium text-slate-300">Account, workday, vehicle and app preferences.</p>
+                </div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-blue-200"><Settings size={20} /></div>
+              </div>
+            </section>
+
             {/* Profile Card */}
-            <div className="relative overflow-hidden rounded-xl bg-blue-600 shadow-lg shadow-blue-600/10">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.1),transparent_60%)]" />
+            <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="absolute inset-y-0 left-0 w-1 bg-blue-600" aria-hidden="true" />
               <div className="relative px-5 py-5">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl font-semibold text-white shadow-inner border border-white/10">
+                  <div className="w-16 h-16 rounded-xl bg-blue-600 flex items-center justify-center text-2xl font-semibold text-white shadow-sm">
                     {String(me?.name || '?').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-xl font-semibold text-white truncate">{me?.name}</h2>
-                    <p className="text-sm text-white/70 truncate">{displayLoginId}</p>
-                    <p className="text-xs text-white/50 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
+                    <h2 className="text-xl font-semibold text-slate-950 truncate">{me?.name}</h2>
+                    <p className="text-sm text-slate-500 truncate">{displayLoginId}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{me?.vehicle || 'No vehicle'} • {me?.currentZone || '—'}</p>
                   </div>
                 </div>
               </div>
             </div>
 
+            <div className="px-1 pt-1"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Workday & vehicle</p></div>
+
             {/* Automatic, trip-authoritative timekeeping. Drivers cannot create payroll punches. */}
-            <div className={`rounded-2xl border p-4 shadow-sm ${isPersonalTime ? 'bg-blue-50 border-blue-200' : isClockedIn ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`rounded-xl border p-4 shadow-sm ${isPersonalTime ? 'bg-blue-50 border-blue-200' : isClockedIn ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                   <Clock size={20} />
@@ -6520,66 +6514,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <button type="button" onClick={togglePersonalTime} disabled={!isPersonalTime && hasTripInProgress} className={`mt-3 w-full rounded-xl px-4 py-2.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 ${isPersonalTime ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'border border-blue-200 bg-white text-blue-700 hover:bg-blue-50'}`}>
                   {isPersonalTime ? 'Return to automatic work tracking' : hasTripInProgress ? 'Personal time unavailable during active trip' : 'Start personal time'}
                 </button>
-              )}
-            </div>
-
-            {/* Analytics */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-              <button onClick={() => setShowAnalytics(!showAnalytics)} className="w-full p-4 flex items-center justify-between">
-                <div className="flex min-w-0 items-center gap-3 text-left">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <BarChart3 size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm     font-semibold text-slate-900">Today's Analytics</p>
-                    <p className="text-slate-500 text-xs font-semibold">{analytics.tripsCompleted} trips completed</p>
-                  </div>
-                </div>
-                <ChevronDown size={16} className={`text-slate-300 transition-transform ${showAnalytics ? 'rotate-180' : ''}`} />
-              </button>
-              {showAnalytics && (
-                <div className="px-4 pb-4 pt-0">
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    {[
-                      { label: 'Trips Done', value: analytics.tripsCompleted, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
-                      { label: 'Distance', value: `${analytics.totalDistance.toLocaleString(undefined, { maximumFractionDigits: 1 })} mi`, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                      { label: 'Drive Time', value: formatDuration(analytics.totalDriveTime), icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                      { label: 'Efficiency', value: `${analytics.efficiency}/hr`, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    ].map(stat => {
-                      const Icon = stat.icon;
-                      return (
-                        <div key={stat.label} className={`${stat.bg} min-w-0 rounded-xl p-3 text-center`}>
-                          <Icon size={16} className={`mx-auto mb-1 ${stat.color}`} />
-                          <p className="truncate text-sm font-semibold tabular-nums text-slate-900" title={String(stat.value)}>{stat.value}</p>
-                          <p className="text-micro font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
-                    <p className="text-micro font-semibold uppercase tracking-wide text-slate-500 mb-2">Time Distribution</p>
-                    <div className="space-y-1.5">
-                      <div>
-                        <div className="flex justify-between text-xs text-slate-500 mb-0.5">
-                          <span>Driving</span>
-                          <span>{analytics.drivingPercent}%</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${analytics.drivingPercent}%` }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-xs text-slate-500 mb-0.5">
-                          <span>Idle/Waiting</span>
-                          <span>{analytics.idlePercent}%</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-amber-500 rounded-full" style={{ width: `${analytics.idlePercent}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               )}
             </div>
 
@@ -6939,50 +6873,56 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </div>
             </div>
 
-            {/* Navigation App */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Route size={16} /> Preferred Navigation App</div>
-              <div className="grid grid-cols-1 gap-2">
-                {[
-                  { value: 'google', label: 'Google Maps' },
-                  { value: 'waze', label: 'Waze' },
-                  { value: 'apple', label: 'Apple Maps' },
-                ].map((option) => {
-                  const active = appSettings?.navigationApp === option.value;
-                  return (
-                    <button key={option.value}
-                      onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })}
-                      className={`p-3 rounded-xl border text-left transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
-                    >
-                      <div className="flex items-center gap-2 font-semibold text-sm"><Navigation size={15} /> {option.label}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <div className="px-1 pt-2"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">App preferences</p></div>
 
-            {/* Appearance */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3 text-slate-800 font-semibold"><Sun size={16} /> Theme</div>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { value: 'light', label: 'Light', icon: Sun },
-                  { value: 'dark', label: 'Dark', icon: Moon },
-                ].map((option) => {
-                  const Icon = option.icon;
-                  const active = appSettings?.theme === option.value;
-                  return (
-                    <button key={option.value}
-                      onClick={() => onUpdateAppSettings?.({ theme: option.value })}
-                      className={`p-3 rounded-xl border text-left transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
-                    >
-                      <div className="flex items-center gap-2 font-semibold text-sm"><Icon size={15} /> {option.label}</div>
-                    </button>
-                  );
-                })}
+            {/* Navigation and appearance share one settings surface to avoid duplicated preference cards. */}
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="driver-display-settings-title">
+              <div className="flex items-center gap-3 border-b border-slate-100 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Navigation size={18} /></div>
+                <div>
+                  <h2 id="driver-display-settings-title" className="text-sm font-semibold text-slate-950">Navigation & display</h2>
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">Choose how routes open and how the app feels.</p>
+                </div>
               </div>
-              <div className="mt-3">
-                <div className="flex items-center gap-2 mb-2 text-slate-800 font-semibold"><span className="text-sm">A</span> Font Size</div>
+              <div className="border-b border-slate-100 p-4">
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Preferred navigation</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'google', label: 'Google' },
+                    { value: 'waze', label: 'Waze' },
+                    { value: 'apple', label: 'Apple' },
+                  ].map((option) => {
+                    const active = appSettings?.navigationApp === option.value;
+                    return (
+                      <button key={option.value} type="button" aria-pressed={active}
+                        onClick={() => onUpdateAppSettings?.({ navigationApp: option.value })}
+                        className={`min-h-11 rounded-xl border px-2 text-xs font-semibold transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'light', label: 'Light', icon: Sun },
+                    { value: 'dark', label: 'Dark', icon: Moon },
+                  ].map((option) => {
+                    const Icon = option.icon;
+                    const active = appSettings?.theme === option.value;
+                    return (
+                      <button key={option.value} type="button" aria-pressed={active}
+                        onClick={() => onUpdateAppSettings?.({ theme: option.value })}
+                        className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border text-xs font-semibold transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        <Icon size={15} /> {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Text size</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: 'sm', label: 'Compact' },
@@ -6991,9 +6931,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   ].map((option) => {
                     const active = appSettings?.fontScale === option.value;
                     return (
-                      <button key={option.value}
+                      <button key={option.value} type="button" aria-pressed={active}
                         onClick={() => onUpdateAppSettings?.({ fontScale: option.value })}
-                        className={`p-3 rounded-xl border font-semibold text-sm transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                        className={`min-h-11 rounded-xl border px-2 text-xs font-semibold transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                       >
                         {option.label}
                       </button>
@@ -7001,7 +6941,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   })}
                 </div>
               </div>
-            </div>
+            </section>
+
+            <div className="px-1 pt-2"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Account & access</p></div>
 
             {/* Time Tracking Admin (admin/dispatcher only) */}
             {(role === 'admin' || role === 'dispatcher') && (
@@ -7015,10 +6957,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             )}
 
             {/* Sign Out */}
-              <button onClick={() => onLogout?.()} className="w-full flex items-center justify-between px-4 py-3.5 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:bg-rose-50/50 transition-all">
+              <button onClick={() => onLogout?.()} className="flex min-h-14 w-full items-center justify-between overflow-hidden rounded-xl border border-rose-200 bg-white px-4 py-3.5 shadow-sm hover:bg-rose-50">
               <div className="flex items-center gap-3">
-                <LogOut size={17} className="text-rose-400" />
-                <span className="font-medium text-sm text-rose-600">Sign Out</span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600"><LogOut size={17} /></div>
+                <div className="text-left"><span className="block text-sm font-semibold text-rose-700">Sign out</span><span className="mt-0.5 block text-[10px] font-medium text-slate-500">End this secure session</span></div>
               </div>
               <ChevronRight size={15} className="text-slate-300" />
             </button>

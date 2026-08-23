@@ -583,17 +583,18 @@ const RoutePlanSession = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 transition"
+        className="flex min-h-14 w-full items-center justify-between px-4 py-3.5 text-left hover:bg-slate-50"
+        aria-expanded={expanded}
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center shrink-0">
             <MapIcon size={17} />
           </div>
           <div className="text-left min-w-0">
-            <span className="block text-sm font-semibold text-slate-900">Route Plan</span>
+            <span className="block text-sm font-semibold text-slate-950">Route builder</span>
             <span className="block text-xs font-semibold text-slate-400 truncate">
               {routeValidation.routeStops.length} stops / {routeValidation.tripCount} trips / {isCalculating ? 'calculating' : routeSummary.duration}
             </span>
@@ -725,7 +726,7 @@ const RoutePlanSession = ({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 };
 
@@ -761,7 +762,42 @@ const DriverToolsPage = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto overscroll-contain pb-24 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] px-3 pt-2 space-y-2">
+    <div className="driver-tools-workspace flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50 px-3 pb-24 pt-3 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:px-4 sm:pt-4">
+      <section className="relative overflow-hidden rounded-xl bg-slate-950 px-4 py-4 text-white shadow-[0_16px_40px_rgba(15,23,42,0.16)]" aria-labelledby="driver-route-studio-title">
+        <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-blue-500/20" aria-hidden="true" />
+        <div className="relative">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-300">Driver workspace</p>
+              <h1 id="driver-route-studio-title" className="mt-1 text-xl font-semibold tracking-tight text-white">Route studio</h1>
+              <p className="mt-1 max-w-md text-xs font-medium leading-5 text-slate-300">Build, check and launch today&apos;s route from one focused workspace.</p>
+            </div>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-blue-200">
+              <Route size={21} aria-hidden="true" />
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              ['Active', activeTrips.length],
+              ['Selected', selectedTrips.length],
+              ['GPS', driverPosition?.lat && driverPosition?.lng ? 'Ready' : 'Waiting'],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl border border-white/10 bg-white/[0.07] px-3 py-2.5">
+                <p className="truncate text-sm font-semibold tabular-nums text-white">{value}</p>
+                <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={onOpenSequencer} className="min-h-11 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white active:bg-blue-700">
+              Open full planner
+            </button>
+            <button type="button" onClick={onSelectAllTrips} disabled={activeTrips.length === 0} className="min-h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-bold text-white disabled:opacity-40 active:bg-white/15">
+              {selectedTrips.length === activeTrips.length && activeTrips.length ? 'Clear selection' : 'Select active trips'}
+            </button>
+          </div>
+        </div>
+      </section>
       {isLoading && <div role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">Loading route tools…</div>}
       {readOnly && <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-800">Route tools are read-only in this session.</div>}
       {/* Guided Mode Progress Header */}
@@ -798,7 +834,7 @@ const DriverToolsPage = ({
 
       {/* Conflict Warning */}
       {conflicts.length > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 shadow-sm">
           <div className="flex items-start gap-2">
             <AlertTriangle size={14} className="text-rose-600 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -820,7 +856,7 @@ const DriverToolsPage = ({
 
       {/* Ride-Share Alerts */}
       {aiRideShare.length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 shadow-sm">
           <div className="flex items-start gap-2">
             <Repeat size={14} className="text-emerald-600 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -837,7 +873,7 @@ const DriverToolsPage = ({
 
       {/* AI Optimize Button */}
       {selectedTrips.length >= 1 && (
-        <div className="bg-white rounded-xl border border-blue-100 shadow-sm p-3 flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-white p-3 shadow-sm">
           <span className="text-xs font-semibold text-blue-700">{selectedTrips.length} selected</span>
           <div className="flex gap-2">
             <button onClick={() => onSelectAllTrips()} className="px-3 h-8 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition border border-blue-100 hover:bg-blue-100">
@@ -867,8 +903,8 @@ const DriverToolsPage = ({
 
       {/* Smart Route Panel */}
       {aiSequence && aiSequence.length >= 2 && !guidedMode && (
-        <div className="bg-blue-600 rounded-xl p-[1.5px] shadow-lg shadow-indigo-200/50">
-          <div className="bg-white rounded-xl p-4">
+        <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-[0_10px_30px_rgba(37,99,235,0.08)]">
+          <div>
             <div className="flex items-center gap-2 mb-2">
               <BrainCircuit size={16} className="text-indigo-600" />
               <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Smart Route</span>
@@ -925,7 +961,7 @@ const DriverToolsPage = ({
 
       {/* Route Quick Nav */}
       {activeTrips.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <button
             onClick={() => toggleSection('quicknav')}
             aria-expanded={expandedSection === 'quicknav'}
@@ -984,7 +1020,7 @@ const DriverToolsPage = ({
 
       {/* Trip ETAs */}
       {activeTrips.length > 0 && Object.keys(etas || {}).length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <button
             onClick={() => toggleSection('etas')}
             aria-expanded={expandedSection === 'etas'}
