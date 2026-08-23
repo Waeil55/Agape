@@ -26,6 +26,12 @@ describe('mobile premium interaction contract', () => {
     expect(driverSource).toContain('aria-current={isActiveTab');
   });
 
+  it('gives the login credential back control an accessible name', () => {
+    const appSource = readComponent('../App.jsx');
+
+    expect(appSource).toContain('aria-label="Back to role selection"');
+  });
+
   it('uses truthful install copy and checks safety before every update reload', () => {
     const installSource = readComponent('./pwa/PWAInstallPrompt.jsx');
     const updateSource = readComponent('./pwa/PWAUpdatePrompt.jsx');

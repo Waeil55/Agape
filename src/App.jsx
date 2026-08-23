@@ -2797,7 +2797,7 @@ const App = () => {
                   setPassword('');
                   setLoginError('');
                   setLoginStep('role_selection');
-                }} className="p-2.5 bg-white rounded-xl text-slate-500 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
+                }} aria-label="Back to role selection" className="p-2.5 bg-white rounded-xl text-slate-500 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
                   <p className="text-base font-semibold text-slate-900 capitalize">{pendingRole}</p>
