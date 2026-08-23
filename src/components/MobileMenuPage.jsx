@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Settings, Users, Clock, LogOut, FileText, Shield, Truck, MapPin, Activity, CreditCard, RefreshCw, Zap } from 'lucide-react';
+import { ChevronRight, Settings, Users, LogOut, Shield, Truck, MapPin, Activity, CreditCard, Zap } from 'lucide-react';
 
 const SHARED_MENU_SECTIONS = [
   {
@@ -14,8 +14,6 @@ const SHARED_MENU_SECTIONS = [
     title: 'Data & Records',
     items: [
       { id: 'map', icon: MapPin, label: 'Live Map', desc: 'Fleet location and route view', color: 'text-sky-600', bg: 'bg-sky-50' },
-      { id: 'reports', icon: FileText, label: 'Reports & Export', desc: 'Trip logs and manifests', color: 'text-amber-600', bg: 'bg-amber-50' },
-      { id: 'archives', icon: Clock, label: 'Archives', desc: 'Past transportation records', color: 'text-rose-600', bg: 'bg-rose-50' },
       { id: 'activity', icon: Activity, label: 'Activity Log', desc: 'Audit trail and time records', color: 'text-violet-600', bg: 'bg-violet-50' },
     ],
   },
@@ -33,7 +31,6 @@ export const ADMIN_MENU_SECTIONS = Object.freeze([
     title: 'Organization',
     items: [
       { id: 'admin', icon: Users, label: 'People & Access', desc: 'Roles, users and account controls', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-      { id: 'welltrans', icon: RefreshCw, label: 'WellTrans Review', desc: 'Broker review and reconciliation', color: 'text-cyan-700', bg: 'bg-cyan-50' },
     ],
   },
   ...SHARED_MENU_SECTIONS,

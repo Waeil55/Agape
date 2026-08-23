@@ -324,7 +324,7 @@ export default function AgapeCommandCenter({
                           onClick={onOpenWellTrans}
                           className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] transition flex items-center gap-1 shadow-sm"
                         >
-                          Open WellTrans Sync <ArrowUpRight size={12} />
+                          Open Portal Completion <ArrowUpRight size={12} />
                         </button>
                       )}
                     </div>
@@ -420,7 +420,7 @@ export default function AgapeCommandCenter({
         {/* ================= BILLING TAB ================= */}
         {activeTab === 'billing' && (
           <div className="space-y-3 animate-in fade-in duration-200">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">WellTrans Billing Intelligence</div>
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Portal Completion Intelligence</div>
 
             <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 space-y-2">
               <div className="flex items-center justify-between">
@@ -435,7 +435,7 @@ export default function AgapeCommandCenter({
                   onClick={onOpenWellTrans}
                   className="w-full mt-2 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20"
                 >
-                  <DollarSign size={14} /> Launch WellTrans Portal Sync
+                  <DollarSign size={14} /> Open Portal Completion
                 </button>
               )}
             </div>

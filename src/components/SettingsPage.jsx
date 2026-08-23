@@ -104,7 +104,6 @@ const SettingsPage = ({
   onResetSystem,
   trashedTrips = [],
   restoreTrip,
-  updateTrashedTrip,
   deleteTrashedTrip,
   appSettings,
   onUpdateAppSettings,
@@ -126,8 +125,11 @@ const SettingsPage = ({
   const _updateSettings = onUpdateAppSettings || updateAppSettingsAlias;
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
-  const resolvedInitialSection = initialSection === 'archives' ? 'archived' : initialSection;
-  const [activeSection, setActiveSection] = useState(() => resolvedInitialSection || localStorage.getItem(`agape_settingsSection_${userKey}`) || 'overview');
+  const resolvedInitialSection = ['archives', 'archived'].includes(initialSection) ? 'overview' : initialSection;
+  const [activeSection, setActiveSection] = useState(() => {
+    const stored = localStorage.getItem(`agape_settingsSection_${userKey}`);
+    return resolvedInitialSection || (stored === 'archived' ? 'overview' : stored) || 'overview';
+  });
   const [showArchivedTrips, setShowArchivedTrips] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
 
@@ -192,7 +194,6 @@ const SettingsPage = ({
     { id: 'documents', label: 'Document Expiration', icon: FileText },
     { id: 'fleet', label: 'Fleet Utilization', icon: Truck },
     { id: 'permissions', label: 'Roles & Permissions', icon: ShieldCheck },
-    { id: 'archived', label: 'Archived Trips', icon: Archive },
     { id: 'system', label: 'System Settings', icon: Settings },
     { id: 'chat-governance', label: 'Chat Governance', icon: MessageSquare },
   ];
@@ -232,7 +233,6 @@ const SettingsPage = ({
                 { label: 'Active Trips', value: trips.filter(t => !['Cancelled', 'No Show', 'Completed'].includes(t.status)).length, icon: Truck, color: 'bg-blue-600' },
                 { label: 'Total Drivers', value: drivers.length, icon: Users, color: 'bg-emerald-600' },
                 { label: 'Dispatchers', value: dispatchers.length, icon: User, color: 'bg-purple-600' },
-                { label: 'Archived', value: trashedTrips.length, icon: Archive, color: 'bg-amber-600' },
                 { label: 'Total Trips', value: trips.length, icon: Activity, color: 'bg-cyan-600' },
                 { label: 'Vehicles', value: vehicles.length, icon: Truck, color: 'bg-indigo-600' },
                 { label: 'Cancelled / No Show', value: trips.filter(t => ['Cancelled', 'No Show'].includes(t.status)).length, icon: XCircle, color: 'bg-rose-600' },

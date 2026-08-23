@@ -1,9 +1,9 @@
 import React, { useState, lazy, Suspense, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  LayoutDashboard, Users, MapPin, Settings, BarChart2,
+  Users, MapPin, Settings, BarChart2,
   Archive, MessageCircle, Bell,
   CheckCircle2, BrainCircuit, Upload, Wand2, Search,
-  AlertTriangle, X, Truck, Zap, Clock,
+  AlertTriangle, X, Zap, Clock,
   PanelRight,
   Eye, Hash, Route, Activity,
   CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
@@ -16,10 +16,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 import { tripMatchesSearch } from '../utils/search';
 import { toValidDate } from '../utils/safeDate';
 import { useChat } from '../hooks/useChat';
-const ArchivesPage = lazy(() => import('./ArchivesPage'));
-const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
-const UsersPage = lazy(() => import('./UsersPage'));
 const OperationsCommandCenter = lazy(() => import('./OperationsCommandCenter'));
 const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
 const AdminPage = lazy(() => import('./AdminPage'));
@@ -32,8 +29,6 @@ const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
-const TripsPage = lazy(() => import('./TripsPage'));
-const WellTransSyncPage = lazy(() => import('../features/welltrans-sync/components/WellTransSyncPage'));
 const AgapeCommandCenter = lazy(() => import('./AgapeCommandCenter'));
 
 const LazyFallback = () => (
@@ -175,7 +170,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
   const matchKey = (val) => val === id || val === bk || (bk && val?.includes?.(bk));
   const locations = [];
   if (trips?.some(t => matchKey(t.id) || matchKey(t.bookingId))) locations.push({ panel: 'operations', label: 'Dispatch Board', icon: 'Zap' });
-  if (trashedTrips?.some(t => matchKey(t.id) || matchKey(t.bookingId))) locations.push({ panel: 'archives', label: 'Archives', icon: 'Archive' });
+  if (trashedTrips?.some(t => matchKey(t.id) || matchKey(t.bookingId))) locations.push({ panel: 'reports', section: 'archive', label: 'Archived Trips', icon: 'Archive' });
   if (logs?.some(l => matchKey(l.meta?.id) || matchKey(l.meta?.bookingId) || String(l.d || '').includes(id) || String(l.d || '').includes(bk))) locations.push({ panel: 'reports', label: 'Activity Logs', icon: 'BarChart2' });
   if (Array.isArray(trip?.routeAssignments) && trip.routeAssignments.length > 0) locations.push({ panel: 'operations', label: 'Route Plans', icon: 'Route' });
   return locations;
@@ -201,10 +196,18 @@ const DesktopEnterpriseDashboard = ({
 }) => {
   const { unreadCount } = useChat({ alerts: true });
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
-  const VALID_PANELS = ['operations', 'liveMap', 'archives', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat'];
+  const VALID_PANELS = ['operations', 'liveMap', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat'];
   const [activePanel, setActivePanel] = useState(() => {
     const saved = localStorage.getItem('agape_activePanel');
+    if (['trips', 'drive'].includes(saved)) return 'operations';
+    if (['archives', 'welltrans'].includes(saved)) return 'reports';
     return saved && VALID_PANELS.includes(saved) ? saved : 'operations';
+  });
+  const [reportsSection, setReportsSection] = useState(() => {
+    const savedPanel = localStorage.getItem('agape_activePanel');
+    if (savedPanel === 'archives') return 'archive';
+    if (savedPanel === 'welltrans') return 'portal';
+    return localStorage.getItem('agape_reportsSection') || 'trips';
   });
   const [operationsTab, setOperationsTab] = useState(() => localStorage.getItem('agape_operationsTab') || 'manifest');
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -226,10 +229,12 @@ const DesktopEnterpriseDashboard = ({
   const [routePlannerSequencerSequence, setRoutePlannerSequencerSequence] = useState(null);
   const [routePlannerSequencerKey, setRoutePlannerSequencerKey] = useState(0);
   const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_driverWorkDriverId') || '');
+  const [driverWorkTripId, setDriverWorkTripId] = useState(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   // Persist navigation state to localStorage (survives refresh)
   useEffect(() => { localStorage.setItem('agape_activePanel', activePanel); }, [activePanel]);
+  useEffect(() => { localStorage.setItem('agape_reportsSection', reportsSection); }, [reportsSection]);
   useEffect(() => { localStorage.setItem('agape_operationsTab', operationsTab); }, [operationsTab]);
   useEffect(() => { if (rightPanelTab) localStorage.setItem('agape_rightPanelTab', rightPanelTab); else localStorage.removeItem('agape_rightPanelTab'); }, [rightPanelTab]);
   useEffect(() => {
@@ -278,6 +283,28 @@ const DesktopEnterpriseDashboard = ({
         (activeDriverWorkDriver.name && trip.driverName === activeDriverWorkDriver.name);
     });
   }, [activeDriverWorkDriver, allDrivers, driverWorkTrips]);
+
+  const openReportsWorkspace = useCallback((section = 'trips') => {
+    setReportsSection(section);
+    setActivePanel('reports');
+  }, []);
+
+  const openDriverWorkspaceForTrip = useCallback((trip) => {
+    const normalizedEmail = String(trip?.driverEmail || '').trim().toLowerCase();
+    const driver = driverWorkDrivers.find((entry) => (
+      entry.id === trip?.driverId
+      || (normalizedEmail && String(entry.email || '').trim().toLowerCase() === normalizedEmail)
+      || (trip?.driverName && entry.name === trip.driverName)
+    ));
+    if (!driver) {
+      setManualAssignTrip(trip);
+      addToast?.('Driver Required', 'Assign this trip to a driver before opening the driver workspace.', 'warning');
+      return;
+    }
+    setDriverWorkDriverId(driver.id);
+    setDriverWorkTripId(trip.id);
+    setActivePanel('drive');
+  }, [addToast, driverWorkDrivers, setManualAssignTrip]);
 
   // Mobile breakpoint listener (< 768px = mobile dispatch view)
   useEffect(() => {
@@ -328,16 +355,12 @@ const DesktopEnterpriseDashboard = ({
 
 
   const sidebarItems = [
-    { id: 'operations', label: 'Dispatch', icon: LayoutDashboard, roles: ['admin', 'dispatcher'] },
-    { id: 'drive', label: 'Drive', icon: Truck, roles: ['admin', 'dispatcher'] },
+    { id: 'operations', label: 'Trips', icon: ClipboardList, roles: ['admin', 'dispatcher'] },
     { id: 'liveMap', label: 'Map', icon: MapPin, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
-    { id: 'archives', label: 'Archives', icon: Archive, roles: ['admin', 'dispatcher', 'fleet_manager', 'qa_auditor', 'supervisor'] },
     { id: 'reports', label: 'Reports', icon: BarChart2, roles: ['admin', 'dispatcher', 'billing', 'qa_auditor', 'fleet_manager', 'supervisor'] },
     { id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, roles: ['admin', 'dispatcher'] },
-    { id: 'welltrans', label: 'WellTrans Sync', icon: RefreshCw, roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
-  ].filter(item => item.roles.includes(role))
-    .filter(item => item.id !== 'drive' || driverWorkDrivers.length > 0);
+  ].filter(item => item.roles.includes(role));
 
   const todayTrips = trips.filter(t => tripCalendarDateKey(t.date) === todayStr);
   const activeTrips = todayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
@@ -370,13 +393,8 @@ const DesktopEnterpriseDashboard = ({
   const workspaceMeta = {
     operations: {
       eyebrow: '',
-      title: 'Dispatch Board',
-      description: 'Manage trips, drivers, routes, and live dispatch from one place.',
-    },
-    trips: {
-      eyebrow: '',
-      title: 'Trips Workspace',
-      description: 'Create, assign, edit, group, and monitor every trip from one responsive operational manifest.',
+      title: 'Trip Operations',
+      description: 'Dispatch, assign, monitor, and open driver workflows from one trip workspace.',
     },
     drive: {
       eyebrow: '',
@@ -395,13 +413,8 @@ const DesktopEnterpriseDashboard = ({
     },
     reports: {
       eyebrow: '',
-      title: 'Enterprise Reports',
-      description: 'Trip performance, utilization, compliance, and daily financial-operational visibility.',
-    },
-    archives: {
-      eyebrow: '',
-      title: 'Archives & Recovery',
-      description: 'Recovered trips, historical records, and audit-backed operational history.',
+      title: 'Reports & Records',
+      description: 'All trip reporting, archived records, mileage, and portal completion in one workspace.',
     },
     admin: {
       eyebrow: '',
@@ -424,19 +437,16 @@ const DesktopEnterpriseDashboard = ({
 
   const topNavItems = useMemo(() => {
     const items = [
-      { id: 'dispatch', label: 'Dispatch', icon: Zap, active: activePanel === 'operations', action: () => openOperationsWorkspace('manifest') },
-      { id: 'trips', label: 'Trips', icon: ClipboardList, active: activePanel === 'trips', action: () => setActivePanel('trips') },
+      { id: 'trips', label: 'Trips', icon: ClipboardList, active: activePanel === 'operations' || activePanel === 'drive', action: () => openOperationsWorkspace('manifest') },
       { id: 'schedule', label: 'Tools', icon: Route, active: activePanel === 'routePlanner' || showSequencerModal, action: () => setActivePanel('routePlanner') },
-      ...(driverWorkDrivers.length > 0 ? [{ id: 'drive', label: 'Drive', icon: Truck, active: activePanel === 'drive', action: () => setActivePanel('drive') }] : []),
       ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
-      ...(role === 'admin' ? [{ id: 'welltrans', label: 'WellTrans', icon: RefreshCw, active: activePanel === 'welltrans', action: () => setActivePanel('welltrans') }] : []),
-      { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => setActivePanel('reports') },
+      { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => openReportsWorkspace('trips') },
       { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
       { id: 'chat', label: unreadCount ? `Chat (${unreadCount > 99 ? '99+' : unreadCount})` : 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat'), badge: unreadCount },
       { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
     ];
     return items;
-  }, [activePanel, driverWorkDrivers.length, openOperationsWorkspace, role, setActivePanel, showSequencerModal, unreadCount]);
+  }, [activePanel, openOperationsWorkspace, openReportsWorkspace, role, setActivePanel, showSequencerModal, unreadCount]);
 
   const topActionItems = useMemo(() => {
     switch (activePanel) {
@@ -447,18 +457,10 @@ const DesktopEnterpriseDashboard = ({
           { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
           { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
         ];
-      case 'trips':
-        return [
-          { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
-        ];
       case 'liveMap':
         return [
           { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
           { id: 'routes', label: 'Tools', icon: Route, action: () => setActivePanel('routePlanner') },
-        ];
-      case 'archives':
-        return [
-          { id: 'reports', label: 'Reports', icon: BarChart2, action: () => setActivePanel('reports') },
         ];
       case 'admin':
         return [
@@ -476,13 +478,13 @@ const DesktopEnterpriseDashboard = ({
 
   // Command palette commands
   const commands = useMemo(() => [
-    { id: 'ops', label: 'Go to Operations', icon: LayoutDashboard, action: () => setActivePanel('operations') },
-    { id: 'trips', label: 'Go to Trips', icon: ClipboardList, action: () => setActivePanel('trips') },
+    { id: 'ops', label: 'Go to Trip Operations', icon: ClipboardList, action: () => setActivePanel('operations') },
     { id: 'map', label: 'Go to Live Map', icon: MapPin, action: () => setActivePanel('liveMap') },
     { id: 'sequencer', label: 'Open Tools', icon: Route, action: () => setActivePanel('routePlanner') },
     { id: 'routes', label: 'Go to Route Plan', icon: Route, action: () => setActivePanel('routePlanner') },
-    { id: 'reports', label: 'Go to Reports', icon: BarChart2, action: () => setActivePanel('reports') },
-    { id: 'archives', label: 'Go to Archives', icon: Archive, action: () => setActivePanel('archives') },
+    { id: 'reports', label: 'Go to Reports', icon: BarChart2, action: () => openReportsWorkspace('trips') },
+    { id: 'archives', label: 'Go to Archived Trips', icon: Archive, action: () => openReportsWorkspace('archive') },
+    ...(role === 'admin' ? [{ id: 'portal', label: 'Go to Portal Completion', icon: PanelRight, action: () => openReportsWorkspace('portal') }] : []),
     { id: 'admin', label: 'Go to Admin', icon: Users, action: () => setActivePanel('admin') },
     { id: 'settings', label: 'Go to Settings', icon: Settings, action: () => setActivePanel('settings') },
     { id: 'optimize', label: 'Run Fleet Optimization', icon: Wand2, action: () => setShowOptimizeModal(true) },
@@ -491,7 +493,7 @@ const DesktopEnterpriseDashboard = ({
   ].filter(cmd => {
     if (cmd.id === 'admin' && role !== 'admin') return false;
     return true;
-  }), [role, toggleRightPanel]);
+  }), [openReportsWorkspace, role, toggleRightPanel]);
 
   const filteredCommands = useMemo(() => commandQuery
     ? commands.filter(c => c.label.toLowerCase().includes(commandQuery.toLowerCase()))
@@ -920,7 +922,7 @@ const DesktopEnterpriseDashboard = ({
                       {locs.map((loc, i) => (
                         <button
                           key={i}
-                          onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowRightPanel(false); setShowTripLocations(false); }}
+                          onClick={() => { if (loc.section) setReportsSection(loc.section); setActivePanel(loc.panel); setTripDetails(null); setShowRightPanel(false); setShowTripLocations(false); }}
                           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
                         >
                           {loc.icon === 'Zap' && <Zap size={16} className="text-indigo-600" />}
@@ -991,7 +993,7 @@ const DesktopEnterpriseDashboard = ({
                   drivers={drivers}
                   vehicles={vehicles}
                   dispatchers={dispatchers}
-                  onOpenWellTrans={() => setActivePanel('welltrans')}
+                  onOpenWellTrans={() => openReportsWorkspace('portal')}
                   onAssignTrips={() => setShowOptimizeModal(true)}
                   onFilterLate={() => handleSmartNavigate('late')}
                   onClose={() => setShowRightPanel(false)}
@@ -1133,6 +1135,7 @@ const DesktopEnterpriseDashboard = ({
         setShowUploadModal={setShowUploadModal}
         onOpenSequencer={() => setShowSequencerModal(true)}
         onOpenLiveMap={() => setActivePanel('liveMap')}
+        onDriveTrip={openDriverWorkspaceForTrip}
         showRightPanel={showRightPanel}
         onTogglePanel={toggleRightPanel}
         phoneNumbers={phoneNumbers}
@@ -1174,32 +1177,9 @@ const DesktopEnterpriseDashboard = ({
       );
       case 'reports': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-          <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
+          <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} />
         </Suspense></ErrorBoundary>
       );
-      case 'trips': return (
-        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-          <TripsPage
-            trips={trips}
-            role={role}
-            currentUser={currentUser}
-            drivers={drivers}
-            selectedTasks={selectedTasks}
-            toggleTaskSelection={(tripId) => setSelectedTasks((current) => (
-              current.includes(tripId) ? current.filter((id) => id !== tripId) : [...current, tripId]
-            ))}
-            onCreateLegMission={createLegMission}
-            onBulkAssignTrips={bulkAssignTrips}
-            onAssignTrip={assignTripToDriver}
-            onUnassignTrip={(tripId) => assignTripToDriver?.(tripId, '')}
-            onAddTrip={addTrip}
-            onUpdateTrip={updateTrip}
-            onDeleteTrip={requestDeleteTrip}
-          />
-        </Suspense></ErrorBoundary>
-      );
-
-      case 'archives': return <ErrorBoundary><Suspense fallback={<LazyFallback />}><ArchivesPage trashedTrips={trashedTrips} restoreTrip={restoreTrip} drivers={drivers} role={role} updateTrashedTrip={updateTrashedTrip} /></Suspense></ErrorBoundary>;
       case 'admin': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
         <AdminPage
@@ -1223,14 +1203,9 @@ const DesktopEnterpriseDashboard = ({
         />
         </Suspense></ErrorBoundary>
       );
-      case 'welltrans': return role === 'admin' ? (
-        <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-          <WellTransSyncPage trips={trips} drivers={drivers} vehicles={vehicles} role={role} onUpdateTrip={updateTrip} />
-        </Suspense></ErrorBoundary>
-      ) : renderOperationsPage();
       case 'settings': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-        <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} trashedTrips={trashedTrips} restoreTrip={restoreTrip} deleteTrashedTrip={deleteTrashedTrip} updateTrashedTrip={updateTrashedTrip} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} persistState={persistState} initialSection={activePanel === 'archives' ? 'archives' : undefined} />
+        <SettingsPage currentUser={currentUser} role={role} onLogout={onLogout} onResetSystem={() => { setTrips([]); setTrashedTrips([]); setDrivers([]); setLogs([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]); addAuditLog('System Reset', 'Master data wipe performed by Admin.', 'rose'); }} appSettings={appSettings} onUpdateAppSettings={updateAppSettings} phoneNumbers={phoneNumbers} onUpdatePhoneNumbers={(updates) => { setPhoneNumbers(prev => ({ ...prev, ...updates })); setTimeout(persistState, 0); }} requestAuthAction={requestAuthAction} hasPermission={hasPermission} driverProfile={null} trips={trips} drivers={drivers} dispatchers={dispatchers} vehicles={vehicles} logs={logs} persistState={persistState} />
         </Suspense></ErrorBoundary>
       );
       case 'drive': return driverWorkDrivers.length > 0 && activeDriverWorkDriver ? (
@@ -1287,6 +1262,7 @@ const DesktopEnterpriseDashboard = ({
               onAddTrip={addTrip}
               showAddTripModal={showAddTripModal}
               setShowAddTripModal={setShowAddTripModal}
+              defaultTripId={driverWorkTripId}
             />
           </div>
         </div>
@@ -1312,19 +1288,17 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${['reports', 'trips', 'admin', 'drive', 'chat', 'welltrans'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat', 'welltrans'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${['reports', 'admin', 'drive', 'chat'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
               <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-                <ReportsPage trips={trips} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} />
+                <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} />
               </Suspense></ErrorBoundary>
             ) : (
               <div className={
-                activePanel === 'drive' || activePanel === 'admin' || activePanel === 'welltrans'
+                activePanel === 'drive' || activePanel === 'admin'
                   ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
-                  : activePanel === 'trips'
-                    ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4 lg:p-5'
                   : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>
                 {renderPanelContent()}
@@ -1681,7 +1655,7 @@ const DesktopEnterpriseDashboard = ({
                     {locs.map((loc, i) => (
                       <button
                         key={i}
-                        onClick={() => { setActivePanel(loc.panel); setTripDetails(null); setShowTripLocations(false); }}
+                        onClick={() => { if (loc.section) setReportsSection(loc.section); setActivePanel(loc.panel); setTripDetails(null); setShowTripLocations(false); }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors text-left"
                       >
                         {loc.icon === 'Zap' && <Zap size={14} className="text-indigo-600" />}

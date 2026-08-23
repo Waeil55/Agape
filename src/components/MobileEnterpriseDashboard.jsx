@@ -27,7 +27,6 @@ const DriverPage = lazy(() => import('./DriverPage'));
 const TripsPage = lazy(() => import('./TripsPage'));
 
 const MobileMenuPage = lazy(() => import('./MobileMenuPage'));
-const ArchivesPage = lazy(() => import('./ArchivesPage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
@@ -36,7 +35,6 @@ const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
-const WellTransSyncPage = lazy(() => import('../features/welltrans-sync/components/WellTransSyncPage'));
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center h-32">
@@ -130,6 +128,9 @@ const MobileEnterpriseDashboard = (props) => {
   const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const [tripDetails, setTripDetails] = useState(null);
   const [tripWorkflowActive, setTripWorkflowActive] = useState(false);
+  const [reportsSection, setReportsSection] = useState(() => {
+    try { return window.localStorage.getItem('agape_reportsSection') || 'trips'; } catch { return 'trips'; }
+  });
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [toolsDriverId, setToolsDriverId] = useState('');
@@ -146,6 +147,7 @@ const MobileEnterpriseDashboard = (props) => {
   const handleNavClick = (view) => {
     setCurrentView(view);
     setSubView(null);
+    if (view === 'reports') setReportsSection('trips');
   };
 
   const VALID_VIEWS = ['trips', 'map', 'reports', 'tools', 'menu', 'chat'];
@@ -278,7 +280,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (subView === 'reports') {
       return (
         <SubViewWrapper title="Reports & Export" renderTopBar={renderTopBar}>
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} initialSection={reportsSection} onSectionChange={setReportsSection} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }
@@ -293,8 +295,8 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'archives') {
       return (
-        <SubViewWrapper title="Archives" renderTopBar={renderTopBar}>
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ArchivesPage {...props} /></Suspense></ErrorBoundary>
+        <SubViewWrapper title="Reports & Records" renderTopBar={renderTopBar}>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} initialSection="archive" onSectionChange={setReportsSection} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }
@@ -361,7 +363,7 @@ const MobileEnterpriseDashboard = (props) => {
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
           {renderTopBar('Reports & Export')}
           <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom,0px))' }}>
-            <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} /></Suspense></ErrorBoundary>
+            <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} initialSection={reportsSection} onSectionChange={setReportsSection} /></Suspense></ErrorBoundary>
           </div>
         </div>
       );
@@ -489,8 +491,8 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (subView === 'welltrans') {
       return (
-        <SubViewWrapper title="WellTrans Sync" fullHeight renderTopBar={renderTopBar}>
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><WellTransSyncPage trips={trips} drivers={drivers} vehicles={props.vehicles || []} role={role} onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip} /></Suspense></ErrorBoundary>
+        <SubViewWrapper title="Reports & Records" fullHeight renderTopBar={renderTopBar}>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} initialSection="portal" onSectionChange={setReportsSection} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }
@@ -515,6 +517,7 @@ const MobileEnterpriseDashboard = (props) => {
               onBulkAssignTrips={props.bulkAssignTrips}
               onAssignTrip={props.assignTripToDriver}
               onUnassignTrip={(tripId) => props.assignTripToDriver?.(tripId, '')}
+              onDriveTrip={(trip) => { setTripWorkflowActive(true); setTripDetails(trip); }}
               onAddTrip={props.addTrip}
               onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
               onDeleteTrip={props.requestDeleteTrip}

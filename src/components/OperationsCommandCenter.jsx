@@ -427,7 +427,7 @@ const OperationsCommandCenter = ({
   triggerSmartAssign, triggerFleetOptimization, assignTripToDriver,
   bulkAssignTrips, setBulkAssignModal, requestDeleteTrip, requestBulkDelete, updateTrip,
   makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer,
-  onOpenLiveMap, showRightPanel, onTogglePanel,
+  onOpenLiveMap, onDriveTrip, showRightPanel, onTogglePanel,
   phoneNumbers,
   logs = []
 }) => {
@@ -1198,7 +1198,7 @@ const OperationsCommandCenter = ({
 
     return (
       <div className="w-full border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-sm space-y-1.5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-700">{to12hr(trip.time)}</span>
             <span className={`rounded-full px-2 py-0.5 text-sm ${getStatusPillClass(trip.status)}`}>{trip.status}</span>
@@ -1209,7 +1209,16 @@ const OperationsCommandCenter = ({
             {directDistance && <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600">{directDistance}</span>}
             {routeAssignments.map((route, i) => <span key={i} className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-sm text-indigo-700">{route.routeName}</span>)}
           </div>
-          <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-100 text-xs">Collapse</button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => driver ? onDriveTrip?.(trip) : setManualAssignTrip(trip)}
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+            >
+              <Navigation size={13} /> {driver ? 'Open Driver Workspace' : 'Assign to Drive'}
+            </button>
+            <button type="button" onClick={() => toggleTripExpanded(trip.id)} className="min-h-8 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-100 text-xs">Collapse</button>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-x-6 text-sm leading-relaxed">
@@ -1645,6 +1654,9 @@ const OperationsCommandCenter = ({
                   </button>
                   <button onClick={() => { setBoardActionsMenuTripId(null); triggerSmartAssign(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
                     <BrainCircuit size={13} className="text-indigo-500" /> AI Auto Assign
+                  </button>
+                  <button onClick={() => { setBoardActionsMenuTripId(null); driver ? onDriveTrip?.(trip) : setManualAssignTrip(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                    <Navigation size={13} className="text-blue-600" /> {driver ? 'Open Driver Workspace' : 'Assign to Drive'}
                   </button>
                   <div className="my-1 border-t border-slate-100" />
                   {/* Trip Actions */}

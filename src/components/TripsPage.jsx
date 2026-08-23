@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation } from 'lucide-react';
 import { suggestBatchAssignment } from '../config/ai';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { isNativeShell } from '../utils/platform';
@@ -40,7 +40,7 @@ const toTimeInput = (value) => {
 
 const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
 
-const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
+const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
   const today = useMemo(() => getTodayStr(), []);
   const [sortBy, setSortBy] = useState('time');
   const [selectedTrip, setSelectedTrip] = useState(null);
@@ -436,7 +436,18 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             )}
 
             {/* Action Buttons */}
-            <div className="mt-2 flex gap-2 justify-end">
+            <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (driver) onDriveTrip?.(trip);
+                  else handleAssignClick();
+                }}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700"
+              >
+                <Navigation size={14} /> {driver ? 'Drive trip' : 'Assign to drive'}
+              </button>
               <button onClick={(e) => { e.stopPropagation(); openEdit(trip); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition" aria-label="Edit"><Edit2 size={14} /></button>
               <button onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); }} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition" aria-label="Delete"><Archive size={14} /></button>
             </div>
