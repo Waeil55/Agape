@@ -4,25 +4,26 @@ import { describe, expect, it } from 'vitest';
 const readComponent = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 describe('mobile premium interaction contract', () => {
-  it('keeps both mobile navigation bars at five stable destinations', () => {
+  it('keeps enterprise navigation stable and inserts only the pinned started trip for drivers', () => {
     const enterpriseSource = readComponent('./MobileEnterpriseDashboard.jsx');
     const driverSource = readComponent('./DriverPage.jsx');
     const enterpriseNav = enterpriseSource.match(/MOBILE_PRIMARY_NAV = Object\.freeze\(\[([\s\S]*?)\]\);/)?.[1] || '';
-    const driverNav = driverSource.match(/const navItems = useMemo\(\(\) => \{([\s\S]*?)\}, \[unreadCount\]\);/)?.[1] || '';
+    const driverNav = driverSource.match(/const navItems = useMemo\(\(\) => \{([\s\S]*?)\}, \[startedTripNav, unreadCount\]\);/)?.[1] || '';
     const enterpriseIds = [...enterpriseNav.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
     const driverIds = [...driverNav.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
 
     expect(enterpriseIds).toEqual(['trips', 'map', 'chat', 'reports', 'menu']);
-    expect(driverIds).toEqual(['trips', 'tools', 'chat', 'history', 'settings']);
-    expect(driverNav).not.toContain('splice');
-    expect(driverNav).not.toContain("id: 'active-trip'");
+    expect(driverIds).toEqual(['trips', 'tools', 'chat', 'history', 'settings', 'active-trip']);
+    expect(driverNav).toContain('items.splice(1, 0');
+    expect(driverNav).toContain("id: 'active-trip'");
   });
 
-  it('keeps active-trip continuity outside the fixed driver navigation', () => {
+  it('keeps active-trip continuity in the pinned driver navigation', () => {
     const driverSource = readComponent('./DriverPage.jsx');
 
-    expect(driverSource).toContain("activeWorkTrip && activeNav !== 'active-trip'");
-    expect(driverSource).toContain('Resume active trip for');
+    expect(driverSource).toContain('const openWorkTrip = startedTripNav');
+    expect(driverSource).toContain('setActiveWorkTripId(item.tripId)');
+    expect(driverSource).not.toContain('Resume active trip for');
     expect(driverSource).toContain('aria-current={isActiveTab');
   });
 
