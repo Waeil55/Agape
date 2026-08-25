@@ -2,43 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Reference-matched Agape surface system: shared by every role and viewport. */
-:root {
-  --agape-page-gutter: clamp(0.75rem, 2.4vw, 1.75rem);
-  --agape-section-gap: clamp(0.75rem, 2vw, 1.25rem);
-  --agape-surface-border: #e7edf5;
-  --agape-surface-shadow: 0 10px 30px rgb(15 23 42 / 6%);
-}
-
-.card,
-.adm-card,
-.admin-command-panel,
-.mobile-admin-command-card,
-.mobile-admin-driver-card,
-.mobile-admin-person-card,
-.agape-empty-card,
-.agape-trip-list-card {
-  border: 1px solid var(--agape-surface-border);
-  border-radius: 0.875rem;
-  background: #fff;
-  box-shadow: var(--agape-surface-shadow);
-}
-
-@media (max-width: 767px) {
-  .driver-trip-workspace { padding-bottom: calc(9rem + env(safe-area-inset-bottom, 0px)); }
-  .driver-trip-workspace > .px-3 { padding: 0.875rem var(--agape-page-gutter) 0; }
-  .driver-route-card { box-shadow: var(--agape-surface-shadow); }
-  .driver-route-card > div { padding: 1.25rem; }
-  .driver-contact-actions { gap: 0.5rem; }
-  .driver-contact-actions button { min-height: 3.5rem; flex-direction: column; gap: 0.25rem; background: #fff; border: 1px solid var(--agape-surface-border); box-shadow: 0 4px 14px rgb(15 23 42 / 5%); }
-  .driver-progress-card { padding: 1rem 0.75rem; }
-  .driver-notes-card { min-height: 5.5rem; }
-  .driver-primary-action-dock { padding: 0.5rem; border: 0; background: transparent; box-shadow: none; }
-  .driver-primary-action-dock > div:last-child > button:first-child { min-height: 4.75rem; border-radius: 0.875rem; font-size: 0.875rem; box-shadow: 0 14px 30px rgb(42 82 172 / 22%); }
-  .mobile-admin-page,
-  .agape-mobile-page { background: #f4f7fc !important; }
-}
-
 /* ===================================================================
    DESIGN TOKEN SYSTEM — Typography, Spacing, Themes & Accessibility
    =================================================================== */
@@ -48,9 +11,9 @@
   --sab: env(safe-area-inset-bottom, 0px);
 
   /* ===== ENTERPRISE TYPOGRAPHY SCALE ===== */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
+  --text-xs: 0.85rem;
+  --text-sm: 0.95rem;
+  --text-base: 1.05rem;
   --text-lg: 1.20rem;
   --text-xl: 1.35rem;
   --text-2xl: 1.60rem;
@@ -88,8 +51,8 @@
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
-  --radius-xl: 0.875rem;
-  --radius-2xl: 1.25rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.6rem;
   --radius-3xl: 2.5rem;
   --radius-full: 9999px;
 
@@ -98,7 +61,7 @@
   --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 10px 32px rgba(15, 23, 42, 0.08);
   --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.10);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.055);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
 
   /* ===== TOUCH TARGETS ===== */
   --touch-min: 48px;
@@ -171,7 +134,7 @@
   --shadow-elevated: 0 12px 40px rgba(15, 23, 42, 0.08);
 
   /* Navigation */
-  --nav-bg: rgba(255, 255, 255, 0.94);
+  --nav-bg: rgba(255, 255, 255, 0.72);
   --nav-border: rgba(255, 255, 255, 0.65);
   --nav-blur: 30px;
 

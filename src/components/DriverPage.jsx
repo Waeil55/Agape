@@ -3999,33 +3999,34 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
 
     return (
-      <><div className="driver-trip-workspace min-h-full bg-[var(--bg-app)] pb-32">
-        <div className="sticky top-0 z-30 bg-white border-b-2 border-amber-400 driver-active-trip-header">
-          <div className="px-3 py-2.5 flex items-center gap-2.5">
+      <><div className="min-h-full bg-[var(--bg-app)] pb-44">
+        <div className="sticky top-0 z-30 bg-[var(--bg-app)] driver-active-trip-header">
+          <div className="px-4 py-4 flex items-center gap-3">
             <button
               type="button"
               onClick={() => { if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); setWorkNotesOpen(false); } }}
-              className="w-8 h-11 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer"
+              className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-800 active:scale-95 cursor-pointer"
               aria-label="Back to trips"
             >
               <ChevronLeft size={22} strokeWidth={2.2} />
             </button>
             <div className="min-w-0 flex-1">
-              <h1 className="text-base font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
+              <h1 className="text-lg font-semibold text-slate-950 leading-tight truncate uppercase">{trip.patient || 'Trip'}</h1>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
                 <Clock size={16} /> {scheduledTime}
               </p>
             </div>
-            <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-100">
-              Trip: {trip.bookingId || trip.id || '--'}
-            </span>
+            <button type="button" onClick={() => copyText(trip.bookingId || trip.id, 'Trip ID')} className="shrink-0 rounded-xl bg-white px-3 py-2 text-left border border-slate-200 shadow-sm">
+              <span className="block text-[10px] font-semibold text-slate-400">Trip ID</span>
+              <span className="text-xs font-semibold text-blue-600">{trip.bookingId || trip.id || '--'}</span>
+            </button>
 
           </div>
         </div>
 
-        <div className="px-3 pt-3 space-y-3">
-          <div className="driver-route-card rounded-xl overflow-hidden shadow-lg bg-white border border-slate-200">
-            <div className="relative px-4 py-2.5">
+        <div className="px-4 pt-4 space-y-4">
+          <div className="rounded-xl overflow-hidden bg-white border border-slate-200 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+            <div className="relative px-5 py-5">
               <div className="absolute right-4 top-4 flex gap-1 opacity-10">
                 <span className="w-2 h-2 rounded-full bg-white" />
                 <span className="w-2 h-2 rounded-full bg-white" />
@@ -4033,30 +4034,30 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </div>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                   <p className="text-xs font-medium uppercase tracking-normal text-blue-600">Scheduled Time</p>
-                  <p className="mt-1 text-lg font-semibold tracking-tight leading-none text-slate-900">{scheduledTime}</p>
+                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Scheduled Time</p>
+                  <p className="mt-1 text-3xl font-semibold tracking-tight leading-none text-slate-950">{scheduledTime}</p>
                 </div>
                 <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-xs font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
                   {trip.status || 'Assigned'}
                 </span>
               </div>
 
-              <div className="mt-2.5 grid grid-cols-[18px_1fr] gap-x-4">
+              <div className="mt-6 grid grid-cols-[20px_1fr] gap-x-4">
                 <div className="row-span-2 flex flex-col items-center pt-1.5">
-                  <span className="w-3.5 h-3.5 rounded-full bg-blue-300 shadow-lg shadow-blue-200/30" />
-                    <span className="w-0.5 flex-1 min-h-[56px] my-0.5 rounded-full bg-slate-200" />
-                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/30" />
+                  <span className="w-4 h-4 rounded-full border-[3px] border-blue-600 bg-white" />
+                    <span className="w-0.5 flex-1 min-h-[92px] my-1 border-l-2 border-dashed border-slate-300" />
+                  <span className="w-4 h-4 rounded-full border-[3px] border-emerald-600 bg-white" />
                 </div>
 
                 <div className="pb-3">
                   <p className="text-xs font-medium uppercase tracking-normal text-blue-600">From</p>
-                  <p className="mt-0.5 text-xs font-medium leading-snug text-slate-800 break-words">{pickupAddress || '--'}</p>
+                  <p className="mt-1 text-base font-semibold leading-snug text-slate-950 break-words">{pickupAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
                     <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-slate-400">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-7 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md">
                       <Navigation size={16} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
@@ -4064,37 +4065,38 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
                 <div>
                   <p className="text-xs font-medium uppercase tracking-normal text-emerald-600">To</p>
-                  <p className="mt-0.5 text-xs font-medium leading-snug text-slate-800 break-words">{dropoffAddress || '--'}</p>
+                  <p className="mt-1 text-base font-semibold leading-snug text-slate-950 break-words">{dropoffAddress || '--'}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
                     <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-slate-400" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-7 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md">
                       <Navigation size={16} strokeWidth={2.5} /> Navigate
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="driver-contact-actions mt-3.5 grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-7 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <Phone size={16} /> Call
-                </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-7 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <MessageCircle size={16} /> SMS
-                </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-7 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <PhoneForwarded size={16} /> Contacts
-                </button>
-                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-7 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium flex items-center justify-center gap-1 cursor-pointer">
-                  <MoreHorizontal size={16} /> More
-                </button>
-              </div>
             </div>
           </div>
 
-          <div className="driver-progress-card rounded-xl bg-white border border-slate-200 shadow-sm px-4 py-2">
+              <div className="grid grid-cols-4 gap-2">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="min-h-16 rounded-xl bg-white border border-slate-200 disabled:opacity-40 text-slate-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
+                  <Phone size={16} /> Call
+                </button>
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="min-h-16 rounded-xl bg-white border border-slate-200 disabled:opacity-40 text-slate-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
+                  <MessageCircle size={16} /> SMS
+                </button>
+                <button type="button" onClick={() => openContactSelector(trip)} className="min-h-16 rounded-xl bg-white border border-slate-200 text-violet-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
+                  <PhoneForwarded size={16} /> Contacts
+                </button>
+                <button type="button" onClick={() => setShowMoreOptions(trip)} className="min-h-16 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
+                  <MoreHorizontal size={16} /> More
+                </button>
+              </div>
+
+          <div className="rounded-xl bg-white border border-slate-200 shadow-sm px-3 py-4">
             <div className="flex items-start gap-2">
               <div className="flex min-w-0 flex-1 items-start">
                 {TRIP_WORK_STEPS.map((label, idx) => {
@@ -4103,8 +4105,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   return (
                     <div key={label} className="flex-1 min-w-0">
                       <div className="flex items-center">
-                         <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 font-medium text-xs shadow-sm ${
-                          isActive ? 'bg-slate-600 text-white border-slate-300' : isDone ? 'bg-emerald-500 text-white border-emerald-300' : 'bg-slate-50 text-slate-500 border-slate-200'
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center border font-semibold text-xs shadow-sm ${
+                          isActive ? 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100' : isDone ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-300'
                         }`}>
                           {idx + 1}
                         </div>
@@ -4117,33 +4119,35 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   );
                 })}
               </div>
+              <div className="mx-1 w-px self-stretch bg-slate-200" />
               <button
                 type="button"
                 onClick={handleStepBack}
                 disabled={!stepBackTarget}
-                className="mt-0 flex h-7 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-700"
+                className="mt-0 flex h-12 w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-35"
                 title={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
                 aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
               >
-                <Undo2 size={16} strokeWidth={2.5} />
+                <Undo2 size={17} strokeWidth={2.5} /><span className="text-[9px] font-semibold">Undo</span>
               </button>
             </div>
           </div>
 
-          <div className="driver-notes-card rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
-            <div className="px-4 pt-3 pb-1.5 flex items-center gap-2 text-amber-600">
-              <AlertCircle size={15} />
+          <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+            <button type="button" onClick={() => setWorkNotesOpen((open) => !open)} className="w-full px-4 py-3 flex items-center gap-2 text-amber-700 text-left">
+              <span className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center"><AlertCircle size={18} /></span>
               <span className="text-xs font-medium uppercase tracking-normal">
                 Driver Notes
               </span>
-            </div>
-            <div className="px-4 pb-3.5 text-xs font-medium text-amber-900 leading-relaxed">
+              <ChevronDown size={18} className={`ml-auto transition-transform ${workNotesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {workNotesOpen && <div className="px-4 pb-4 text-xs font-medium text-amber-900 leading-relaxed">
               {notes || <span className="italic text-amber-700">No driver notes for this trip.</span>}
-            </div>
+            </div>}
           </div>
         </div>
 
-        <div className="driver-primary-action-dock fixed left-3 right-3 z-40 rounded-xl border border-blue-100 bg-blue-50/95 p-2.5 shadow-lg backdrop-blur-xl" style={{ bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="fixed left-4 right-4 z-40 rounded-xl border-0 bg-transparent p-0 shadow-none" style={{ bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mb-2 flex items-center gap-1">
             {getWorkflowSteps(trip).map((step, idx) => {
               const currentStep = getCurrentWorkflowStep(trip);
@@ -4156,7 +4160,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               type="button"
               onClick={bottomAction.onClick}
               disabled={!primary}
-              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-10 ${bottomAction.gradient} text-white rounded-xl font-semibold text-xs uppercase tracking-normal transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 cursor-pointer`}
+              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-20 ${bottomAction.gradient} text-white rounded-xl font-semibold text-sm uppercase tracking-normal transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-70 cursor-pointer`}
             >
               {bottomAction.icon} {bottomAction.label}
             </button>
