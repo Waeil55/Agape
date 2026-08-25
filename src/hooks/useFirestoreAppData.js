@@ -500,6 +500,15 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         const unsub = onSnapshot(ref, applyFn, (err) => {
           if (cancelled || shouldIgnoreRealtimePermissionError(err)) return;
           console.error(`${label} listener error (retry ${retryCount}):`, err);
+          const cacheCorruption = /Target ID already exists|delete range from database without an in-progress transaction/i.test(err?.message || '');
+          if (cacheCorruption) {
+            setState(prev => ({
+              ...prev,
+              error: 'The local Firestore cache became invalid. Close and reopen Agape Care to reconnect with a clean live cache.',
+              loading: false,
+            }));
+            return;
+          }
           if (/INTERNAL ASSERTION FAILED|Unexpected state/.test(err?.message || '')) {
             retryCount++;
             if (retryCount > MAX_RETRIES) {

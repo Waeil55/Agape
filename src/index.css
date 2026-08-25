@@ -2481,6 +2481,13 @@ html.trip-window-kb-open .trip-window-overlay {
   overscroll-behavior: none;
 }
 
+/* Mobile WebKit can paint the caret outside a transformed keyboard-docked
+   dialog. Odometer fields show the complete value while it is entered, so
+   hide only their caret; ordinary text inputs retain normal caret behavior. */
+.trip-odometer-input {
+  caret-color: transparent;
+}
+
 /* Signature windows get extra breathing room for a comfortable confirm. */
 .trip-window-panel-signature {
   min-height: 25rem;

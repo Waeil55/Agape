@@ -39,11 +39,24 @@ const appCheck = (() => {
   }
 })();
 let db;
+const usesWebKitIndexedDbRiskRuntime = typeof navigator !== 'undefined'
+  && /AppleWebKit/i.test(navigator.userAgent || '')
+  && /iPad|iPhone|iPod/i.test(navigator.userAgent || '');
 if (appWasInitialized) {
   // During development hot reloads the default Firebase app already owns a
   // configured Firestore instance. Reuse it so its cache and listeners remain
   // stable instead of attempting a conflicting second initialization.
   db = getFirestore(app);
+} else if (usesWebKitIndexedDbRiskRuntime) {
+  // Firestore's persistent IndexedDB cache can become internally inconsistent
+  // in iOS WebKit (including installed PWAs), producing target-ID collisions
+  // and transactionless range-delete failures across every live listener.
+  // The server remains authoritative; use the stable in-memory Firestore cache
+  // here while the app's own local snapshot layer provides fast startup data.
+  db = initializeFirestore(app, {
+    localCache: memoryLocalCache(),
+    experimentalAutoDetectLongPolling: true,
+  });
 } else try {
   // Persistent local cache: the app opens instantly from on-device data and
   // streams live changes in the background, so every device converges on the
