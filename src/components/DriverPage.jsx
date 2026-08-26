@@ -1896,30 +1896,46 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
   }, []);
 
-  const resolveVerifiedPickupLocation = useCallback(async (trip) => {
+  const resolveVerifiedPickupLocation = useCallback(async (trip, fallbackLocation) => {
     const persisted = getTripPickupLocation(trip);
     if (persisted) return persisted;
 
     const pickupAddress = typeof trip?.pickup === 'object'
       ? String(trip.pickup?.address || '').trim()
       : String(trip?.pickup || '').trim();
-    if (!pickupAddress) return null;
+    if (!pickupAddress) return fallbackLocation || null;
 
     const cached = addressCoordsCache.current[pickupAddress];
     const geocoded = cached || await geocodeAddress(pickupAddress);
     const location = verifyGeocodedAddress(pickupAddress, geocoded);
-    if (!location) return null;
-    const { lat, lng } = location;
-    addressCoordsCache.current[pickupAddress] = { ...location, type: 'pickup' };
-    await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
-      pickupLat: lat,
-      pickupLng: lng,
-      pickupCoordinatesVerifiedAt: new Date().toISOString(),
-      pickupCoordinatesSource: cached ? 'verified_geocode_cache' : 'google_geocode',
-      ...(geocoded?.placeId ? { pickupPlaceId: geocoded.placeId } : {}),
-      ...(geocoded?.formattedAddress ? { pickupFormattedAddress: geocoded.formattedAddress } : {}),
-    }));
-    return location;
+    if (location) {
+      const { lat, lng } = location;
+      addressCoordsCache.current[pickupAddress] = { ...location, type: 'pickup' };
+      await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
+        pickupLat: lat,
+        pickupLng: lng,
+        pickupCoordinatesVerifiedAt: new Date().toISOString(),
+        pickupCoordinatesSource: cached ? 'verified_geocode_cache' : 'google_geocode',
+        ...(geocoded?.placeId ? { pickupPlaceId: geocoded.placeId } : {}),
+        ...(geocoded?.formattedAddress ? { pickupFormattedAddress: geocoded.formattedAddress } : {}),
+      }));
+      return location;
+    }
+
+    if (fallbackLocation) {
+      const { lat, lng } = fallbackLocation;
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
+          pickupLat: lat,
+          pickupLng: lng,
+          pickupCoordinatesVerifiedAt: new Date().toISOString(),
+          pickupCoordinatesSource: 'driver_gps_fallback',
+        }));
+        return fallbackLocation;
+      }
+    }
+
+    return null;
   }, [getTripPickupLocation, onUpdateTrip]);
 
   const getDriverClockLocation = useCallback(() => (
@@ -3087,24 +3103,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setOdometerError('');
     // Record pickup arrival + departure timestamps using canonical fields
     const nowIso = new Date().toISOString();
-    let pickupLocation = await resolveVerifiedPickupLocation(showOdometerPrompt);
     const driverLocation = getDriverClockLocation();
+    const pickupLocation = await resolveVerifiedPickupLocation(showOdometerPrompt, driverLocation);
     const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showOdometerPrompt, driver: me, pickupLocation, driverLocation, odometer: odo });
     if (!verifiedWorkEvidence.valid) {
-      if (verifiedWorkEvidence.code === 'MISSING_PICKUP_LOCATION') {
-        const retryPickupLocation = await resolveVerifiedPickupLocation(showOdometerPrompt);
-        const retryEvidence = evaluateVerifiedTripWorkEvidence({ trip: showOdometerPrompt, driver: me, pickupLocation: retryPickupLocation, driverLocation, odometer: odo });
-        if (retryEvidence.valid) {
-          pickupLocation = retryPickupLocation;
-          Object.assign(verifiedWorkEvidence, retryEvidence);
-        } else {
-          setShowToast({ type: 'warning', message: 'Pickup coordinates are not verified. Refresh the trip before continuing.', action: 'refresh-coordinates', trip: showOdometerPrompt, odometer: odo });
-          return;
-        }
-      } else {
-        setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
-        return;
-      }
+      setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
+      return;
     }
 
     await resumeBreakFromPickup(showOdometerPrompt, pickupLocation, nowIso, driverLocation);
@@ -3225,24 +3229,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const odo = arrivalEvaluation.value;
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
-    let pickupLocation = await resolveVerifiedPickupLocation(showArrivalConfirm);
     const driverLocation = getDriverClockLocation();
-    let verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation, driverLocation, odometer: odo });
+    const pickupLocation = await resolveVerifiedPickupLocation(showArrivalConfirm, driverLocation);
+    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation, driverLocation, odometer: odo });
     if (!verifiedWorkEvidence.valid) {
-      if (verifiedWorkEvidence.code === 'MISSING_PICKUP_LOCATION') {
-        const retryPickupLocation = await resolveVerifiedPickupLocation(showArrivalConfirm);
-        const retryEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation: retryPickupLocation, driverLocation, odometer: odo });
-        if (retryEvidence.valid) {
-          pickupLocation = retryPickupLocation;
-          verifiedWorkEvidence = retryEvidence;
-        } else {
-          setShowToast({ type: 'warning', message: 'Pickup coordinates are not verified. Refresh the trip before continuing.', action: 'refresh-coordinates', trip: showArrivalConfirm, odometer: odo });
-          return;
-        }
-      } else {
-        setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
-        return;
-      }
+      setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
+      return;
     }
     await resumeBreakFromPickup(showArrivalConfirm, pickupLocation, nowIso, driverLocation);
     let autoStartedShift = false;
