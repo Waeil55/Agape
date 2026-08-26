@@ -4,7 +4,7 @@ import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
 import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
 import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
-import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
+import { getDistanceMiles, getTravelDuration, geocodeAddress, verifyGeocodedAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useChat } from '../hooks/useChat';
@@ -33,7 +33,7 @@ import {
   calculateAnchor,
   calculateReturnToWorkFromPickup,
   estimateTravelTimeMinutes,
-  validateArrival,
+  evaluateVerifiedTripWorkEvidence,
   classifyGap,
   generatePendingClockOut,
   buildTimeEvents,
@@ -49,7 +49,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
-import { getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
+import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
 import { deriveVehicleOdometerState, evaluateOdometerEntry } from '../utils/vehicleOdometer';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
@@ -171,6 +171,7 @@ const focusTripWindowInput = () => {
     const el = document.querySelector('.trip-window-panel input[autofocus]');
     if (el) {
       try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+      requestAnimationFrame(() => el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' }));
     }
   }, 80);
 };
@@ -640,19 +641,7 @@ const applyWorkflowProgress = (trip, progress) => {
 
 const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], setVehicles, driverTelemetry = [], timeTrackingDeclarations = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
-  const [phoneNumbersFallback, setPhoneNumbersFallback] = useState(null);
-
-  useEffect(() => {
-    if (phoneNumbersProp?.dispatcher && phoneNumbersProp?.routing) return;
-    const unsub = onSnapshot(doc(db, 'systemConfig', 'phoneNumbers'), (snap) => {
-      if (snap.exists()) {
-        setPhoneNumbersFallback(snap.data());
-      }
-    }, () => {});
-    return () => unsub();
-  }, [phoneNumbersProp?.dispatcher, phoneNumbersProp?.routing]);
-
-  const phoneNumbers = phoneNumbersProp?.dispatcher || phoneNumbersProp?.routing ? phoneNumbersProp : (phoneNumbersFallback || phoneNumbersProp);
+  const phoneNumbers = phoneNumbersProp;
   const me = useMemo(
     () => {
       const rawMe = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
@@ -1028,9 +1017,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const runTripActionOnFirstPress = useCallback((event, action) => {
-    if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+    // Run before Mobile Safari changes the visual viewport. Blurring the
+    // focused odometer field here dismisses the keyboard and can cancel the
+    // same gesture, leaving Save/Cancel apparently unresponsive. Preventing
+    // the synthetic click also guarantees that async actions run only once.
+    if (event.button !== undefined && event.button !== 0) return;
     event.preventDefault();
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     void action();
   }, []);
 
@@ -1058,14 +1050,19 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [defaultTripId, setActiveWorkTripId, setExpandedTripId, userKey]);
 
   const handlePullTouchStart = useCallback((e) => {
-    pullStartY.current = e.touches[0].clientY;
-  }, []);
+    const scrollTop = tripsScrollRef.current?.scrollTop ?? 0;
+    pullStartY.current = activeNav === 'trips' && scrollTop <= 0
+      ? e.touches[0].clientY
+      : null;
+  }, [activeNav]);
 
   const handlePullTouchMove = useCallback((e) => {
     if (pullStartY.current === null || isRefreshing) return;
     const delta = e.touches[0].clientY - pullStartY.current;
-    if (delta > 0) {
+    if (delta > 0 && (tripsScrollRef.current?.scrollTop ?? 0) <= 0) {
       setPullDistance(Math.min(delta * 0.25, 120));
+    } else {
+      setPullDistance(0);
     }
   }, [isRefreshing]);
 
@@ -1310,7 +1307,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       try {
         const coords = await geocodeAddress(addr);
         if (coords?.lat && coords?.lng) {
-          addressCoordsCache.current[addr] = { lat: coords.lat, lng: coords.lng, type };
+          addressCoordsCache.current[addr] = { ...coords, lat: coords.lat, lng: coords.lng, type };
         }
       } catch (e) { console.warn('[geocode]', e); }
     }
@@ -1451,18 +1448,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   // visually stable when the on-screen keyboard opens. On resizing viewports
   // (Android) the browser itself keeps the centered window above the
   // keyboard and this lift computes to zero. On non-resizing viewports
-  // (iOS) it measures how much of the open window is covered and lifts it by
-  // exactly that amount (--agape-kb-shift). A ResizeObserver on the open
-  // window plus focus listeners keep the lift self-correcting, and the
-  // trip-window-open class stops the background page from panning.
+  // (iOS) the fixed overlay must not be repositioned after focus: WebKit can
+  // keep painting the native caret in its original coordinate space. The
+  // viewport events below only track keyboard state; the focused input is
+  // scrolled inside the panel by focusTripWindowInput.
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return undefined;
     const visualViewport = window.visualViewport;
     let frame = 0;
     let settleTimer = 0;
     let observedPanel = null;
-    let fullHeight = window.innerHeight;
-    let lastShiftWritten = null;
     const syncWindowShift = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
@@ -1474,25 +1469,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           if (panel) resizeObserver.observe(panel);
           observedPanel = panel;
         }
-        fullHeight = Math.max(fullHeight, window.innerHeight);
-        const visibleBottom = Math.min(window.innerHeight, visualViewport.offsetTop + visualViewport.height);
-        const keyboardOpen = fullHeight - visibleBottom > 120;
+        const viewportTop = Math.max(0, Math.round(visualViewport.offsetTop || 0));
+        const viewportHeight = Math.max(1, Math.round(visualViewport.height || window.innerHeight));
+        const keyboardOpen = viewportHeight + viewportTop < window.innerHeight - 120;
         document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
-        // When the browser itself shrinks the layout viewport (Android
-        // resizes-content), flex-end docking already puts the window above
-        // the keyboard — any extra transform lift would move the painted
-        // window away from its touch targets, so keep the transform at zero.
-        // The measured lift is only for viewports that do NOT resize (iOS).
-        const contentResized = fullHeight - window.innerHeight > 120;
-        let shift = 0;
-        if (panel && keyboardOpen && !contentResized) {
-          const rect = panel.getBoundingClientRect();
-          shift = Math.max(0, Math.ceil(rect.bottom - visibleBottom + 30));
-        }
-        if (shift !== lastShiftWritten) {
-          lastShiftWritten = shift;
-          document.documentElement.style.setProperty('--agape-kb-shift', `${shift}px`);
-        }
       });
     };
     const scheduleSettlePass = () => {
@@ -1501,7 +1481,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
     // Rotation changes the portrait/landscape baseline; without this reset
     // the stale taller baseline keeps the keyboard heuristic stuck ON.
-    const resetBaseline = () => { fullHeight = window.innerHeight; syncWindowShift(); };
+    const resetBaseline = () => syncWindowShift();
     const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncWindowShift) : null;
     syncWindowShift();
     visualViewport.addEventListener('resize', syncWindowShift);
@@ -1528,7 +1508,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       document.removeEventListener('focusout', scheduleSettlePass, true);
       document.documentElement.classList.remove('trip-window-open');
       document.documentElement.classList.remove('trip-window-kb-open');
-      document.documentElement.style.setProperty('--agape-kb-shift', '0px');
     };
   }, []);
 
@@ -1917,6 +1896,32 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
   }, []);
 
+  const resolveVerifiedPickupLocation = useCallback(async (trip) => {
+    const persisted = getTripPickupLocation(trip);
+    if (persisted) return persisted;
+
+    const pickupAddress = typeof trip?.pickup === 'object'
+      ? String(trip.pickup?.address || '').trim()
+      : String(trip?.pickup || '').trim();
+    if (!pickupAddress) return null;
+
+    const cached = addressCoordsCache.current[pickupAddress];
+    const geocoded = cached || await geocodeAddress(pickupAddress);
+    const location = verifyGeocodedAddress(pickupAddress, geocoded);
+    if (!location) return null;
+    const { lat, lng } = location;
+    addressCoordsCache.current[pickupAddress] = { ...location, type: 'pickup' };
+    await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
+      pickupLat: lat,
+      pickupLng: lng,
+      pickupCoordinatesVerifiedAt: new Date().toISOString(),
+      pickupCoordinatesSource: cached ? 'verified_geocode_cache' : 'google_geocode',
+      ...(geocoded?.placeId ? { pickupPlaceId: geocoded.placeId } : {}),
+      ...(geocoded?.formattedAddress ? { pickupFormattedAddress: geocoded.formattedAddress } : {}),
+    }));
+    return location;
+  }, [getTripPickupLocation, onUpdateTrip]);
+
   const getDriverClockLocation = useCallback(() => (
     driverPosition?.lat && driverPosition?.lng
       ? { lat: driverPosition.lat, lng: driverPosition.lng }
@@ -1924,6 +1929,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   ), [driverPosition?.lat, driverPosition?.lng]);
 
   const clockHistory = useMemo(() => {
+    if (activeNav !== 'settings') {
+      return { days: [], weekDays: [], weeklyTotal: 0, weeklyOvertime: 0 };
+    }
     const events = [...(me?.clockEvents || []), ...immutableTimeDeclarations];
     const today = new Date();
     const days = [];
@@ -2024,7 +2032,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const weeklyTotal = weeklyMilliseconds / 3600000;
     const weeklyOvertime = weeklyTotal > 40 ? weeklyTotal - 40 : 0;
     return { days, weekDays, weeklyTotal, weeklyOvertime };
-  }, [driverScopedTrips, driverTelemetry, immutableTimeDeclarations, me, timeTrackingPolicyMode]);
+  }, [activeNav, driverScopedTrips, driverTelemetry, immutableTimeDeclarations, me, timeTrackingPolicyMode]);
 
   // Cleanup timekeeping interval on unmount.
   useEffect(() => {
@@ -2411,7 +2419,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   useEffect(() => {
     if (!me?.pendingClockOut || activeTrips.length === 0 || pendingCancelInFlightRef.current) return;
     pendingCancelInFlightRef.current = true;
-    onDriverStatusUpdate?.(driverId, true, {
+    onDriverStatusUpdate?.(driverId, isClockedIn, {
       pendingClockOut: null,
       pendingClockOutCanceledAt: new Date().toISOString(),
       pendingClockOutCancelReason: 'ACTIVE_WORK_FOUND',
@@ -2420,7 +2428,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     });
     const timer = setTimeout(() => { pendingCancelInFlightRef.current = false; }, 3000);
     return () => clearTimeout(timer);
-  }, [activeTrips.length, driverId, me?.name, me?.pendingClockOut, onDriverStatusUpdate]);
+  }, [activeTrips.length, driverId, isClockedIn, me?.name, me?.pendingClockOut, onDriverStatusUpdate]);
 
   // Detect ride-sharing opportunities — deduplicated, max 3
   useEffect(() => {
@@ -2489,7 +2497,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   // Batch update ETAs (limit to first 3 trips, 30s interval to avoid rate limits)
   useEffect(() => {
-    if (!(activeNav !== 'tools' && activeNav !== 'settings') || activeTrips.length === 0) return undefined;
+    if (!['trips', 'active-trip'].includes(activeNav) || activeTrips.length === 0) return undefined;
     const refreshEtas = async () => {
       const pos = positionRef.current;
       if (!pos?.lat || !pos?.lng) return;
@@ -2507,7 +2515,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   // Geofence proximity detection — check every 15s if near pickup/dropoff
   useEffect(() => {
-    if (activeNav === 'settings' || activeTrips.length === 0) return undefined;
+    if (!['trips', 'active-trip'].includes(activeNav) || activeTrips.length === 0) return undefined;
     const timer = setInterval(() => {
       const pos = positionRef.current;
       if (!pos?.lat || !pos?.lng) return;
@@ -3079,12 +3087,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setOdometerError('');
     // Record pickup arrival + departure timestamps using canonical fields
     const nowIso = new Date().toISOString();
-    const pickupLocation = getTripPickupLocation(showOdometerPrompt);
+    let pickupLocation = await resolveVerifiedPickupLocation(showOdometerPrompt);
     const driverLocation = getDriverClockLocation();
-    if (pickupLocation && driverLocation) {
-      const arrivalCheck = validateArrival(driverLocation.lat, driverLocation.lng, pickupLocation.lat, pickupLocation.lng);
-      if (!arrivalCheck.valid) {
-        setShowToast({ type: 'warning', message: `You are ${arrivalCheck.distanceFeet}ft from pickup. Move closer before confirming arrival.` });
+    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showOdometerPrompt, driver: me, pickupLocation, driverLocation, odometer: odo });
+    if (!verifiedWorkEvidence.valid) {
+      if (verifiedWorkEvidence.code === 'MISSING_PICKUP_LOCATION') {
+        const retryPickupLocation = await resolveVerifiedPickupLocation(showOdometerPrompt);
+        const retryEvidence = evaluateVerifiedTripWorkEvidence({ trip: showOdometerPrompt, driver: me, pickupLocation: retryPickupLocation, driverLocation, odometer: odo });
+        if (retryEvidence.valid) {
+          pickupLocation = retryPickupLocation;
+          Object.assign(verifiedWorkEvidence, retryEvidence);
+        } else {
+          setShowToast({ type: 'warning', message: 'Pickup coordinates are not verified. Refresh the trip before continuing.', action: 'refresh-coordinates', trip: showOdometerPrompt, odometer: odo });
+          return;
+        }
+      } else {
+        setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
         return;
       }
     }
@@ -3117,12 +3135,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       onDriverStatusUpdate?.(driverId, true, {
         clockTimestamp: autoClockInTime,
         clockEventType: 'auto_in',
+        clockEventSource: 'verified_trip_pickup',
         timeTrackingState: TT.ON_SHIFT_ACTIVE,
         timeTrackingPolicy: timeTrackingPolicyMode,
         timeTrackingAnchor: anchorType,
         timeTrackingTravelMinutes: travelMin,
         timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
         timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
+        verifiedWorkEvidence,
         ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
       });
       setTtState(TT.ON_SHIFT_ACTIVE);
@@ -3146,6 +3166,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
+      verifiedWorkEvidence,
       ...(homeTravel?.minutes > 0 ? {
         homeToPickupTravelMinutes: homeTravel.minutes,
         homeToPickupCalculatedAt: nowIso,
@@ -3204,12 +3225,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const odo = arrivalEvaluation.value;
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
-    const pickupLocation = getTripPickupLocation(showArrivalConfirm);
+    let pickupLocation = await resolveVerifiedPickupLocation(showArrivalConfirm);
     const driverLocation = getDriverClockLocation();
-    if (pickupLocation && driverLocation) {
-      const arrivalCheck = validateArrival(driverLocation.lat, driverLocation.lng, pickupLocation.lat, pickupLocation.lng);
-      if (!arrivalCheck.valid) {
-        setShowToast({ type: 'warning', message: `You are ${arrivalCheck.distanceFeet}ft from pickup. Move closer before confirming arrival.` });
+    let verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation, driverLocation, odometer: odo });
+    if (!verifiedWorkEvidence.valid) {
+      if (verifiedWorkEvidence.code === 'MISSING_PICKUP_LOCATION') {
+        const retryPickupLocation = await resolveVerifiedPickupLocation(showArrivalConfirm);
+        const retryEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation: retryPickupLocation, driverLocation, odometer: odo });
+        if (retryEvidence.valid) {
+          pickupLocation = retryPickupLocation;
+          verifiedWorkEvidence = retryEvidence;
+        } else {
+          setShowToast({ type: 'warning', message: 'Pickup coordinates are not verified. Refresh the trip before continuing.', action: 'refresh-coordinates', trip: showArrivalConfirm, odometer: odo });
+          return;
+        }
+      } else {
+        setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
         return;
       }
     }
@@ -3240,12 +3271,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       onDriverStatusUpdate?.(driverId, true, {
         clockTimestamp: autoClockInTime,
         clockEventType: 'auto_in',
+        clockEventSource: 'verified_trip_pickup',
         timeTrackingState: TT.ON_SHIFT_ACTIVE,
         timeTrackingPolicy: timeTrackingPolicyMode,
         timeTrackingAnchor: anchorType,
         timeTrackingTravelMinutes: travelMin,
         timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
         timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
+        verifiedWorkEvidence,
         ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
       });
       setTtState(TT.ON_SHIFT_ACTIVE);
@@ -3269,6 +3302,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
+      verifiedWorkEvidence,
       ...(homeTravel?.minutes > 0 ? {
         homeToPickupTravelMinutes: homeTravel.minutes,
         homeToPickupCalculatedAt: nowIso,
@@ -4011,22 +4045,21 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <ChevronLeft size={22} strokeWidth={2.2} />
             </button>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-semibold text-slate-950 leading-tight truncate uppercase">{trip.patient || 'Trip'}</h1>
+              <h1 className="text-xl font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
               <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
                 <Clock size={16} /> {scheduledTime}
               </p>
             </div>
-            <button type="button" onClick={() => copyText(trip.bookingId || trip.id, 'Trip ID')} className="shrink-0 rounded-xl bg-white px-3 py-2 text-left border border-slate-200 shadow-sm">
-              <span className="block text-[10px] font-semibold text-slate-400">Trip ID</span>
-              <span className="text-xs font-semibold text-blue-600">{trip.bookingId || trip.id || '--'}</span>
+            <button type="button" onClick={() => copyText(trip.bookingId || trip.id, 'Trip ID')} className="shrink-0 rounded-xl bg-blue-50 px-3 py-2 text-left border border-blue-100">
+              <span className="text-sm font-semibold leading-tight text-blue-700">Trip: {trip.bookingId || trip.id || '--'}</span>
             </button>
 
           </div>
         </div>
 
-        <div className="px-4 pt-4 space-y-4">
+        <div className="px-2 pt-2 space-y-3">
           <div className="rounded-xl overflow-hidden bg-white border border-slate-200 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-            <div className="relative px-5 py-5">
+            <div className="relative px-4 py-3">
               <div className="absolute right-4 top-4 flex gap-1 opacity-10">
                 <span className="w-2 h-2 rounded-full bg-white" />
                 <span className="w-2 h-2 rounded-full bg-white" />
@@ -4035,68 +4068,66 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <div className="flex items-start justify-between gap-3">
                 <div>
                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Scheduled Time</p>
-                  <p className="mt-1 text-3xl font-semibold tracking-tight leading-none text-slate-950">{scheduledTime}</p>
+                  <p className="mt-0.5 text-2xl font-semibold tracking-tight leading-none text-slate-950">{scheduledTime}</p>
                 </div>
                 <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-xs font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
                   {trip.status || 'Assigned'}
                 </span>
               </div>
 
-              <div className="mt-6 grid grid-cols-[20px_1fr] gap-x-4">
+              <div className="mt-4 grid grid-cols-[16px_1fr] gap-x-3">
                 <div className="row-span-2 flex flex-col items-center pt-1.5">
-                  <span className="w-4 h-4 rounded-full border-[3px] border-blue-600 bg-white" />
-                    <span className="w-0.5 flex-1 min-h-[92px] my-1 border-l-2 border-dashed border-slate-300" />
-                  <span className="w-4 h-4 rounded-full border-[3px] border-emerald-600 bg-white" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-blue-300 ring-2 ring-white" />
+                    <span className="w-0.5 flex-1 min-h-[72px] my-1 bg-slate-200" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-300 ring-2 ring-white" />
                 </div>
 
-                <div className="pb-3">
+                <div className="pb-2">
                   <p className="text-xs font-medium uppercase tracking-normal text-blue-600">From</p>
-                  <p className="mt-1 text-base font-semibold leading-snug text-slate-950 break-words">{pickupAddress || '--'}</p>
-                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-950 break-words">{pickupAddress || '--'}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
                     <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-slate-400">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md">
-                      <Navigation size={16} strokeWidth={2.5} /> Navigate
+                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-11 cursor-pointer text-xs font-semibold text-white">
+                      <span className="flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 shadow-sm hover:bg-blue-700"><Navigation size={16} strokeWidth={2.5} /> Navigate</span>
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <p className="text-xs font-medium uppercase tracking-normal text-emerald-600">To</p>
-                  <p className="mt-1 text-base font-semibold leading-snug text-slate-950 break-words">{dropoffAddress || '--'}</p>
-                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-950 break-words">{dropoffAddress || '--'}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
                     <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-slate-400" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md">
-                      <Navigation size={16} strokeWidth={2.5} /> Navigate
+                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-11 cursor-pointer text-xs font-semibold text-white">
+                      <span className="flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 shadow-sm hover:bg-emerald-700"><Navigation size={16} strokeWidth={2.5} /> Navigate</span>
                     </button>
                   </div>
                 </div>
               </div>
-
+              <div className="mt-2 grid grid-cols-4 gap-2">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
+                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-emerald-600"><Phone size={17} /> Call</span>
+                </button>
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
+                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-blue-600"><MessageCircle size={17} /> SMS</span>
+                </button>
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-11 text-white text-xs font-semibold cursor-pointer">
+                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-violet-600"><PhoneForwarded size={17} /> Contacts</span>
+                </button>
+                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-11 text-slate-700 text-xs font-semibold cursor-pointer">
+                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-slate-100"><MoreHorizontal size={17} /> More</span>
+                </button>
+              </div>
             </div>
           </div>
 
-              <div className="grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="min-h-16 rounded-xl bg-white border border-slate-200 disabled:opacity-40 text-slate-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
-                  <Phone size={16} /> Call
-                </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="min-h-16 rounded-xl bg-white border border-slate-200 disabled:opacity-40 text-slate-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
-                  <MessageCircle size={16} /> SMS
-                </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="min-h-16 rounded-xl bg-white border border-slate-200 text-violet-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
-                  <PhoneForwarded size={16} /> Contacts
-                </button>
-                <button type="button" onClick={() => setShowMoreOptions(trip)} className="min-h-16 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-semibold flex flex-col items-center justify-center gap-1 cursor-pointer shadow-sm">
-                  <MoreHorizontal size={16} /> More
-                </button>
-              </div>
-
-          <div className="rounded-xl bg-white border border-slate-200 shadow-sm px-3 py-4">
+          <div className="rounded-xl bg-white border border-slate-200 shadow-sm px-3 py-3">
             <div className="flex items-start gap-2">
               <div className="flex min-w-0 flex-1 items-start">
                 {TRIP_WORK_STEPS.map((label, idx) => {
@@ -4124,7 +4155,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 type="button"
                 onClick={handleStepBack}
                 disabled={!stepBackTarget}
-                className="mt-0 flex h-12 w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-35"
+                className="mt-0 flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-35"
                 title={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
                 aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
               >
@@ -4141,7 +4172,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </span>
               <ChevronDown size={18} className={`ml-auto transition-transform ${workNotesOpen ? 'rotate-180' : ''}`} />
             </button>
-            {workNotesOpen && <div className="px-4 pb-4 text-xs font-medium text-amber-900 leading-relaxed">
+            {(workNotesOpen || Boolean(notes)) && <div className="px-4 pb-4 text-sm font-medium text-amber-900 leading-relaxed">
               {notes || <span className="italic text-amber-700">No driver notes for this trip.</span>}
             </div>}
           </div>
@@ -4160,9 +4191,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               type="button"
               onClick={bottomAction.onClick}
               disabled={!primary}
-              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-20 ${bottomAction.gradient} text-white rounded-xl font-semibold text-sm uppercase tracking-normal transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-70 cursor-pointer`}
+              className={`${(trip.status === 'In Progress' || trip.status === 'In Transit') ? 'flex-[3]' : 'flex-1'} h-12 text-white font-semibold text-sm uppercase tracking-normal transition-all disabled:opacity-70 cursor-pointer`}
             >
-              {bottomAction.icon} {bottomAction.label}
+              <span className={`flex h-10 w-full items-center justify-center gap-2 rounded-xl shadow-lg ${bottomAction.gradient}`}>{bottomAction.icon} {bottomAction.label}</span>
             </button>
             {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
               skipConfirmTripId === `work-${trip.id}` ? (
@@ -5576,8 +5607,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             </div>
 
             <div className="trip-window-footer px-4 pb-4">
-              <button type="button" onClick={closeScheduleEditor} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onClick={saveScheduleEdit} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Save</button>
+              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, closeScheduleEditor)} onClick={closeScheduleEditor} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, saveScheduleEdit)} onClick={saveScheduleEdit} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Save</button>
             </div>
           </div>
         </div>
@@ -5616,7 +5647,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 )}
               </div>
               <div className="trip-window-footer px-4 pb-4">
-                <button type="button" onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, () => setShowOdometerPrompt(null))} onClick={() => setShowOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
                 <button
                   type="button"
                   onPointerDown={(event) => runTripActionOnFirstPress(event, submitOdometer)}
@@ -5665,7 +5696,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 )}
               </div>
               <div className="trip-window-footer px-4 pb-4">
-                <button type="button" onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, () => setRouteStopOdometerPrompt(null))} onClick={() => setRouteStopOdometerPrompt(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
                 <button
                   type="button"
                   onPointerDown={(event) => runTripActionOnFirstPress(event, submitRouteStopOdometer)}
@@ -5759,8 +5790,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <p className="mt-2 text-center text-xs font-semibold text-slate-500">Confirm arrival details before proceeding.</p>
             </div>
             <div className="trip-window-footer px-4 pb-4">
-              <button type="button" onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onClick={confirmArrival} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
+              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, () => setShowArrivalConfirm(null))} onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
+              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, confirmArrival)} onClick={confirmArrival} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
             </div>
           </div>
         </div>
@@ -5865,7 +5896,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </div>
 
               <div className="trip-window-footer px-4 pb-4">
-                <button type="button" onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, () => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); })} onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
                 <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, submitComplete)} onClick={submitComplete} disabled={!completeOdometer || completionBlocked} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
               </div>
             </div>
@@ -6597,7 +6628,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-extrabold text-slate-900">Oil mileage cycle</p>
-                        <p className="mt-1 text-[11px] font-semibold text-slate-600">{vehicleMaintenance.oil.milesRemaining.toLocaleString()} miles remaining · due at {vehicleMaintenance.oil.nextServiceOdometer.toLocaleString()} mi</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-600">{formatOilRemaining(vehicleMaintenance.oil.milesRemaining)} · due at {vehicleMaintenance.oil.nextServiceOdometer.toLocaleString()} mi</p>
                         <p className="mt-0.5 text-[10px] text-slate-500">Interval {vehicleMaintenance.oil.intervalMiles.toLocaleString()} mi · last reset {vehicleMaintenance.oil.lastServiceOdometer?.toLocaleString() || 'not recorded'} mi</p>
                       </div>
                       <span className="rounded-lg bg-white/80 px-2 py-1 text-[10px] font-extrabold uppercase text-slate-700">{vehicleMaintenance.oil.status.replace('_', ' ')}</span>
@@ -6611,7 +6642,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-extrabold text-slate-900">Annual filter cycle</p>
-                        <p className="mt-1 text-[11px] font-semibold text-slate-600">{vehicleMaintenance.filter.nextServiceDate ? `Due ${vehicleMaintenance.filter.nextServiceDate} · ${vehicleMaintenance.filter.daysRemaining} days remaining` : 'A verified service date is required'}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-600">{formatFilterRemaining(vehicleMaintenance.filter.daysRemaining)}{vehicleMaintenance.filter.nextServiceDate ? ` · due ${vehicleMaintenance.filter.nextServiceDate}` : ''}</p>
                         <p className="mt-0.5 text-[10px] text-slate-500">Interval {vehicleMaintenance.filter.intervalMonths} months · last reset {vehicleMaintenance.filter.lastServiceDate || 'not recorded'}</p>
                       </div>
                       <span className="rounded-lg bg-white/80 px-2 py-1 text-[10px] font-extrabold uppercase text-slate-700">{vehicleMaintenance.filter.status.replace('_', ' ')}</span>
@@ -7755,6 +7786,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             {showToast.action === 'arrive-dropoff' && (
               <button type="button" onClick={() => { setShowToast(null); if (showToast.trip) handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-semibold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
                 Arrive
+              </button>
+            )}
+            {showToast.action === 'refresh-coordinates' && (
+              <button type="button" onClick={() => setShowToast(null)} className="px-4 py-2 bg-emerald-500 rounded-xl text-xs font-semibold text-white hover:bg-emerald-400 transition-all shrink-0 cursor-pointer">
+                Refresh
               </button>
             )}
             <button type="button" onClick={() => setShowToast(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 cursor-pointer">

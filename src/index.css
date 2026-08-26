@@ -438,7 +438,7 @@ body {
   height: 100vh;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -678,7 +678,7 @@ a,
   font-weight: var(--font-black);
   letter-spacing: -0.04em;
   line-height: 0.9;
-  font-family: 'Outfit', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--gradient-brand);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2255,12 +2255,14 @@ table th {
 
 @media (min-width: 768px) {
   table th {
-    resize: horizontal;
-    cursor: col-resize;
+    resize: none;
+    cursor: default;
   }
 
-  table th:hover {
-    box-shadow: inset -3px 0 0 rgba(255, 255, 255, 0.5);
+  table th button,
+  table th a,
+  table th [role='button'] {
+    cursor: pointer;
   }
 }
 
@@ -2312,16 +2314,7 @@ table th {
   }
 }
 
-/* ===== TABLE ROW SELECTION & FONT FIXES ===== */
-table tbody tr[data-agape-selected="true"],
-table tbody tr[data-agape-selected="true"]:hover {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.5) !important;
-}
-[data-theme="dark"] table tbody tr[data-agape-selected="true"],
-[data-theme="dark"] table tbody tr[data-agape-selected="true"]:hover {
-  background-color: rgba(59, 130, 246, 0.25) !important;
-}
+/* ===== TABLE FONT & POINTER FIXES ===== */
 table tbody td {
   font-weight: 400 !important;
 }
@@ -2330,6 +2323,66 @@ table tbody td *:not(button):not(.btn):not(.badge):not(.driver-history-detail-la
 }
 table, table *, table th, table td {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+table td {
+  cursor: default;
+}
+
+@media (pointer: fine) {
+  button:not(:disabled),
+  a[href],
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
+.operations-manifest-row,
+.agape-trip-list-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+
+/* Admin/dispatcher pages embedded in the shared Driver-style mobile shell. */
+.admin-mobile-section-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.375rem;
+  overflow-x: auto;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 0.5rem 0.75rem;
+  scrollbar-width: none;
+}
+
+.admin-mobile-section-tabs::-webkit-scrollbar { display: none; }
+
+.admin-mobile-section-tabs button {
+  display: inline-flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.5rem 0.75rem;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.admin-mobile-section-tabs button.is-active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+@media (max-width: 767px) {
+  .admin-embedded-content {
+    padding: 0.75rem !important;
+    padding-bottom: 6rem !important;
+  }
 }
 
 /* ===== FAST INTERACTION / MODAL PERFORMANCE PASS =====
@@ -2419,20 +2472,19 @@ textarea {
      overlay simply fills the visible area, so the browser itself keeps the
      window centered and fully visible above the keyboard — no JS math, no
      possible gap.
-   - Non-resizing viewports (iOS): DriverPage measures the covered part of
-     the open window and lifts it by exactly that amount via --agape-kb-shift
-     (smooth transform, self-correcting). */
-:root {
-  --agape-kb-shift: 0px;
-}
+   - Non-resizing viewports (iOS): the overlay remains fixed in one painting
+     coordinate system after focus. The focused field scrolls inside the
+     panel instead of moving the fixed ancestor under its native caret. */
 
 .trip-window-overlay {
   position: fixed;
   inset: 0;
+  height: 100dvh;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .trip-window-panel {
@@ -2442,13 +2494,11 @@ textarea {
   flex-direction: column;
   width: 100%;
   max-width: 24rem;
-  max-height: min(72dvh, 34rem, 100%);
+  max-height: min(34rem, calc(100% - 1rem));
   background: #ffffff;
   border-radius: 1.5rem;
   box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.35);
   pointer-events: auto;
-  transform: translateY(calc(-1 * var(--agape-kb-shift, 0px)));
-  transition: transform 160ms ease-out;
 }
 
 /* While a trip window is open, stop the background page from panning when
@@ -2458,15 +2508,8 @@ html.trip-window-open body {
   overflow: hidden !important;
 }
 
-/* When the keyboard is open, dock the window just above it (8px gap)
-   instead of centering — no floating empty space between window and
-   keyboard. On Android the browser's own resize does the work; on iOS the
-   measured --agape-kb-shift lift lands the window at the same spot. */
-html.trip-window-kb-open .trip-window-overlay {
-  justify-content: flex-end;
-  align-items: flex-end;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
-}
+/* With the keyboard open, retain only a small visual-viewport edge gap. */
+html.trip-window-kb-open .trip-window-overlay { padding-block: 0.35rem; }
 
 /* Touch hardening: no double-tap-zoom delay or ghost highlights inside
    trip windows, and no scroll chaining from the overlay to the page. */
@@ -2481,11 +2524,14 @@ html.trip-window-kb-open .trip-window-overlay {
   overscroll-behavior: none;
 }
 
-/* Mobile WebKit can paint the caret outside a transformed keyboard-docked
-   dialog. Odometer fields show the complete value while it is entered, so
-   hide only their caret; ordinary text inputs retain normal caret behavior. */
+/* Keep a visible, scoped caret in trip-progress odometer fields. */
 .trip-odometer-input {
-  caret-color: transparent;
+  caret-color: #2a52ac;
+  line-height: 1.25rem;
+  font-size: 1rem;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: textfield;
 }
 
 /* Signature windows get extra breathing room for a comfortable confirm. */
@@ -2509,8 +2555,9 @@ html.trip-window-kb-open .trip-window-overlay {
 }
 
 @supports not (height: 1dvh) {
+  .trip-window-overlay { height: 100vh; }
   .trip-window-panel {
-    max-height: min(72vh, 34rem, 100%);
+    max-height: min(34rem, calc(100% - 1rem));
   }
 }
 
@@ -5389,6 +5436,149 @@ html, body {
   color: #050505;
 }
 
+.agape-messenger-input-wrap textarea {
+  width: 100%;
+  max-height: 6rem;
+  resize: none;
+  overflow-y: auto;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35rem;
+  outline: none;
+}
+
+.agape-messenger-input-wrap textarea::placeholder { color: #94a3b8; }
+
+.agape-chat-pinned-banner { box-shadow: inset 3px 0 0 #2a52ac; }
+
+.agape-message-actions {
+  min-height: 2rem;
+  opacity: 0.72;
+  transition: opacity 160ms ease;
+}
+
+.agape-messenger-bubble-row:hover .agape-message-actions,
+.agape-message-actions:focus-within { opacity: 1; }
+
+.agape-message-actions > button {
+  display: inline-flex;
+  min-width: 1.875rem;
+  min-height: 1.875rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  color: #64748b;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.agape-message-actions > button:hover { background: #fff; color: #2a52ac; }
+.agape-message-actions > button:active { transform: scale(0.94); }
+.agape-message-actions > button.is-pinned { color: #d97706; }
+.agape-message-actions > button.is-destructive:hover { color: #e11d48; }
+
+/* Premium secure-chat visual surface */
+.agape-messenger-sidebar {
+  background: #f8fafc;
+}
+
+.agape-chat-sidebar-head {
+  margin: 10px 10px 2px;
+  border: 1px solid rgb(42 82 172 / 12%);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 8%, rgb(255 255 255 / 24%), transparent 30%),
+    linear-gradient(135deg, #2a52ac 0%, #1f428f 100%);
+  box-shadow: 0 12px 30px rgb(42 82 172 / 16%);
+}
+
+.agape-chat-sidebar-head p,
+.agape-chat-sidebar-head h1 { color: #fff !important; }
+.agape-chat-sidebar-head p:last-child { color: rgb(255 255 255 / 72%) !important; }
+.agape-chat-sidebar-head > div:last-child button { background: #fff; color: #2a52ac; box-shadow: 0 8px 20px rgb(15 23 42 / 18%); }
+
+.agape-messenger-search-bar {
+  border-color: #dbe4f5 !important;
+  background: #fff !important;
+  box-shadow: 0 5px 18px rgb(15 23 42 / 5%);
+}
+
+.agape-messenger-list { padding: 4px 6px 12px; background: transparent !important; }
+.agape-messenger-row {
+  border: 1px solid transparent;
+  background: rgb(255 255 255 / 72%);
+}
+.agape-messenger-row:hover { border-color: #dbe4f5; background: #fff; box-shadow: 0 8px 24px rgb(15 23 42 / 6%); }
+.agape-messenger-row.is-active {
+  border-color: rgb(42 82 172 / 18%);
+  background: linear-gradient(135deg, #eef4ff 0%, #fff 100%);
+  box-shadow: inset 3px 0 0 #2a52ac, 0 8px 22px rgb(42 82 172 / 8%);
+}
+
+.agape-messenger-thread-header {
+  min-height: 70px;
+  border-bottom-color: #e2e8f0;
+  background: rgb(255 255 255 / 88%) !important;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 4%);
+}
+.agape-chat-secure-pill { background: #eef4ff; color: #2a52ac; }
+.agape-chat-thread-intro { border: 1px solid #dbe4f5; background: rgb(255 255 255 / 86%); color: #64748b; box-shadow: 0 5px 15px rgb(15 23 42 / 4%); }
+
+.agape-messenger-thread-messages {
+  background:
+    radial-gradient(circle at 15% 0%, rgb(42 82 172 / 7%), transparent 30%),
+    radial-gradient(circle at 90% 90%, rgb(16 185 129 / 5%), transparent 28%),
+    #f6f8fc !important;
+}
+.agape-messenger-date-divider {
+  margin: 14px auto 8px;
+  padding: 5px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 82%);
+  color: #64748b;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 4%);
+}
+.agape-messenger-bubble {
+  padding: 11px 15px;
+  line-height: 1.48;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 7%);
+}
+.agape-messenger-bubble-group.is-sent .agape-messenger-bubble {
+  background: linear-gradient(135deg, #2a52ac 0%, #3969ce 100%);
+  box-shadow: 0 9px 22px rgb(42 82 172 / 22%);
+}
+.agape-messenger-bubble-group.is-received .agape-messenger-bubble {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+}
+.agape-message-actions {
+  width: fit-content;
+  margin-top: 3px;
+  padding: 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 86%);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 5%);
+}
+.agape-messenger-composer {
+  margin: 8px 10px 10px;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 96%) !important;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 10%);
+}
+
+@media (max-width: 767px) {
+  .agape-chat-sidebar-head { margin: 8px 8px 2px; padding: 14px 14px 12px; }
+  .agape-messenger-thread-header { min-height: 66px; }
+  .agape-messenger-composer { margin: 6px 8px 8px; padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px)); }
+  .agape-message-actions { max-width: 100%; overflow-x: auto; }
+}
+
 .agape-messenger-input-wrap input::placeholder {
   color: #8a8d91;
 }
@@ -5820,11 +6010,6 @@ table tbody tr {
   transition: background-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
-table tbody tr[data-agape-selected="true"] {
-  background: #f3f5fa;
-  box-shadow: inset 3px 0 0 #2a52ac;
-}
-
 input,
 select,
 textarea,
@@ -6198,6 +6383,67 @@ textarea:focus,
   }
 }
 
+/* Compact, edge-to-edge chat composer. Keep this after shared textarea and
+   touch-target rules so the one-line field is not inflated to 44–70px. */
+.agape-messenger-container,
+.agape-messenger-main,
+.agape-messenger-thread {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The feed must be allowed to shrink inside the flex thread; otherwise its
+   content height expands behind the thread's overflow clip and mobile has no
+   real scroll viewport. Keep this as the only vertical scroll owner. */
+.agape-messenger-thread-messages {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.agape-messenger-composer {
+  min-height: 3rem;
+  margin: 0 !important;
+  padding: 0.375rem 0.5rem !important;
+  gap: 0.375rem !important;
+  align-items: center !important;
+  border-width: 1px 0 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 -4px 14px rgb(15 23 42 / 5%) !important;
+}
+
+.agape-messenger-input-wrap {
+  height: 2.25rem;
+  min-height: 2.25rem !important;
+  padding: 0 0.75rem !important;
+  align-items: stretch !important;
+}
+
+.agape-messenger-input-wrap .agape-chat-composer-textarea {
+  display: block;
+  width: 100%;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 6rem !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.35rem !important;
+  overflow-y: auto;
+}
+
+@media (max-width: 767px) {
+  .agape-messenger-composer {
+    padding-bottom: calc(0.375rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  body.keyboard-visible .agape-messenger-composer {
+    padding-bottom: 0.375rem !important;
+  }
+}
+
 /* ===== FINAL MOBILE RENDER PERFORMANCE POLICY =====
    This must stay last. Mobile GPUs should composite only purposeful motion. */
 @media (pointer: coarse), (max-width: 900px) {
@@ -6226,5 +6472,3 @@ textarea:focus,
     animation: none !important;
   }
 }
-
-
