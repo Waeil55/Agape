@@ -5852,8 +5852,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Departed Pickup Time</label>
+                    <div className="text-center">
                     <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} onChange={(e) => updateCompletionDeparture(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none" />
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Pickup Odometer</label>
@@ -5866,8 +5868,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Arrival Dropoff Time</label>
+                    <div className="text-center">
                     <input type="time" value={arrivalDropoffTime} min={departedTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none" />
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-rose-600 mb-1">Final Odometer (mi)</label>
