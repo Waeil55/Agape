@@ -3725,7 +3725,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       now: value,
     });
     setDepartedTime(normalized.pickupDeparture);
-    setArrivalDropoffTime(normalized.dropoffArrival);
+    if (normalized.dropoffArrival !== arrivalDropoffTime) {
+      setArrivalDropoffTime(normalized.dropoffArrival);
+    }
     setCompleteError('');
     setCompleteTimeNotice(normalized.pickupDeparture !== value
       ? `Pickup departure cannot precede pickup arrival. It was adjusted to ${to12hrFromTimeInput(normalized.pickupDeparture)}.`
@@ -3740,6 +3742,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       now: value,
     });
     setArrivalDropoffTime(normalized.dropoffArrival);
+    if (normalized.pickupDeparture !== departedTime) {
+      setDepartedTime(normalized.pickupDeparture);
+    }
     setCompleteError('');
     setCompleteTimeNotice(normalized.dropoffArrival !== value
       ? `Dropoff arrival cannot precede pickup departure. It was adjusted to ${to12hrFromTimeInput(normalized.dropoffArrival)}.`
