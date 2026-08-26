@@ -2530,8 +2530,6 @@ html.trip-window-kb-open .trip-window-overlay { padding-block: 0.35rem; }
   line-height: 1.25rem;
   font-size: 1rem;
   box-sizing: border-box;
-  -webkit-appearance: none;
-  appearance: textfield;
 }
 
 /* Signature windows get extra breathing room for a comfortable confirm. */

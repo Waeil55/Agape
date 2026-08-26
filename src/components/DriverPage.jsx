@@ -5625,11 +5625,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </div>
                 <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Current Odometer (mi)</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   autoFocus
                   value={odometerValue}
-                  onChange={(e) => { setOdometerValue(e.target.value); setOdometerError(''); }}
+                  onChange={(e) => { setOdometerValue(e.target.value.replace(/[^0-9]/g, '')); setOdometerError(''); }}
                   placeholder='Enter full odometer reading'
                   className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
@@ -5674,11 +5675,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </div>
                 <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   autoFocus
                   value={routeStopOdometerValue}
-                  onChange={(e) => { setRouteStopOdometerValue(e.target.value); setOdometerError(''); }}
+                  onChange={(e) => { setRouteStopOdometerValue(e.target.value.replace(/[^0-9]/g, '')); setOdometerError(''); }}
                   placeholder="Enter odometer reading"
                   className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
@@ -5750,7 +5752,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <div className="bg-slate-50 rounded-xl p-3 space-y-2">
                 <div>
                   <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival (mi)</label>
-                  <input type="number" inputMode="numeric" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value)}
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value.replace(/[^0-9]/g, ''))}
                     className="trip-odometer-input w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none"
                   />
                 </div>
@@ -5864,11 +5866,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-rose-600 mb-1">Final Odometer (mi)</label>
                     <input
-                      type="number"
+                      type="text"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       autoFocus
                       value={completeOdometer}
-                      onChange={(e) => { setCompleteOdometer(e.target.value); setCompleteError(''); }}
+                      onChange={(e) => { setCompleteOdometer(e.target.value.replace(/[^0-9]/g, '')); setCompleteError(''); }}
                       placeholder="Final reading"
                       className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                     />
