@@ -5624,6 +5624,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                 </div>
                 <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Current Odometer (mi)</label>
+                <div className="text-center">
                 <input
                   type="text"
                   inputMode="numeric"
@@ -5632,8 +5633,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   value={odometerValue}
                   onChange={(e) => { setOdometerValue(e.target.value.replace(/[^0-9]/g, '')); setOdometerError(''); }}
                   placeholder='Enter full odometer reading'
-                  className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
+                  className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
+                </div>
                 <OdometerGuardFeedback compact evaluation={arrivalEvaluation} ack={odometerAck} onAckChange={setOdometerAck} />
                 {odometerError && (
                   <p className="mt-2 text-center text-xs font-semibold text-rose-600">{odometerError}</p>
@@ -5674,6 +5676,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                 </div>
                 <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival</label>
+                <div className="text-center">
                 <input
                   type="text"
                   inputMode="numeric"
@@ -5682,8 +5685,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   value={routeStopOdometerValue}
                   onChange={(e) => { setRouteStopOdometerValue(e.target.value.replace(/[^0-9]/g, '')); setOdometerError(''); }}
                   placeholder="Enter odometer reading"
-                  className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
+                  className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
+                </div>
                 <OdometerGuardFeedback compact evaluation={stopEvaluation} ack={odometerAck} onAckChange={setOdometerAck} />
                 {odometerError && (
                   <p className="mt-2 text-center text-xs font-semibold text-rose-600">{odometerError}</p>
@@ -5752,9 +5756,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <div className="bg-slate-50 rounded-xl p-3 space-y-2">
                 <div>
                   <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival (mi)</label>
+                  <div className="text-center">
                   <input type="text" inputMode="numeric" pattern="[0-9]*" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="trip-odometer-input w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none"
+                    className="trip-odometer-input w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none"
                   />
+                  </div>
                 </div>
                 {showArrivalConfirm.bookingId && (
                   <div className="flex justify-between items-center">
@@ -5865,6 +5871,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-rose-600 mb-1">Final Odometer (mi)</label>
+                    <div className="text-center">
                     <input
                       type="text"
                       inputMode="numeric"
@@ -5873,8 +5880,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       value={completeOdometer}
                       onChange={(e) => { setCompleteOdometer(e.target.value.replace(/[^0-9]/g, '')); setCompleteError(''); }}
                       placeholder="Final reading"
-                      className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm text-center outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
+                      className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                     />
+                    </div>
                   </div>
                 </div>
 

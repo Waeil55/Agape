@@ -2529,6 +2529,7 @@ html.trip-window-kb-open .trip-window-overlay { padding-block: 0.35rem; }
   caret-color: #2a52ac;
   line-height: 1.25rem;
   font-size: 1rem;
+  text-align: center;
   box-sizing: border-box;
 }
 
