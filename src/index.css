@@ -2508,8 +2508,22 @@ html.trip-window-open body {
   overflow: hidden !important;
 }
 
-/* With the keyboard open, retain only a small visual-viewport edge gap. */
-html.trip-window-kb-open .trip-window-overlay { padding-block: 0.35rem; }
+/* With the keyboard open (tracked by the visual-viewport effect), stop
+   centering in the full 100dvh. On iOS the visual viewport does not resize,
+   so a centered panel in the full height falls behind the keyboard and out
+   of reach. Anchor to the top of the visible area instead and bring the
+   focused input into that region. The panel's own body scrolls internally. */
+html.trip-window-kb-open .trip-window-overlay {
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding-block: max(0.35rem, env(safe-area-inset-top, 0px));
+}
+
+/* Keep the panel height bounded to the visible viewport so its bottom (and
+   the inputs near it) stay reachable above the keyboard. */
+html.trip-window-kb-open .trip-window-panel {
+  max-height: min(34rem, calc(100dvh - 1rem));
+}
 
 /* Touch hardening: no double-tap-zoom delay or ghost highlights inside
    trip windows, and no scroll chaining from the overlay to the page. */

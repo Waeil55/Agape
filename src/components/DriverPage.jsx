@@ -168,12 +168,17 @@ const OdometerBaselineLine = ({ vehicleName, miles }) => (
 // every trip-window opener calls this right after mounting its window.
 const focusTripWindowInput = () => {
   setTimeout(() => {
-    const el = document.querySelector('.trip-window-panel input[autofocus]');
-    if (el) {
-      try { el.focus({ preventScroll: true }); } catch { el.focus(); }
-      requestAnimationFrame(() => el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' }));
-    }
-  }, 80);
+    const el = document.querySelector('.trip-window-panel input[autofocus], .trip-window-panel input[type="time"]');
+    if (!el) return;
+    try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+    requestAnimationFrame(() => {
+      const body = el.closest('.trip-window-body') || document.querySelector('.trip-window-panel');
+      if (body) {
+        const target = body.getBoundingClientRect().top + (el.getBoundingClientRect().top - body.getBoundingClientRect().top) - 16;
+        body.scrollTop = Math.max(0, target);
+      }
+    });
+  }, 120);
 };
 
 const calculateBoundaryTravel = async (origin, destination) => {
