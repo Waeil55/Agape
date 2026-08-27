@@ -1478,6 +1478,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const viewportHeight = Math.max(1, Math.round(visualViewport.height || window.innerHeight));
         const keyboardOpen = viewportHeight + viewportTop < window.innerHeight - 120;
         document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
+        if (panel) {
+          // Drive the overlay/panel from the live visual viewport. On iOS the
+          // document size never changes when the keyboard opens, so only the
+          // visualViewport values describe the truly visible area above the
+          // keyboard. Storing them as CSS vars lets the panel bound itself to
+          // the visible area (never hiding behind or leaving a gap from the
+          // keyboard) without repositioning the fixed caret.
+          const top = viewportHeight + viewportTop < window.innerHeight - 40 ? viewportTop : 0;
+          panel.style.setProperty('--vvh', `${viewportHeight}px`);
+          panel.style.setProperty('--vvt', `${top}px`);
+        }
       });
     };
     const scheduleSettlePass = () => {
