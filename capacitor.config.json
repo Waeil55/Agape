@@ -12,6 +12,10 @@
   "plugins": {
     "Geolocation": {
       "permissions": "always"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
     }
   }
 }

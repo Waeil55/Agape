@@ -2526,6 +2526,21 @@ html.trip-window-kb-open .trip-window-panel {
   margin-top: var(--vvt, 0px);
 }
 
+/* Native Capacitor keyboard: the Keyboard plugin reports the exact on-screen
+   height (--kbh). The overlay is inset from the bottom by the keyboard height
+   so its remaining area (and the centered panel within it) always sits flush
+   above the keyboard — no gap, no top off-screen clipping, even when
+   WKWebView ignores visualViewport and does not resize the layout viewport. */
+html.trip-window-kb-native .trip-window-overlay {
+  bottom: var(--kbh, 0px);
+  height: auto;
+}
+
+html.trip-window-kb-native .trip-window-panel {
+  margin-top: 0;
+  max-height: min(34rem, calc(100% - 1rem));
+}
+
 /* Touch hardening: no double-tap-zoom delay or ghost highlights inside
    trip windows, and no scroll chaining from the overlay to the page. */
 .trip-window-overlay button,

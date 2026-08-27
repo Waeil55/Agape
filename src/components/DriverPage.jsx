@@ -1527,6 +1527,46 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
   }, []);
 
+  // Native (Capacitor) keyboard: WKWebView does not always resize the layout
+  // viewport / fire visualViewport changes on iOS, so use the Keyboard plugin
+  // events for a pixel-accurate keyboard height. Store it as a CSS var on the
+  // document so the trip-window overlay can bound the panel exactly above the
+  // keyboard with no gap and no off-screen clipping. Falls back silently when
+  // running in a plain browser.
+  useEffect(() => {
+    let didShowCancel = null;
+    let didHideCancel = null;
+    let cancelled = false;
+    const setKeyboardHeight = (px) => {
+      document.documentElement.style.setProperty('--kbh', px > 0 ? `${px}px` : '0px');
+      document.documentElement.classList.toggle('trip-window-kb-open', px > 0);
+      if (isNativeShell()) {
+        document.documentElement.classList.toggle('trip-window-kb-native', px > 0);
+      }
+    };
+    const register = () => {
+      if (!isNativeShell()) return;
+      Promise.all([
+        import('@capacitor/keyboard').then(({ Keyboard }) => {
+          didShowCancel = Keyboard.addListener('keyboardDidShow', (info) => setKeyboardHeight(info?.keyboardHeight || 0));
+          didHideCancel = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+          return null;
+        }).catch(() => null),
+        new Promise((resolve) => setTimeout(resolve, 50)),
+      ]).then(() => { if (cancelled) setKeyboardHeight(0); });
+    };
+    setKeyboardHeight(0);
+    register();
+    return () => {
+      cancelled = true;
+      if (didShowCancel) didShowCancel.remove();
+      if (didHideCancel) didHideCancel.remove();
+      document.documentElement.style.removeProperty('--kbh');
+      document.documentElement.classList.remove('trip-window-kb-open');
+      document.documentElement.classList.remove('trip-window-kb-native');
+    };
+  }, []);
+
   // GPS is mandatory — always active on mount
   // Clean up undo timeout on unmount
   useEffect(() => {
