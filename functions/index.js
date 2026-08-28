@@ -189,6 +189,218 @@ async function requireAdmin(context) {
   return requireRole(context, ["admin"]);
 }
 
+const WELLTRANS_AGENT_ENROLLMENT_TTL_MS = 10 * 60 * 1000;
+const WELLTRANS_AGENT_TOKEN_MIN_INTERVAL_MS = 5 * 1000;
+const wellTransAgentHash = (value) => crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+const wellTransAgentSecret = () => crypto.randomBytes(32).toString("base64url");
+const wellTransAgentUid = () => `wta_${crypto.randomUUID().replace(/-/g, "")}`;
+const safeEqualHex = (left, right) => {
+  try {
+    const leftBytes = Buffer.from(String(left || ""), "hex");
+    const rightBytes = Buffer.from(String(right || ""), "hex");
+    return leftBytes.length === 32 && rightBytes.length === 32
+      && crypto.timingSafeEqual(leftBytes, rightBytes);
+  } catch (_error) {
+    return false;
+  }
+};
+
+const writeAgentJson = (response, status, payload) => {
+  response.set("Cache-Control", "no-store");
+  response.set("X-Content-Type-Options", "nosniff");
+  response.status(status).json(payload);
+};
+
+exports.createWellTransAgentEnrollment = functions.https.onCall(async (data, context) => {
+  const actor = await requireAdmin(context);
+  const label = String(data?.label || "Windows WellTrans Agent").trim().slice(0, 120);
+  const grantId = crypto.randomUUID();
+  const grantSecret = wellTransAgentSecret();
+  const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + WELLTRANS_AGENT_ENROLLMENT_TTL_MS);
+  await admin.firestore().doc(`welltrans_agent_enrollments/${grantId}`).create({
+    secretHash: wellTransAgentHash(grantSecret),
+    label,
+    status: "pending",
+    tenantId: actor.tenantId,
+    createdBy: context.auth.uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt,
+  });
+  await admin.firestore().collection("audit_logs").add({
+    action: "welltrans.agent_enrollment_created",
+    entityType: "welltrans_agent_enrollment",
+    entityId: grantId,
+    actorId: context.auth.uid,
+    tenantId: actor.tenantId,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return {
+    grantId,
+    grantSecret,
+    expiresAtMs: expiresAt.toMillis(),
+    exchangeUrl: `https://us-central1-${runtimeProjectId || "agape-95c9f"}.cloudfunctions.net/exchangeWellTransAgentEnrollment`,
+  };
+});
+
+exports.exchangeWellTransAgentEnrollment = functions.https.onRequest(async (request, response) => {
+  if (request.method !== "POST") return writeAgentJson(response, 405, { ok: false, error: "POST is required" });
+  const grantId = String(request.body?.grantId || "").trim();
+  const grantSecret = String(request.body?.grantSecret || "");
+  const deviceLabel = String(request.body?.deviceLabel || "Windows WellTrans Agent").trim().slice(0, 120);
+  if (!/^[0-9a-f-]{36}$/i.test(grantId) || grantSecret.length < 32) {
+    return writeAgentJson(response, 400, { ok: false, error: "Enrollment grant is invalid" });
+  }
+  try {
+    const grantRef = admin.firestore().doc(`welltrans_agent_enrollments/${grantId}`);
+    const deviceId = wellTransAgentUid();
+    const deviceSecret = wellTransAgentSecret();
+    let tenantId = "agape-care";
+    let createdBy = "unknown";
+    await admin.firestore().runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(grantRef);
+      if (!snapshot.exists) throw new Error("Enrollment grant was not found");
+      const grant = snapshot.data() || {};
+      if (grant.status !== "pending") throw new Error("Enrollment grant was already used");
+      if ((grant.expiresAt?.toMillis?.() || 0) <= Date.now()) throw new Error("Enrollment grant expired");
+      if (!safeEqualHex(grant.secretHash, wellTransAgentHash(grantSecret))) throw new Error("Enrollment grant is invalid");
+      tenantId = grant.tenantId || tenantId;
+      createdBy = grant.createdBy || createdBy;
+      transaction.create(admin.firestore().doc(`welltrans_agent_devices/${deviceId}`), {
+        deviceId,
+        label: deviceLabel || grant.label || "Windows WellTrans Agent",
+        secretHash: wellTransAgentHash(deviceSecret),
+        active: true,
+        tenantId,
+        enrolledBy: createdBy,
+        enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastTokenAt: null,
+        lastSeenAt: null,
+      });
+      transaction.update(grantRef, {
+        status: "consumed",
+        consumedByDeviceId: deviceId,
+        consumedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    try {
+      await admin.auth().createUser({ uid: deviceId, displayName: deviceLabel || "Agape WellTrans Agent", disabled: false });
+    } catch (authError) {
+      // Do not leave a consumed grant or an apparently active device when the
+      // corresponding Firebase Auth identity could not be created.
+      await admin.firestore().runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(grantRef);
+        if (snapshot.data()?.consumedByDeviceId === deviceId) {
+          transaction.delete(admin.firestore().doc(`welltrans_agent_devices/${deviceId}`));
+          transaction.update(grantRef, {
+            status: "pending",
+            consumedByDeviceId: admin.firestore.FieldValue.delete(),
+            consumedAt: admin.firestore.FieldValue.delete(),
+          });
+        }
+      }).catch(() => {});
+      throw authError;
+    }
+    await admin.firestore().collection("audit_logs").add({
+      action: "welltrans.agent_enrolled",
+      entityType: "welltrans_agent_device",
+      entityId: deviceId,
+      actorId: createdBy,
+      tenantId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return writeAgentJson(response, 200, {
+      ok: true,
+      deviceId,
+      deviceSecret,
+      projectId: runtimeProjectId || "agape-95c9f",
+      storageBucket: "agape-95c9f.firebasestorage.app",
+      tokenUrl: `https://us-central1-${runtimeProjectId || "agape-95c9f"}.cloudfunctions.net/issueWellTransAgentToken`,
+    });
+  } catch (error) {
+    functions.logger.warn("WellTrans Agent enrollment exchange rejected", { message: error.message });
+    return writeAgentJson(response, 403, { ok: false, error: error.message || "Enrollment was rejected" });
+  }
+});
+
+exports.issueWellTransAgentToken = functions.https.onRequest(async (request, response) => {
+  if (request.method !== "POST") return writeAgentJson(response, 405, { ok: false, error: "POST is required" });
+  const deviceId = String(request.body?.deviceId || "").trim();
+  const deviceSecret = String(request.body?.deviceSecret || "");
+  if (!/^wta_[0-9a-f]{32}$/i.test(deviceId) || deviceSecret.length < 32) {
+    return writeAgentJson(response, 401, { ok: false, error: "Device credential is invalid" });
+  }
+  try {
+    const deviceRef = admin.firestore().doc(`welltrans_agent_devices/${deviceId}`);
+    let tenantId = "agape-care";
+    await admin.firestore().runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(deviceRef);
+      if (!snapshot.exists) throw new Error("Device is not enrolled");
+      const device = snapshot.data() || {};
+      if (device.active !== true) throw new Error("Device enrollment is revoked");
+      if (!safeEqualHex(device.secretHash, wellTransAgentHash(deviceSecret))) throw new Error("Device credential is invalid");
+      const lastTokenAt = device.lastTokenAt?.toMillis?.() || 0;
+      if (Date.now() - lastTokenAt < WELLTRANS_AGENT_TOKEN_MIN_INTERVAL_MS) throw new Error("Token request rate limit reached");
+      tenantId = device.tenantId || tenantId;
+      transaction.update(deviceRef, {
+        lastTokenAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    const customToken = await admin.auth().createCustomToken(deviceId, {
+      welltransAgent: true,
+      tenantId,
+    });
+    return writeAgentJson(response, 200, { ok: true, customToken });
+  } catch (error) {
+    functions.logger.warn("WellTrans Agent token request rejected", { deviceId, message: error.message });
+    return writeAgentJson(response, 401, { ok: false, error: error.message || "Device authorization failed" });
+  }
+});
+
+exports.listWellTransAgentDevices = functions.https.onCall(async (_data, context) => {
+  await requireAdmin(context);
+  const snapshot = await admin.firestore().collection("welltrans_agent_devices").orderBy("enrolledAt", "desc").limit(100).get();
+  return {
+    devices: snapshot.docs.map((document) => {
+      const device = document.data() || {};
+      return {
+        id: document.id,
+        label: device.label || "Windows WellTrans Agent",
+        active: device.active === true,
+        enrolledAtMs: device.enrolledAt?.toMillis?.() || null,
+        lastSeenAtMs: device.lastSeenAt?.toMillis?.() || null,
+      };
+    }),
+  };
+});
+
+exports.revokeWellTransAgentDevice = functions.https.onCall(async (data, context) => {
+  const actor = await requireAdmin(context);
+  const deviceId = String(data?.deviceId || "").trim();
+  if (!/^wta_[0-9a-f]{32}$/i.test(deviceId)) {
+    throw new functions.https.HttpsError("invalid-argument", "A valid enrolled device ID is required.");
+  }
+  const deviceRef = admin.firestore().doc(`welltrans_agent_devices/${deviceId}`);
+  const snapshot = await deviceRef.get();
+  if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Enrolled device was not found.");
+  await deviceRef.set({
+    active: false,
+    revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+    revokedBy: context.auth.uid,
+  }, { merge: true });
+  await admin.auth().revokeRefreshTokens(deviceId).catch(() => {});
+  await admin.auth().updateUser(deviceId, { disabled: true }).catch(() => {});
+  await admin.firestore().collection("audit_logs").add({
+    action: "welltrans.agent_revoked",
+    entityType: "welltrans_agent_device",
+    entityId: deviceId,
+    actorId: context.auth.uid,
+    tenantId: actor.tenantId,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { success: true, deviceId };
+});
+
 function requireRecentAuthentication(context, maxAgeSeconds = 300) {
   const authenticatedAt = Number(context.auth?.token?.auth_time || 0);
   const ageSeconds = Math.floor(Date.now() / 1000) - authenticatedAt;

@@ -6,13 +6,14 @@ $ErrorActionPreference = 'Stop'
 $ConfirmPreference = 'None'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Security
-$agentVersion = '5.0.2'
+$agentVersion = '5.1.0'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'
 $credentialPath = Join-Path $secretRoot 'agape-worker-service-account.json'
 $protectedCredentialPath = Join-Path $secretRoot 'agape-worker-service-account.protected'
 $federatedCredentialPath = Join-Path $secretRoot 'agape-worker-wif.json'
+$deviceCredentialPath = Join-Path $secretRoot 'agape-agent-device.vault'
 $sessionPath = Join-Path $secretRoot 'welltrans-session.enc'
 $installLog = Join-Path $secretRoot 'welltrans-agent-install.log'
 $runtimeRoot = Join-Path $installRoot 'runtime'
@@ -111,14 +112,12 @@ try {
       Sort-Object LastWriteTime -Descending |
       Select-Object -First 1
     if ($candidate) {
-      Copy-Item -LiteralPath $candidate.FullName -Destination $credentialPath -Force
+      Move-Item -LiteralPath $candidate.FullName -Destination $credentialPath -Force
     }
   }
-  if (-not (Test-Path -LiteralPath $federatedCredentialPath) -and
-      -not (Test-Path -LiteralPath $protectedCredentialPath) -and
-      -not (Test-Path -LiteralPath $credentialPath)) {
-    throw "This computer is not enrolled. Preferred: place agape-worker-wif.json in Downloads. Legacy fallback: place the service-account file at $credentialPath."
-  }
+  # Enrollment is intentionally optional during installation. A signed-in
+  # Agape administrator enrolls this specific PC through the local service
+  # after installation; no Firebase private-key JSON is needed.
   if (Test-Path -LiteralPath $credentialPath) {
     $credentialBytes = [IO.File]::ReadAllBytes($credentialPath)
     $protectedBytes = [System.Security.Cryptography.ProtectedData]::Protect(
@@ -133,13 +132,15 @@ try {
   $sessionKey = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_KEY', 'User')
   if (-not $sessionKey) {
     $keyBytes = New-Object byte[] 32
-    [Security.Cryptography.RandomNumberGenerator]::Fill($keyBytes)
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($keyBytes) } finally { $rng.Dispose() }
     $sessionKey = [Convert]::ToBase64String($keyBytes)
     [Environment]::SetEnvironmentVariable('WELLTRANS_SESSION_KEY', $sessionKey, 'User')
   }
   [Environment]::SetEnvironmentVariable('WELLTRANS_SESSION_FILE', $sessionPath, 'User')
   [Environment]::SetEnvironmentVariable('WELLTRANS_PORTAL_URL', 'https://tripspark.welltransnemt.com/', 'User')
   [Environment]::SetEnvironmentVariable('WELLTRANS_ALLOWED_HOSTS', 'tripspark.welltransnemt.com', 'User')
+  [Environment]::SetEnvironmentVariable('AGAPE_DEVICE_CREDENTIAL_FILE', $deviceCredentialPath, 'User')
 
   if (-not (Test-Path -LiteralPath $nodeExecutable)) {
     $nodeArchitecture = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
@@ -193,6 +194,7 @@ try {
 
   Push-Location $installRoot
   try {
+    $env:Path = "$nodeRoot;$env:Path"
     & $npmExecutable ci --omit=dev --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw "npm installation failed with code $LASTEXITCODE." }
     if (-not $SkipBrowserInstall) {
@@ -215,8 +217,40 @@ try {
   Set-Item -Path "$protocolKey\shell\open\command" -Value $command
 
   Set-Content -LiteralPath (Join-Path $installRoot 'VERSION') -Value $agentVersion -NoNewline
-  & icacls.exe $secretRoot /inheritance:r /grant:r "$env:USERNAME`:(OI)(CI)F" | Out-Null
+  $windowsIdentity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+  if (-not $windowsIdentity) {
+    throw 'Unable to resolve the current Windows identity for the Agent secret directory.'
+  }
+  & icacls.exe $secretRoot /inheritance:r /grant:r "${windowsIdentity}:(OI)(CI)F" | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to secure the Agent secret directory for $windowsIdentity."
+  }
+  $env:WELLTRANS_SESSION_KEY = $sessionKey
+  $env:WELLTRANS_CREDENTIAL_FILE = Join-Path $secretRoot 'welltrans-login.vault'
+  $env:AGAPE_DEVICE_CREDENTIAL_FILE = $deviceCredentialPath
+  $env:AGAPE_LOCAL_SETTINGS_PORT = '43127'
+  $env:AGAPE_LOCAL_SETTINGS_ORIGINS = 'https://agape5.web.app'
+  $settingsHost = Join-Path $installRoot 'src\welltrans.settings-host.js'
+  $settingsHostRuntime = Join-Path $env:LOCALAPPDATA 'AgapeCare\Runtime'
+  New-Item -ItemType Directory -Path $settingsHostRuntime -Force | Out-Null
+  $settingsHostPidPath = Join-Path $settingsHostRuntime 'welltrans-settings-host.pid'
+  $existingSettingsHost = $null
+  if (Test-Path -LiteralPath $settingsHostPidPath) {
+    $settingsHostPid = 0
+    [void][int]::TryParse((Get-Content -LiteralPath $settingsHostPidPath -Raw).Trim(), [ref]$settingsHostPid)
+    if ($settingsHostPid -gt 0) { $existingSettingsHost = Get-Process -Id $settingsHostPid -ErrorAction SilentlyContinue }
+  }
+  if ($existingSettingsHost) {
+    Stop-Process -Id $existingSettingsHost.Id -Force -ErrorAction SilentlyContinue
+  }
+  $settingsHostProcess = Start-Process -FilePath $nodeExecutable -ArgumentList "`"$settingsHost`"" -WindowStyle Hidden -PassThru
+  Set-Content -LiteralPath $settingsHostPidPath -Value $settingsHostProcess.Id -NoNewline
   Write-Host "Agape WellTrans Agent $agentVersion installed successfully." -ForegroundColor Green
+  if (-not (Test-Path -LiteralPath $deviceCredentialPath) -and
+      -not (Test-Path -LiteralPath $federatedCredentialPath) -and
+      -not (Test-Path -LiteralPath $protectedCredentialPath)) {
+    Write-Host 'Next: sign in to Agape as an administrator and click Enroll This PC.' -ForegroundColor Yellow
+  }
 } finally {
   Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
 }

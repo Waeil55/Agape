@@ -277,7 +277,7 @@ async function writeAssignmentsToCollection(trips = [], tenantId) {
   }
 }
 
-export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = true } = {}) {
+export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = true, includeActivity = true } = {}) {
   const activeTenantId = normalizeTenantId(tenantId);
   const [state, setState] = useState({
     trips: [], drivers: [], dispatchers: [], vehicles: [], trashedTrips: [], logs: [],
@@ -544,7 +544,9 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     cleanupFns.push(setupListener(collection(db, DISPATCHER_PROFILE_COLLECTION), (snap) => applyCollectionData('dispatchers', snap), 'Dispatchers'));
     cleanupFns.push(setupListener(collection(db, VEHICLE_COLLECTION), (snap) => applyCollectionData('vehicles', snap), 'Vehicles'));
     cleanupFns.push(setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION), applyTripProgressSnapshot, 'TripProgress'));
-    cleanupFns.push(setupListener(collection(db, 'logs'), (snap) => applyCollectionData('logs', snap), 'Activity'));
+    if (includeActivity) {
+      cleanupFns.push(setupListener(collection(db, 'logs'), (snap) => applyCollectionData('logs', snap), 'Activity'));
+    }
 
     const unsubPhones = onSnapshot(doc(db, PHONE_NUMBERS_DOC), (snap) => {
       if (cancelled) return;
@@ -578,7 +580,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       unsubscribers.forEach((unsub) => unsub());
     };
 
-  }, [activeTenantId, resubscribeKey, enabled]);
+  }, [activeTenantId, resubscribeKey, enabled, includeActivity]);
 
   const writeField = useCallback(async (field, value) => {
     const previousData = dataRef.current;

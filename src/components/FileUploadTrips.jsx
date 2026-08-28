@@ -984,6 +984,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             const c = cleanPhone(raw);
             return raw && isValidPhone(c) ? raw : '';
           })(),
+          fromCity: extract(row['From City'], row['From City '], row['City (Orig)'], row['Origin City'], row['pickupCity']),
+          toCity: extract(row['To City'], row['To City '], row['City (Dest)'], row['Destination City'], row['dropoffCity']),
 
           // --- TYPE & NOTES ---
           type: extract(m.type, row['Space Types'], row['Type'], row['Service Type'], row['Req'], row['req']),
@@ -1017,6 +1019,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
           // --- MILEAGE ---
           distance,
+          originalTripCost: parseFloat(String(extract(row['Original Trip Cost'], row['Provider Cost'], row['providerCost'], row['Trip Cost'])).replace(/[$,]/g, '')) || null,
+          unloadedMileageMiles: parseFloat(String(extract(row['Unloaded Miles'], row['unloadedMileageMiles'])).replace(/,/g, '')) || null,
+          overrideWaitingHours: parseFloat(String(extract(row['Wait time hours -(30 min)'], row['Billable Waiting Hours'], row['overrideWaitingHours'])).replace(/,/g, '')) || null,
 
 
 

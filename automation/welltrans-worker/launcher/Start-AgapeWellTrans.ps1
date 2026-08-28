@@ -12,6 +12,7 @@ $workerDirectory = Split-Path -Parent $PSScriptRoot
 $secretDirectory = Join-Path $env:USERPROFILE 'AgapeSecrets'
 $protectedCredentialPath = Join-Path $secretDirectory 'agape-worker-service-account.protected'
 $federatedCredentialPath = Join-Path $secretDirectory 'agape-worker-wif.json'
+$deviceCredentialPath = Join-Path $secretDirectory 'agape-agent-device.vault'
 $runtimeDirectory = Join-Path $env:LOCALAPPDATA 'AgapeCare\Runtime'
 $runtimeCredentialPath = Join-Path $runtimeDirectory "welltrans-credential-$PID.json"
 $requestedDatePath = Join-Path $runtimeDirectory 'requested-service-date.txt'
@@ -91,6 +92,7 @@ try {
   }
   $env:WELLTRANS_SESSION_KEY = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_KEY', 'User')
   $env:WELLTRANS_CREDENTIAL_FILE = $wellTransCredentialPath
+  $env:AGAPE_DEVICE_CREDENTIAL_FILE = $deviceCredentialPath
   $env:AGAPE_LOCAL_SETTINGS_PORT = '43127'
   $env:AGAPE_LOCAL_SETTINGS_ORIGINS = 'https://agape5.web.app'
   if (-not $env:WELLTRANS_SESSION_KEY) {
@@ -233,7 +235,11 @@ try {
   Start-Transcript -Path $transcriptPath -Append | Out-Null
 
   New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
-  if (Test-Path -LiteralPath $federatedCredentialPath) {
+  if (Test-Path -LiteralPath $deviceCredentialPath) {
+    Remove-Item Env:\GOOGLE_APPLICATION_CREDENTIALS -ErrorAction SilentlyContinue
+    $env:AGAPE_DEVICE_CREDENTIAL_FILE = $deviceCredentialPath
+    $env:AGAPE_WORKER_CREDENTIAL_MODE = 'device_enrollment'
+  } elseif (Test-Path -LiteralPath $federatedCredentialPath) {
     $federatedConfig = Get-Content -LiteralPath $federatedCredentialPath -Raw | ConvertFrom-Json
     if ($federatedConfig.type -ne 'external_account') {
       throw 'The enrolled Workload Identity configuration is not an external_account credential.'
@@ -257,7 +263,7 @@ try {
     $env:GOOGLE_APPLICATION_CREDENTIALS = $runtimeCredentialPath
     $env:AGAPE_WORKER_CREDENTIAL_MODE = 'legacy_dpapi_service_account'
   } else {
-    throw 'This computer is not enrolled. Install a Workload Identity external-account configuration or contact an Agape administrator.'
+    throw 'This computer is not enrolled. In Agape, open WellTrans Agent Setup and click Enroll This PC.'
   }
   $env:GOOGLE_CLOUD_PROJECT = 'agape-95c9f'
   $env:WELLTRANS_SESSION_KEY = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_KEY', 'User')
@@ -265,6 +271,7 @@ try {
   $env:WELLTRANS_PORTAL_URL = [Environment]::GetEnvironmentVariable('WELLTRANS_PORTAL_URL', 'User')
   $env:WELLTRANS_ALLOWED_HOSTS = [Environment]::GetEnvironmentVariable('WELLTRANS_ALLOWED_HOSTS', 'User')
   $env:WELLTRANS_CREDENTIAL_FILE = $wellTransCredentialPath
+  $env:AGAPE_DEVICE_CREDENTIAL_FILE = $deviceCredentialPath
   $env:AGAPE_LOCAL_SETTINGS_PORT = '43127'
   $env:AGAPE_LOCAL_SETTINGS_ORIGINS = 'https://agape5.web.app'
   $env:WELLTRANS_ENABLE_WRITES = 'true'

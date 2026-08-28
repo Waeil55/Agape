@@ -27,13 +27,14 @@ describe('driver mobile active-trip navigation regression', () => {
 
   it('suppresses only odometer carets affected by the transformed mobile dialog', () => {
     expect(driverSource.match(/trip-odometer-input/g)).toHaveLength(4);
-    expect(appCss).toContain('.trip-odometer-input {\n  caret-color: transparent;\n}');
+    expect(appCss).toContain('.trip-odometer-input {\n  caret-color: #2a52ac;\n  line-height: 1.25rem;\n  font-size: 1rem;\n  text-align: center;\n  box-sizing: border-box;\n}');
     expect(appCss).not.toMatch(/(?:^|\n)input\s*\{[^}]*caret-color:\s*transparent/s);
   });
 
-  it('avoids the corruptible persistent Firestore cache on iOS WebKit', () => {
-    expect(firebaseSource).toContain('usesWebKitIndexedDbRiskRuntime');
-    expect(firebaseSource).toMatch(/usesWebKitIndexedDbRiskRuntime[\s\S]*localCache: memoryLocalCache\(\)/);
+  it('avoids the corruptible persistent Firestore target cache on every client', () => {
+    expect(firebaseSource).toContain('localCache: memoryLocalCache()');
+    expect(firebaseSource).not.toContain('persistentLocalCache');
+    expect(firebaseSource).not.toContain('persistentMultipleTabManager');
     expect(appDataSource).toContain('Target ID already exists|delete range from database without an in-progress transaction');
     expect(appDataSource).toContain('The local Firestore cache became invalid. Close and reopen Agape Care');
   });

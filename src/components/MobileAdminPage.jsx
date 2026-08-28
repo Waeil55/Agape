@@ -227,6 +227,7 @@ const MobileAdminPage = ({
   updateAppSettings,
   isLoading = false,
   readOnly = false,
+  embeddedMobile = false,
 }) => {
   const [pwResetMsg, setPwResetMsg] = useState({});
   const [activeTab, setActiveTab] = useState('overview');
@@ -379,6 +380,7 @@ const MobileAdminPage = ({
       eyebrow=""
       hideBrand
       navInline
+      embeddedMobile={embeddedMobile}
       actions={
         <AdminBadge tone={unassignedTrips.length ? 'danger' : 'online'} dot>
           {unassignedTrips.length ? `${unassignedTrips.length} open` : 'Live'}

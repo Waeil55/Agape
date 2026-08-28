@@ -5,7 +5,7 @@ import AIInsightsBanner from './AIInsightsBanner';
 import { aiAnalyzeDriver } from '../config/ai';
 import { geocodeAddress } from '../config/maps';
 import { POLICY_MODES } from '../utils/timeTracking';
-import { getVehicleMaintenanceStatus, normalizeMaintenancePolicy, summarizeFleetMaintenance } from '../utils/fleetMaintenance';
+import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus, normalizeMaintenancePolicy, summarizeFleetMaintenance } from '../utils/fleetMaintenance';
 import { localCalendarYmd } from '../utils/tripDate';
 import { functions, httpsCallable } from '../config/firebase';
 
@@ -735,10 +735,10 @@ const [form, setForm] = useState({
                       </div>
                     </div>
                     <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-semibold ${['overdue', 'due'].includes(service.oil.status) ? 'border-rose-200 bg-rose-50 text-rose-700' : service.oil.status === 'due_soon' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                      Oil: {service.oil.status.replace('_', ' ')} · {service.oil.milesRemaining.toLocaleString()} mi · due {service.oil.nextServiceOdometer.toLocaleString()} mi
+                      Oil: {formatOilRemaining(service.oil.milesRemaining)} · due at {service.oil.nextServiceOdometer.toLocaleString()} mi
                     </div>
                     <div className={`mt-2 rounded-xl border px-3 py-2 text-xs font-semibold ${['overdue', 'due'].includes(service.filter.status) ? 'border-rose-200 bg-rose-50 text-rose-700' : ['due_soon', 'setup_required'].includes(service.filter.status) ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                      Filter: {service.filter.status === 'setup_required' ? 'service baseline required' : `${service.filter.status.replace('_', ' ')} · due ${service.filter.nextServiceDate}`}
+                      Filter: {formatFilterRemaining(service.filter.daysRemaining)}{service.filter.nextServiceDate ? ` · due ${service.filter.nextServiceDate}` : ''}
                     </div>
                     <select value={assignedDriver?.id || ''} onChange={async (e) => {
                       const driverId = e.target.value;
@@ -793,7 +793,7 @@ const [form, setForm] = useState({
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{v.make || '-'} {v.model || ''}</td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden md:table-cell">{v.year || '-'} / {v.color || '-'}</td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600 hidden lg:table-cell font-mono">{v.plate || '-'} / {v.vin ? v.vin.slice(-6) : '-'}</td>
-                        <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs hidden lg:table-cell"><p className="font-semibold text-slate-700">{service.odometer.toLocaleString()} mi</p><p className={['overdue', 'due'].includes(service.oil.status) ? 'text-rose-600' : service.oil.status === 'due_soon' ? 'text-amber-600' : 'text-emerald-600'}>Oil: {service.oil.status.replace('_', ' ')}</p><p className={['overdue', 'due'].includes(service.filter.status) ? 'text-rose-600' : ['due_soon', 'setup_required'].includes(service.filter.status) ? 'text-amber-600' : 'text-emerald-600'}>Filter: {service.filter.status.replace('_', ' ')}</p></td>
+                        <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs hidden lg:table-cell"><p className="font-semibold text-slate-700">{service.odometer.toLocaleString()} mi</p><p className={['overdue', 'due'].includes(service.oil.status) ? 'text-rose-600' : service.oil.status === 'due_soon' ? 'text-amber-600' : 'text-emerald-600'}>Oil: {formatOilRemaining(service.oil.milesRemaining)}</p><p className={['overdue', 'due'].includes(service.filter.status) ? 'text-rose-600' : ['due_soon', 'setup_required'].includes(service.filter.status) ? 'text-amber-600' : 'text-emerald-600'}>Filter: {formatFilterRemaining(service.filter.daysRemaining)}</p></td>
                         <td className="px-3 sm:px-6 py-1.5 text-xs sm:text-xs text-slate-600">
                           <select value={assignedDriver?.id || ''} onChange={async (e) => {
                             const driverId = e.target.value;

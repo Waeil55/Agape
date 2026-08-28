@@ -30,5 +30,12 @@ export function filterDriversForRole(role, currentUser, drivers = [], dispatcher
 export function filterTripsForRole(role, currentUser, trips = [], drivers = [], dispatchers = []) {
   if (role !== 'dispatcher') return trips;
   const scopedDrivers = filterDriversForRole(role, currentUser, drivers, dispatchers);
-  return trips.filter(trip => isTripInDispatcherScope(trip, scopedDrivers));
+  const scopedIds = new Set(scopedDrivers.map(driver => driver.id).filter(Boolean));
+  const scopedEmails = new Set(scopedDrivers.map(driver => normalizeEmail(driver.email)).filter(Boolean));
+  return trips.filter(trip => (
+    trip?.status === 'Unassigned'
+    || !trip?.driverId
+    || scopedIds.has(trip.driverId)
+    || scopedEmails.has(normalizeEmail(trip.driverEmail))
+  ));
 }

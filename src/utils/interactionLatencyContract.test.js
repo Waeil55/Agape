@@ -21,6 +21,10 @@ const appSource = readFileSync(
   new URL('../App.jsx', import.meta.url),
   'utf8',
 );
+const firebaseSource = readFileSync(
+  new URL('../config/firebase.js', import.meta.url),
+  'utf8',
+);
 
 describe('interaction latency regression contract', () => {
   it('paints optimistic field state before collection-wide persistence preparation', () => {
@@ -74,19 +78,27 @@ describe('interaction latency regression contract', () => {
     expect(chatSource).toContain('if (!currentUser || alerts) return;');
   });
 
-  it('does not scan every table row in the global capture-phase click handler', () => {
-    const clickHandlerStart = mainSource.indexOf("document.addEventListener('click'");
-    const clickHandlerEnd = mainSource.indexOf("document.addEventListener('keydown'", clickHandlerStart);
-    const clickHandler = mainSource.slice(clickHandlerStart, clickHandlerEnd);
-
-    expect(clickHandlerStart).toBeGreaterThan(-1);
-    expect(mainSource).toContain('let selectedTableRow = null');
-    expect(clickHandler).not.toContain('querySelectorAll');
+  it('does not install fake global table-row selection handlers', () => {
+    expect(mainSource).not.toContain('selectedTableRow');
+    expect(mainSource).not.toContain("closest('tbody tr')");
+    expect(mainSource).not.toContain("querySelectorAll('tbody tr')");
   });
 
   it('marks telemetry and declaration echoes as non-urgent rendering work', () => {
     expect(appSource).toContain('startTransition(() => setDriverTelemetry(filtered))');
     expect(appSource).toContain('startTransition(() => setTimeTrackingDeclarations(recentDeclarations))');
     expect(appSource).toContain('startTransition(() => setDriverTelemetry((prev) => {');
+  });
+
+  it('keeps driver sessions off the unused activity stream and indexes trip driver emails', () => {
+    expect(appSource).toContain("includeActivity: role === 'admin' || role === 'dispatcher'");
+    expect(appDataSource).toContain('if (includeActivity) {');
+    expect(appSource).toContain('const driverEmailById = useMemo(() => new Map(');
+    expect(appSource).not.toContain("drivers.find(driver => driver.id === trip.driverId)?.email");
+  });
+
+  it('does not initialize unused analytics during application startup', () => {
+    expect(firebaseSource).not.toContain("from 'firebase/analytics'");
+    expect(firebaseSource).not.toContain('getAnalytics(app)');
   });
 });

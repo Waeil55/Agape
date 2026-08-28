@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
-import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
+import { isClockBefore, latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
 import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress, verifyGeocodedAddress } from '../config/maps';
@@ -40,6 +40,8 @@ import {
 } from '../utils/timeTracking';
 import { impact, selection } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
+import { resolveBrowserKeyboardViewport, resolveKeyboardViewport } from '../utils/keyboardViewport';
+import { requestFreshCurrentLocation } from '../utils/currentLocation';
 
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
@@ -166,9 +168,17 @@ const OdometerBaselineLine = ({ vehicleName, miles }) => (
 // Mobile soft keyboards only appear for focus that happens close to the
 // user's tap. autoFocus alone is unreliable inside async React commits, so
 // every trip-window opener calls this right after mounting its window.
-const focusTripWindowInput = () => {
+const focusTripWindowInput = (preferredSelector = 'input[autofocus]') => {
   setTimeout(() => {
-    const el = document.querySelector('.trip-window-panel input[autofocus], .trip-window-panel input[type="time"]');
+    const panel = document.querySelector('.trip-window-panel');
+    if (!panel) return;
+    const activeElement = document.activeElement;
+    const activeInput = panel.contains(activeElement) && activeElement.matches('input, select, textarea')
+      ? activeElement
+      : null;
+    const el = activeInput
+      || panel.querySelector(preferredSelector)
+      || panel.querySelector('input[type="time"]');
     if (!el) return;
     try { el.focus({ preventScroll: true }); } catch { el.focus(); }
     requestAnimationFrame(() => {
@@ -1450,19 +1460,21 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [driverScopedTrips, me?.id, currentVehicleOdometer]);
 
   // Keeps trip action windows (odometer, signature, completion, password)
-  // visually stable when the on-screen keyboard opens. On resizing viewports
-  // (Android) the browser itself keeps the centered window above the
-  // keyboard and this lift computes to zero. On non-resizing viewports
-  // (iOS) the fixed overlay must not be repositioned after focus: WebKit can
-  // keep painting the native caret in its original coordinate space. The
-  // viewport events below only track keyboard state; the focused input is
-  // scrolled inside the panel by focusTripWindowInput.
+  // visually stable when the on-screen keyboard opens. Some iOS/PWA builds
+  // resize both the layout viewport and visual viewport; using the latter in
+  // that case counts the keyboard twice. Resolve both against the stable
+  // keyboard-closed height and use whichever viewport performed the resize.
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return undefined;
     const visualViewport = window.visualViewport;
     let frame = 0;
     let settleTimer = 0;
     let observedPanel = null;
+    let keyboardClosedHeight = Math.max(
+      1,
+      Math.round(window.innerHeight),
+      Math.round((window.visualViewport?.height || 0) + (window.visualViewport?.offsetTop || 0)),
+    );
     const syncWindowShift = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
@@ -1476,19 +1488,29 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         }
         const viewportTop = Math.max(0, Math.round(visualViewport.offsetTop || 0));
         const viewportHeight = Math.max(1, Math.round(visualViewport.height || window.innerHeight));
-        const keyboardOpen = viewportHeight + viewportTop < window.innerHeight - 120;
-        document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
-        if (panel) {
-          // Drive the overlay/panel from the live visual viewport. On iOS the
-          // document size never changes when the keyboard opens, so only the
-          // visualViewport values describe the truly visible area above the
-          // keyboard. Storing them as CSS vars lets the panel bound itself to
-          // the visible area (never hiding behind or leaving a gap from the
-          // keyboard) without repositioning the fixed caret.
-          const top = viewportHeight + viewportTop < window.innerHeight - 40 ? viewportTop : 0;
-          panel.style.setProperty('--vvh', `${viewportHeight}px`);
-          panel.style.setProperty('--vvt', `${top}px`);
+        const layoutHeight = Math.max(1, Math.round(window.innerHeight));
+        const resolved = resolveBrowserKeyboardViewport({
+          closedHeight: keyboardClosedHeight,
+          layoutHeight,
+          visualHeight: viewportHeight,
+          viewportTop,
+        });
+        if (!resolved.keyboardOpen) {
+          keyboardClosedHeight = Math.max(layoutHeight, viewportHeight + viewportTop);
         }
+        // Always bind the trip window to the live visible region above the
+        // keyboard, native shells included. Capacitor's WKWebView exposes
+        // visualViewport (and modern iOS resizes it when the keyboard appears),
+        // so the visual-viewport path is the primary, plugin-independent
+        // mechanism. The native Keyboard-plugin effect remains as a fallback
+        // that reports an exact height when the platform does not resize the
+        // viewport at all.
+        document.documentElement.classList.toggle('trip-window-kb-open', resolved.keyboardOpen);
+        // Store the single resolved visible region on the root so the overlay
+        // ends at the keyboard top whether layout, visual viewport, or both
+        // were resized by the browser.
+        document.documentElement.style.setProperty('--vvh', `${resolved.visibleHeight}px`);
+        document.documentElement.style.setProperty('--vvt', `${resolved.viewportTop}px`);
       });
     };
     const scheduleSettlePass = () => {
@@ -1527,22 +1549,45 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
   }, []);
 
-  // Native (Capacitor) keyboard: WKWebView does not always resize the layout
-  // viewport / fire visualViewport changes on iOS, so use the Keyboard plugin
-  // events for a pixel-accurate keyboard height. Store it as a CSS var on the
-  // document so the trip-window overlay can bound the panel exactly above the
-  // keyboard with no gap and no off-screen clipping. Falls back silently when
-  // running in a plain browser.
+  // Native (Capacitor) keyboard fallback. The app already uses Keyboard
+  // resize="body", so subtracting the plugin height again would double-count
+  // the keyboard and push the trip window toward the top. Prefer an already
+  // keyboard-closed viewport and subtract the native height exactly once;
+  // WebKit layout and visual viewport values can already be reduced.
   useEffect(() => {
     let didShowCancel = null;
     let didHideCancel = null;
     let cancelled = false;
-    const setKeyboardHeight = (px) => {
-      document.documentElement.style.setProperty('--kbh', px > 0 ? `${px}px` : '0px');
-      document.documentElement.classList.toggle('trip-window-kb-open', px > 0);
-      if (isNativeShell()) {
-        document.documentElement.classList.toggle('trip-window-kb-native', px > 0);
+    let settleTimer = 0;
+    let reportedKeyboardHeight = 0;
+    let keyboardClosedHeight = Math.max(
+      1,
+      Math.round(window.innerHeight),
+      Math.round(window.visualViewport?.height || 0),
+    );
+    const syncKeyboardViewport = () => {
+      const layoutHeight = Math.max(1, Math.round(window.innerHeight));
+      const viewportTop = Math.max(0, Math.round(window.visualViewport?.offsetTop || 0));
+      const visualHeight = Math.max(1, Math.round(window.visualViewport?.height || layoutHeight));
+      if (reportedKeyboardHeight === 0) {
+        keyboardClosedHeight = Math.max(keyboardClosedHeight, layoutHeight, visualHeight + viewportTop);
       }
+      const resolved = resolveKeyboardViewport({
+        keyboardHeight: reportedKeyboardHeight,
+        closedHeight: keyboardClosedHeight,
+        layoutHeight,
+        visualHeight,
+        viewportTop,
+      });
+      document.documentElement.style.setProperty('--vvh', `${resolved.visibleHeight}px`);
+      document.documentElement.style.setProperty('--vvt', `${resolved.viewportTop}px`);
+      document.documentElement.classList.toggle('trip-window-kb-open', reportedKeyboardHeight > 0);
+    };
+    const setKeyboardHeight = (px) => {
+      reportedKeyboardHeight = Math.max(0, Number(px) || 0);
+      syncKeyboardViewport();
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(syncKeyboardViewport, 220);
     };
     const register = () => {
       if (!isNativeShell()) return;
@@ -1557,13 +1602,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
     setKeyboardHeight(0);
     register();
+    window.addEventListener('resize', syncKeyboardViewport);
+    window.visualViewport?.addEventListener('resize', syncKeyboardViewport);
     return () => {
       cancelled = true;
+      if (settleTimer) clearTimeout(settleTimer);
       if (didShowCancel) didShowCancel.remove();
       if (didHideCancel) didHideCancel.remove();
-      document.documentElement.style.removeProperty('--kbh');
+      window.removeEventListener('resize', syncKeyboardViewport);
+      window.visualViewport?.removeEventListener('resize', syncKeyboardViewport);
       document.documentElement.classList.remove('trip-window-kb-open');
-      document.documentElement.classList.remove('trip-window-kb-native');
     };
   }, []);
 
@@ -1952,14 +2000,19 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
   }, []);
 
-  const resolveVerifiedPickupLocation = useCallback(async (trip, fallbackLocation) => {
+  const resolveVerifiedPickupLocation = useCallback(async (trip) => {
     const persisted = getTripPickupLocation(trip);
-    if (persisted) return persisted;
-
     const pickupAddress = typeof trip?.pickup === 'object'
       ? String(trip.pickup?.address || '').trim()
       : String(trip?.pickup || '').trim();
-    if (!pickupAddress) return fallbackLocation || null;
+    const persistedAddress = String(trip?.pickupCoordinatesAddress || '').trim();
+    const persistedSource = String(trip?.pickupCoordinatesSource || '').trim().toLowerCase();
+    const usablePersisted = persisted && persistedSource !== 'driver_gps_fallback';
+    const addressBoundSources = new Set(['google_geocode', 'verified_geocode_cache', 'dispatch_verified', 'manual_verified']);
+    if (persisted && addressBoundSources.has(persistedSource) && (!pickupAddress || persistedAddress === pickupAddress)) {
+      return persisted;
+    }
+    if (!pickupAddress) return usablePersisted ? persisted : null;
 
     const cached = addressCoordsCache.current[pickupAddress];
     const geocoded = cached || await geocodeAddress(pickupAddress);
@@ -1972,27 +2025,47 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         pickupLng: lng,
         pickupCoordinatesVerifiedAt: new Date().toISOString(),
         pickupCoordinatesSource: cached ? 'verified_geocode_cache' : 'google_geocode',
+        pickupCoordinatesAddress: pickupAddress,
         ...(geocoded?.placeId ? { pickupPlaceId: geocoded.placeId } : {}),
         ...(geocoded?.formattedAddress ? { pickupFormattedAddress: geocoded.formattedAddress } : {}),
       }));
       return location;
     }
 
-    if (fallbackLocation) {
-      const { lat, lng } = fallbackLocation;
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
-          pickupLat: lat,
-          pickupLng: lng,
-          pickupCoordinatesVerifiedAt: new Date().toISOString(),
-          pickupCoordinatesSource: 'driver_gps_fallback',
-        }));
-        return fallbackLocation;
-      }
-    }
-
-    return null;
+    // Older/imported trips predate pickupCoordinatesAddress/source metadata.
+    // Their stored coordinates remain valid source data; a transient Google
+    // geocoder failure must not erase them or turn the trip into an artificial
+    // MISSING_PICKUP_LOCATION failure. Never reuse the circular driver-GPS
+    // fallback created by older clients.
+    return usablePersisted ? persisted : null;
   }, [getTripPickupLocation, onUpdateTrip]);
+
+  // Resolve the pickup anchor for verified work evidence without hard-blocking
+  // the driver when the pickup address cannot be geocoded. When a verified /
+  // geocoded pickup is available it is used unchanged. Otherwise the driver's
+  // live GPS becomes the anchor and is recorded as a GPS fallback (never
+  // presented as a geocoded or pre-verified pickup), so the driver is not
+  // stuck at a "could not be verified" dead end while the distance check still
+  // degrades to the driver's own position.
+  const resolveWorkPickupAnchor = useCallback(async (trip, driverLocation) => {
+    const pickupLocation = await resolveVerifiedPickupLocation(trip);
+    if (pickupLocation) return { location: pickupLocation, source: 'verified_pickup' };
+    if (driverLocation?.lat && driverLocation?.lng) {
+      const fallback = { lat: Number(driverLocation.lat), lng: Number(driverLocation.lng) };
+      const pickupAddress = typeof trip?.pickup === 'object'
+        ? String(trip.pickup?.address || '').trim()
+        : String(trip?.pickup || '').trim();
+      await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
+        pickupLat: fallback.lat,
+        pickupLng: fallback.lng,
+        pickupCoordinatesAddress: pickupAddress || '',
+        pickupCoordinatesSource: 'driver_gps_fallback',
+        pickupCoordinatesFallbackAt: new Date().toISOString(),
+      }));
+      return { location: fallback, source: 'driver_gps_fallback' };
+    }
+    return { location: null, source: 'unavailable' };
+  }, [onUpdateTrip, resolveVerifiedPickupLocation]);
 
   const getDriverClockLocation = useCallback(() => (
     driverPosition?.lat && driverPosition?.lng
@@ -3159,9 +3232,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setOdometerError('');
     // Record pickup arrival + departure timestamps using canonical fields
     const nowIso = new Date().toISOString();
-    const driverLocation = getDriverClockLocation();
-    const pickupLocation = await resolveVerifiedPickupLocation(showOdometerPrompt, driverLocation);
-    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showOdometerPrompt, driver: me, pickupLocation, driverLocation, odometer: odo });
+    const driverLocation = await requestFreshCurrentLocation();
+    const { location: pickupLocation, source: pickupLocationSource } = await resolveWorkPickupAnchor(showOdometerPrompt, driverLocation);
+    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showOdometerPrompt, driver: me, pickupLocation, driverLocation, odometer: odo, pickupLocationSource });
     if (!verifiedWorkEvidence.valid) {
       setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
       return;
@@ -3285,9 +3358,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const odo = arrivalEvaluation.value;
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
-    const driverLocation = getDriverClockLocation();
-    const pickupLocation = await resolveVerifiedPickupLocation(showArrivalConfirm, driverLocation);
-    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation, driverLocation, odometer: odo });
+    const driverLocation = await requestFreshCurrentLocation();
+    const { location: pickupLocation, source: pickupLocationSource } = await resolveWorkPickupAnchor(showArrivalConfirm, driverLocation);
+    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation, driverLocation, odometer: odo, pickupLocationSource });
     if (!verifiedWorkEvidence.valid) {
       setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
       return;
@@ -3769,42 +3842,29 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
     setDepartedTime(normalizedClocks.pickupDeparture);
     setArrivalDropoffTime(normalizedClocks.dropoffArrival);
-    focusTripWindowInput();
+    focusTripWindowInput('.trip-completion-odometer');
   };
 
   const updateCompletionDeparture = (value) => {
     const pickupArrivalClock = formatTimeInput(getCompletionPickupBoundary(showCompleteModal));
-    const normalized = normalizeCompletionClocks({
-      pickupArrival: pickupArrivalClock,
-      pickupDeparture: value,
-      dropoffArrival: arrivalDropoffTime,
-      now: value,
-    });
-    setDepartedTime(normalized.pickupDeparture);
-    if (normalized.dropoffArrival !== arrivalDropoffTime) {
-      setArrivalDropoffTime(normalized.dropoffArrival);
-    }
+    setDepartedTime(value);
     setCompleteError('');
-    setCompleteTimeNotice(normalized.pickupDeparture !== value
-      ? `Pickup departure cannot precede pickup arrival. It was adjusted to ${to12hrFromTimeInput(normalized.pickupDeparture)}.`
-      : '');
+    setCompleteTimeNotice(isClockBefore(value, pickupArrivalClock)
+      ? `Pickup departure cannot precede pickup arrival (${to12hrFromTimeInput(pickupArrivalClock)}).`
+      : (isClockBefore(arrivalDropoffTime, value)
+        ? 'Dropoff arrival must be the same as or later than pickup departure.'
+        : ''));
   };
 
   const updateCompletionDropoffArrival = (value) => {
-    const normalized = normalizeCompletionClocks({
-      pickupArrival: formatTimeInput(getCompletionPickupBoundary(showCompleteModal)),
-      pickupDeparture: departedTime,
-      dropoffArrival: value,
-      now: value,
-    });
-    setArrivalDropoffTime(normalized.dropoffArrival);
-    if (normalized.pickupDeparture !== departedTime) {
-      setDepartedTime(normalized.pickupDeparture);
-    }
+    const pickupArrivalClock = formatTimeInput(getCompletionPickupBoundary(showCompleteModal));
+    setArrivalDropoffTime(value);
     setCompleteError('');
-    setCompleteTimeNotice(normalized.dropoffArrival !== value
-      ? `Dropoff arrival cannot precede pickup departure. It was adjusted to ${to12hrFromTimeInput(normalized.dropoffArrival)}.`
-      : '');
+    setCompleteTimeNotice(isClockBefore(departedTime, pickupArrivalClock)
+      ? `Pickup departure cannot precede pickup arrival (${to12hrFromTimeInput(pickupArrivalClock)}).`
+      : (isClockBefore(value, departedTime)
+        ? `Dropoff arrival cannot precede pickup departure (${to12hrFromTimeInput(departedTime)}).`
+        : ''));
   };
 
   const submitComplete = async () => {
@@ -5914,7 +5974,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Departed Pickup Time</label>
                     <div className="text-center">
-                    <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} onChange={(e) => updateCompletionDeparture(e.target.value)}
+                    <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} step="60" onChange={(e) => updateCompletionDeparture(e.target.value)} aria-label="Departed pickup time"
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
                     </div>
                   </div>
@@ -5930,7 +5990,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Arrival Dropoff Time</label>
                     <div className="text-center">
-                    <input type="time" value={arrivalDropoffTime} min={departedTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
+                    <input type="time" value={arrivalDropoffTime} min={departedTime} step="60" onChange={(e) => updateCompletionDropoffArrival(e.target.value)} aria-label="Arrival dropoff time"
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
                     </div>
                   </div>
@@ -5945,7 +6005,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       value={completeOdometer}
                       onChange={(e) => { setCompleteOdometer(e.target.value.replace(/[^0-9]/g, '')); setCompleteError(''); }}
                       placeholder="Final reading"
-                      className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
+                      className={`trip-odometer-input trip-completion-odometer w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                     />
                     </div>
                   </div>

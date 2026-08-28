@@ -159,6 +159,56 @@ export const validateArrival = (driverLat, driverLng, targetLat, targetLng, radi
   };
 };
 
+export const evaluateVerifiedTripWorkEvidence = ({ trip, driver, pickupLocation, driverLocation, odometer, pickupLocationSource } = {}) => {
+  if (!trip?.id) return { valid: false, code: 'MISSING_TRIP', reason: 'A verified assigned trip is required.' };
+  const driverIds = [driver?.id, driver?.driverId, driver?.uid].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+  const driverEmails = [driver?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+  const tripDriverIds = [trip.driverId, trip.assignedDriver, trip.assignedDriverId].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+  const tripDriverEmails = [trip.driverEmail, trip.assignedDriverEmail].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+  const assignedToDriver = tripDriverIds.some((value) => driverIds.includes(value))
+    || tripDriverEmails.some((value) => driverEmails.includes(value));
+  if (!assignedToDriver) return { valid: false, code: 'TRIP_NOT_ASSIGNED_TO_DRIVER', reason: 'This trip is not assigned to the signed-in driver.' };
+  const normalizedStatus = String(trip.status || '').trim().toLowerCase();
+  const workflowStarted = Boolean(trip.startedAt) || ['in progress', 'in mission', 'en route', 'navigating pickup'].includes(normalizedStatus);
+  if (!workflowStarted) return { valid: false, code: 'TRIP_NOT_STARTED', reason: 'Start the assigned trip before confirming work at pickup.' };
+  const reading = Number(String(odometer ?? '').replace(/,/g, ''));
+  if (!Number.isFinite(reading) || reading <= 0) return { valid: false, code: 'INVALID_ODOMETER', reason: 'A valid vehicle odometer reading is required.' };
+  const pickupLat = Number(pickupLocation?.lat ?? pickupLocation?.latitude);
+  const pickupLng = Number(pickupLocation?.lng ?? pickupLocation?.longitude);
+  if (!Number.isFinite(pickupLat) || !Number.isFinite(pickupLng)) return { valid: false, code: 'MISSING_PICKUP_LOCATION', reason: 'The pickup address could not be verified on the map and no driver GPS was available. Ask dispatch to correct the pickup address before continuing.' };
+  const driverLat = Number(driverLocation?.lat ?? driverLocation?.latitude);
+  const driverLng = Number(driverLocation?.lng ?? driverLocation?.longitude);
+  if (!Number.isFinite(driverLat) || !Number.isFinite(driverLng)) return { valid: false, code: 'MISSING_DRIVER_GPS', reason: 'Live GPS is required to verify work at pickup.' };
+  const capturedAtMs = Date.parse(driverLocation?.capturedAt || '');
+  if (Number.isFinite(capturedAtMs) && Date.now() - capturedAtMs > 60_000) {
+    return { valid: false, code: 'STALE_DRIVER_GPS', reason: 'Your GPS reading is stale. Keep Agape Care open and try again when live location updates.' };
+  }
+  const accuracyMeters = Number(driverLocation?.accuracy);
+  if (Number.isFinite(accuracyMeters) && accuracyMeters > 100) {
+    return { valid: false, code: 'INACCURATE_DRIVER_GPS', reason: `GPS accuracy is currently ${Math.round(accuracyMeters)}m. Move to an open area and try again.` };
+  }
+  const arrival = validateArrival(driverLat, driverLng, pickupLat, pickupLng);
+  if (!arrival.valid) return { valid: false, code: 'OUTSIDE_PICKUP_GEOFENCE', reason: `You are ${arrival.distanceFeet}ft from pickup. Move closer before confirming work.`, distanceFeet: arrival.distanceFeet };
+  // When the pickup anchor came from the driver's live GPS (pickup could not
+  // be geocoded), label the evidence honestly rather than presenting it as a
+  // geocoded/verified pickup. The distance check above still ran; with a GPS
+  // anchor it degrades to the driver's own position, which is why this path is
+  // recorded as a lower-confidence GPS fallback and never as confirmed pickup
+  // coordinates.
+  const isGpsFallback = String(pickupLocationSource || '').trim().toLowerCase() === 'driver_gps_fallback';
+  return {
+    valid: true,
+    code: isGpsFallback ? 'GPS_ODOMETER_PICKUP_GPS_FALLBACK' : 'GPS_ODOMETER_PICKUP_VERIFIED',
+    verifiedAt: new Date().toISOString(),
+    tripId: trip.id,
+    odometer: reading,
+    distanceFeet: arrival.distanceFeet,
+    pickupLocationSource: isGpsFallback ? 'driver_gps_fallback' : 'verified_pickup',
+    driverLocation: { lat: driverLat, lng: driverLng },
+    pickupLocation: { lat: pickupLat, lng: pickupLng },
+  };
+};
+
 // ─── GPS ANCHOR CALCULATION ──────────────────────────────────────
 /**
  * Calculate the auto clock-in time based on policy mode.

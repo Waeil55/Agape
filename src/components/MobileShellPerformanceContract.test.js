@@ -6,6 +6,7 @@ const adminSource = readComponent('MobileAdminPage.jsx');
 const reportsSource = readComponent('MobileReportsPage.jsx');
 const menuSource = readComponent('MobileMenuPage.jsx');
 const shellSource = readComponent('EnterpriseDashboard.jsx');
+const accessControlSource = readFileSync(new URL('../utils/accessControl.js', import.meta.url), 'utf8');
 
 describe('mobile shell interaction performance contract', () => {
   it('indexes driver identity once for admin trip assignment lookups', () => {
@@ -45,5 +46,13 @@ describe('mobile shell interaction performance contract', () => {
     expect(shellSource).toContain('const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)');
     expect(shellSource).not.toContain("window.addEventListener('resize'");
     expect(shellSource).toContain('export default React.memo(EnterpriseDashboard)');
+  });
+
+  it('builds dispatcher trip scope indexes once per filter pass', () => {
+    const filterStart = accessControlSource.indexOf('export function filterTripsForRole');
+    const filterBody = accessControlSource.slice(filterStart);
+    expect(filterBody).toContain('const scopedIds = new Set(');
+    expect(filterBody).toContain('const scopedEmails = new Set(');
+    expect(filterBody).not.toContain('isTripInDispatcherScope(trip, scopedDrivers)');
   });
 });

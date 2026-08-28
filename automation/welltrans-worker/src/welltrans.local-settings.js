@@ -20,6 +20,22 @@ const allowedOrigins = () => {
 };
 
 const credentialPath = () => process.env.WELLTRANS_CREDENTIAL_FILE || '';
+const deviceCredentialPath = () => process.env.AGAPE_DEVICE_CREDENTIAL_FILE || '';
+
+const safeDeviceStatus = async () => {
+  const filePath = deviceCredentialPath();
+  if (!filePath) return { configured: false, deviceId: '', label: '' };
+  try {
+    const value = await loadEncryptedCredentials(filePath);
+    return {
+      configured: Boolean(value?.deviceId && value?.deviceSecret),
+      deviceId: String(value?.deviceId || ''),
+      label: String(value?.label || ''),
+    };
+  } catch {
+    return { configured: false, deviceId: '', label: '' };
+  }
+};
 
 export async function loadLocalWellTransCredentials() {
   const filePath = credentialPath();
@@ -86,11 +102,72 @@ export function startLocalWellTransSettingsServer({ onCredentialsChanged } = {})
       return;
     }
     const url = new URL(request.url || '/', 'http://127.0.0.1');
-    if (url.pathname !== '/v1/welltrans-credentials') {
+    const isPortalCredentials = url.pathname === '/v1/welltrans-credentials';
+    const isAgentEnrollment = url.pathname === '/v1/agent-enrollment';
+    if (!isPortalCredentials && !isAgentEnrollment) {
       writeJson(response, 404, { ok: false, error: 'Not found' }, origin);
       return;
     }
     try {
+      if (isAgentEnrollment) {
+        if (request.method === 'GET') {
+          writeJson(response, 200, { ok: true, ...await safeDeviceStatus() }, origin);
+          return;
+        }
+        if (request.method !== 'PUT') {
+          writeJson(response, 405, { ok: false, error: 'Method not allowed' }, origin);
+          return;
+        }
+        if (!String(request.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
+          writeJson(response, 415, { ok: false, error: 'JSON is required' }, origin);
+          return;
+        }
+        const body = await readJson(request);
+        const exchangeUrl = new URL(String(body.exchangeUrl || ''));
+        if (exchangeUrl.protocol !== 'https:'
+          || exchangeUrl.hostname !== 'us-central1-agape-95c9f.cloudfunctions.net'
+          || exchangeUrl.pathname !== '/exchangeWellTransAgentEnrollment') {
+          writeJson(response, 400, { ok: false, error: 'The enrollment service URL is not authorized' }, origin);
+          return;
+        }
+        if (!body.grantId || !body.grantSecret || !body.apiKey) {
+          writeJson(response, 400, { ok: false, error: 'The enrollment grant is incomplete' }, origin);
+          return;
+        }
+        const exchangeResponse = await fetch(exchangeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grantId: body.grantId,
+            grantSecret: body.grantSecret,
+            deviceLabel: String(body.deviceLabel || 'Windows WellTrans Agent').slice(0, 120),
+          }),
+        });
+        const enrollment = await exchangeResponse.json().catch(() => ({}));
+        if (!exchangeResponse.ok || !enrollment.deviceId || !enrollment.deviceSecret) {
+          writeJson(response, 403, { ok: false, error: enrollment.error || 'Enrollment was rejected' }, origin);
+          return;
+        }
+        const filePath = deviceCredentialPath();
+        if (!filePath) throw new Error('The encrypted device vault is not configured');
+        await saveEncryptedCredentials(filePath, {
+          deviceId: enrollment.deviceId,
+          deviceSecret: enrollment.deviceSecret,
+          label: String(body.deviceLabel || 'Windows WellTrans Agent').slice(0, 120),
+          apiKey: String(body.apiKey),
+          projectId: enrollment.projectId,
+          storageBucket: enrollment.storageBucket,
+          tokenUrl: enrollment.tokenUrl,
+          enrolledAt: new Date().toISOString(),
+        });
+        writeJson(response, 200, {
+          ok: true,
+          configured: true,
+          deviceId: enrollment.deviceId,
+          label: String(body.deviceLabel || 'Windows WellTrans Agent').slice(0, 120),
+        }, origin);
+        return;
+      }
       if (request.method === 'GET') {
         const credentials = await loadLocalWellTransCredentials();
         writeJson(response, 200, {

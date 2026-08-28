@@ -82,7 +82,7 @@ describe('WellTrans staging safety contract', () => {
     expect(localSettings).not.toContain('firebase');
     expect(localSettingsHost).not.toContain('firebase');
     expect(launcher).toContain('$env:WELLTRANS_CREDENTIAL_FILE = $wellTransCredentialPath');
-    expect(service).toContain('http://127.0.0.1:43127/v1/welltrans-credentials');
+    expect(service).toContain("const LOCAL_AGENT_SETTINGS_ROOT = 'http://127.0.0.1:43127/v1'");
     expect(service).toContain('portalPassword: deleteField()');
     const page = readFileSync(syncPagePath, 'utf8');
     expect(page).toContain('reauthenticateWithCredential');
@@ -90,6 +90,18 @@ describe('WellTrans staging safety contract', () => {
     expect(page).toContain("const CREDENTIAL_ADMIN_ROLES = ['admin', 'superadmin', 'owner']");
     expect(page).toContain('Unlocks credential management for five minutes.');
     expect(page).toContain('The saved WellTrans password is never displayed.');
+  });
+  it('supports revocable per-device enrollment without requiring a Firebase JSON file', () => {
+    const localSettings = readFileSync(localSettingsPath, 'utf8');
+    const launcher = readFileSync(workerLauncherPath, 'utf8');
+    const service = readFileSync(syncServicePath, 'utf8');
+    const rules = readFileSync(firestoreRulesPath, 'utf8');
+    expect(localSettings).toContain("url.pathname === '/v1/agent-enrollment'");
+    expect(localSettings).toContain("exchangeUrl.hostname !== 'us-central1-agape-95c9f.cloudfunctions.net'");
+    expect(launcher).toContain("$env:AGAPE_WORKER_CREDENTIAL_MODE = 'device_enrollment'");
+    expect(service).toContain("httpsCallable(functions, 'createWellTransAgentEnrollment')");
+    expect(rules).toContain('function isActiveWellTransAgent()');
+    expect(rules).toContain('request.auth.token.welltransAgent == true');
   });
   it('replaces queued payload snapshots with the authoritative data actually staged', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');
@@ -414,7 +426,12 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).not.toContain('data-action="reindex"');
     expect(operatorConsole).toContain('data-action="detect-date"');
     expect(operatorConsole).toContain('Use Open Date');
-    expect(operatorConsole).not.toContain('data-action="collapse"');
+    expect(operatorConsole).toContain('data-role="collapse"');
+    expect(operatorConsole).toContain('BOTTOM_ACTION_CLEARANCE = 96');
+    expect(operatorConsole).toContain(':host([data-collapsed="true"])');
+    expect(worker).toContain('previousErrorMessage:');
+    expect(worker).toContain("type: 'trip_staging_failed'");
+    expect(worker).toContain('errorMessage: String(error?.message || error).slice(0, 2000)');
     expect(worker).toContain('await installWellTransOperatorConsole(session.page, handleOperatorCommand)');
     expect(worker).toContain('operatorControl.dateOverride');
     expect(worker).toContain("action === 'restart'");
@@ -432,6 +449,10 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain("state: 'verifying_every_field'");
     expect(worker).toContain('finalReviewAuditValid');
     expect(worker).toContain('verifiedFields');
+    expect(worker).toContain('&& summary.coverageComplete');
+    expect(worker).toContain('blockedBookingIds');
+    expect(worker).toContain('expected trip(s) remain blocked or missing');
+    expect(worker).toContain("state: finalReviewAuditValid");
   });
 
   it('automatically starts a clean session after the operator closes an unsafe review', () => {

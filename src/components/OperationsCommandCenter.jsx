@@ -463,7 +463,6 @@ const OperationsCommandCenter = ({
   const [inlineEditSaving, setInlineEditSaving] = useState(false);
   const [inlineEditError, setInlineEditError] = useState('');
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
-  const [activeTripRow, setActiveTripRow] = useState(null);
   const [actionsMenuTripId, setActionsMenuTripId] = useState(null);
   const actionsMenuRef = useRef(null);
   const [boardActionsMenuTripId, setBoardActionsMenuTripId] = useState(null);
@@ -2155,7 +2154,7 @@ const OperationsCommandCenter = ({
 
   // ==================== TRIP TABLE ====================
   const renderTripTable = () => (
-    <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+    <div data-operations-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-gutter:stable]">
       {manifestFeedTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="bg-white border border-slate-100/50 rounded-xl p-8 text-center max-w-xs shadow-sm">
@@ -2182,7 +2181,16 @@ const OperationsCommandCenter = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto"
+            onWheel={(event) => {
+              if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+              const verticalScroller = event.currentTarget.closest('[data-operations-scroll]');
+              if (!verticalScroller) return;
+              event.preventDefault();
+              verticalScroller.scrollBy({ top: event.deltaY, behavior: 'auto' });
+            }}
+          >
             <table className="w-full table-fixed text-xs">
               <colgroup>
                 <col className="w-8" />
@@ -2275,8 +2283,7 @@ const OperationsCommandCenter = ({
                   return (
                     <React.Fragment key={trip.id}>
                     <tr
-                      className={`${activeTripRow === trip.id ? 'bg-blue-100' : rowBg} transition-colors hover:bg-blue-50/70 cursor-pointer`}
-                      onClick={() => setActiveTripRow(trip.id)}
+                      className={`operations-manifest-row ${rowBg} transition-colors hover:bg-blue-50/70`}
                     >
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-start pt-1`}>
@@ -2973,7 +2980,7 @@ const OperationsCommandCenter = ({
 
   // ==================== MAIN RENDER ====================
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Unified Control Bar */}
       {renderControlBar()}
 

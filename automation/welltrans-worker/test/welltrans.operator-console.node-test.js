@@ -90,6 +90,24 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.deepEqual(interaction, { host: 'none', bar: 'none', fill: 'auto' });
   });
 
+  it('minimizes to status and counts without sending an agent command', async () => {
+    const host = page.locator('#agape-welltrans-operator-console');
+    const commandCount = commands.length;
+    await host.locator('[data-role="collapse"]').click();
+    const minimized = await host.evaluate(element => ({
+      collapsed: element.dataset.collapsed,
+      width: element.getBoundingClientRect().width,
+      fillVisible: getComputedStyle(element.shadowRoot.querySelector('[data-action="fill-date"]')).display,
+      stateVisible: getComputedStyle(element.shadowRoot.querySelector('[data-role="state"]')).display,
+    }));
+    assert.equal(minimized.collapsed, 'true');
+    assert.ok(minimized.width < 900);
+    assert.equal(minimized.fillVisible, 'none');
+    assert.notEqual(minimized.stateVisible, 'none');
+    assert.equal(commands.length, commandCount);
+    await host.locator('[data-role="collapse"]').click();
+  });
+
   it('shows a persistent independent-reviewer result', async () => {
     const result = await page.locator('#agape-welltrans-operator-console').evaluate(host => ({
       state: host.shadowRoot.querySelector('[data-role="verifier"]').dataset.state,
@@ -173,5 +191,17 @@ describe('WellTrans one-line operator toolbar', () => {
     const afterMove = await host.boundingBox();
     assert.equal(Math.round(afterMove.x), Math.round(before.x));
     assert.ok(afterMove.y > before.y + 30);
+  });
+
+  it('reserves the bottom action area when dragged down', async () => {
+    const host = page.locator('#agape-welltrans-operator-console');
+    const drag = host.locator('[data-role="drag"]');
+    const handle = await drag.boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handle.x, 890, { steps: 5 });
+    await page.mouse.up();
+    const box = await host.boundingBox();
+    assert.ok(box.y + box.height <= 804);
   });
 });

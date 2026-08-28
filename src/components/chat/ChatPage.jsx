@@ -108,6 +108,7 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [groupName, setGroupName] = useState('');
   const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [showPinnedBanner, setShowPinnedBanner] = useState(true);
   const [outbox, setOutbox] = useState([]);
   const [typingClock, setTypingClock] = useState(() => Date.now());
   const messagesEndRef = useRef(null);
@@ -137,6 +138,7 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
   }, [messages, activeChannelId]);
 
   useEffect(() => { setComposerText(''); }, [activeChannelId]);
+  useEffect(() => { setShowPinnedBanner(true); }, [activeChannelId]);
 
   useEffect(() => () => {
     clearTimeout(typingTimerRef.current);
@@ -240,6 +242,24 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
   const visibleMessages = threadQuery.trim()
     ? messages.filter(message => (message.text || '').toLowerCase().includes(threadQuery.trim().toLowerCase()))
     : messages;
+  const pinnedMessages = messages.filter(message => message.pinned && !message.deletedAt);
+  const latestPinnedMessage = pinnedMessages[pinnedMessages.length - 1] || null;
+
+  const messageDate = (timestamp) => timestamp?.toDate?.() || (timestamp ? new Date(timestamp) : null);
+  const messageDateKey = (timestamp) => {
+    const date = messageDate(timestamp);
+    return date && !Number.isNaN(date.getTime()) ? date.toDateString() : '';
+  };
+  const formatMessageDate = (timestamp) => {
+    const date = messageDate(timestamp);
+    if (!date || Number.isNaN(date.getTime())) return '';
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  };
 
   const formatMessageTime = (timestamp) => {
     const date = timestamp?.toDate?.();
@@ -383,7 +403,7 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
         {activeChannel && otherContact ? (
           <div className="agape-messenger-thread h-full flex flex-col">
             {/* Thread Header */}
-            <div className="agape-messenger-thread-header flex items-center justify-between px-4 md:px-6 py-3 border-b border-slate-200 bg-white/95 shrink-0">
+            <div className="agape-messenger-thread-header flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 border-b border-slate-200 bg-white/95 backdrop-blur-xl shrink-0">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActiveChannelId(null)}
@@ -402,6 +422,7 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
                   <h3 className="truncate text-sm font-semibold leading-tight text-slate-950">{formatDisplayName(otherContact)}</h3>
                   <p className={`text-[11px] font-semibold capitalize flex items-center gap-1.5 ${isContactOnline ? 'text-emerald-600' : 'text-slate-400'}`}><span className={`w-1.5 h-1.5 rounded-full ${isContactOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} /> {presenceLabel} · {otherContact.role || 'Driver'}</p>
                 </div>
+                <span className="agape-chat-secure-pill hidden lg:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"><ShieldCheck size={12} /> Secure</span>
               </div>
 
               <div className="flex items-center gap-1.5 text-slate-600">
@@ -410,6 +431,17 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
                 <button onClick={() => setShowDetails(value => !value)} className={`w-10 h-10 flex items-center justify-center rounded-xl transition ${showDetails ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} title="Conversation details"><Info size={18} strokeWidth={2.2} /></button>
               </div>
             </div>
+
+            {latestPinnedMessage && showPinnedBanner && (
+              <div className="agape-chat-pinned-banner flex shrink-0 items-center gap-3 border-b border-blue-100 bg-blue-50/90 px-4 py-2.5 md:px-6">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm"><Pin size={14} /></span>
+                <button type="button" onClick={() => { setShowThreadSearch(true); setThreadQuery(latestPinnedMessage.text || ''); }} className="min-w-0 flex-1 text-left">
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700">Pinned message</span>
+                  <span className="mt-0.5 block truncate text-xs font-semibold text-slate-700">{latestPinnedMessage.text || 'Pinned attachment'}{pinnedMessages.length > 1 ? ` · ${pinnedMessages.length} pinned` : ''}</span>
+                </button>
+                <button type="button" onClick={() => setShowPinnedBanner(false)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-white hover:text-slate-800" aria-label="Hide pinned message"><X size={16} /></button>
+              </div>
+            )}
 
             {showThreadSearch && (
               <div className="px-4 md:px-6 py-2.5 bg-white border-b border-slate-200 flex items-center gap-2">
@@ -421,7 +453,7 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
 
             {/* Messages Feed */}
             <div className="agape-messenger-thread-messages flex-1 overflow-y-auto p-4 md:px-8 md:py-6 flex flex-col gap-3">
-              <div className="agape-messenger-date-divider">{activeChannel.isDraft ? 'New private conversation' : 'Secure team conversation'}</div>
+              <div className="agape-chat-thread-intro mx-auto mb-2 flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-semibold"><ShieldCheck size={12} /> {activeChannel.isDraft ? 'New private conversation' : 'Secure team conversation'}</div>
               {hasOlderMessages && <button onClick={() => { suppressNextScrollRef.current = true; loadOlderMessages(); }} disabled={loadingOlderMessages} className="mx-auto mb-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm disabled:opacity-50">{loadingOlderMessages ? 'Loading history…' : 'Load older messages'}</button>}
 
               {activeChannel.isDraft && messages.length === 0 && !threadQuery && (
@@ -434,10 +466,14 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
 
               {visibleMessages.map((msg, index) => {
                 const isSent = msg.senderId === currentUser.id;
+                const previousMessage = visibleMessages[index - 1];
                 const nextMessage = visibleMessages[index + 1];
                 const isLastInGroup = !nextMessage || nextMessage.senderId !== msg.senderId;
+                const showDateDivider = !previousMessage || messageDateKey(previousMessage.timestamp) !== messageDateKey(msg.timestamp);
                 return (
-                  <div key={msg.id || index} className={`agape-messenger-bubble-row ${isSent ? 'is-sent' : 'is-received'}`}>
+                  <React.Fragment key={msg.id || index}>
+                  {showDateDivider && formatMessageDate(msg.timestamp) && <div className="agape-messenger-date-divider">{formatMessageDate(msg.timestamp)}</div>}
+                  <div className={`agape-messenger-bubble-row ${isSent ? 'is-sent' : 'is-received'}`}>
                     {!isSent && isLastInGroup ? (
                       <ChatAvatar user={otherContact} size="xs" decorative />
                     ) : !isSent ? <span className="w-7 shrink-0" /> : null}
@@ -449,11 +485,12 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
                         ) : <>{msg.text}{msg.editedAt && <span className="ml-1 text-[9px] opacity-60">edited</span>}</>}
                         {(msg.attachments || (msg.attachment ? [msg.attachment] : [])).map((attachment, attachmentIndex) => !msg.deletedAt && (attachment.type?.startsWith('image/') ? <a key={attachment.path || attachmentIndex} href={attachment.url} target="_blank" rel="noreferrer"><img src={attachment.url} alt={attachment.name} className="mt-2 max-h-64 rounded-xl object-cover" /></a> : <a key={attachment.path || attachmentIndex} href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 p-2"><FileText size={18} /><span className="truncate text-xs font-bold">{attachment.name}</span><Download size={14} /></a>))}
                       </div>
-                      {!msg.deletedAt && <div className={`flex items-center gap-1 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => setReplyTo(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Reply to message"><Reply size={11} /></button><button onClick={() => setForwardingMessage(msg)} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Forward message"><Forward size={11} /></button><button onClick={() => togglePin(msg)} className={`p-1 ${msg.pinned ? 'text-amber-600' : 'text-slate-400 hover:text-amber-600'}`} aria-label={msg.pinned ? 'Unpin message' : 'Pin message'}><Pin size={11} /></button><button onClick={() => toggleReaction(msg, '👍')} className="rounded-full px-1.5 py-0.5 text-xs hover:bg-slate-200">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} className="p-1 text-slate-400 hover:text-blue-600" aria-label="Edit message"><Pencil size={11} /></button><button onClick={() => deleteMessage(msg.id)} className="p-1 text-slate-400 hover:text-rose-600" aria-label="Delete message"><Trash2 size={11} /></button></>}</div>}
+                      {!msg.deletedAt && <div className={`agape-message-actions flex items-center gap-0.5 ${isSent ? 'justify-end' : 'justify-start'}`}><button onClick={() => setReplyTo(msg)} aria-label="Reply to message"><Reply size={13} /></button><button onClick={() => setForwardingMessage(msg)} aria-label="Forward message"><Forward size={13} /></button><button onClick={() => togglePin(msg)} className={msg.pinned ? 'is-pinned' : ''} aria-label={msg.pinned ? 'Unpin message' : 'Pin message'}><Pin size={13} /></button><button onClick={() => toggleReaction(msg, '👍')} aria-label="React with thumbs up">👍</button>{isSent && <><button onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.text || ''); }} aria-label="Edit message"><Pencil size={13} /></button><button onClick={() => deleteMessage(msg.id)} className="is-destructive" aria-label="Delete message"><Trash2 size={13} /></button></>}</div>}
                       {msg.reactions && <div className="flex flex-wrap gap-1">{Object.entries(msg.reactions).filter(([, ids]) => ids?.length).map(([emoji, ids]) => <button key={emoji} onClick={() => toggleReaction(msg, emoji)} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] shadow-sm">{emoji} {ids.length}</button>)}</div>}
                       {isLastInGroup && <span className="agape-message-meta">{formatMessageTime(msg.timestamp)}{isSent && <><CheckCheck size={12} />{isMessageSeen(msg, otherReadAt) && <span>Seen</span>}</>}</span>}
                     </div>
                   </div>
+                  </React.Fragment>
                 );
               })}
 
@@ -468,21 +505,22 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
             {sendError && <div className="flex items-center justify-center gap-3 bg-rose-50 border-t border-rose-100 px-4 py-2 text-center text-[11px] font-bold text-rose-700"><span>{sendError}</span>{outbox.some(item => item.channelId === activeChannelId) && <button onClick={retryOutbox} className="rounded-full bg-rose-700 px-2.5 py-1 text-white">Retry queued</button>}</div>}
             {pendingFiles.length > 0 && <div className="border-t border-slate-200 bg-slate-50 px-4 py-2"><div className="flex flex-wrap gap-2">{pendingFiles.map((file, index) => <div key={`${file.name}-${index}`} className="flex max-w-[220px] items-center gap-2 rounded-lg bg-white px-2 py-1 text-xs font-bold text-slate-700"><FileText size={15} /><span className="min-w-0 flex-1 truncate">{file.name}</span><button onClick={() => setPendingFiles(files => files.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove attachment"><X size={15} /></button></div>)}</div>{isSending && uploadProgress > 0 && <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-blue-600 transition-all" style={{ width: `${uploadProgress}%` }} /></div>}</div>}
             {replyTo && <div className="flex items-center gap-2 border-t border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-900"><Reply size={14} /><div className="min-w-0 flex-1"><strong>Replying to {replyTo.senderName || 'message'}</strong><p className="truncate text-[10px] opacity-70">{replyTo.text || 'Attachment'}</p></div><button onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X size={15} /></button></div>}
-            <div className="agape-messenger-composer border-t border-slate-200 bg-white px-4 md:px-6 py-3.5 flex items-center gap-3 shrink-0 relative">
+            <div className="agape-messenger-composer border-t border-slate-200 bg-white flex items-center shrink-0 relative">
               <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.txt" className="hidden" onChange={event => { const files = Array.from(event.target.files || []); const allowed = files.filter(isAllowedChatAttachment); if (allowed.length !== files.length) setSendError('Choose images, PDFs, or text files up to 10 MB each.'); setPendingFiles(current => [...current, ...allowed].slice(0, 5)); event.target.value = ''; }} />
-              <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center" title="Attach file"><Paperclip size={19} /></button>
-              <button onClick={() => setShowEmojiPicker(value => !value)} className="w-9 h-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center flex-shrink-0" title="Add emoji">
-                <Smile size={20} strokeWidth={2.2} />
+              <button onClick={() => fileInputRef.current?.click()} className="w-8 h-8 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center" title="Attach file"><Paperclip size={17} /></button>
+              <button onClick={() => setShowEmojiPicker(value => !value)} className="w-8 h-8 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center flex-shrink-0" title="Add emoji">
+                <Smile size={18} strokeWidth={2.2} />
               </button>
               {showEmojiPicker && <div className="absolute bottom-[64px] left-4 md:left-6 bg-white border border-slate-200 shadow-2xl rounded-2xl p-2 flex gap-1 z-20">{['👍','❤️','😊','🎉','✅','🙏'].map(emoji => <button key={emoji} onClick={() => { setComposerText(value => value + emoji); setShowEmojiPicker(false); }} className="w-9 h-9 rounded-xl hover:bg-slate-100 text-lg">{emoji}</button>)}</div>}
 
-              <div className="agape-messenger-input-wrap flex-1 bg-slate-100 rounded-full px-4 py-2 flex items-center">
-                <input
-                  type="text"
-                  placeholder="Aa"
+              <div className="agape-messenger-input-wrap flex-1 bg-slate-100 rounded-xl flex items-center">
+                <textarea
+                  className="agape-chat-composer-textarea"
+                  rows={1}
+                  placeholder="Type a message…"
                   value={composerText}
                   onChange={e => handleComposerChange(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) handleSend(); }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 />
               </div>
 

@@ -1,11 +1,6 @@
-import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import {
-  FieldPath,
-  FieldValue,
-  Timestamp,
-  getFirestore,
-} from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
+  createDocument, db, FieldPath, FieldValue, saveScreenshot, Timestamp,
+} from './worker.firebase.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { performManualLogin } from './welltrans.login.js';
@@ -36,12 +31,6 @@ import { createAgentSupervisor } from './agent.supervisor.js';
 import { analyzeLocally } from './agent.local-intelligence.js';
 import { selectBrokerTransport } from './broker.transport.js';
 
-initializeApp({
-  credential: applicationDefault(),
-  projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'agape-95c9f',
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'agape-95c9f.firebasestorage.app',
-});
-const db = getFirestore();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const wellTransSourceFingerprint = payload => createHash('sha256')
   .update(JSON.stringify({
@@ -55,7 +44,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '5.0.2';
+const workerVersion = '5.1.0';
 const capabilityKernel = createCapabilityKernel(workerInstanceId);
 const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
 const supervisor = createAgentSupervisor([
@@ -651,6 +640,10 @@ async function publishDateReviewSummary(serviceDate) {
     missing: 0,
     unverifiedCompleted: 0,
     blocked: Number(manifest.blockedCount || 0),
+    blockedBookingIds: (manifest.blockedTrips || [])
+      .map(item => String(item.bookingId || item.tripId || '').trim())
+      .filter(Boolean)
+      .slice(0, 20),
   };
   for (const tripId of expectedTripIds) {
     const item = latestByTrip.get(tripId);
@@ -680,13 +673,15 @@ async function publishDateReviewSummary(serviceDate) {
     && summary.processing === 0
     && summary.missing === 0
     && summary.blocked === 0;
+  summary.verified = verified;
+  summary.coverageComplete = coverageComplete;
   const state = coverageComplete
     ? (summary.staged > 0 ? 'review_ready' : 'completed')
     : (summary.failed || summary.blocked || summary.missing ? 'reconciliation_blocked' : 'calibrated');
   const update = {
     state,
     selectedDate: serviceDate,
-    reviewSummary: { ...summary, verified, coverageComplete },
+    reviewSummary: summary,
     reviewSummaryAt: FieldValue.serverTimestamp(),
     indexedBookings: portalGridIndex?.bookingCount || 0,
     indexedRows: portalGridIndex?.rowCount || 0,
@@ -1004,7 +999,7 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
 
     if (!latest) {
       const ref = db.collection('welltrans_sync_logs').doc();
-      await ref.create({
+      await createDocument(ref, {
         tripId: String(trip.id),
         bookingId: current.validation.payload.bookingId,
         serviceDate,
@@ -1061,6 +1056,7 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
       await latest.ref.update({
         status: 'pending',
         stage: 'requeued_by_authoritative_worker_reconciliation',
+        previousErrorMessage: String(latest.data.errorMessage || '').slice(0, 2000),
         errorMessage: '',
         completedAt: FieldValue.delete(),
         leaseExpiresAt: FieldValue.delete(),
@@ -1597,7 +1593,7 @@ async function processJob(job, existingSession = null) {
       if (buffer) {
         try {
           screenshot = `welltrans_sync_screenshots/${job.id}.png`;
-          await getStorage().bucket().file(screenshot).save(buffer, { contentType: 'image/png', resumable: false, metadata: { cacheControl: 'private, no-store' } });
+          await saveScreenshot(screenshot, buffer);
         } catch (uploadError) {
           screenshot = '';
           screenshotError = ` Screenshot capture could not be stored: ${uploadError?.message || uploadError}`;
@@ -1637,6 +1633,9 @@ async function processJob(job, existingSession = null) {
       status: 'failed',
       stage: safeToContinue ? 'failed_no_partial_changes' : 'failed_review_close_required',
       sourceFingerprint: job.queuedSourceFingerprint,
+      errorMessage: String(error?.message || error).slice(0, 2000),
+      mutationStarted: error?.welltransMutationStarted === true,
+      rollbackVerified,
     });
     // Dismiss only a transient cell/dropdown editor so one failed row cannot
     // poison the next job. Keep the itinerary itself open and never Apply.
@@ -2027,11 +2026,23 @@ async function main() {
             message: operatorControl.message,
           });
           const forcedAudit = await auditStagedReviewBatch(session.page, selectedDate);
-          finalReviewAuditValid = forcedAudit.requeued === 0 && forcedAudit.failed === 0;
           summary = await publishDateReviewSummary(selectedDate);
-          operatorControl.message = `${forcedAudit.verified}/${forcedAudit.checked} trips and ${forcedAudit.verifiedFields} fields verified before Apply.`;
+          finalReviewAuditValid = forcedAudit.requeued === 0
+            && forcedAudit.failed === 0
+            && summary.coverageComplete;
+          const blockerCount = summary.failed + summary.blocked + summary.missing;
+          const blockerBookings = summary.blockedBookingIds.length
+            ? ` Booking ${summary.blockedBookingIds.join(', ')} requires source correction.`
+            : '';
+          operatorControl.message = blockerCount
+            ? `${forcedAudit.verified}/${forcedAudit.checked} staged trips verified, but ${blockerCount} expected trip(s) remain blocked or missing.${blockerBookings} Do not Apply.`
+            : `${forcedAudit.verified}/${forcedAudit.checked} trips and ${forcedAudit.verifiedFields} fields verified before Apply.`;
           await updateOperatorConsole(session.page, summary, {
-            state: finalReviewAuditValid ? 'verified' : 'repairing_mismatches',
+            state: finalReviewAuditValid
+              ? 'verified'
+              : blockerCount
+                ? 'reconciliation_blocked_do_not_apply'
+                : 'repairing_mismatches',
             message: operatorControl.message,
           });
         }

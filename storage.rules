@@ -19,6 +19,13 @@ service firebase.storage {
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isActiveWellTransAgent() {
+      return request.auth != null
+        && request.auth.token.welltransAgent == true
+        && firestore.exists(/databases/(default)/documents/welltrans_agent_devices/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/welltrans_agent_devices/$(request.auth.uid)).data.active == true;
+    }
+
     function isChannelParticipant(channelId) {
       return signedIn() &&
         request.auth.uid in firestore.get(
@@ -44,6 +51,14 @@ service firebase.storage {
       allow read: if signedIn();
       allow create, update: if false;
       allow delete: if signedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /welltrans_sync_screenshots/{fileName} {
+      allow read: if isAdmin();
+      allow create: if isActiveWellTransAgent()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType == 'image/png';
+      allow update, delete: if false;
     }
 
     match /{allPaths=**} {

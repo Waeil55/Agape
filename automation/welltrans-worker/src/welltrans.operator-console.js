@@ -1,8 +1,9 @@
 const CONSOLE_ID = 'agape-welltrans-operator-console';
 const COMMAND_BINDING = '__agapeWellTransCommand';
-const POSITION_KEY = 'agape-welltrans-toolbar-position-v2';
+const POSITION_KEY = 'agape-welltrans-toolbar-position-v3';
+const BOTTOM_ACTION_CLEARANCE = 96;
 
-const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
+const consoleBootstrap = ({ consoleId, commandBinding, positionKey, bottomActionClearance }) => {
   if (window.top !== window || document.getElementById(consoleId)) return;
 
   const host = document.createElement('div');
@@ -33,6 +34,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}
       button:disabled{cursor:wait;opacity:.5}
       .drag{width:27px;padding:0;cursor:grab;color:#91a4c8;font-size:15px;touch-action:none;user-select:none}
+      .collapse{width:30px;padding:0;font-size:15px}
       .drag:active{cursor:grabbing}
       .brand{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:900;letter-spacing:.06em}
       .mark{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#2563eb;color:white}
@@ -57,27 +59,31 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         font-size:9px;font-weight:600}
       .manual{padding:4px 7px;border-radius:7px;background:#3a1c1c;border:1px solid #713232;
         color:#fecaca;font-size:8px;font-weight:900}
+      :host([data-collapsed="true"]){width:auto!important;max-width:calc(100vw - 16px)!important}
+      :host([data-collapsed="true"]) .bar{overflow:hidden}
+      :host([data-collapsed="true"]) .optional{display:none}
       @media(max-width:900px){.message{min-width:140px;flex-basis:140px}.brandText{display:none}}
     </style>
     <section class="bar" role="toolbar" aria-label="Agape WellTrans controls">
       <button class="drag" data-role="drag" title="Drag toolbar" aria-label="Drag toolbar">&#8942;&#8942;</button>
+      <button class="collapse" data-role="collapse" title="Minimize toolbar" aria-label="Minimize toolbar">&#8722;</button>
       <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
       <span class="state" data-role="state">CONNECTING</span>
-      <input data-role="date" type="date" aria-label="Go to WellTrans service date" title="Choose a date; the Agent will navigate WellTrans and verify the exact schedule automatically">
-      <select data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
+      <input class="optional" data-role="date" type="date" aria-label="Go to WellTrans service date" title="Choose a date; the Agent will navigate WellTrans and verify the exact schedule automatically">
+      <select class="optional" data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
         <option value="all">All drivers</option>
       </select>
-      <button class="primary" data-action="fill-date" title="Reconcile and fill the selected date; the Agent verifies the opened WellTrans date before writing">Fill Date</button>
-      <button data-action="detect-date" title="Cancel a pending date switch and use the date currently open in WellTrans">Use Open Date</button>
-      <button class="verify" data-action="verify" title="Read every staged field back without clicking Apply">Review &amp; Verify</button>
-      <button data-action="pause">Pause</button>
-      <button class="restart" data-action="restart" title="Discard an unsafe unsaved session and start clean" hidden>Reset Session</button>
+      <button class="primary optional" data-action="fill-date" title="Reconcile and fill the selected date; the Agent verifies the opened WellTrans date before writing">Fill Date</button>
+      <button class="optional" data-action="detect-date" title="Cancel a pending date switch and use the date currently open in WellTrans">Use Open Date</button>
+      <button class="verify optional" data-action="verify" title="Read every staged field back without clicking Apply">Review &amp; Verify</button>
+      <button class="optional" data-action="pause">Pause</button>
+      <button class="restart optional" data-action="restart" title="Discard an unsafe unsaved session and start clean" hidden>Reset Session</button>
       <span class="metric"><b data-role="staged">0</b> filled</span>
       <span class="metric"><b data-role="pending">0</b> pending</span>
       <span class="metric"><b data-role="failed">0</b> blocked</span>
       <span class="metric verifier" data-role="verifier" data-state="idle" title="Independent deterministic reviewer integrated into this installed Agent"><b data-role="verified">0/0</b> reviewed</span>
-      <span class="message" data-role="message" title="Waiting for the itinerary workspace">Waiting for the itinerary workspace</span>
-      <span class="manual" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
+      <span class="message optional" data-role="message" title="Waiting for the itinerary workspace">Waiting for the itinerary workspace</span>
+      <span class="manual optional" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
     </section>`;
   document.documentElement.appendChild(host);
   const hostGuard = new MutationObserver(() => {
@@ -99,11 +105,19 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   try {
     const stored = JSON.parse(localStorage.getItem(positionKey) || 'null');
     if (Number.isFinite(stored?.top)) {
-      host.style.top = `${clamp(stored.top, 0, Math.max(0, innerHeight - 42))}px`;
+      host.style.top = `${clamp(stored.top, 0, Math.max(0, innerHeight - bottomActionClearance - 42))}px`;
     }
   } catch {}
 
   const drag = $('[data-role="drag"]');
+  const collapse = $('[data-role="collapse"]');
+  collapse.addEventListener('click', () => {
+    const collapsed = host.dataset.collapsed !== 'true';
+    host.dataset.collapsed = String(collapsed);
+    collapse.innerHTML = collapsed ? '&#43;' : '&#8722;';
+    collapse.title = collapsed ? 'Expand toolbar' : 'Minimize toolbar';
+    collapse.setAttribute('aria-label', collapse.title);
+  });
   drag.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
     const rect = host.getBoundingClientRect();
@@ -118,7 +132,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         dragging = true;
         host.style.top = `${rect.top}px`;
       }
-      const top = clamp(start.top + moveEvent.clientY - start.y, 0, Math.max(0, innerHeight - 42));
+      const top = clamp(start.top + moveEvent.clientY - start.y, 0, Math.max(0, innerHeight - bottomActionClearance - 42));
       host.style.top = `${top}px`;
     };
     const end = endEvent => {
@@ -346,6 +360,7 @@ export async function installWellTransOperatorConsole(page, onCommand) {
     consoleId: CONSOLE_ID,
     commandBinding: COMMAND_BINDING,
     positionKey: POSITION_KEY,
+    bottomActionClearance: BOTTOM_ACTION_CLEARANCE,
   };
   if (!context.__agapeOperatorInitInstalled) {
     await context.addInitScript(consoleBootstrap, options);
