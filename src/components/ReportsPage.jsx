@@ -51,7 +51,7 @@ const ReportsPage = (props) => {
 
   const renderSection = () => {
     if (section === 'unloaded') {
-      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} onUpdateTrip={props.onUpdateTrip} appSettings={props.appSettings} />;
+      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} onUpdateTrip={props.onUpdateTrip} appSettings={props.appSettings} onOpenImport={props.setShowUploadModal ? () => props.setShowUploadModal(true) : undefined} />;
     }
     if (section === 'archive') {
       return (

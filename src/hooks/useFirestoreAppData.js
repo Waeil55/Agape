@@ -33,6 +33,7 @@ import { attachTenantScope, normalizeTenantId, recordBelongsToTenant } from '../
 import { hydrateTripDriverIdentities } from '../utils/driverIdentity';
 import { readAppData, saveField as saveLocalField, saveFieldWithSyncOperations } from '../utils/localDB';
 import { createSerializedOperationQueue } from '../utils/serializedOperationQueue';
+import { tripImportMatchKey, unmatchedOverrideReportBookingIds } from '../utils/reportOverrideImport';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -822,21 +823,53 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         throw new Error('Trip import requires a verified connection. Reconnect and retry; no trips were changed.');
       }
       const baseData = normalizeData(dataRef.current);
-      const makeKey = (trip) => {
-        const bookingId = String(trip?.bookingId || '').trim();
-        if (bookingId && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bookingId)) return `booking::${bookingId}`;
-        return ['patient', 'date', 'time', 'pickup', 'dropoff']
-          .map((field) => String(trip?.[field] || '').trim().toLowerCase().replace(/\s+/g, ' '))
-          .join('|');
-      };
+      const makeKey = tripImportMatchKey;
       const activeByKey = new Map(baseData.trips.map((trip) => [makeKey(trip), trip]));
       const archivedByKey = new Map(baseData.trashedTrips.map((trip) => [makeKey(trip), trip]));
+      const unmatchedOverrideBookingIds = unmatchedOverrideReportBookingIds(newTrips, baseData.trips, baseData.trashedTrips);
+      if (unmatchedOverrideBookingIds.length > 0) {
+        throw new Error(`Override report was not imported. No existing trip matches Booking ID${unmatchedOverrideBookingIds.length === 1 ? '' : 's'}: ${unmatchedOverrideBookingIds.join(', ')}.`);
+      }
+      const importedAt = new Date().toISOString();
       const importedTrips = newTrips.map((incoming) => {
         const match = activeByKey.get(makeKey(incoming)) || archivedByKey.get(makeKey(incoming));
-        const meaningfulIncoming = Object.fromEntries(Object.entries(incoming).filter(([, value]) => value !== '' && value !== null && value !== undefined));
+        const overridePatchFields = ['bookingId', 'date', 'dateKey', 'fromCity', 'toCity', 'originalTripCost', 'unloadedMileageMiles', 'overrideWaitingHours', 'waitingNoInterveningTrips'];
+        const incomingEntries = incoming.reportOverridePatch
+          ? overridePatchFields.map((field) => [field, incoming[field]])
+          : Object.entries(incoming);
+        const meaningfulIncoming = Object.fromEntries(incomingEntries.filter(([, value]) => value !== '' && value !== null && value !== undefined));
         const fallbackId = incoming.id || incoming.bookingId || `trip_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const merged = { ...(match || {}), ...meaningfulIncoming, id: match?.id || fallbackId };
-        return { ...merged, archiveState: null, archivedAtLocal: null };
+        const imported = {
+          ...merged,
+          archiveState: null,
+          archivedAtLocal: null,
+          ...(incoming.reportOverridePatch ? { costOverrideReportImportedAt: importedAt } : {}),
+        };
+        if (!incoming.reportOverridePatch) return imported;
+        const reportReviewStatus = Number(incoming.unloadedMileageMiles || 0) > 0 || Number(incoming.overrideWaitingHours || 0) > 0
+          ? 'candidate'
+          : 'not_eligible';
+        return {
+          ...imported,
+          costOverride: {
+            ...(match?.costOverride || {}),
+            status: reportReviewStatus,
+            unloadedMiles: incoming.unloadedMileageMiles,
+            waitingHours: incoming.overrideWaitingHours,
+            waitingNoInterveningTrips: incoming.waitingNoInterveningTrips === true,
+            paymentRequestStatus: 'not_requested',
+            paymentRequestedAt: null,
+            reviewedAt: null,
+            sourceReportImportedAt: importedAt,
+          },
+          unloadedMileage: {
+            ...(match?.unloadedMileage || {}),
+            status: reportReviewStatus,
+            miles: incoming.unloadedMileageMiles,
+            sourceReportImportedAt: importedAt,
+          },
+        };
       });
       const reactivatedIds = new Set(importedTrips.map((trip) => String(trip.id)));
       const plan = {
