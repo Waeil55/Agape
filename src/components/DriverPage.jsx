@@ -1470,20 +1470,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     let savedScrollY = 0;
     const lockBodyScroll = () => {
       savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.top = `-${savedScrollY}px`;
       document.body.style.left = '0';
       document.body.style.right = '0';
       document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
     };
     const unlockBodyScroll = () => {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.left = '';
       document.body.style.right = '';
       document.body.style.width = '';
-      document.body.style.overflow = '';
       window.scrollTo(0, savedScrollY);
     };
     const syncWindowShift = () => {
@@ -1529,12 +1531,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     document.addEventListener('focusin', scheduleSettlePass, true);
     document.addEventListener('focusout', scheduleSettlePass, true);
     // Prevent iOS body scroll when keyboard opens inside trip window.
-    // Skip inputs and time pickers so their native interaction isn't blocked.
+    // Block scroll on html/body elements; allow native input interaction.
     const preventScroll = (e) => {
       if (!document.documentElement.classList.contains('trip-window-open')) return;
-      const tag = e.target?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-      if (e.target?.closest?.('input, select, textarea, .trip-window-panel')) return;
+      if (e.target?.closest?.('.trip-window-panel')) return;
+      if (e.target === document || e.target === document.body || e.target === document.documentElement) {
+        window.scrollTo(0, savedScrollY);
+      }
       e.preventDefault();
     };
     document.addEventListener('scroll', preventScroll, { capture: true, passive: false });
@@ -1604,30 +1607,41 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   // Polling fallback: on iOS WKWebView, visualViewport events may not fire and
   // the Capacitor Keyboard plugin native bridge may not be installed. Detect
-  // keyboard by tracking visualViewport.height changes against a captured
-  // baseline. This ensures trip-window-kb-open is applied even when neither
-  // the visualViewport listener nor the native Keyboard plugin fires.
+  // keyboard by watching focusin on inputs and polling innerHeight. When an
+  // input gets focus and the viewport shrinks, the keyboard is open.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const baselineHeight = window.innerHeight;
     let pollTimer = null;
     let lastKnownHeight = baselineHeight;
+    let inputFocused = false;
+
+    const onFocusIn = () => { inputFocused = true; };
+    const onFocusOut = () => { inputFocused = false; };
+
     const poll = () => {
       const vh = window.visualViewport?.height || window.innerHeight;
       if (vh !== lastKnownHeight) {
         lastKnownHeight = vh;
-        const keyboardOpen = vh < baselineHeight - 120;
-        const wasOpen = document.documentElement.classList.contains('trip-window-kb-open');
-        if (keyboardOpen !== wasOpen) {
-          document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
-          document.documentElement.style.setProperty('--vvh', `${Math.round(vh)}px`);
-          document.documentElement.style.setProperty('--vvt', `${Math.round(window.visualViewport?.offsetTop || 0)}px`);
-        }
+      }
+      // Keyboard is open when an input is focused and viewport shrank
+      const keyboardOpen = inputFocused && vh < baselineHeight - 80;
+      const wasOpen = document.documentElement.classList.contains('trip-window-kb-open');
+      if (keyboardOpen !== wasOpen) {
+        document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
+        document.documentElement.style.setProperty('--vvh', `${Math.round(vh)}px`);
+        document.documentElement.style.setProperty('--vvt', `${Math.round(window.visualViewport?.offsetTop || 0)}px`);
       }
     };
-    pollTimer = window.setInterval(poll, 120);
+
+    document.addEventListener('focusin', onFocusIn, true);
+    document.addEventListener('focusout', onFocusOut, true);
+    pollTimer = window.setInterval(poll, 100);
+
     return () => {
       if (pollTimer) window.clearInterval(pollTimer);
+      document.removeEventListener('focusin', onFocusIn, true);
+      document.removeEventListener('focusout', onFocusOut, true);
     };
   }, []);
 
