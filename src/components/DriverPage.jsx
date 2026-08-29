@@ -1463,12 +1463,34 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     let frame = 0;
     let settleTimer = 0;
     let observedPanel = null;
+    let savedScrollY = 0;
+    const lockBodyScroll = () => {
+      savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${savedScrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    };
+    const unlockBodyScroll = () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, savedScrollY);
+    };
     const syncWindowShift = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         frame = 0;
         const panel = document.querySelector('.trip-window-panel');
+        const hadPanel = document.documentElement.classList.contains('trip-window-open');
         document.documentElement.classList.toggle('trip-window-open', !!panel);
+        if (panel && !hadPanel) lockBodyScroll();
+        if (!panel && hadPanel) unlockBodyScroll();
         if (resizeObserver && panel !== observedPanel) {
           if (observedPanel) resizeObserver.unobserve(observedPanel);
           if (panel) resizeObserver.observe(panel);
@@ -1478,17 +1500,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const viewportHeight = Math.max(1, Math.round(visualViewport.height || window.innerHeight));
         const keyboardOpen = viewportHeight + viewportTop < window.innerHeight - 120;
         document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
-        if (panel) {
-          // Drive the overlay/panel from the live visual viewport. On iOS the
-          // document size never changes when the keyboard opens, so only the
-          // visualViewport values describe the truly visible area above the
-          // keyboard. Storing them as CSS vars lets the panel bound itself to
-          // the visible area (never hiding behind or leaving a gap from the
-          // keyboard) without repositioning the fixed caret.
-          const top = viewportHeight + viewportTop < window.innerHeight - 40 ? viewportTop : 0;
-          panel.style.setProperty('--vvh', `${viewportHeight}px`);
-          panel.style.setProperty('--vvt', `${top}px`);
-        }
+        // Set CSS vars on documentElement so .trip-window-kb-open rules can
+        // resolve var(--vvh) / var(--vvt) without relying on inline panel styles.
+        document.documentElement.style.setProperty('--vvh', `${viewportHeight}px`);
+        document.documentElement.style.setProperty('--vvt', `${viewportTop}px`);
       });
     };
     const scheduleSettlePass = () => {
@@ -1509,6 +1524,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
     document.addEventListener('focusin', scheduleSettlePass, true);
     document.addEventListener('focusout', scheduleSettlePass, true);
+    // Prevent iOS body scroll when keyboard opens inside trip window
+    const preventScroll = (e) => {
+      if (document.documentElement.classList.contains('trip-window-open')) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('scroll', preventScroll, { capture: true, passive: false });
+    document.addEventListener('touchmove', preventScroll, { capture: true, passive: false });
     return () => {
       if (frame) cancelAnimationFrame(frame);
       if (settleTimer) clearTimeout(settleTimer);
@@ -1522,8 +1545,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       }
       document.removeEventListener('focusin', scheduleSettlePass, true);
       document.removeEventListener('focusout', scheduleSettlePass, true);
+      document.removeEventListener('scroll', preventScroll, true);
+      document.removeEventListener('touchmove', preventScroll, true);
+      unlockBodyScroll();
       document.documentElement.classList.remove('trip-window-open');
       document.documentElement.classList.remove('trip-window-kb-open');
+      document.documentElement.style.removeProperty('--vvh');
+      document.documentElement.style.removeProperty('--vvt');
     };
   }, []);
 

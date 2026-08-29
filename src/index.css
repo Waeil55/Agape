@@ -2479,12 +2479,16 @@ textarea {
 .trip-window-overlay {
   position: fixed;
   inset: 0;
-  height: 100dvh;
+  height: 100vh;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0.5rem;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-overflow-scrolling: none;
+  overflow: hidden;
 }
 
 .trip-window-panel {
@@ -2512,18 +2516,18 @@ html.trip-window-open body {
    centering in the full 100dvh. On iOS the layout viewport does not resize
    when the keyboard opens, so a centered panel in the full height falls
    behind the keyboard and out of reach. The panel is instead bound to the
-   live visual viewport (--vvh / --vvt set from JS) and pinned to the top of
+   live visual viewport (--vvh / --vvt set from JS) and pinned to the bottom of
    the visible area, keeping the fields and their caret inside the visible
    region above the keyboard with no gap. */
 html.trip-window-kb-open .trip-window-overlay {
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding-block: max(0.35rem, env(safe-area-inset-top, 0px));
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
 html.trip-window-kb-open .trip-window-panel {
-  max-height: min(34rem, calc(var(--vvh, 100dvh) - 1rem));
-  margin-top: var(--vvt, 0px);
+  max-height: min(34rem, calc(var(--vvh, 100dvh) - 1.5rem));
+  margin-bottom: 0;
 }
 
 /* Native Capacitor keyboard: the Keyboard plugin reports the exact on-screen
@@ -2538,6 +2542,7 @@ html.trip-window-kb-native .trip-window-overlay {
 
 html.trip-window-kb-native .trip-window-panel {
   margin-top: 0;
+  margin-bottom: 0;
   max-height: min(34rem, calc(100% - 1rem));
 }
 
