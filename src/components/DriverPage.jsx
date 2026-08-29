@@ -3852,36 +3852,26 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const updateCompletionDeparture = (value) => {
     const pickupArrivalClock = formatTimeInput(getCompletionPickupBoundary(showCompleteModal));
-    const normalized = normalizeCompletionClocks({
-      pickupArrival: pickupArrivalClock,
-      pickupDeparture: value,
-      dropoffArrival: arrivalDropoffTime,
-      now: value,
-    });
-    setDepartedTime(normalized.pickupDeparture);
-    if (normalized.dropoffArrival !== arrivalDropoffTime) {
-      setArrivalDropoffTime(normalized.dropoffArrival);
-    }
+    // Keep the driver's selected value intact while the native time picker is
+    // open. Normalizing on every change immediately replaced the selection
+    // (and made iOS appear read-only). Chronology is still enforced on submit.
+    setDepartedTime(value);
     setCompleteError('');
-    setCompleteTimeNotice(normalized.pickupDeparture !== value
-      ? `Pickup departure cannot precede pickup arrival. It was adjusted to ${to12hrFromTimeInput(normalized.pickupDeparture)}.`
-      : '');
+    if (value && pickupArrivalClock && timeToMinutes(value) < timeToMinutes(pickupArrivalClock)) {
+      setCompleteTimeNotice(`Pickup departure cannot be before pickup arrival (${to12hrFromTimeInput(pickupArrivalClock)}). Choose another time.`);
+    } else if (value && arrivalDropoffTime && timeToMinutes(arrivalDropoffTime) < timeToMinutes(value)) {
+      setCompleteTimeNotice('Dropoff arrival is now before pickup departure. Update the dropoff time before completing.');
+    } else {
+      setCompleteTimeNotice('');
+    }
   };
 
   const updateCompletionDropoffArrival = (value) => {
-    const normalized = normalizeCompletionClocks({
-      pickupArrival: formatTimeInput(getCompletionPickupBoundary(showCompleteModal)),
-      pickupDeparture: departedTime,
-      dropoffArrival: value,
-      now: value,
-    });
-    setArrivalDropoffTime(normalized.dropoffArrival);
-    if (normalized.pickupDeparture !== departedTime) {
-      setDepartedTime(normalized.pickupDeparture);
-    }
+    // Do not rewrite the other field while the driver edits this one.
+    setArrivalDropoffTime(value);
     setCompleteError('');
-    setCompleteTimeNotice(normalized.dropoffArrival !== value
-      ? `Dropoff arrival cannot precede pickup departure. It was adjusted to ${to12hrFromTimeInput(normalized.dropoffArrival)}.`
+    setCompleteTimeNotice(value && departedTime && timeToMinutes(value) < timeToMinutes(departedTime)
+      ? `Dropoff arrival cannot be before pickup departure (${to12hrFromTimeInput(departedTime)}). Choose another time.`
       : '');
   };
 
@@ -5992,7 +5982,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Departed Pickup Time</label>
                     <div className="text-center">
-                    <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} onChange={(e) => updateCompletionDeparture(e.target.value)}
+                    <input type="time" value={departedTime} onChange={(e) => updateCompletionDeparture(e.target.value)}
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
                     </div>
                   </div>
@@ -6008,7 +5998,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Arrival Dropoff Time</label>
                     <div className="text-center">
-                    <input type="time" value={arrivalDropoffTime} min={departedTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
+                    <input type="time" value={arrivalDropoffTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
                     </div>
                   </div>
