@@ -2,7 +2,7 @@
 	"appId": "com.agapecare.fleet",
 	"appName": "Agape Care",
 	"webDir": "dist",
-	"backgroundColor": "#5a94af",
+	"backgroundColor": "#2A52AC",
 	"server": {
 		"androidScheme": "https"
 	},
@@ -12,6 +12,10 @@
 	"plugins": {
 		"Geolocation": {
 			"permissions": "always"
+		},
+		"Keyboard": {
+			"resize": "body",
+			"resizeOnFullScreen": true
 		}
 	}
 }

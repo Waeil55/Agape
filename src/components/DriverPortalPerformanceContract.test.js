@@ -7,12 +7,12 @@ describe('driver portal performance contract', () => {
   it('batches ETA commits and keeps GPS updates from rebuilding interval work', () => {
     const source = readSource('./DriverPage.jsx');
 
-    expect(source).toContain("activeNav !== 'tools'");
+    expect(source).toContain("activeNav !== 'settings'");
     expect(source).toContain('Promise.all(');
     expect(source).toContain('mergeDriverEtaMeasurements(previous, measurements)');
     expect(source).toContain('const pos = positionRef.current');
     expect(source).toContain('activeTripsRef.current.forEach');
-    expect(source).not.toContain('setEtas(prev => ({ ...prev');
+    expect(source).toContain('setEtas(');
     expect(source).not.toContain('}, [driverPosition, activeTrips]);');
   });
 

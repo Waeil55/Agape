@@ -128,6 +128,18 @@ export function getVehicleMaintenanceStatus(vehicle = {}, trips = [], drivers = 
   };
 }
 
+export function formatOilRemaining(milesRemaining) {
+  if (milesRemaining == null || !Number.isFinite(milesRemaining)) return '';
+  if (milesRemaining <= 0) return `overdue by ${Math.abs(milesRemaining).toLocaleString()} mi`;
+  return `${milesRemaining.toLocaleString()} mi remaining`;
+}
+
+export function formatFilterRemaining(daysRemaining) {
+  if (daysRemaining == null || !Number.isFinite(daysRemaining)) return '';
+  if (daysRemaining <= 0) return `overdue by ${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) === 1 ? '' : 's'}`;
+  return `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`;
+}
+
 export function summarizeFleetMaintenance(vehicles = [], trips = [], drivers = [], policy = {}, now = new Date()) {
   const records = vehicles.map((vehicle) => ({ vehicle, ...getVehicleMaintenanceStatus(vehicle, trips, drivers, policy, now) }));
   return {
