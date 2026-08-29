@@ -168,7 +168,11 @@ const OdometerBaselineLine = ({ vehicleName, miles }) => (
 // every trip-window opener calls this right after mounting its window.
 const focusTripWindowInput = () => {
   setTimeout(() => {
-    const el = document.querySelector('.trip-window-panel input[autofocus], .trip-window-panel input[type="time"]');
+    // Prefer the explicit autoFocus field (odometer) over type="time" so
+    // the completion modal lands on the odometer, not the time picker.
+    const el = document.querySelector('.trip-window-panel input[autofocus]')
+      || document.querySelector('.trip-window-panel input[type="text"][inputmode="numeric"]')
+      || document.querySelector('.trip-window-panel input[type="time"]');
     if (!el) return;
     try { el.focus({ preventScroll: true }); } catch { el.focus(); }
     requestAnimationFrame(() => {
