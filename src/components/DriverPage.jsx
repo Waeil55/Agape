@@ -1595,6 +1595,35 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
   }, []);
 
+  // Polling fallback: on iOS WKWebView, visualViewport events may not fire and
+  // the Capacitor Keyboard plugin native bridge may not be installed. Detect
+  // keyboard by tracking visualViewport.height changes against a captured
+  // baseline. This ensures trip-window-kb-open is applied even when neither
+  // the visualViewport listener nor the native Keyboard plugin fires.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const baselineHeight = window.innerHeight;
+    let pollTimer = null;
+    let lastKnownHeight = baselineHeight;
+    const poll = () => {
+      const vh = window.visualViewport?.height || window.innerHeight;
+      if (vh !== lastKnownHeight) {
+        lastKnownHeight = vh;
+        const keyboardOpen = vh < baselineHeight - 120;
+        const wasOpen = document.documentElement.classList.contains('trip-window-kb-open');
+        if (keyboardOpen !== wasOpen) {
+          document.documentElement.classList.toggle('trip-window-kb-open', keyboardOpen);
+          document.documentElement.style.setProperty('--vvh', `${Math.round(vh)}px`);
+          document.documentElement.style.setProperty('--vvt', `${Math.round(window.visualViewport?.offsetTop || 0)}px`);
+        }
+      }
+    };
+    pollTimer = window.setInterval(poll, 120);
+    return () => {
+      if (pollTimer) window.clearInterval(pollTimer);
+    };
+  }, []);
+
   // GPS is mandatory — always active on mount
   // Clean up undo timeout on unmount
   useEffect(() => {
