@@ -1528,11 +1528,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
     document.addEventListener('focusin', scheduleSettlePass, true);
     document.addEventListener('focusout', scheduleSettlePass, true);
-    // Prevent iOS body scroll when keyboard opens inside trip window
+    // Prevent iOS body scroll when keyboard opens inside trip window.
+    // Skip inputs and time pickers so their native interaction isn't blocked.
     const preventScroll = (e) => {
-      if (document.documentElement.classList.contains('trip-window-open')) {
-        e.preventDefault();
-      }
+      if (!document.documentElement.classList.contains('trip-window-open')) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (e.target?.closest?.('input, select, textarea, .trip-window-panel')) return;
+      e.preventDefault();
     };
     document.addEventListener('scroll', preventScroll, { capture: true, passive: false });
     document.addEventListener('touchmove', preventScroll, { capture: true, passive: false });

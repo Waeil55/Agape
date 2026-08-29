@@ -2486,8 +2486,6 @@ textarea {
   justify-content: center;
   padding: 0.5rem;
   overscroll-behavior: none;
-  touch-action: none;
-  -webkit-overflow-scrolling: none;
   overflow: hidden;
 }
 
