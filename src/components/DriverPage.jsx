@@ -84,30 +84,6 @@ const to12hr = (time) => {
   return `${h}:${min} ${ampm}`;
 };
 
-const TimeSelect = ({ value, onChange, min }) => {
-  const [h, m] = (value || '').split(':');
-  const pad = (n) => String(n).padStart(2, '0');
-  const hours = Array.from({ length: 24 }, (_, i) => pad(i));
-  const minutes = Array.from({ length: 12 }, (_, i) => pad(i * 5));
-  const hh = h || '';
-  const mm = m || '';
-  const setH = (v) => onChange(`${v}:${mm || '00'}`);
-  const setM = (v) => onChange(`${hh || '00'}:${v}`);
-  return (
-    <div className="flex gap-1 items-center justify-center">
-      <select value={hh} onChange={(e) => setH(e.target.value)} className="w-16 p-2 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none cursor-pointer">
-        <option value="" disabled>HH</option>
-        {hours.map((h) => <option key={h} value={h}>{h}</option>)}
-      </select>
-      <span className="font-bold text-slate-400">:</span>
-      <select value={mm} onChange={(e) => setM(e.target.value)} className="w-16 p-2 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-blue-500 outline-none cursor-pointer">
-        <option value="" disabled>MM</option>
-        {minutes.map((m) => <option key={m} value={m}>{m}</option>)}
-      </select>
-    </div>
-  );
-};
-
 const formatTimeInput = (v) => {
   if (!v) return '';
   const d = new Date(v);
@@ -6015,7 +5991,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Departed Pickup Time</label>
-                    <TimeSelect value={departedTime} onChange={(v) => updateCompletionDeparture(v)} />
+                    <div className="text-center">
+                    <input type="time" value={departedTime} min={formatTimeInput(getCompletionPickupBoundary(showCompleteModal))} onChange={(e) => updateCompletionDeparture(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Pickup Odometer</label>
@@ -6028,7 +6007,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Arrival Dropoff Time</label>
-                    <TimeSelect value={arrivalDropoffTime} onChange={(v) => updateCompletionDropoffArrival(v)} />
+                    <div className="text-center">
+                    <input type="time" value={arrivalDropoffTime} min={departedTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-rose-600 mb-1">Final Odometer (mi)</label>
