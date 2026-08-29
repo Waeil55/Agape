@@ -1,6 +1,7 @@
 import { initializeApp, deleteApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, initializeFirestore, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, increment, writeBatch, setDoc, getDoc, getDocFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, increment, writeBatch, setDoc, getDoc, getDocFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
 import { initializeAuth, getAuth, browserSessionPersistence, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
+import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -38,21 +39,41 @@ const appCheck = (() => {
   }
 })();
 let db;
+const usesWebKitIndexedDbRiskRuntime = typeof navigator !== 'undefined'
+  && /AppleWebKit/i.test(navigator.userAgent || '')
+  && /iPad|iPhone|iPod/i.test(navigator.userAgent || '');
 if (appWasInitialized) {
   // During development hot reloads the default Firebase app already owns a
   // configured Firestore instance. Reuse it so its cache and listeners remain
   // stable instead of attempting a conflicting second initialization.
   db = getFirestore(app);
-} else {
-  // Firestore's persistent IndexedDB target database can become internally
-  // inconsistent across browser/PWA lifecycle changes, producing target-ID
-  // collisions and transactionless range-delete failures across every live
-  // listener. The server remains authoritative; the app's separate local
-  // snapshot layer provides fast startup data without reusing that database.
+} else if (usesWebKitIndexedDbRiskRuntime) {
+  // Firestore's persistent IndexedDB cache can become internally inconsistent
+  // in iOS WebKit (including installed PWAs), producing target-ID collisions
+  // and transactionless range-delete failures across every live listener.
+  // The server remains authoritative; use the stable in-memory Firestore cache
+  // here while the app's own local snapshot layer provides fast startup data.
   db = initializeFirestore(app, {
     localCache: memoryLocalCache(),
     experimentalAutoDetectLongPolling: true,
   });
+} else try {
+  // Persistent local cache: the app opens instantly from on-device data and
+  // streams live changes in the background, so every device converges on the
+  // same global state fast — including offline starts. Multi-tab manager
+  // keeps the PWA, admin console, and any duplicate tabs consistent.
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    experimentalAutoDetectLongPolling: true,
+  });
+} catch (err) {
+  console.warn('Persistent cache unavailable, using memory cache:', err.message);
+  try {
+    db = initializeFirestore(app, { localCache: memoryLocalCache() });
+  } catch (err2) {
+    console.warn('Memory cache failed, using default Firestore:', err2.message);
+    db = getFirestore(app);
+  }
 }
 
 let auth;
@@ -63,6 +84,8 @@ try {
 } catch (err) {
   auth = getAuth(app);
 }
+const analytics = (() => { try { return getAnalytics(app); } catch { return null; } })();
+
 // Messaging is initialized lazily by the notification service after browser
 // capability/permission checks. Eager initialization rejects in unsupported
 // browsers and server-side test environments.
@@ -72,12 +95,12 @@ const functions = getFunctions(app);
 const storage = getStorage(app);
 
 export default app;
-export { app, appCheck, db, auth, messaging, storage, storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, deleteApp, initializeApp, firebaseConfig,
+export { app, appCheck, db, auth, analytics, messaging, storage, storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, deleteApp, initializeApp, firebaseConfig,
   getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp, increment,
   writeBatch, setDoc, getDoc, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
-  browserLocalPersistence, browserSessionPersistence, getAuth, getMessaging, getToken, onMessage, functions, httpsCallable };
+  browserLocalPersistence, browserSessionPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
 
 const _agapeApiKey = env.VITE_GOOGLE_MAPS_API_KEY || "";
 export function GOOGLE_MAPS_API_KEY() { return _agapeApiKey; }

@@ -19,12 +19,6 @@ service cloud.firestore {
         && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'terminated'
         && currentProfile().get('accessStatus', currentProfile().get('employmentStatus', 'active')) != 'separated';
     }
-    function isActiveWellTransAgent() {
-      return request.auth != null
-        && request.auth.token.welltransAgent == true
-        && exists(/databases/$(database)/documents/welltrans_agent_devices/$(request.auth.uid))
-        && get(/databases/$(database)/documents/welltrans_agent_devices/$(request.auth.uid)).data.active == true;
-    }
     function isAdmin() {
       return signedIn() && currentProfile().role == 'admin';
     }
@@ -67,7 +61,7 @@ service cloud.firestore {
       allow update, delete: if signedIn() && isAdmin();
     }
     match /trips/{tripId} {
-      allow read: if signedIn() || isActiveWellTransAgent();
+      allow read: if signedIn();
       allow create: if signedIn();
       allow update: if signedIn();
       allow delete: if signedIn() && isAdmin();
@@ -148,7 +142,7 @@ service cloud.firestore {
       allow write: if signedIn() && isAdmin();
     }
     match /welltrans_settings/{document} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
       allow create, update: if signedIn() && isAdmin()
         && !request.resource.data.keys().hasAny([
           'portalUsername',
@@ -162,78 +156,66 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /welltrans_sync_logs/{logId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_sync_events/{eventId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_verification_runs/{runId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_correction_commands/{commandId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_sync_manifests/{serviceDate} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_driver_sync_status/{driverRunId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_sync_shards/{shardId} {
       allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_sync_outbox/{outboxId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_sync_leases/{serviceDate} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_worker_status/{workerId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_workers/{workerInstanceId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
     }
     match /welltrans_operations/{document} {
       allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
     match /welltrans_canary/{document} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
-    }
-    match /welltrans_canary_history/{document} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if isActiveWellTransAgent();
-    }
-    match /drivers/{driverId} {
-      allow read: if signedIn() || isActiveWellTransAgent();
-      allow create: if signedIn() && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow update: if signedIn() && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
-      allow delete: if signedIn() && isAdmin();
-    }
-
-    match /welltrans_booking_aliases/{aliasId} {
-      allow read: if (signedIn() && isAdmin()) || isActiveWellTransAgent();
-      allow write: if false;
-    }
-    match /welltrans_agent_devices/{deviceId} {
       allow read: if signedIn() && isAdmin();
       allow write: if false;
     }
-    match /welltrans_agent_enrollments/{grantId} {
-      allow read, write: if false;
+    match /welltrans_canary_history/{document} {
+      allow read: if signedIn() && isAdmin();
+      allow write: if false;
+    }
+    match /drivers/{driverId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (isOwner(driverId) || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow update: if signedIn() && (isOwner(driverId) || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isDispatcher());
+      allow delete: if signedIn() && isAdmin();
     }
 
     match /presence/{email} {

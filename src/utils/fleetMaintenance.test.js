@@ -1,16 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_MAINTENANCE_POLICY, deriveVehicleOdometer, formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus } from './fleetMaintenance';
+import { DEFAULT_MAINTENANCE_POLICY, deriveVehicleOdometer, getVehicleMaintenanceStatus } from './fleetMaintenance';
 
 describe('fleet maintenance', () => {
-  it('formats remaining and overdue service intervals without negative wording', () => {
-    expect(formatOilRemaining(1250)).toBe('1,250 miles remaining');
-    expect(formatOilRemaining(-120)).toBe('120 miles overdue');
-    expect(formatOilRemaining(0)).toBe('Oil change due now');
-    expect(formatFilterRemaining(45)).toBe('45 days remaining');
-    expect(formatFilterRemaining(-8)).toBe('8 days overdue');
-    expect(formatFilterRemaining(null)).toBe('Service baseline required');
-  });
-
   it('uses the highest completed-trip odometer for the assigned vehicle', () => {
     const vehicle = { id: 'V1', name: 'Van 1', odometer: '1,000' };
     const drivers = [{ id: 'D1', vehicleId: 'V1', vehicle: 'Van 1' }];

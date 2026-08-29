@@ -17,7 +17,6 @@ import {
   isWellTransFailureRetryable, queueWellTransSync, saveWellTransSettings,
   clearLocalWellTransCredentials, getLocalWellTransCredentialStatus,
   saveLocalWellTransCredentials,
-  enrollLocalWellTransAgent, getLocalWellTransAgentEnrollment,
   categorizeFailure, FAILURE_CATEGORIES,
 } from '../services/welltransService';
 import {
@@ -160,8 +159,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   const [queuePage, setQueuePage] = useState(0);
   const [logsPage, setLogsPage] = useState(0);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
-  const [enrollmentStatus, setEnrollmentStatus] = useState({ loading: false, configured: false, deviceId: '', label: '' });
-  const [enrollmentError, setEnrollmentError] = useState('');
   const [agentRelease, setAgentRelease] = useState(null);
   const [credentialStatus, setCredentialStatus] = useState({ loading: false, connected: false, configured: false, username: '' });
   const [credentialDraft, setCredentialDraft] = useState({ username: '', password: '' });
@@ -2031,7 +2028,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                   'In Downloads, right-click the ZIP, choose Properties, select Unblock, then Apply.',
                   'Choose Extract All and open the extracted agape-welltrans-agent folder.',
                   'Double-click Install-Agent.cmd. Return to Agape when installation completes.',
-                  'Return here and click Enroll This PC once. No Firebase JSON file is needed.',
                   'Select the service date and click Reconcile & Fill Date.',
                 ].map((step, index) => (
                   <li key={step} className="flex gap-2">
@@ -2058,27 +2054,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
               )}
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
-              {normalizedRole === 'admin' && (
-                <button type="button"
-                  disabled={enrollmentStatus.loading}
-                  onClick={async () => {
-                    setEnrollmentError('');
-                    setEnrollmentStatus(current => ({ ...current, loading: true }));
-                    try {
-                      const current = await getLocalWellTransAgentEnrollment();
-                      const enrolled = current.configured ? current : await enrollLocalWellTransAgent();
-                      setEnrollmentStatus({ ...enrolled, loading: false });
-                      setNotice(current.configured ? 'This PC is already enrolled.' : 'This PC is securely enrolled. No Firebase file is required.');
-                    } catch (error) {
-                      setEnrollmentStatus(current => ({ ...current, loading: false }));
-                      setEnrollmentError(error.message || 'This PC could not be enrolled.');
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
-                  {enrollmentStatus.loading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-                  {enrollmentStatus.configured ? 'PC Enrolled' : 'Enroll This PC'}
-                </button>
-              )}
               <a href="/welltrans-agent/agape-welltrans-agent.zip" download
                 className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-blue-700">
                 <Download size={13} /> Download Agent ZIP
@@ -2088,7 +2063,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                 Close
               </button>
             </div>
-            {enrollmentError && <p className="border-t border-rose-200 bg-rose-50 px-5 py-2 text-[10px] font-semibold text-rose-700">{enrollmentError}</p>}
           </div>
         </div>
       )}

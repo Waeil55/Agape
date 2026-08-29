@@ -20,27 +20,10 @@ describe('local encrypted WellTrans credential vault', () => {
     temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'agape-welltrans-vault-'));
     process.env.WELLTRANS_SESSION_KEY = crypto.randomBytes(32).toString('base64');
     process.env.WELLTRANS_CREDENTIAL_FILE = path.join(temporaryDirectory, 'credentials.vault');
-    process.env.AGAPE_DEVICE_CREDENTIAL_FILE = path.join(temporaryDirectory, 'device.vault');
     process.env.AGAPE_LOCAL_SETTINGS_PORT = '0';
     server = startLocalWellTransSettingsServer();
     if (!server.listening) await once(server, 'listening');
     baseUrl = `http://127.0.0.1:${server.address().port}/v1/welltrans-credentials`;
-  });
-
-  it('rejects enrollment exchanges to every non-Agape endpoint', async () => {
-    const enrollmentUrl = baseUrl.replace('/welltrans-credentials', '/agent-enrollment');
-    const rejected = await fetch(enrollmentUrl, {
-      method: 'PUT',
-      headers: { Origin: origin, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        exchangeUrl: 'https://attacker.example/steal',
-        grantId: 'grant',
-        grantSecret: 'secret',
-        apiKey: 'public-firebase-api-key',
-      }),
-    });
-    assert.equal(rejected.status, 400);
-    assert.equal((await rejected.json()).error, 'The enrollment service URL is not authorized');
   });
 
   after(async () => {

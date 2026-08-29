@@ -9,17 +9,6 @@ export function extractZipFromAddress(address) {
   return match ? match[1] : '';
 }
 
-export function verifyGeocodedAddress(address, geocoded) {
-  if (geocoded?.lat == null || geocoded?.lng == null) return null;
-  const lat = Number(geocoded?.lat);
-  const lng = Number(geocoded?.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-  const requestedZip = extractZipFromAddress(address);
-  const verifiedZip = String(geocoded?.postalCode || '').trim();
-  if (requestedZip && verifiedZip && requestedZip !== verifiedZip) return null;
-  return { lat, lng };
-}
-
 export function haversineMiles(pointA, pointB) {
   if (pointA?.lat == null || pointA?.lng == null || pointB?.lat == null || pointB?.lng == null) return null;
   const toRad = (degrees) => (degrees * Math.PI) / 180;

@@ -86,23 +86,6 @@ const oilState = (remaining) => {
   return 'healthy';
 };
 
-export const formatOilRemaining = (milesRemaining) => {
-  const miles = Number(milesRemaining);
-  if (!Number.isFinite(miles)) return 'Mileage unavailable';
-  if (miles < 0) return `${Math.abs(miles).toLocaleString()} miles overdue`;
-  if (miles === 0) return 'Oil change due now';
-  return `${miles.toLocaleString()} miles remaining`;
-};
-
-export const formatFilterRemaining = (daysRemaining) => {
-  if (daysRemaining === null || daysRemaining === undefined || daysRemaining === '') return 'Service baseline required';
-  const days = Number(daysRemaining);
-  if (!Number.isFinite(days)) return 'Service baseline required';
-  if (days < 0) return `${Math.abs(days).toLocaleString()} days overdue`;
-  if (days === 0) return 'Filter change due today';
-  return `${days.toLocaleString()} days remaining`;
-};
-
 export function getVehicleMaintenanceStatus(vehicle = {}, trips = [], drivers = [], policy = {}, now = new Date()) {
   const defaults = normalizeMaintenancePolicy(policy);
   const odometer = deriveVehicleOdometer(vehicle, trips, drivers);

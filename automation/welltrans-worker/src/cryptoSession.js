@@ -31,12 +31,7 @@ export async function saveEncryptedSession(filePath, state) {
 }
 
 export async function loadEncryptedSession(filePath) {
-  try {
-    return await loadEncryptedJson(filePath, 'AGWT1');
-  } catch (error) {
-    if (error?.code === 'ENOENT') return null;
-    throw error;
-  }
+  return loadEncryptedJson(filePath, 'AGWT1');
 }
 
 export async function saveEncryptedCredentials(filePath, credentials) {

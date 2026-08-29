@@ -3,40 +3,10 @@ import {
   LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route,
   Phone, ShieldCheck, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus,
   LayoutDashboard, Users, Activity, Archive, Settings, User, Bell, KeyRound,
-  Truck, RefreshCw, Trash2, RotateCcw, FileText, MessageSquare, SlidersHorizontal
+  Truck, RefreshCw, Trash2, RotateCcw, FileText, MessageSquare
 } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
-import { resolveCostOverrideRules } from '../utils/unloadedMileage';
-
-const pairsToText = pairs => (pairs || []).map(pair => typeof pair === 'string' ? pair : `${pair.from || ''} > ${pair.to || ''}`).join('\n');
-const textToPairs = text => String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-
-const CostOverrideSettings = ({ settings, onSave, saving }) => {
-  const [draft, setDraft] = useState(() => resolveCostOverrideRules(settings));
-  useEffect(() => setDraft(resolveCostOverrideRules(settings)), [settings]);
-  const numberField = (key, label, suffix, step = 1) => <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span><div className="flex items-center rounded-xl border border-slate-200 bg-white px-3"><input type="number" min="0" step={step} value={draft[key]} onChange={event => setDraft(current => ({ ...current, [key]: event.target.value }))} className="min-h-11 min-w-0 flex-1 bg-transparent font-mono text-sm font-semibold text-slate-900 outline-none" /><span className="text-xs font-semibold text-slate-400">{suffix}</span></div></label>;
-  return <div className="space-y-5">
-    <div><h3 className="text-heading mb-1 text-slate-900">Cost override rules</h3><p className="text-body text-slate-500">Control unloaded mileage, verified waiting gaps, rates, mobility classes, and route exclusions.</p></div>
-    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-900">A trip qualifies only when it is strictly greater than the configured threshold. Waiting can require proof that the driver completed no other trip during the waiting window.</div>
-    <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2">
-      {[['collectUnloadedMileage', 'Collect unloaded mileage'], ['collectWaitingTime', 'Collect waiting time'], ['includeAmbulatory', 'Include ambulatory legs'], ['includeWheelchair', 'Include wheelchair legs']].map(([key, label]) => <label key={key} className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-50 px-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={draft[key] !== false} onChange={event => setDraft(current => ({ ...current, [key]: event.target.checked }))} className="h-5 w-5 rounded" />{label}</label>)}
-      <label className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-50 px-3 text-sm font-semibold text-slate-700 sm:col-span-2"><input type="checkbox" checked={draft.requireNoInterveningTripsForWaiting !== false} onChange={event => setDraft(current => ({ ...current, requireNoInterveningTripsForWaiting: event.target.checked }))} className="h-5 w-5 rounded" />Waiting requires no other completed trip during the waiting window</label>
-    </div>
-    <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
-      {numberField('minimumUnloadedMiles', 'Unloaded mileage must exceed', 'mi', 0.1)}
-      {numberField('unloadedRatePerMile', 'Unloaded mileage rate', '$/mi', 0.01)}
-      {numberField('minimumWaitingMinutes', 'Waiting time must exceed', 'min', 1)}
-      {numberField('waitingGraceMinutes', 'Free waiting time deducted', 'min', 1)}
-      {numberField('waitingRatePerHour', 'Waiting rate', '$/hr', 0.01)}
-    </div>
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={Boolean(draft.excludeSameCityUnloaded)} onChange={event => setDraft(current => ({ ...current, excludeSameCityUnloaded: event.target.checked }))} className="h-5 w-5 rounded" />Exclude every same-city unloaded route</label><label className="mt-3 block text-xs font-semibold text-slate-600">Specific unloaded exclusions — one per line</label><textarea value={pairsToText(draft.unloadedExcludedCityPairs)} onChange={event => setDraft(current => ({ ...current, unloadedExcludedCityPairs: textToPairs(event.target.value) }))} rows="6" placeholder={'Indianapolis > Indianapolis'} className="mt-1.5 w-full rounded-xl border border-slate-200 p-3 font-mono text-sm outline-none focus:border-blue-500" /><p className="mt-2 text-xs font-semibold text-slate-400">Default: Indianapolis &gt; Indianapolis only. Indianapolis to or from another city remains eligible.</p></div>
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={Boolean(draft.excludeSameCityWaiting)} onChange={event => setDraft(current => ({ ...current, excludeSameCityWaiting: event.target.checked }))} className="h-5 w-5 rounded" />Exclude every same-city waiting route</label><label className="mt-3 block text-xs font-semibold text-slate-600">Specific waiting exclusions — one per line</label><textarea value={pairsToText(draft.waitingExcludedCityPairs)} onChange={event => setDraft(current => ({ ...current, waitingExcludedCityPairs: textToPairs(event.target.value) }))} rows="6" placeholder={'Indianapolis > Indianapolis'} className="mt-1.5 w-full rounded-xl border border-slate-200 p-3 font-mono text-sm outline-none focus:border-blue-500" /><p className="mt-2 text-xs font-semibold text-slate-400">Default: Indianapolis &gt; Indianapolis only. Waiting on every other city combination can qualify.</p></div>
-    </div>
-    <button type="button" disabled={saving} onClick={() => onSave({ ...draft, minimumUnloadedMiles: Number(draft.minimumUnloadedMiles), unloadedRatePerMile: Number(draft.unloadedRatePerMile), minimumWaitingMinutes: Number(draft.minimumWaitingMinutes), waitingGraceMinutes: Number(draft.waitingGraceMinutes), waitingRatePerHour: Number(draft.waitingRatePerHour) })} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"><Save size={17} /> Save override rules</button>
-  </div>;
-};
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -156,7 +126,6 @@ const SettingsPage = ({
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const personalSectionIds = ['profile', 'appearance', 'accessibility', 'navigation', 'notifications', 'security'];
-  if (role === 'admin') personalSectionIds.unshift('costOverrides');
   if (role === 'dispatcher') personalSectionIds.unshift('activity');
   const resolvedInitialSection = personalSectionIds.includes(initialSection) ? initialSection : 'profile';
   const [activeSection, setActiveSection] = useState(() => {
@@ -165,11 +134,6 @@ const SettingsPage = ({
   });
   const [showArchivedTrips, setShowArchivedTrips] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
-  const [odometerDraft, setOdometerDraft] = useState(() => String(driverProfile?.odometer ?? ''));
-
-  useEffect(() => {
-    setOdometerDraft(String(driverProfile?.odometer ?? ''));
-  }, [driverProfile?.odometer]);
 
   useEffect(() => {
     if (resolvedInitialSection && resolvedInitialSection !== activeSection) {
@@ -231,7 +195,6 @@ const SettingsPage = ({
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: KeyRound },
   ];
-  if (role === 'admin') personalNav.unshift({ id: 'costOverrides', label: 'Cost overrides', icon: SlidersHorizontal });
 
   // Make System Activity available to dispatchers as a personal section (they will be filtered)
   if (role === 'dispatcher' && !personalNav.find(p => p.id === 'activity')) {
@@ -245,8 +208,6 @@ const SettingsPage = ({
 
   const sectionContent = () => {
     switch (activeSection) {
-      case 'costOverrides':
-        return <CostOverrideSettings settings={appSettings?.costOverrideRules} saving={saveStatus === 'Saving changes...'} onSave={rules => saveSettings({ costOverrideRules: rules })} />;
       // ===== OVERVIEW =====
       case 'overview':
         return (
@@ -580,28 +541,13 @@ const SettingsPage = ({
                       <p className="text-micro">Vehicle</p>
                       <p className="text-lg font-semibold text-slate-900 mt-2">{driverProfile?.vehicle || 'Not Assigned'}</p>
                     </div>
-                    <form
-                      className="bg-white border border-slate-200 rounded-xl p-4"
-                      onSubmit={async (event) => {
-                        event.preventDefault();
-                        const value = Number(String(odometerDraft).replace(/,/g, ''));
-                        if (!Number.isFinite(value) || value < 0) {
-                          setSaveStatus('Enter a valid odometer reading.');
-                          return;
-                        }
-                        document.activeElement?.blur?.();
-                        await saveSettings({ odometer: value }, true);
-                      }}
-                    >
+                    <div className="bg-white border border-slate-200 rounded-xl p-4">
                       <p className="text-micro">Current Odometer</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <input type="number" inputMode="numeric" min="0" value={odometerDraft} onChange={(event) => setOdometerDraft(event.target.value)} className="min-w-0 w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:border-blue-500 outline-none text-base" />
+                        <input type="number" value={driverProfile?.odometer || 0} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val)) saveSettings({ odometer: val }, true); }} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:border-blue-500 outline-none text-base" />
                         <span className="text-sm font-semibold text-slate-400">mi</span>
                       </div>
-                      <button type="submit" disabled={!odometerDraft || saveStatus === 'Saving changes...'} className="mt-3 min-h-11 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
-                        {saveStatus === 'Saving changes...' ? 'Saving…' : 'Save Odometer'}
-                      </button>
-                    </form>
+                    </div>
                   </div>
                 )}
                 <div className="pt-6 border-t border-slate-200">

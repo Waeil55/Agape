@@ -39,7 +39,6 @@ export const AdminShell = ({
   fab,
   hideBrand = false,
   navInline = false,
-  embeddedMobile = false,
 }) => (
   <div className="admin-app">
     {/* Desktop Sidebar */}
@@ -91,7 +90,7 @@ export const AdminShell = ({
 
     {/* Main Column */}
     <div className="adm-main">
-      <header className={`adm-topbar !border-slate-200 !bg-white ${embeddedMobile ? 'hidden md:flex' : ''}`} style={{ backdropFilter: 'none' }}>
+      <header className="adm-topbar !border-slate-200 !bg-white" style={{ backdropFilter: 'none' }}>
         <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm md:hidden mr-2">
           <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
         </div>
@@ -135,28 +134,13 @@ export const AdminShell = ({
         </div>
       )}
 
-      {embeddedMobile && mobileNav.length > 0 && (
-        <nav className="admin-mobile-section-tabs md:hidden" aria-label="Administration sections">
-          {mobileNav.map((item) => {
-            const Icon = item.icon;
-            const isActive = (mobileActive ?? active) === item.id;
-            return (
-              <button key={item.id} type="button" onClick={() => onMobileNavigate?.(item.id)} aria-current={isActive ? 'page' : undefined} className={isActive ? 'is-active' : ''}>
-                {Icon && <Icon size={15} />}
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      )}
-
-      <main className={`adm-content ${embeddedMobile ? 'admin-embedded-content' : ''}`}>
+      <main className="adm-content">
         {children}
       </main>
     </div>
 
     {/* Mobile Bottom Nav */}
-    <nav className={`adm-bottomnav md:hidden ${embeddedMobile ? '!hidden' : ''}`}>
+    <nav className="adm-bottomnav md:hidden">
       {mobileNav.map((item) => {
         const Icon = item.icon;
         const isActive = (mobileActive ?? active) === item.id;

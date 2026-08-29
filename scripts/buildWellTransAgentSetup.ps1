@@ -46,7 +46,7 @@ $manifest | Add-Member -NotePropertyName setupSha256 `
   -NotePropertyValue (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash.ToLowerInvariant() -Force
 $manifest | Add-Member -NotePropertyName setupSignatureStatus -NotePropertyValue $signatureStatus -Force
 $manifest | Add-Member -NotePropertyName signed -NotePropertyValue ($signatureStatus -eq 'Valid') -Force
-$manifestJson = ($manifest | ConvertTo-Json) -replace "`r`n", "`n"
+$manifestJson = $manifest | ConvertTo-Json
 $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($manifestPath, $manifestJson, $utf8WithoutBom)
 Write-Output $setupPath

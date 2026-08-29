@@ -10,7 +10,6 @@ import { tripCalendarDateKey } from '../utils/tripDate';
 import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 import { isCompanyDriverPlaceholder } from '../utils/driverIdentity';
 import { analyzePhoneOwnershipForTrips, isValidPhoneDigits } from '../utils/clientPhoneResolution';
-import { isReviewableImportedTrip, parseOptionalReportNumber } from '../utils/reportOverrideImport';
 
 
 const timeToMinutes = (t) => {
@@ -985,8 +984,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             const c = cleanPhone(raw);
             return raw && isValidPhone(c) ? raw : '';
           })(),
-          fromCity: extract(row['From City'], row['From City '], row['City (Orig)'], row['Origin City'], row['pickupCity']),
-          toCity: extract(row['To City'], row['To City '], row['City (Dest)'], row['Destination City'], row['dropoffCity']),
 
           // --- TYPE & NOTES ---
           type: extract(m.type, row['Space Types'], row['Type'], row['Service Type'], row['Req'], row['req']),
@@ -1020,14 +1017,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
           // --- MILEAGE ---
           distance,
-          originalTripCost: parseOptionalReportNumber(extract(row['Original Trip Cost'], row['Provider Cost'], row['providerCost'], row['Trip Cost'])),
-          unloadedMileageMiles: parseOptionalReportNumber(extract(row['Unloaded Miles'], row['unloadedMileageMiles']), {
-            blankAsZero: uploadContext === 'reports' && ['Unloaded Miles', 'unloadedMileageMiles'].some(key => Object.prototype.hasOwnProperty.call(row, key)),
-          }),
-          overrideWaitingHours: parseOptionalReportNumber(extract(row['Wait time hours -(30 min)'], row['Billable Waiting Hours'], row['overrideWaitingHours']), {
-            blankAsZero: uploadContext === 'reports' && ['Wait time hours -(30 min)', 'Billable Waiting Hours', 'overrideWaitingHours'].some(key => Object.prototype.hasOwnProperty.call(row, key)),
-          }),
-          waitingNoInterveningTrips: parseSig(extract(row['No Intervening Trips'], row['No Trips Worked During Wait'], row['waitingNoInterveningTrips'])),
 
 
 
@@ -1047,15 +1036,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         };
       });
 
-      const pairedMapped = annotateInOutPairs(mapped).filter(trip => isReviewableImportedTrip(trip, { report: forceCompleted }));
-
-      if (pairedMapped.length === 0) {
-        setError(forceCompleted
-          ? 'No usable report rows were found. Override rows need an exact Booking ID and at least one cost, unloaded-mile, or waiting value.'
-          : 'No usable trip rows were found after validation.');
-        setStep('upload');
-        return;
-      }
+      const pairedMapped = annotateInOutPairs(mapped);
 
       // Post-pairing: normalize phone fields across IN/OUT groups
       // All legs in the same group MUST share the same patientPhone (home) and hospitalPhone (facility)
@@ -1248,20 +1229,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       })());
 
       const dateKey = resolvedDate;
-      const isOverrideReportPatch = uploadContext === 'reports'
-        && Boolean(String(trip.bookingId || '').trim())
-        && !trip.pickup
-        && !trip.dropoff
-        && (!trip.patient || trip.patient === 'Unknown');
 
       const baseTrip = {
         ...trip,
         source: tripSource,
-        reportOverridePatch: isOverrideReportPatch,
         dateKey,
         status: newStatus,
         date: dateKey,
-        patient: isOverrideReportPatch ? '' : (trip.patient || trip.clientName || trip.memberName || 'Unknown Client'),
+        patient: trip.patient || trip.clientName || trip.memberName || 'Unknown Client',
         pickup: trip.pickup || trip.pickupAddress || trip.originAddress || '',
         dropoff: trip.dropoff || trip.dropoffAddress || trip.destinationAddress || '',
         time: trip.time || trip.scheduledTime || '',
@@ -1272,15 +1247,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         return { ...baseTrip, driverId: finalDriverId };
       }
       return baseTrip;
-    }).filter((trip) => (trip.patient && trip.patient !== 'Unknown Client') || trip.pickup || trip.dropoff || (
-      trip.reportOverridePatch
-      && trip.bookingId
-      && [trip.originalTripCost, trip.unloadedMileageMiles, trip.overrideWaitingHours].some(value => value !== null && value !== undefined)
-    ));
+    }).filter((trip) => (trip.patient && trip.patient !== 'Unknown Client') || trip.pickup || trip.dropoff);
     if (cleanTrips.length === 0) {
-      setError(uploadContext === 'reports'
-        ? 'No valid report rows found. Override rows need an exact Booking ID and at least one cost, unloaded-mile, or waiting value.'
-        : 'No valid trips found. Each trip needs a real client name, service date, and pickup or dropoff address.');
+      setError('No valid trips found. Each trip needs a real client name, service date, and pickup or dropoff address.');
       return;
     }
     onTripsCreated(cleanTrips);

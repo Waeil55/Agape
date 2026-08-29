@@ -41,7 +41,6 @@ import useEnterpriseSessionSecurity, { beginSecuritySession, clearSecuritySessio
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
 import { hydrateTripDriverIdentity } from './utils/driverIdentity';
-import { DEFAULT_COST_OVERRIDE_RULES } from './utils/unloadedMileage';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -146,7 +145,6 @@ const DEFAULT_APP_SETTINGS = {
   navigationApp: 'google',
   routePlanNavApp: 'google',
   timeTrackingPolicy: 'PAY_FROM_HOME',
-  costOverrideRules: { ...DEFAULT_COST_OVERRIDE_RULES },
   maintenancePolicy: {
     oilChangeIntervalMiles: 4000,
     oilDueSoonMiles: 500,
@@ -250,28 +248,20 @@ function getDriverProfilesForEmail(drivers = [], email = '') {
 function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
   const matches = getDriverProfilesForEmail(drivers, email);
   if (matches.length === 0) return null;
-  const driverEmailById = new Map(
-    drivers.map(driver => [driver.id, normalizeEmail(driver.email)]),
-  );
-  const tripCountByDriverId = new Map();
-  const tripCountByDriverEmail = new Map();
-  (trips || []).forEach((trip) => {
-    if (trip?.driverId) {
-      tripCountByDriverId.set(trip.driverId, (tripCountByDriverId.get(trip.driverId) || 0) + 1);
-    }
-    const tripEmail = normalizeEmail(trip?.driverEmail) || driverEmailById.get(trip?.driverId) || '';
-    if (tripEmail) {
-      tripCountByDriverEmail.set(tripEmail, (tripCountByDriverEmail.get(tripEmail) || 0) + 1);
-    }
-  });
   return [...matches].sort((a, b) => {
-    const aExactTripCount = tripCountByDriverId.get(a.id) || 0;
-    const bExactTripCount = tripCountByDriverId.get(b.id) || 0;
+    const aExactTripCount = (trips || []).filter(trip => trip.driverId === a.id).length;
+    const bExactTripCount = (trips || []).filter(trip => trip.driverId === b.id).length;
     if (bExactTripCount !== aExactTripCount) return bExactTripCount - aExactTripCount;
     const scoreDiff = getDriverProfileHealthScore(b) - getDriverProfileHealthScore(a);
     if (scoreDiff !== 0) return scoreDiff;
-    const aEmailTripCount = tripCountByDriverEmail.get(normalizeEmail(a.email)) || 0;
-    const bEmailTripCount = tripCountByDriverEmail.get(normalizeEmail(b.email)) || 0;
+    const aEmailTripCount = (trips || []).filter(trip => {
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
+      return tripEmail === normalizeEmail(a.email);
+    }).length;
+    const bEmailTripCount = (trips || []).filter(trip => {
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
+      return tripEmail === normalizeEmail(b.email);
+    }).length;
     if (bEmailTripCount !== aEmailTripCount) return bEmailTripCount - aEmailTripCount;
     const aUpdated = Date.parse(a?.updatedAt || a?.updatedAtLocal || 0) || 0;
     const bUpdated = Date.parse(b?.updatedAt || b?.updatedAtLocal || 0) || 0;
@@ -533,12 +523,7 @@ const App = () => {
     setTrips, archiveTripsById, persistUploadedTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles,
     setTrashedTrips, setLogs, setPhoneNumbers,
     addLog, initializeAppData,
-  } = useFirestoreAppData({
-    tenantId,
-    resubscribeKey: realtimeReliability.resubscribeKey,
-    enabled: isAuthenticated,
-    includeActivity: role === 'admin' || role === 'dispatcher',
-  });
+  } = useFirestoreAppData({ tenantId, resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
@@ -550,17 +535,14 @@ const App = () => {
     () => filterTripsForRole(role, currentUser, trips, drivers, dispatchers),
     [role, currentUser, trips, drivers, dispatchers]
   );
-  const driverEmailById = useMemo(() => new Map(
-    drivers.map(driver => [driver.id, normalizeEmail(driver.email)]),
-  ), [drivers]);
   const currentUserEmailTripMatches = useMemo(() => {
     const email = normalizeEmail(currentUser);
     if (!email) return [];
     return trips.filter(trip => {
-      const tripEmail = normalizeEmail(trip.driverEmail) || driverEmailById.get(trip.driverId) || '';
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
       return tripEmail === email;
     });
-  }, [trips, driverEmailById, currentUser]);
+  }, [trips, drivers, currentUser]);
   const currentUserDriverProfile = useMemo(() => {
     if (role !== 'driver') return null;
     const email = normalizeEmail(currentUser);
@@ -597,7 +579,7 @@ const App = () => {
       currentUserDriverProfile?.id,
     ].filter(Boolean));
     return trips.filter(trip => {
-      const tripEmail = normalizeEmail(trip.driverEmail) || driverEmailById.get(trip.driverId) || '';
+      const tripEmail = normalizeEmail(trip.driverEmail || drivers.find(driver => driver.id === trip.driverId)?.email);
       const assignedToCurrentDriver = driverIds.has(trip.driverId) || tripEmail === email;
       const incomingTransfer = trip.transferRequest?.status === 'pending'
         && (
@@ -609,7 +591,7 @@ const App = () => {
       const visibleHistoryTrip = isRecentDriverHistoryTrip(trip);
       return (assignedToCurrentDriver || incomingTransfer) && (visibleManifestTrip || visibleHistoryTrip);
     });
-  }, [trips, drivers, driverEmailById, currentUserDriverProfile, currentUser, role]);
+  }, [trips, drivers, currentUserDriverProfile, currentUser, role]);
   useEffect(() => {
     if (role !== 'driver' || dataLoading || !auth.currentUser || !currentUserDriverProfile) return;
     const normalizedEmail = normalizeEmail(currentUser);
@@ -1333,7 +1315,7 @@ const App = () => {
 
   useEffect(() => {
     const metaTags = [
-      { name: 'viewport', content: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
       { name: 'mobile-web-app-capable', content: 'yes' },

@@ -28,7 +28,7 @@ try {
   Compress-Archive -LiteralPath $packageRoot -DestinationPath $archivePath -CompressionLevel Optimal
   $packageMetadata = Get-Content -LiteralPath (Join-Path $workerRoot 'package.json') -Raw | ConvertFrom-Json
   $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-  $manifestJson = (@{
+  $manifestJson = @{
     version = $packageMetadata.version
     sha256 = $archiveHash
     file = 'agape-welltrans-agent.zip'
@@ -45,7 +45,7 @@ try {
       brokerTransportBoundary = 'integrated'
     }
     publishedAt = [DateTime]::UtcNow.ToString('o')
-  } | ConvertTo-Json) -replace "`r`n", "`n"
+  } | ConvertTo-Json
   $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
   [IO.File]::WriteAllText(
     (Join-Path $outputRoot 'version.json'),

@@ -2466,12 +2466,12 @@ textarea {
 }
 
 /* ===== TRIP ACTION WINDOWS (odometer / signature / completion / password) =====
-   Centered dialog normally; bottom-aligned above an open keyboard, with
-   height-bounded internal scrolling.
+   Centered dialog on every size, height-bounded with internal scrolling.
    Keyboard stability, two modes:
    - Resizing viewports (Android, interactive-widget=resizes-content): the
      overlay simply fills the visible area, so the browser itself keeps the
-     window fully visible above the keyboard — no duplicate inset math.
+     window centered and fully visible above the keyboard — no JS math, no
+     possible gap.
    - Non-resizing viewports (iOS): the overlay remains fixed in one painting
      coordinate system after focus. The focused field scrolls inside the
      panel instead of moving the fixed ancestor under its native caret. */
@@ -2508,25 +2508,37 @@ html.trip-window-open body {
   overflow: hidden !important;
 }
 
-/* With the keyboard open (tracked by the visual-viewport effect), the overlay
-   is bound to the live visible area instead of the full 100dvh. On iOS the
-   layout viewport does not resize when the keyboard opens, so a panel centered
-   in the full height falls behind the keyboard and out of reach. --vvh is the
-   visible height and --vvt its offset from the top of the fixed viewport; both
-   are set on the ROOT element from the visualViewport in JS. Sizing the overlay
-   to exactly that region keeps the panel bottom-aligned within the area above
-   the keyboard (never pinned to the top), with every field and footer visible
-   and no large dead gap between the inputs and the keyboard. */
+/* With the keyboard open (tracked by the visual-viewport effect), stop
+   centering in the full 100dvh. On iOS the layout viewport does not resize
+   when the keyboard opens, so a centered panel in the full height falls
+   behind the keyboard and out of reach. The panel is instead bound to the
+   live visual viewport (--vvh / --vvt set from JS) and pinned to the top of
+   the visible area, keeping the fields and their caret inside the visible
+   region above the keyboard with no gap. */
 html.trip-window-kb-open .trip-window-overlay {
-  top: var(--vvt, 0px);
-  height: var(--vvh, 100dvh);
-  align-items: flex-end;
-  padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-block: max(0.35rem, env(safe-area-inset-top, 0px));
 }
+
 html.trip-window-kb-open .trip-window-panel {
   max-height: min(34rem, calc(var(--vvh, 100dvh) - 1rem));
+  margin-top: var(--vvt, 0px);
+}
+
+/* Native Capacitor keyboard: the Keyboard plugin reports the exact on-screen
+   height (--kbh). The overlay is inset from the bottom by the keyboard height
+   so its remaining area (and the centered panel within it) always sits flush
+   above the keyboard — no gap, no top off-screen clipping, even when
+   WKWebView ignores visualViewport and does not resize the layout viewport. */
+html.trip-window-kb-native .trip-window-overlay {
+  bottom: var(--kbh, 0px);
+  height: auto;
+}
+
+html.trip-window-kb-native .trip-window-panel {
   margin-top: 0;
-  margin-bottom: 0.25rem;
+  max-height: min(34rem, calc(100% - 1rem));
 }
 
 /* Touch hardening: no double-tap-zoom delay or ghost highlights inside

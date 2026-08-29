@@ -1,6 +1,6 @@
 import {
   collection, db, deleteField, doc, functions, httpsCallable, limit, onSnapshot,
-  orderBy, query, setDoc, where, firebaseConfig,
+  orderBy, query, setDoc, where,
 } from '../../../config/firebase';
 import { DEFAULT_WELLTRANS_FIELD_MAPPING } from '../utils/welltransMapping';
 
@@ -95,12 +95,12 @@ export const saveWellTransSettings = (settings, actorId) => {
   }, { merge: true });
 };
 
-const LOCAL_AGENT_SETTINGS_ROOT = 'http://127.0.0.1:43127/v1';
+const LOCAL_AGENT_SETTINGS_URL = 'http://127.0.0.1:43127/v1/welltrans-credentials';
 
-const localAgentRequest = async (path, method = 'GET', body) => {
+const localAgentRequest = async (method = 'GET', body) => {
   let response;
   try {
-    response = await fetch(`${LOCAL_AGENT_SETTINGS_ROOT}/${path}`, {
+    response = await fetch(LOCAL_AGENT_SETTINGS_URL, {
       method,
       cache: 'no-store',
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -116,30 +116,12 @@ const localAgentRequest = async (path, method = 'GET', body) => {
   return payload;
 };
 
-export const getLocalWellTransCredentialStatus = () => localAgentRequest('welltrans-credentials', 'GET');
+export const getLocalWellTransCredentialStatus = () => localAgentRequest('GET');
 
 export const saveLocalWellTransCredentials = (username, password) =>
-  localAgentRequest('welltrans-credentials', 'PUT', { username, password });
+  localAgentRequest('PUT', { username, password });
 
-export const clearLocalWellTransCredentials = () => localAgentRequest('welltrans-credentials', 'DELETE');
-
-export const getLocalWellTransAgentEnrollment = () => localAgentRequest('agent-enrollment', 'GET');
-
-export const enrollLocalWellTransAgent = async () => {
-  const deviceLabel = `${navigator.platform || 'Windows'} · ${new Date().toLocaleDateString()}`.slice(0, 120);
-  const enrollment = await httpsCallable(functions, 'createWellTransAgentEnrollment')({ label: deviceLabel });
-  return localAgentRequest('agent-enrollment', 'PUT', {
-    ...enrollment.data,
-    apiKey: firebaseConfig.apiKey,
-    deviceLabel,
-  });
-};
-
-export const listWellTransAgentDevices = async () =>
-  (await httpsCallable(functions, 'listWellTransAgentDevices')({})).data?.devices || [];
-
-export const revokeWellTransAgentDevice = deviceId =>
-  httpsCallable(functions, 'revokeWellTransAgentDevice')({ deviceId });
+export const clearLocalWellTransCredentials = () => localAgentRequest('DELETE');
 
 export const queueWellTransSync = (tripIds, mode, serviceDate, scope = { type: 'all' }) =>
   httpsCallable(functions, 'queueWellTransSync')({ tripIds, mode, serviceDate, scope });

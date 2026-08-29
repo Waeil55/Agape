@@ -16,7 +16,6 @@ dependencies {
     implementation project(':capacitor-dialog')
     implementation project(':capacitor-geolocation')
     implementation project(':capacitor-haptics')
-    implementation project(':capacitor-keyboard')
 
 }
 

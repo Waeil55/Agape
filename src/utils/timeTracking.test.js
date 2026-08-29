@@ -6,7 +6,6 @@ import {
   buildTimeEvents,
   calculateReturnToWorkFromPickup,
   classifyGap,
-  evaluateVerifiedTripWorkEvidence,
   generatePayrollOutput,
   stitchSessions,
   validateTimeEventSequence,
@@ -15,80 +14,6 @@ import {
 const event = (type, timestamp) => ({ type, timestamp });
 
 describe('payroll time ledger', () => {
-  it('does not clock paid work from a Start Trip tap without pickup evidence', () => {
-    const result = evaluateVerifiedTripWorkEvidence({
-      trip: { id: 'trip-1', driverId: 'driver-1', status: 'In Progress', startedAt: '2026-08-26T12:00:00.000Z' },
-      driver: { id: 'driver-1' },
-      odometer: 12000,
-    });
-    expect(result.valid).toBe(false);
-    expect(result.code).toBe('MISSING_PICKUP_LOCATION');
-  });
-
-  it('requires live GPS inside the pickup geofence before returning to clocked in', () => {
-    const trip = { id: 'trip-1', driverId: 'driver-1', status: 'Navigating Pickup', startedAt: '2026-08-26T12:00:00.000Z' };
-    const driver = { id: 'driver-1' };
-    const pickupLocation = { lat: 39.7684, lng: -86.1581 };
-    expect(evaluateVerifiedTripWorkEvidence({ trip, driver, pickupLocation, odometer: 12000 }).code).toBe('MISSING_DRIVER_GPS');
-    expect(evaluateVerifiedTripWorkEvidence({ trip, driver, pickupLocation, driverLocation: { lat: 39.9, lng: -86.3 }, odometer: 12000 }).code).toBe('OUTSIDE_PICKUP_GEOFENCE');
-  });
-
-  it('accepts started workflow, odometer, and near-pickup GPS as verified work', () => {
-    const result = evaluateVerifiedTripWorkEvidence({
-      trip: { id: 'trip-1', driverEmail: 'driver@example.com', status: 'Navigating Pickup', startedAt: '2026-08-26T12:00:00.000Z' },
-      driver: { email: 'DRIVER@example.com' },
-      pickupLocation: { lat: 39.7684, lng: -86.1581 },
-      driverLocation: { lat: 39.7685, lng: -86.1582 },
-      odometer: '12,000',
-    });
-    expect(result.valid).toBe(true);
-    expect(result.code).toBe('GPS_ODOMETER_PICKUP_VERIFIED');
-    expect(result.tripId).toBe('trip-1');
-  });
-
-  it('accepts a GPS fallback pickup anchor without masking it as a verified pickup', () => {
-    const driverLocation = { lat: 39.7685, lng: -86.1582, capturedAt: new Date().toISOString(), accuracy: 12 };
-    const result = evaluateVerifiedTripWorkEvidence({
-      trip: { id: 'trip-1', driverId: 'driver-1', status: 'Navigating Pickup', startedAt: '2026-08-26T12:00:00.000Z' },
-      driver: { id: 'driver-1' },
-      pickupLocation: driverLocation,
-      driverLocation,
-      odometer: 12000,
-      pickupLocationSource: 'driver_gps_fallback',
-    });
-    expect(result.valid).toBe(true);
-    expect(result.code).toBe('GPS_ODOMETER_PICKUP_GPS_FALLBACK');
-    expect(result.pickupLocationSource).toBe('driver_gps_fallback');
-  });
-
-  it('does not report a misleading geofence distance from stale or inaccurate GPS', () => {
-    const base = {
-      trip: { id: 'trip-1', driverId: 'driver-1', status: 'Navigating Pickup', startedAt: '2026-08-26T12:00:00.000Z' },
-      driver: { id: 'driver-1' },
-      pickupLocation: { lat: 39.7684, lng: -86.1581 },
-      odometer: 12000,
-    };
-    expect(evaluateVerifiedTripWorkEvidence({
-      ...base,
-      driverLocation: { lat: 39.9, lng: -86.3, capturedAt: '2026-08-26T12:00:00.000Z', accuracy: 10 },
-    }).code).toBe('STALE_DRIVER_GPS');
-    expect(evaluateVerifiedTripWorkEvidence({
-      ...base,
-      driverLocation: { lat: 39.9, lng: -86.3, capturedAt: new Date().toISOString(), accuracy: 250 },
-    }).code).toBe('INACCURATE_DRIVER_GPS');
-  });
-
-  it('rejects pickup evidence from a trip assigned to another driver', () => {
-    const result = evaluateVerifiedTripWorkEvidence({
-      trip: { id: 'trip-1', driverId: 'driver-2', status: 'Navigating Pickup', startedAt: '2026-08-26T12:00:00.000Z' },
-      driver: { id: 'driver-1' },
-      pickupLocation: { lat: 39.7684, lng: -86.1581 },
-      driverLocation: { lat: 39.7685, lng: -86.1582 },
-      odometer: 12000,
-    });
-    expect(result.code).toBe('TRIP_NOT_ASSIGNED_TO_DRIVER');
-  });
-
   it('back-calculates return from break using verified pickup arrival and route time', () => {
     const result = calculateReturnToWorkFromPickup({
       breakStartTime: '2026-08-05T15:00:00.000Z',

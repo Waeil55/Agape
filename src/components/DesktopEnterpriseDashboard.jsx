@@ -8,7 +8,6 @@ import {
   Eye, Hash, Route, Activity,
   CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
   RefreshCw,
-  MoreHorizontal,
 } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 import { openMapLink } from '../utils/nativeActions';
@@ -198,7 +197,7 @@ const DesktopEnterpriseDashboard = ({
 }) => {
   const { unreadCount } = useChat({ alerts: true });
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
-  const VALID_PANELS = ['operations', 'liveMap', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat', 'more'];
+  const VALID_PANELS = ['operations', 'liveMap', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat'];
   const [activePanel, setActivePanel] = useState(() => {
     const saved = localStorage.getItem('agape_activePanel');
     if (['trips', 'drive'].includes(saved)) return 'operations';
@@ -364,14 +363,6 @@ const DesktopEnterpriseDashboard = ({
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
   ].filter(item => item.roles.includes(role));
 
-  const mobilePrimaryItems = useMemo(() => [
-    { id: 'operations', label: 'Trips', icon: ClipboardList },
-    { id: 'routePlanner', label: 'Tools', icon: Route },
-    { id: 'chat', label: 'Chat', icon: MessageCircle, badge: unreadCount },
-    { id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users },
-    { id: 'more', label: 'More', icon: MoreHorizontal },
-  ], [role, unreadCount]);
-
   const todayTrips = trips.filter(t => tripCalendarDateKey(t.date) === todayStr);
   const activeTrips = todayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
   const unassignedTrips = activeTrips.filter(t => t.status === 'Unassigned');
@@ -435,11 +426,6 @@ const DesktopEnterpriseDashboard = ({
       eyebrow: '',
       title: 'Platform Settings',
       description: 'Communication channels, workflow preferences, security controls, and application behavior.',
-    },
-    more: {
-      eyebrow: '',
-      title: 'More Controls',
-      description: 'Role-authorized operations, records, maps, settings, and driver workflows.',
     },
   };
 
@@ -675,39 +661,29 @@ const DesktopEnterpriseDashboard = ({
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="driver-page-header enterprise-mobile-topbar flex min-h-[64px] shrink-0 items-center gap-2.5 border-b border-slate-200 bg-white px-3 py-2.5 text-slate-900 shadow-sm md:hidden" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.625rem)' }}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <img src="/agape.png" alt="Agape Care" className="h-7 w-7 object-contain" />
+    <header className="enterprise-mobile-topbar bg-[var(--brand-primary)] text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
+        <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-[15px] font-semibold leading-none tracking-tight text-slate-950">Agape Care</h1>
-          <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-blue-700">{role}</span>
-        </div>
-        <div className="mt-1 flex min-w-0 items-center gap-1.5">
-          <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-500">{displayLoginId || currentUser || activeWorkspaceMeta.title}</p>
-          <span className="inline-flex min-h-5 shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Live
-          </span>
-        </div>
+      <div>
+        <h1 className="text-[13px] font-semibold tracking-tight leading-none text-white drop-shadow-sm">Agape Care</h1>
+        <p className="text-xs font-medium text-blue-200 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
       </div>
+      <div className="flex-1" />
       {activePanel === 'operations' && (
         <button
-          type="button"
           onClick={toggleRightPanel}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-            showRightPanel ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold shadow-sm transition-colors ${
+            showRightPanel ? 'bg-white text-blue-600' : 'bg-white/10 text-white hover:bg-white/20'
           }`}
-          aria-label="Open command panel"
         >
-          <PanelRight size={16} />
+          <PanelRight size={16} /> Panel
         </button>
       )}
+      {/* User avatar -> settings */}
       <button
-        type="button"
         onClick={() => setActivePanel('settings')}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-xs font-bold uppercase text-blue-700 transition-colors active:bg-blue-100"
-        aria-label="Open account settings"
+        className="w-9 h-9 rounded-full bg-white/20 border border-white/20 shadow-sm flex items-center justify-center text-white text-xs font-bold hover:bg-white/30 transition uppercase"
       >
         {(currentUser || 'U')[0]}
       </button>
@@ -717,32 +693,22 @@ const DesktopEnterpriseDashboard = ({
   // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
   const renderBottomNav = () => (
     <nav className="bottom-nav md:hidden">
-      <div className="relative flex h-full items-center justify-between gap-1 px-3">
-        {(() => {
-          const normalizedPanel = ['liveMap', 'reports', 'settings', 'drive', 'dispatch'].includes(activePanel) ? 'more' : activePanel;
-          const activeIndex = mobilePrimaryItems.findIndex(item => item.id === normalizedPanel);
-          return <span aria-hidden="true" className="pointer-events-none absolute inset-y-1.5 rounded-full bg-blue-50" style={{ left: '0.75rem', width: `calc((100% - 1.5rem) / ${mobilePrimaryItems.length})`, transform: `translateX(${Math.max(0, activeIndex) * 100}%)`, transition: 'transform var(--dur-base) var(--ease-out-expo)' }} />;
-        })()}
-        {mobilePrimaryItems.map(item => {
+      <div className="flex h-full items-center justify-around gap-1">
+        {sidebarItems.map(item => {
           const Icon = item.icon;
-          const isActive = item.id === 'more'
-            ? ['more', 'liveMap', 'reports', 'settings', 'drive', 'dispatch'].includes(activePanel)
-            : activePanel === item.id;
+          const isActive = activePanel === item.id;
           return (
             <button
               key={item.id}
-              type="button"
               onClick={() => setActivePanel(item.id)}
-              aria-current={isActive ? 'page' : undefined}
-              className={`relative z-10 flex min-h-[56px] min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-full px-1.5 py-1 transition-colors duration-200 ${
+              className={`flex-1 flex flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all relative touch-manipulation min-h-[56px] ${
                 isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
               }`}
             >
               <div className="relative flex items-center justify-center">
-                <Icon size={24} strokeWidth={isActive ? 1.8 : 1.3} className={isActive ? 'anim-pop text-blue-600' : 'text-slate-400'} />
-                {item.badge > 0 && <span className="messenger-nav-badge absolute -right-2.5 -top-2">{item.badge > 99 ? '99+' : item.badge}</span>}
+                <Icon size={22} strokeWidth={isActive ? 2 : 1.5} className="relative" />
               </div>
-              <span className={`max-w-full truncate text-[10px] font-normal leading-none tracking-wide ${
+              <span className={`text-[10px] font-medium leading-none mt-1 truncate max-w-full px-0.5 ${
                 isActive ? 'text-blue-600' : 'text-slate-400'
               }`}>
                 {item.label}
@@ -1232,65 +1198,6 @@ const DesktopEnterpriseDashboard = ({
     );
   };
 
-  const renderMobileMorePage = () => {
-    const workspaceItems = [
-      { id: 'liveMap', label: 'Live Map', description: 'Fleet locations and trip movement', icon: MapPin, tone: 'blue' },
-      { id: 'reports', label: 'Reports', description: 'Trip records, mileage, and archives', icon: BarChart2, tone: 'indigo' },
-      { id: 'settings', label: 'Settings', description: 'Account, contacts, and application controls', icon: Settings, tone: 'slate' },
-      { id: 'drive', label: 'Driver Work', description: 'Open an authorized driver workflow', icon: CarFront, tone: 'emerald' },
-      { id: 'dispatch', label: 'Dispatch Assistant', description: 'Assignment and coverage support', icon: Zap, tone: 'amber' },
-    ];
-    const toneClasses = {
-      blue: 'bg-blue-50 text-blue-700 border-blue-100',
-      indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-      slate: 'bg-slate-100 text-slate-700 border-slate-200',
-      emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    };
-    return (
-      <div className="agape-mobile-page flex-1 overflow-y-auto bg-slate-50 px-3 pb-28 pt-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><ShieldCheck size={20} /></div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">{role} controls</p>
-              <h2 className="text-base font-semibold text-slate-950">More workspaces</h2>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">Only controls authorized for your account are shown.</p>
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-3 grid grid-cols-2 gap-2.5">
-          {workspaceItems.map(item => {
-            const Icon = item.icon;
-            return (
-              <button key={item.id} type="button" onClick={() => setActivePanel(item.id)} className="min-h-[132px] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-colors active:bg-slate-50">
-                <span className={`flex h-10 w-10 items-center justify-center rounded-xl border ${toneClasses[item.tone]}`}><Icon size={19} /></span>
-                <span className="mt-3 block text-sm font-semibold text-slate-950">{item.label}</span>
-                <span className="mt-1 block text-[11px] font-medium leading-4 text-slate-500">{item.description}</span>
-              </button>
-            );
-          })}
-          <button type="button" onClick={() => setShowUploadModal(true)} className="min-h-[132px] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-colors active:bg-slate-50">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-700"><Upload size={19} /></span>
-            <span className="mt-3 block text-sm font-semibold text-slate-950">Upload Trips</span>
-            <span className="mt-1 block text-[11px] font-medium leading-4 text-slate-500">Import transportation records for review.</span>
-          </button>
-        </div>
-
-        <section className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-slate-950">Today’s command status</p>
-              <p className="mt-0.5 text-[11px] font-medium text-slate-500">{activeTrips.length} active · {unassignedTrips.length} unassigned · {completedToday} completed</p>
-            </div>
-            <button type="button" onClick={() => setActivePanel('operations')} className="min-h-10 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white">Open trips</button>
-          </div>
-        </section>
-      </div>
-    );
-  };
-
 
   // ==================== PANEL RENDERER ====================
   const renderPanelContent = () => {
@@ -1324,7 +1231,7 @@ const DesktopEnterpriseDashboard = ({
       );
       case 'reports': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-          <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} appSettings={appSettings} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} />
+          <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} />
         </Suspense></ErrorBoundary>
       );
       case 'admin': return (
@@ -1347,7 +1254,6 @@ const DesktopEnterpriseDashboard = ({
             const trip = trips.find(t => t.id === ref || t.bookingId === ref);
             if (trip) setTripDetails(trip);
           }}
-          embeddedMobile
         />
         </Suspense></ErrorBoundary>
       );
@@ -1420,7 +1326,6 @@ const DesktopEnterpriseDashboard = ({
           <ChatPage />
         </Suspense></ErrorBoundary>
       );
-      case 'more': return renderMobileMorePage();
       default: return renderOperationsPage();
     }
   };
@@ -1437,16 +1342,16 @@ const DesktopEnterpriseDashboard = ({
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${['operations', 'reports', 'admin', 'drive', 'chat', 'more'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat', 'more'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${['reports', 'admin', 'drive', 'chat'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
               <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-                <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} appSettings={appSettings} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} />
+                <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} />
               </Suspense></ErrorBoundary>
             ) : (
               <div className={
-                activePanel === 'drive' || activePanel === 'admin' || activePanel === 'more'
+                activePanel === 'drive' || activePanel === 'admin'
                   ? 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden'
                   : 'md:rounded-[2rem] md:border border-slate-200/50 bg-white md:shadow-sm overflow-hidden'
               }>
