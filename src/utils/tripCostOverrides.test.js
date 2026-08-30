@@ -8,266 +8,229 @@ import {
   normalizeOverridePolicy,
 } from './tripCostOverrides';
 
+const driver = {
+  id: 'driver-1',
+  name: 'Driver One',
+  city: 'Fishers',
+  state: 'IN',
+  zip: '46038',
+  homeAddress: '10409 Parmer Cir',
+  homeLat: 39.993689,
+  homeLng: -85.988494,
+};
+
 const trip = (id, overrides = {}) => ({
   id,
   bookingId: id,
   patient: `Rider ${id}`,
-  driverId: 'driver-1',
+  driverId: driver.id,
   completedVehicle: 'Van 1',
   date: '2026-08-01',
   status: 'Completed',
-  arrivalTime: `2026-08-01T0${id}:00:00-04:00`,
-  arrivalDropoffTime: `2026-08-01T0${id}:30:00-04:00`,
-  pickupOdometer: 100 + Number(id) * 10,
-  dropoffOdometer: 105 + Number(id) * 10,
+  arrivalTime: '2026-08-01T07:00:00-04:00',
+  arrivalDropoffTime: '2026-08-01T07:30:00-04:00',
+  pickupOdometer: 100,
+  dropoffOdometer: 110,
   pickupCity: 'Fishers',
   dropoffCity: 'Carmel',
+  pickup: '100 Main St, Fishers, IN 46038',
+  dropoff: '200 Main St, Carmel, IN 46032',
   originalTripCost: 25,
   ...overrides,
 });
 
+const analyze = (trips, options = {}) => analyzeTripCostOverrides(trips, {
+  allDates: true,
+  drivers: [driver],
+  ...options,
+});
+
+const rowFor = (result, bookingId, legType = 'before_pickup') => result.rows.find((row) => (
+  String(row.trip.bookingId) === String(bookingId) && row.legType === legType
+));
+
 describe('trip cost override calculation', () => {
-  it('uses the current dropoff to next pickup odometer and records the override on the preceding trip', () => {
-    const first = trip('1', { dropoffOdometer: 120, dropoffCity: 'Carmel' });
-    const second = trip('2', { pickupOdometer: 145, pickupCity: 'Fishers' });
-    const rows = analyzeTripCostOverrides([second, first], { allDates: true }).rows;
-    expect(rows.map((row) => row.trip.id)).toEqual(['1', '2']);
-    expect(rows[0]).toMatchObject({ rawUnloadedMiles: 25, unloadedMiles: 25, unloadedAmount: 20 });
-    expect(rows[1]).toMatchObject({ unloadedMiles: 0, waitHours: 0 });
+  it('orders the reported 107813500/107813501 day by odometer and creates one Booking ID per unloaded leg', () => {
+    const prior = trip('107706390', {
+      arrivalTime: '2026-08-27T12:50:00-04:00',
+      arrivalDropoffTime: '2026-08-27T13:34:00-04:00',
+      pickupOdometer: 271488,
+      dropoffOdometer: 271510,
+      pickupCity: 'Indianapolis',
+      dropoffCity: 'Carmel',
+      dropoff: 'Carmel, IN',
+    });
+    const outbound = trip('107813500', {
+      arrivalTime: '2026-08-27T15:04:46-04:00',
+      arrivalDropoffTime: '2026-08-27T15:26:00-04:00',
+      pickupOdometer: 271705,
+      dropoffOdometer: 271718,
+      pickupCity: 'BOONVILLE',
+      dropoffCity: 'EVANSVILLE',
+      pickup: '430 S 2ND ST apt b, BOONVILLE, IN 47601',
+      dropoff: '7307 E COLUMBIA ST, EVANSVILLE, IN 47715',
+    });
+    const returnTrip = trip('107813501', {
+      // This recorded pickup time is wrong and would sort before 107813500 without odometer reconciliation.
+      arrivalTime: '2026-08-27T14:41:00-04:00',
+      arrivalDropoffTime: '2026-08-27T16:28:00-04:00',
+      pickupOdometer: 271718,
+      dropoffOdometer: 271727,
+      pickupCity: 'EVANSVILLE',
+      dropoffCity: 'BOONVILLE',
+      pickup: '7307 E COLUMBIA ST, EVANSVILLE, IN 47715',
+      dropoff: '430 S 2ND ST apt b, BOONVILLE, IN 47601',
+    });
+    const pending = analyze([returnTrip, outbound, prior]);
+    const homeKey = pending.boundaryRequests.find((request) => request.tripId === '107813501' && request.legType === 'home_return').id;
+    const result = analyze([returnTrip, outbound, prior], {
+      boundaryDistances: new Map([[homeKey, { status: 'ready', miles: 183 }]]),
+    });
+
+    expect(rowFor(result, '107813500')).toMatchObject({
+      originCity: 'Carmel',
+      destinationCity: 'BOONVILLE',
+      rawUnloadedMiles: 195,
+      unloadedMiles: 195,
+      unloadedAmount: 156,
+    });
+    expect(rowFor(result, '107813501')).toMatchObject({
+      originCity: 'EVANSVILLE',
+      destinationCity: 'EVANSVILLE',
+      sameCity: true,
+      unloadedMiles: 0,
+    });
+    expect(rowFor(result, '107813501', 'home_return')).toMatchObject({
+      originCity: 'BOONVILLE',
+      destinationCity: 'Fishers',
+      rawUnloadedMiles: 183,
+      unloadedMiles: 183,
+      unloadedAmount: 146.4,
+    });
+    expect(result.rows.every((row) => !Object.hasOwn(row, 'nextTrip'))).toBe(true);
   });
 
-  it('uses a strict unloaded threshold and excludes same-city aliases', () => {
-    const base = trip('1', { dropoffOdometer: 120, dropoffCity: 'Indianapolis' });
-    const exactThreshold = trip('2', { pickupOdometer: 140, pickupCity: 'Fishers' });
-    expect(analyzeTripCostOverrides([base, exactThreshold], { allDates: true }).rows[0].unloadedMiles).toBe(0);
-
-    const sameCity = trip('2', { pickupOdometer: 180, pickupCity: 'Indy' });
-    const row = analyzeTripCostOverrides([base, sameCity], { allDates: true }).rows[0];
-    expect(row).toMatchObject({ sameCity: true, unloadedMiles: 0, unloadedAmount: 0 });
+  it('creates first-trip home-to-pickup and last-trip dropoff-to-home boundary legs', () => {
+    const only = trip('B-1', { pickupCity: 'Carmel', dropoffCity: 'Muncie' });
+    const pending = analyze([only]);
+    const firstKey = pending.boundaryRequests.find((request) => request.legType === 'before_pickup').id;
+    const homeKey = pending.boundaryRequests.find((request) => request.legType === 'home_return').id;
+    const result = analyze([only], {
+      boundaryDistances: new Map([
+        [firstKey, { status: 'ready', miles: 24 }],
+        [homeKey, { status: 'ready', miles: 55 }],
+      ]),
+    });
+    expect(rowFor(result, 'B-1')).toMatchObject({ legLabel: 'Home to first pickup', originCity: 'Fishers', destinationCity: 'Carmel', unloadedMiles: 24 });
+    expect(rowFor(result, 'B-1', 'home_return')).toMatchObject({ legLabel: 'Return home', originCity: 'Muncie', destinationCity: 'Fishers', unloadedMiles: 55 });
   });
 
-  it('bills only wait beyond the threshold and rounds up to the configured increment', () => {
-    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00' });
-    const second = trip('2', {
-      arrivalTime: '2026-08-01T09:01:00-04:00',
-      arrivalDropoffTime: '2026-08-01T09:30:00-04:00',
-    });
-    const row = analyzeTripCostOverrides([first, second], { allDates: true }).rows[0];
-    expect(row.rawGapHours).toBeCloseTo(61 / 60);
-    expect(row.waitHours).toBe(0.5);
-    expect(row.waitCost).toBe(4.5);
-    expect(row.waitReason).toBe('Billable time after threshold, rounded up to 30 min');
-  });
-
-  it('uses every configurable threshold, rate, and rounding value', () => {
-    const first = trip('1', {
-      arrivalDropoffTime: '2026-08-01T08:00:00-04:00',
-      dropoffOdometer: 120,
-    });
-    const second = trip('2', {
-      arrivalTime: '2026-08-01T10:01:00-04:00',
-      arrivalDropoffTime: '2026-08-01T10:30:00-04:00',
-      pickupOdometer: 160,
-    });
-    const row = analyzeTripCostOverrides([first, second], {
-      allDates: true,
-      policy: {
-        unloadedThresholdMiles: 30,
-        unloadedRate: 1.25,
-        waitingThresholdHours: 2,
-        waitRate: 12,
-        waitRoundingMinutes: 15,
-      },
-    }).rows[0];
-    expect(row).toMatchObject({ unloadedMiles: 40, unloadedAmount: 50, waitHours: 0.25, waitCost: 3 });
-  });
-
-  it('does not bill waiting when another trip overlaps the gap', () => {
-    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffOdometer: 120 });
-    const second = trip('2', {
-      arrivalTime: '2026-08-01T11:00:00-04:00',
-      arrivalDropoffTime: '2026-08-01T11:30:00-04:00',
-      pickupOdometer: 180,
-    });
-    const overlapping = trip('x', {
-      status: 'Assigned',
-      arrivalTime: '2026-08-01T09:00:00-04:00',
-      arrivalDropoffTime: '2026-08-01T10:00:00-04:00',
-    });
-    const row = analyzeTripCostOverrides([first, second, overlapping], { allDates: true }).rows[0];
-    expect(row.interveningWork).toBe(true);
-    expect(row.unloadedMiles).toBe(0);
-    expect(row.unloadedReason).toContain('Another trip occurs');
-    expect(row.waitCost).toBe(0);
-  });
-
-  it('matches the corrected workbook math for cross-city mileage and waiting supplements', () => {
-    const first = trip('1', {
-      arrivalTime: '2026-08-01T07:00:00-04:00',
-      arrivalDropoffTime: '2026-08-01T08:00:00-04:00',
-      dropoffOdometer: 120,
-      dropoffCity: 'Rushville',
-      originalTripCost: 65.28,
-    });
-    const next = trip('2', {
+  it('assigns between-trip mileage and waiting to the current pickup Booking ID', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffOdometer: 120, dropoffCity: 'Rushville' });
+    const current = trip('2', {
       arrivalTime: '2026-08-01T12:30:00-04:00',
       arrivalDropoffTime: '2026-08-01T13:00:00-04:00',
       pickupOdometer: 179,
+      dropoffOdometer: 190,
       pickupCity: 'Carmel',
+      originalTripCost: 65.28,
     });
-    const row = analyzeTripCostOverrides([next, first], { allDates: true }).rows[0];
+    const row = rowFor(analyze([current, first]), '2');
     expect(row).toMatchObject({ unloadedMiles: 59, unloadedAmount: 47.2, waitHours: 3.5, waitCost: 31.5 });
     expect(row.totalCost).toBeCloseTo(143.98);
   });
 
-  it('keeps same-city unloaded mileage at zero while still billing qualifying wait', () => {
-    const first = trip('1', {
-      arrivalDropoffTime: '2026-08-01T08:00:00-04:00',
-      dropoffOdometer: 120,
-      dropoffCity: 'Indianapolis',
-      originalTripCost: 31.33,
-    });
-    const next = trip('2', {
-      arrivalTime: '2026-08-01T10:00:00-04:00',
-      arrivalDropoffTime: '2026-08-01T10:30:00-04:00',
-      pickupOdometer: 180,
-      pickupCity: 'Indy',
-    });
-    const row = analyzeTripCostOverrides([first, next], { allDates: true }).rows[0];
-    expect(row).toMatchObject({ sameCity: true, unloadedMiles: 0, waitHours: 1, waitCost: 9 });
-    expect(row.totalCost).toBeCloseTo(40.33);
+  it('uses a strict mileage threshold and suppresses same-city mileage without suppressing wait', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffOdometer: 120, dropoffCity: 'Indianapolis' });
+    const exact = trip('2', { arrivalTime: '2026-08-01T09:00:00-04:00', arrivalDropoffTime: '2026-08-01T09:30:00-04:00', pickupOdometer: 140, pickupCity: 'Fishers' });
+    expect(rowFor(analyze([first, exact]), '2').unloadedMiles).toBe(0);
+
+    const sameCity = trip('2', { arrivalTime: '2026-08-01T10:00:00-04:00', arrivalDropoffTime: '2026-08-01T10:30:00-04:00', pickupOdometer: 180, pickupCity: 'Indy' });
+    expect(rowFor(analyze([first, sameCity]), '2')).toMatchObject({ sameCity: true, unloadedMiles: 0, waitHours: 1, waitCost: 9 });
   });
 
-  it('does not bill an exact one-hour wait and can disable same-city and overnight exemptions', () => {
-    const first = trip('1', {
-      arrivalDropoffTime: '2026-08-01T23:00:00-04:00',
-      dropoffOdometer: 120,
-      dropoffCity: 'Indianapolis',
-    });
-    const exactHour = trip('2', {
-      date: '2026-08-02',
-      arrivalTime: '2026-08-02T00:00:00-04:00',
-      arrivalDropoffTime: '2026-08-02T00:30:00-04:00',
-      pickupOdometer: 170,
-      pickupCity: 'Indianapolis',
-    });
-    const exactRow = analyzeTripCostOverrides([first, exactHour], {
-      allDates: true,
-      policy: { sameCityExemption: false, excludeOvernightGaps: false },
-    }).rows[0];
-    expect(exactRow).toMatchObject({ unloadedMiles: 50, waitHours: 0, waitCost: 0 });
-
-    const later = { ...exactHour, arrivalTime: '2026-08-02T02:00:00-04:00', arrivalDropoffTime: '2026-08-02T02:30:00-04:00' };
-    const overnightRow = analyzeTripCostOverrides([first, later], {
-      allDates: true,
-      policy: { sameCityExemption: false, excludeOvernightGaps: false },
-    }).rows[0];
-    expect(overnightRow.waitHours).toBe(2);
+  it('bills only time beyond the threshold and rounds it up', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T09:01:00-04:00', arrivalDropoffTime: '2026-08-01T09:30:00-04:00', pickupOdometer: 145 });
+    const row = rowFor(analyze([first, current]), '2');
+    expect(row.rawGapHours).toBeCloseTo(61 / 60);
+    expect(row).toMatchObject({ waitHours: 0.5, waitCost: 4.5 });
   });
 
-  it('excludes overnight waiting while allowing a multi-day empty mileage segment', () => {
-    const first = trip('1', { arrivalDropoffTime: '2026-08-01T23:00:00-04:00', dropoffOdometer: 120 });
-    const second = trip('2', {
-      date: '2026-08-02',
-      arrivalTime: '2026-08-02T02:00:00-04:00',
-      arrivalDropoffTime: '2026-08-02T03:00:00-04:00',
-      pickupOdometer: 150,
-    });
-    const row = analyzeTripCostOverrides([first, second], { allDates: true }).rows[0];
-    expect(row.unloadedMiles).toBe(30);
-    expect(row.waitHours).toBe(0);
-    expect(row.waitReason).toBe('Overnight gap excluded');
+  it('uses every configurable threshold, rate, and rounding value', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T10:01:00-04:00', arrivalDropoffTime: '2026-08-01T10:30:00-04:00', pickupOdometer: 160 });
+    const row = rowFor(analyze([first, current], {
+      policy: { unloadedThresholdMiles: 30, unloadedRate: 1.25, waitingThresholdHours: 2, waitRate: 12, waitRoundingMinutes: 15 },
+    }), '2');
+    expect(row).toMatchObject({ unloadedMiles: 40, unloadedAmount: 50, waitHours: 0.25, waitCost: 3 });
   });
 
-  it('excludes cancelled, no-show, incomplete, and missing-timestamp trips', () => {
-    const result = analyzeTripCostOverrides([
+  it('blocks both supplements when another worked trip overlaps the between-trip gap', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T11:00:00-04:00', arrivalDropoffTime: '2026-08-01T11:30:00-04:00', pickupOdometer: 180 });
+    const overlapping = trip('x', { status: 'Assigned', arrivalTime: '2026-08-01T09:00:00-04:00', arrivalDropoffTime: '2026-08-01T10:00:00-04:00' });
+    const row = rowFor(analyze([first, current, overlapping]), '2');
+    expect(row).toMatchObject({ interveningWork: true, unloadedMiles: 0, waitCost: 0 });
+  });
+
+  it('counts original trip cost once when the same Booking ID has two qualifying legs', () => {
+    const only = trip('B-2', { pickupCity: 'Carmel', dropoffCity: 'Muncie', originalTripCost: 40 });
+    const pending = analyze([only]);
+    const firstKey = pending.boundaryRequests.find((request) => request.legType === 'before_pickup').id;
+    const homeKey = pending.boundaryRequests.find((request) => request.legType === 'home_return').id;
+    const result = analyze([only], { boundaryDistances: new Map([[firstKey, 30], [homeKey, 50]]) });
+    const ownedRows = result.rows.filter((row) => row.trip.bookingId === 'B-2');
+    expect(ownedRows.reduce((sum, row) => sum + row.originalTripCost, 0)).toBe(40);
+    expect(ownedRows.reduce((sum, row) => sum + row.totalCost, 0)).toBe(104);
+  });
+
+  it('applies route exclusions directionally and allows other routes', () => {
+    const first = trip('1', { dropoffCity: 'Indianapolis', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T09:00:00-04:00', arrivalDropoffTime: '2026-08-01T09:30:00-04:00', pickupCity: 'Carmel', pickupOdometer: 170 });
+    const excluded = rowFor(analyze([first, current], { policy: { excludedCityPairs: ['Indianapolis > Carmel'] } }), '2');
+    expect(excluded).toMatchObject({ pairExcluded: true, unloadedMiles: 0, waitHours: 0 });
+    const reverseFirst = trip('1', { dropoffCity: 'Carmel', dropoffOdometer: 120 });
+    const reverse = rowFor(analyze([reverseFirst, { ...current, pickupCity: 'Indianapolis' }], { policy: { excludedCityPairs: ['Indianapolis > Carmel'] } }), '2');
+    expect(reverse).toMatchObject({ pairExcluded: false, unloadedMiles: 50 });
+  });
+
+  it('fails closed for missing home data, missing cities, vehicle changes, and unavailable routed mileage', () => {
+    const single = trip('solo');
+    const missingHome = analyzeTripCostOverrides([single], { allDates: true, drivers: [{ id: driver.id }] });
+    expect(rowFor(missingHome, 'solo')).toMatchObject({ requiresReview: true, isOverrideCandidate: false });
+
+    const first = trip('1', { dropoffCity: '', dropoff: '', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T09:00:00-04:00', arrivalDropoffTime: '2026-08-01T09:30:00-04:00', pickupOdometer: 170 });
+    const missingCity = rowFor(analyze([first, current]), '2');
+    expect(missingCity).toMatchObject({ cityPairComplete: false, requiresReview: true, unloadedMiles: 0 });
+
+    const changedVehicle = rowFor(analyze([trip('1', { dropoffOdometer: 120 }), { ...current, completedVehicle: 'Van 2' }]), '2');
+    expect(changedVehicle.unloadedReason).toContain('Vehicle changed');
+
+    const pending = analyze([single]);
+    expect(pending.boundaryRequests).toHaveLength(1);
+    expect(rowFor(pending, 'solo')).toMatchObject({ boundaryDistanceStatus: 'pending', isOverrideCandidate: false });
+  });
+
+  it('excludes noncompleted and timestamp-invalid trips and keeps each service date independent', () => {
+    const result = analyze([
       trip('1'),
       trip('2', { status: 'Cancelled' }),
       trip('3', { status: 'No Show' }),
       trip('4', { status: 'Assigned' }),
       trip('5', { arrivalTime: null }),
-    ], { allDates: true });
-    expect(result.rows).toHaveLength(1);
+    ]);
+    expect(result.rows).toHaveLength(2);
     expect(result.excluded).toEqual({ missingTimestamps: 1, notCompleted: 3, invalidChronology: 0 });
+
+    const nextDay = trip('6', { date: '2026-08-02', arrivalTime: '2026-08-02T07:00:00-04:00', arrivalDropoffTime: '2026-08-02T07:30:00-04:00' });
+    const dates = analyze([trip('1'), nextDay]).rows;
+    expect(dates.filter((row) => row.legLabel === 'Home to first pickup')).toHaveLength(2);
+    expect(dates.filter((row) => row.legLabel === 'Return home')).toHaveLength(2);
   });
 
-  it('applies directional city-pair exclusions without excluding other Indianapolis routes', () => {
-    const first = trip('1', { dropoffCity: 'Indianapolis', dropoffOdometer: 120 });
-    const indy = trip('2', { pickupCity: 'Indianapolis', pickupOdometer: 170 });
-    const excluded = analyzeTripCostOverrides([first, indy], {
-      allDates: true,
-      policy: { sameCityExemption: false, excludedCityPairs: ['Indianapolis > Indianapolis'] },
-    }).rows[0];
-    expect(excluded).toMatchObject({ pairExcluded: true, unloadedMiles: 0, waitHours: 0 });
-
-    const muncie = trip('2', { pickupCity: 'Muncie', pickupOdometer: 170 });
-    const included = analyzeTripCostOverrides([first, muncie], {
-      allDates: true,
-      policy: { excludedCityPairs: ['Indianapolis > Indianapolis'] },
-    }).rows[0];
-    expect(included.unloadedMiles).toBe(50);
-  });
-
-  it('applies city-pair exclusions to configured aliases but keeps reverse routes independent', () => {
-    const first = trip('1', { dropoffCity: 'Indy', dropoffOdometer: 120 });
-    const next = trip('2', { pickupCity: 'Indianapolis, IN', pickupOdometer: 170 });
-    const excluded = analyzeTripCostOverrides([first, next], {
-      allDates: true,
-      policy: { sameCityExemption: false, excludedCityPairs: ['Indianapolis > Indianapolis'] },
-    }).rows[0];
-    expect(excluded.pairExcluded).toBe(true);
-
-    const reverseFirst = trip('1', { dropoffCity: 'Carmel', dropoffOdometer: 120 });
-    const reverseNext = trip('2', { pickupCity: 'Indianapolis', pickupOdometer: 170 });
-    const reverse = analyzeTripCostOverrides([reverseFirst, reverseNext], {
-      allDates: true,
-      policy: { excludedCityPairs: ['Indianapolis > Carmel'] },
-    }).rows[0];
-    expect(reverse.pairExcluded).toBe(false);
-    expect(reverse.unloadedMiles).toBe(50);
-  });
-
-  it('fails closed when either city needed for exclusion and same-city checks is missing', () => {
-    const first = trip('1', { dropoffCity: '', dropoff: '', dropoffOdometer: 120, arrivalDropoffTime: '2026-08-01T08:00:00-04:00' });
-    const next = trip('2', {
-      pickupCity: 'Fishers',
-      pickupOdometer: 170,
-      arrivalTime: '2026-08-01T10:00:00-04:00',
-      arrivalDropoffTime: '2026-08-01T10:30:00-04:00',
-    });
-    const row = analyzeTripCostOverrides([first, next], { allDates: true }).rows[0];
-    expect(row).toMatchObject({ cityPairComplete: false, unloadedMiles: 0, waitHours: 0 });
-    expect(row.unloadedReason).toContain('city is missing');
-    expect(row.waitReason).toContain('city is missing');
-  });
-
-  it('requires the same recorded vehicle odometer chain and keeps base cost in totals', () => {
-    const first = trip('1', { dropoffOdometer: 120, originalTripCost: '$40.00' });
-    const next = trip('2', { pickupOdometer: 170, completedVehicle: 'Van 2' });
-    const row = analyzeTripCostOverrides([first, next], { allDates: true }).rows[0];
-    expect(row.unloadedMiles).toBe(0);
-    expect(row.unloadedReason).toContain('Vehicle changed');
-    expect(row.totalCost).toBe(40);
-  });
-
-  it('extracts city names and normalizes incomplete settings to safe defaults', () => {
-    expect(extractCityFromAddress('10409 Parmer Cir, Fishers, IN 46038, USA')).toBe('Fishers');
-    expect(extractCityFromAddress('500 Main St, Louisville, Kentucky, USA')).toBe('Louisville');
-    expect(extractCityFromAddress('13000 North Main Street  Rushville In 46173')).toBe('Rushville');
-    expect(extractCityFromAddress('4485 Malden Ln  Beech Grove Indiana 46107')).toBe('Beech Grove');
-    expect(extractCityFromAddress('7910 E WASHINGTON ST 110 INDIANAPOLIS IN 46219')).toBe('INDIANAPOLIS');
-    expect(extractCityFromAddress('808 W Riverside Ave Apt 217 Muncie IN 47303')).toBe('Muncie');
-    expect(extractCityFromAddress('6855 Shore Terrace Suite 130 and 220 Indianapolis IN 46254')).toBe('Indianapolis');
-    expect(normalizeOverridePolicy({ unloadedRate: -1, waitRoundingMinutes: 0 })).toMatchObject({
-      unloadedRate: DEFAULT_OVERRIDE_POLICY.unloadedRate,
-      waitRoundingMinutes: 1,
-    });
-    expect(isOverridePolicyDocumentValid(DEFAULT_OVERRIDE_POLICY)).toBe(true);
-    expect(isOverridePolicyDocumentValid({ ...DEFAULT_OVERRIDE_POLICY, waitRate: '9' })).toBe(false);
-    expect(isOverridePolicyDocumentValid({ ...DEFAULT_OVERRIDE_POLICY, excludedCityPairs: [42] })).toBe(false);
-  });
-
-  it('supports recorded legacy field names and pickup service-date scoping', () => {
+  it('supports legacy recorded field names and pickup service-date scoping', () => {
     const first = trip('1', {
       date: undefined,
       serviceDate: '2026-08-01',
@@ -278,7 +241,7 @@ describe('trip cost override calculation', () => {
       dropoffOdometer: undefined,
       endMileage: '1,120',
     });
-    const next = trip('2', {
+    const current = trip('2', {
       date: undefined,
       dateKey: '2026-08-01',
       arrivalTime: undefined,
@@ -288,32 +251,29 @@ describe('trip cost override calculation', () => {
       pickupOdometer: undefined,
       startMileage: '1,170',
     });
-    const rows = analyzeTripCostOverrides([first, next], {
-      fromDate: '2026-08-01',
-      toDate: '2026-08-01',
-    }).rows;
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatchObject({ serviceDate: '2026-08-01', unloadedMiles: 50, waitHours: 1 });
+    const result = analyzeTripCostOverrides([first, current], { drivers: [driver], fromDate: '2026-08-01', toDate: '2026-08-01' });
+    expect(rowFor(result, '2')).toMatchObject({ serviceDate: '2026-08-01', unloadedMiles: 50, waitHours: 1 });
   });
 
-  it('applies minimum, driver, directional city, and search filters together', () => {
+  it('applies candidate, leg, driver, route, minimum, and search filters together', () => {
     const rows = [
-      { trip: { id: '1', bookingId: 'B-100', driverId: 'd1', patient: 'First Rider' }, driverKey: 'd1', pickupCity: 'Rushville', dropoffCity: 'Indianapolis', nextPickupCity: 'Carmel', unloadedMiles: 25, waitHours: 1, isOverrideCandidate: true, overrideType: 'both' },
-      { trip: { id: '2', bookingId: 'B-200', driverId: 'd2', patient: 'Second Rider' }, driverKey: 'd2', pickupCity: 'Fishers', dropoffCity: 'Carmel', nextPickupCity: 'Indianapolis', unloadedMiles: 50, waitHours: 2, isOverrideCandidate: true, overrideType: 'both' },
+      { legType: 'before_pickup', legLabel: 'Before pickup', trip: { id: '1', bookingId: 'B-100', driverId: 'd1', patient: 'First Rider' }, driverKey: 'd1', originCity: 'Indianapolis', destinationCity: 'Carmel', tripPickupCity: 'Carmel', tripDropoffCity: 'Muncie', unloadedMiles: 25, waitHours: 1, isOverrideCandidate: true, overrideType: 'both' },
+      { legType: 'home_return', legLabel: 'Return home', trip: { id: '2', bookingId: 'B-200', driverId: 'd2', patient: 'Second Rider' }, driverKey: 'd2', originCity: 'Carmel', destinationCity: 'Fishers', tripPickupCity: 'Muncie', tripDropoffCity: 'Carmel', unloadedMiles: 50, waitHours: 2, isOverrideCandidate: true, overrideType: 'both' },
     ];
     const filtered = filterTripCostOverrideRows(rows, {
       search: 'second driver',
       driverKey: 'd2',
+      legType: 'home_return',
       minimumUnloadedMiles: 40,
       minimumWaitHours: 1.5,
       gapFromCity: 'CARMEL',
-      gapToCity: 'Indianapolis, IN',
+      gapToCity: 'Fishers, IN',
       driverNamesById: new Map([['d2', 'Second Driver']]),
     });
     expect(filtered.map((row) => row.trip.bookingId)).toEqual(['B-200']);
   });
 
-  it('shows only real supplement candidates by default and keeps explicit audit views', () => {
+  it('shows only real candidates by default and keeps explicit audit views', () => {
     const rows = [
       { trip: { id: 'mileage' }, driverKey: 'd1', unloadedMiles: 30, waitHours: 0, isOverrideCandidate: true, overrideType: 'mileage', requiresReview: false },
       { trip: { id: 'waiting' }, driverKey: 'd1', unloadedMiles: 0, waitHours: 1.5, isOverrideCandidate: true, overrideType: 'waiting', requiresReview: false },
@@ -327,5 +287,15 @@ describe('trip cost override calculation', () => {
     expect(filterTripCostOverrideRows(rows, { candidateType: 'both' }).map((row) => row.trip.id)).toEqual(['both']);
     expect(filterTripCostOverrideRows(rows, { candidateType: 'review' }).map((row) => row.trip.id)).toEqual(['review']);
     expect(filterTripCostOverrideRows(rows, { candidateType: 'all' })).toHaveLength(5);
+  });
+
+  it('extracts city names and normalizes incomplete settings to safe defaults', () => {
+    expect(extractCityFromAddress('10409 Parmer Cir, Fishers, IN 46038, USA')).toBe('Fishers');
+    expect(extractCityFromAddress('500 Main St, Louisville, Kentucky, USA')).toBe('Louisville');
+    expect(extractCityFromAddress('13000 North Main Street  Rushville In 46173')).toBe('Rushville');
+    expect(extractCityFromAddress('4485 Malden Ln  Beech Grove Indiana 46107')).toBe('Beech Grove');
+    expect(normalizeOverridePolicy({ unloadedRate: -1, waitRoundingMinutes: 0 })).toMatchObject({ unloadedRate: DEFAULT_OVERRIDE_POLICY.unloadedRate, waitRoundingMinutes: 1 });
+    expect(isOverridePolicyDocumentValid(DEFAULT_OVERRIDE_POLICY)).toBe(true);
+    expect(isOverridePolicyDocumentValid({ ...DEFAULT_OVERRIDE_POLICY, waitRate: '9' })).toBe(false);
   });
 });

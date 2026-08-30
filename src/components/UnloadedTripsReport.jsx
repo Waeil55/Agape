@@ -1,6 +1,8 @@
-import { Fragment, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Download, RotateCcw, Search } from 'lucide-react';
-import { analyzeTripCostOverrides, filterTripCostOverrideRows } from '../utils/tripCostOverrides';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Ban, ChevronDown, ChevronLeft, ChevronRight, Download, RotateCcw, Search } from 'lucide-react';
+import { getDistanceMiles } from '../config/maps';
+import { forEachWithConcurrency } from '../utils/boundedConcurrency';
+import { analyzeTripCostOverrides, filterTripCostOverrideRows, normalizeCityPair } from '../utils/tripCostOverrides';
 import { downloadTripOverrideWorkbook } from '../utils/tripOverrideWorkbook';
 import { localCalendarYmd } from '../utils/tripDate';
 
@@ -34,10 +36,10 @@ const FILTER_VIEWS = [
 
 const TABLE_COLUMNS = [
   ['Date', 'Trip Date', '8%'],
-  ['Booking ID', 'Booking ID receiving the override', '10%'],
-  ['Driver', 'Driver', '10%'],
-  ['Empty leg', 'Current dropoff city to next pickup city', '17%'],
-  ['Next trip', 'Next Booking ID', '9%'],
+  ['Booking ID', 'Booking ID receiving the override', '9%'],
+  ['Leg', 'Empty-leg type', '10%'],
+  ['Driver', 'Driver', '9%'],
+  ['Unloaded route', 'Empty vehicle origin to destination', '18%'],
   ['A/W', 'Ambulatory or Wheelchair', '4%'],
   ['Empty mi', 'Billable Unloaded Miles', '7%'],
   ['Mileage', 'Mileage Override Amount', '8%'],
@@ -47,7 +49,7 @@ const TABLE_COLUMNS = [
   ['Total', 'Total Cost', '7%'],
 ];
 
-const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overridePolicyStatus = 'ready', overridePolicyError = '' }) => {
+const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overridePolicyStatus = 'ready', overridePolicyError = '', updateOverridePolicy, routeDistanceResolver = getDistanceMiles }) => {
   const initialWeek = useMemo(() => currentWeek(), []);
   const [fromDate, setFromDate] = useState(initialWeek.from);
   const [toDate, setToDate] = useState(initialWeek.to);
@@ -59,8 +61,12 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
   const [minimumWait, setMinimumWait] = useState('0');
   const [gapFromCity, setGapFromCity] = useState('all');
   const [gapToCity, setGapToCity] = useState('all');
+  const [legType, setLegType] = useState('all');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState('');
+  const [boundaryDistances, setBoundaryDistances] = useState(() => new Map());
+  const [excludingRowId, setExcludingRowId] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
   const policyReady = overridePolicyStatus === 'ready';
 
   const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
@@ -71,12 +77,43 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
       allDates,
       fromDate,
       toDate,
+      boundaryDistances,
     });
     return policyReady ? analyzed : { ...analyzed, rows: [] };
-  }, [allDates, drivers, fromDate, overridePolicy, policyReady, toDate, trips]);
+  }, [allDates, boundaryDistances, drivers, fromDate, overridePolicy, policyReady, toDate, trips]);
+
+  useEffect(() => {
+    if (!policyReady) return undefined;
+    const requests = [...new Map(result.boundaryRequests
+      .filter((request) => !boundaryDistances.has(request.id))
+      .map((request) => [request.id, request])).values()];
+    if (!requests.length) return undefined;
+    setBoundaryDistances((current) => {
+      const next = new Map(current);
+      requests.forEach((request) => next.set(request.id, { status: 'loading' }));
+      return next;
+    });
+    void forEachWithConcurrency(requests, async (request) => {
+      try {
+        const miles = await routeDistanceResolver(request.origin, request.destination);
+        if (!Number.isFinite(miles)) throw new Error('Google route mileage is unavailable');
+        setBoundaryDistances((current) => new Map(current).set(request.id, {
+          status: 'ready',
+          miles,
+          source: 'Google routed mileage',
+        }));
+      } catch (error) {
+        setBoundaryDistances((current) => new Map(current).set(request.id, {
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Google route mileage is unavailable',
+        }));
+      }
+    }, 4);
+    return undefined;
+  }, [boundaryDistances, policyReady, result.boundaryRequests, routeDistanceResolver]);
 
   const driverNamesById = useMemo(() => new Map([...driverById].map(([id, driver]) => [id, driver?.name || ''])), [driverById]);
-  const cityOptions = useMemo(() => [...new Set(result.rows.flatMap((row) => [row.dropoffCity, row.nextPickupCity]).filter(Boolean))]
+  const cityOptions = useMemo(() => [...new Set(result.rows.flatMap((row) => [row.originCity, row.destinationCity]).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right)), [result.rows]);
   const driverOptions = useMemo(() => [...new Map(result.rows.map((row) => {
     const driver = driverById.get(row.trip.driverId);
@@ -95,8 +132,9 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
     minimumWaitHours: minimumWait,
     gapFromCity,
     gapToCity,
+    legType,
     driverNamesById,
-  }), [candidateType, driverFilter, driverNamesById, gapFromCity, gapToCity, minimumUnloaded, minimumWait, result.rows, search]);
+  }), [candidateType, driverFilter, driverNamesById, gapFromCity, gapToCity, legType, minimumUnloaded, minimumWait, result.rows, search]);
 
   const totals = useMemo(() => rows.reduce((sum, row) => ({
     original: sum.original + row.originalTripCost,
@@ -104,6 +142,10 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
     waiting: sum.waiting + row.waitCost,
     total: sum.total + row.totalCost,
   }), { original: 0, unloaded: 0, waiting: 0, total: 0 }), [rows]);
+  const boundaryStatus = useMemo(() => [...boundaryDistances.values()].reduce((summary, value) => ({
+    loading: summary.loading + (value?.status === 'loading' ? 1 : 0),
+    errors: summary.errors + (value?.status === 'error' ? 1 : 0),
+  }), { loading: 0, errors: 0 }), [boundaryDistances]);
 
   const driverName = (row) => driverById.get(row.trip.driverId)?.name
     || row.trip.completedDriverName
@@ -127,11 +169,35 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
     setMinimumWait('0');
     setGapFromCity('all');
     setGapToCity('all');
+    setLegType('all');
     setExpandedRowId('');
   };
   const exportRows = () => {
     const range = allDates ? 'all-dates' : `${fromDate || 'start'}_to_${toDate || 'end'}`;
     downloadTripOverrideWorkbook(rows, driverById, `trip-cost-overrides_${range}.xlsx`);
+  };
+  const retryBoundaryMileage = () => {
+    setBoundaryDistances((current) => new Map([...current].filter(([, value]) => value?.status !== 'error')));
+  };
+  const excludeRoute = async (row) => {
+    if (!updateOverridePolicy || !row.originCity || !row.destinationCity) return;
+    const route = `${row.originCity} > ${row.destinationCity}`;
+    const existing = Array.isArray(overridePolicy?.excludedCityPairs) ? overridePolicy.excludedCityPairs : [];
+    const routeKey = normalizeCityPair(route, overridePolicy?.sameCityNames);
+    if (existing.some((pair) => normalizeCityPair(pair, overridePolicy?.sameCityNames) === routeKey)) {
+      setActionMessage(`${route} is already excluded.`);
+      return;
+    }
+    setExcludingRowId(row.rowId);
+    setActionMessage('');
+    try {
+      await updateOverridePolicy({ excludedCityPairs: [...existing, route] });
+      setActionMessage(`Excluded ${route}. You can remove it later in Settings.`);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : 'The route exclusion could not be saved.');
+    } finally {
+      setExcludingRowId('');
+    }
   };
 
   return (
@@ -172,11 +238,12 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
         </div>
 
         {advancedOpen && (
-          <div className="mt-2 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-2 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-2 xl:grid-cols-6">
             <label className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600">Minimum empty miles<input aria-label="Minimum unloaded miles" type="number" min="0" step="0.1" value={minimumUnloaded} onChange={(event) => setMinimumUnloaded(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent p-0 text-right text-xs" /></label>
             <label className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600">Minimum wait hours<input aria-label="Minimum waiting hours" type="number" min="0" step="0.5" value={minimumWait} onChange={(event) => setMinimumWait(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent p-0 text-right text-xs" /></label>
             <select aria-label="Empty leg from city" value={gapFromCity} onChange={(event) => setGapFromCity(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">Any empty-leg origin</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select>
             <select aria-label="Empty leg to city" value={gapToCity} onChange={(event) => setGapToCity(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">Any empty-leg destination</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select>
+            <select aria-label="Empty leg type" value={legType} onChange={(event) => setLegType(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">All empty-leg types</option><option value="before_pickup">Before pickup</option><option value="home_return">Return home</option></select>
             <label className="flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={allDates} onChange={(event) => setAllDates(event.target.checked)} /> Ignore date range</label>
           </div>
         )}
@@ -199,6 +266,13 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
         </div>
       )}
 
+      {(boundaryStatus.loading > 0 || boundaryStatus.errors > 0 || actionMessage) && (
+        <div className={`mx-3 mb-2 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-[10px] font-semibold ${boundaryStatus.errors > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-blue-200 bg-blue-50 text-blue-900'}`} role={boundaryStatus.errors > 0 ? 'alert' : 'status'}>
+          <span>{actionMessage || (boundaryStatus.errors > 0 ? `${boundaryStatus.errors} home-route mileage calculation${boundaryStatus.errors === 1 ? '' : 's'} failed. Those legs remain blocked.` : `Calculating ${boundaryStatus.loading} home-route mileage${boundaryStatus.loading === 1 ? '' : 's'}…`)}</span>
+          {boundaryStatus.errors > 0 && <button type="button" onClick={retryBoundaryMileage} className="shrink-0 rounded-lg border border-amber-300 bg-white px-2 py-1 font-bold">Retry</button>}
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 md:pb-3">
         {candidateType === 'review' && rows.length > 0 && (
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900"><AlertTriangle size={14} className="shrink-0" /> These gaps are blocked from cost calculation until the shown trip data is corrected.</div>
@@ -206,12 +280,12 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
 
         <div className="space-y-2 md:hidden">
           {rows.map((row) => (
-            <article key={row.trip.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <article key={row.rowId} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2"><p className="truncate font-mono text-xs font-bold text-blue-700">#{row.trip.bookingId || row.trip.id}</p><p className="shrink-0 text-xs font-bold text-slate-900">{money(row.totalCost)}</p></div>
-              <p className="mt-1 truncate text-xs font-semibold text-slate-800" title={`${row.dropoffCity} to ${row.nextPickupCity}`}>{row.dropoffCity || 'Missing city'} → {row.nextPickupCity || 'Missing city'}</p>
-              <p className="mt-1 truncate text-[10px] font-semibold text-slate-500">Next #{row.nextTrip?.bookingId || row.nextTrip?.id || 'none'} · {driverName(row)}</p>
+              <p className="mt-1 truncate text-xs font-semibold text-slate-800" title={`${row.originCity} to ${row.destinationCity}`}>{row.originCity || 'Missing city'} → {row.destinationCity || 'Missing city'}</p>
+              <p className="mt-1 truncate text-[10px] font-semibold text-slate-500">{row.legLabel} · {driverName(row)}</p>
               <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]"><div><p className="text-slate-500">Empty miles</p><p className="font-bold text-slate-900">{decimal(row.unloadedMiles)}</p></div><div><p className="text-slate-500">Mileage</p><p className="font-bold text-blue-700">{money(row.unloadedAmount)}</p></div><div><p className="text-slate-500">Wait</p><p className="font-bold text-slate-900">{decimal(row.waitHours)} hr · {money(row.waitCost)}</p></div></div>
-              <details className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-600"><summary className="cursor-pointer text-blue-700">Audit details</summary><div className="mt-2 space-y-1"><p>Dropoff {dateTime(row.dropoffTimestamp)} at {odometer(row.dropoffOdometer)} mi</p><p>Next pickup {dateTime(row.nextPickupTimestamp)} at {odometer(row.nextPickupOdometer)} mi</p><p>{row.unloadedReason}</p><p>{row.waitReason}</p></div></details>
+              <details className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-600"><summary className="cursor-pointer text-blue-700">Audit details</summary><div className="mt-2 space-y-1"><p>Passenger trip: {row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p>Empty leg: {row.originAddress || 'Missing origin'} → {row.destinationAddress || 'Missing destination'}</p><p>{row.mileageSource}: {row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${decimal(row.rawUnloadedMiles)} mi`}</p><p>{row.unloadedReason}</p><p>{row.waitReason}</p><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={() => void excludeRoute(row)} className="mt-2 inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'Route excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude this route'}</button></div></details>
             </article>
           ))}
         </div>
@@ -222,16 +296,16 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
             <thead><tr>{TABLE_COLUMNS.map(([label, fullLabel]) => <th key={fullLabel} className="px-2 py-2 text-left" title={fullLabel}>{label}</th>)}</tr></thead>
             <tbody>
               {rows.map((row) => {
-                const rowId = text(row.trip.id || row.trip.bookingId);
+                const rowId = text(row.rowId);
                 const expanded = expandedRowId === rowId;
                 return (
                   <Fragment key={rowId}>
-                    <tr className="cursor-pointer border-b border-slate-100 hover:bg-blue-50/60" aria-expanded={expanded} aria-controls={`override-detail-${rowId}`} onClick={() => toggleExpanded(rowId)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleExpanded(rowId); } }}>
+                    <tr tabIndex="0" data-agape-table-row="true" className="cursor-pointer border-b border-slate-100 hover:bg-blue-50/60 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" aria-expanded={expanded} aria-controls={`override-detail-${rowId}`} onClick={() => toggleExpanded(rowId)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleExpanded(rowId); } }}>
                       <td className="px-2 py-1.5" title={row.serviceDate}>{row.serviceDate}</td>
                       <td className="px-2 py-1.5 font-mono font-semibold text-blue-700" title={text(row.trip.bookingId || row.trip.id)}><span className="inline-flex max-w-full items-center gap-1"><ChevronRight size={12} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} /><span className="truncate">{row.trip.bookingId || row.trip.id}</span></span></td>
+                      <td className="px-2 py-1.5" title={row.legLabel}>{row.legLabel}</td>
                       <td className="px-2 py-1.5" title={driverName(row)}>{driverName(row)}</td>
-                      <td className="px-2 py-1.5 font-semibold" title={`${row.dropoffCity || 'Missing'} → ${row.nextPickupCity || 'Missing'}`}>{row.dropoffCity || 'Missing'} → {row.nextPickupCity || 'Missing'}</td>
-                      <td className="px-2 py-1.5 font-mono text-blue-700" title={text(row.nextTrip?.bookingId || row.nextTrip?.id)}>{row.nextTrip?.bookingId || row.nextTrip?.id || '—'}</td>
+                      <td className="px-2 py-1.5 font-semibold" title={`${row.originCity || 'Missing'} → ${row.destinationCity || 'Missing'}`}>{row.originCity || 'Missing'} → {row.destinationCity || 'Missing'}</td>
                       <td className="px-2 py-1.5 text-center" title={row.tripType}>{row.tripType}</td>
                       <td className="px-2 py-1.5 font-mono" title={`${decimal(row.rawUnloadedMiles)} recorded raw miles`}>{decimal(row.unloadedMiles)}</td>
                       <td className="px-2 py-1.5 font-mono font-semibold text-blue-700" title={row.unloadedReason}>{money(row.unloadedAmount)}</td>
@@ -244,12 +318,12 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                       <tr id={`override-detail-${rowId}`} data-agape-detail-row="true" className="bg-slate-50">
                         <td colSpan={TABLE_COLUMNS.length} className="px-3 py-3">
                           <div className="grid gap-3 text-[11px] font-semibold text-slate-700 lg:grid-cols-4">
-                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Passenger trip</p><p className="mt-1 truncate" title={`${row.pickupCity} → ${row.dropoffCity}`}>{row.pickupCity || 'Missing'} → {row.dropoffCity || 'Missing'}</p><p className="truncate text-slate-500" title={row.dropoffAddress}>{row.dropoffAddress || 'Dropoff address missing'}</p></div>
-                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Next pickup</p><p className="mt-1">#{row.nextTrip?.bookingId || row.nextTrip?.id || 'none'} · {dateTime(row.nextPickupTimestamp)}</p><p className="truncate text-slate-500" title={row.nextPickupAddress}>{row.nextPickupAddress || 'Next pickup address missing'}</p></div>
-                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Mileage evidence</p><p className="mt-1">{odometer(row.dropoffOdometer)} → {odometer(row.nextPickupOdometer)} mi · raw {decimal(row.rawUnloadedMiles)}</p><p className="text-slate-500">{decimal(row.unloadedMiles)} × {money(row.unloadedRate)} = {money(row.unloadedAmount)}</p></div>
-                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Waiting evidence</p><p className="mt-1">Dropoff {dateTime(row.dropoffTimestamp)} · raw gap {decimal(row.rawGapHours)} hr</p><p className="text-slate-500">Billable {decimal(row.waitHours)} hr × {money(row.waitRate)} = {money(row.waitCost)}</p></div>
+                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Passenger trip</p><p className="mt-1 truncate" title={`${row.tripPickupCity} → ${row.tripDropoffCity}`}>{row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p className="truncate text-slate-500" title={`${row.tripPickupAddress} → ${row.tripDropoffAddress}`}>{row.tripPickupAddress || 'Pickup missing'} → {row.tripDropoffAddress || 'Dropoff missing'}</p></div>
+                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Unloaded leg</p><p className="mt-1">{row.legLabel}: {row.originCity || 'Missing'} → {row.destinationCity || 'Missing'}</p><p className="truncate text-slate-500" title={`${row.originAddress} → ${row.destinationAddress}`}>{row.originAddress || 'Origin missing'} → {row.destinationAddress || 'Destination missing'}</p></div>
+                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Mileage evidence</p><p className="mt-1">{row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${row.mileageSource} · raw ${decimal(row.rawUnloadedMiles)} mi`}</p><p className="text-slate-500">{decimal(row.unloadedMiles)} × {money(row.unloadedRate)} = {money(row.unloadedAmount)}</p></div>
+                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Waiting evidence</p><p className="mt-1">{row.originTimestamp ? `${dateTime(row.originTimestamp)} → ${dateTime(row.destinationTimestamp)}` : 'Not applicable to this home boundary leg'} · raw gap {decimal(row.rawGapHours)} hr</p><p className="text-slate-500">Billable {decimal(row.waitHours)} hr × {money(row.waitRate)} = {money(row.waitCost)}</p></div>
                           </div>
-                          <div className="mt-3 grid gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold sm:grid-cols-2"><p className={row.unloadedAmount > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Mileage: {row.unloadedReason}</p><p className={row.waitCost > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Waiting: {row.waitReason}</p></div>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold"><div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2"><p className={row.unloadedAmount > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Mileage: {row.unloadedReason}</p><p className={row.waitCost > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Waiting: {row.waitReason}</p></div><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={(event) => { event.stopPropagation(); void excludeRoute(row); }} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'Route excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude route'}</button></div>
                         </td>
                       </tr>
                     )}

@@ -1148,7 +1148,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
       );
       case 'reports': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-          <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} overridePolicy={overridePolicy} overridePolicyStatus={overridePolicyStatus} overridePolicyError={overridePolicyError} />
+          <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} overridePolicy={overridePolicy} overridePolicyStatus={overridePolicyStatus} overridePolicyError={overridePolicyError} updateOverridePolicy={updateOverridePolicy} />
         </Suspense></ErrorBoundary>
       );
       case 'admin': return (
@@ -1264,7 +1264,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
               renderPanelContent()
             ) : activePanel === 'reports' ? (
               <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-                <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} overridePolicy={overridePolicy} overridePolicyStatus={overridePolicyStatus} overridePolicyError={overridePolicyError} />
+                <ReportsPage trips={trips} trashedTrips={trashedTrips} restoreTrip={restoreTrip} updateTrashedTrip={updateTrashedTrip} drivers={drivers} vehicles={vehicles} driverTelemetry={driverTelemetry} onUpdateTrip={updateTrip} role={role} setShowUploadModal={setShowUploadModal} requestBulkDelete={requestBulkDelete} initialSection={reportsSection} onSectionChange={setReportsSection} overridePolicy={overridePolicy} overridePolicyStatus={overridePolicyStatus} overridePolicyError={overridePolicyError} updateOverridePolicy={updateOverridePolicy} />
               </Suspense></ErrorBoundary>
             ) : (
               <div className={

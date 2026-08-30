@@ -26,6 +26,7 @@ describe('override policy UI integration contract', () => {
     expect(mobile).toContain('<SettingsPage');
     expect(mobile).toContain('{...props}');
     expect(reports).toContain('overridePolicyStatus={props.overridePolicyStatus}');
+    expect(reports).toContain('updateOverridePolicy={props.updateOverridePolicy}');
     expect(settings).toContain("const canSaveOverridePolicy = ['ready', 'error'].includes(overridePolicyStatus)");
     expect(settings).toContain('disabled={!canSaveOverridePolicy}');
     expect(settings).toContain("'Repair override policy'");
@@ -41,9 +42,11 @@ describe('override policy UI integration contract', () => {
     expect(report).toContain("useState('override')");
     expect(report).toContain("['review', 'Needs review']");
     expect(report).toContain("['all', 'All evaluated gaps']");
-    expect(report).toContain("row.dropoffCity || 'Missing'");
-    expect(report).toContain("row.nextPickupCity || 'Missing'");
-    expect(report).toContain('Next Booking ID');
+    expect(report).toContain("row.originCity || 'Missing'");
+    expect(report).toContain("row.destinationCity || 'Missing'");
+    expect(report).toContain("['Leg', 'Empty-leg type'");
+    expect(report).not.toContain('Next Booking ID');
+    expect(report).toContain('Exclude route');
     expect(report).toContain('data-agape-detail-row="true"');
   });
 });

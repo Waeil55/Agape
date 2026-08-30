@@ -7,8 +7,8 @@ describe('trip override workbook', () => {
     const workbook = buildTripOverrideWorkbook([{
       serviceDate: '2026-08-01',
       trip: { id: 't1', bookingId: 'B-100', driverId: 'd1' },
-      nextTrip: { id: 't2', bookingId: 'B-101' },
-      pickupCity: 'Indianapolis', dropoffCity: 'Carmel', nextPickupCity: 'Fishers',
+      legLabel: 'Before pickup', originCity: 'Carmel', destinationCity: 'Fishers',
+      tripPickupCity: 'Indianapolis', tripDropoffCity: 'Carmel',
       originalTripCost: 40, tripType: 'A', unloadedMiles: 25, unloadedRate: 0.8,
       unloadedAmount: 20, rawGapHours: 2.25, waitHours: 1.5, waitRate: 9,
       waitCost: 13.5, totalCost: 73.5, unloadedReason: 'Qualifying empty segment',
@@ -19,9 +19,10 @@ describe('trip override workbook', () => {
     expect(sheet.A2).toMatchObject({ t: 'd', z: 'yyyy-mm-dd' });
     expect(sheet.G2).toMatchObject({ t: 'n', v: 40, z: '$#,##0.00' });
     expect(sheet.I2).toMatchObject({ t: 'n', v: 25, z: '0.00' });
-    expect(sheet.D2.v).toBe('Carmel');
-    expect(sheet.E2.v).toBe('Fishers');
-    expect(sheet.F2.v).toBe('B-101');
+    expect(sheet.D2.v).toBe('Before pickup');
+    expect(sheet.E2.v).toBe('Carmel');
+    expect(sheet.F2.v).toBe('Fishers');
+    expect(OVERRIDE_EXPORT_HEADERS).not.toContain('Next Booking ID');
     expect(sheet.S2.v).toBe('Indianapolis');
     expect(sheet.T2.v).toBe('Carmel');
     expect(sheet['!cols']).toHaveLength(OVERRIDE_EXPORT_HEADERS.length);
@@ -30,8 +31,9 @@ describe('trip override workbook', () => {
     expect(sheet['!autofilter'].ref).toBe('A1:T2');
 
     const serialized = writeTripOverrideWorkbook([{
-      serviceDate: '2026-08-01', trip: { id: 't1' }, pickupCity: 'A', dropoffCity: 'B',
-      nextPickupCity: 'C', originalTripCost: 40, tripType: 'A', unloadedMiles: 25,
+      serviceDate: '2026-08-01', trip: { id: 't1' }, legLabel: 'Before pickup',
+      originCity: 'B', destinationCity: 'C', tripPickupCity: 'A', tripDropoffCity: 'B',
+      originalTripCost: 40, tripType: 'A', unloadedMiles: 25,
       unloadedRate: 0.8, unloadedAmount: 20, rawGapHours: 2, waitHours: 1,
       waitRate: 9, waitCost: 9, totalCost: 69, unloadedReason: 'Included', waitReason: 'Included',
     }]);
