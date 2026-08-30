@@ -746,8 +746,8 @@ const SettingsPage = ({
       </nav>
 
       {/* Mobile nav */}
-      <div className="lg:hidden w-full overflow-x-auto no-scrollbar pb-2 -mx-1 px-1 touch-manipulation">
-        <div className="flex gap-1.5">
+      <div className="app-filter-bar -mx-1 w-full px-1 pb-2 touch-manipulation lg:hidden">
+        <div className="flex flex-wrap gap-1.5">
           {mobileNavItems.map(item => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;

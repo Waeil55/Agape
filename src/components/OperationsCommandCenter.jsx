@@ -1308,7 +1308,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   // ==================== CONTROL BAR (DEDUPED COMMAND STRIP) ====================
 
   const renderControlBar = () => (
-    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm overflow-x-auto">
+    <div className="app-filter-bar gap-1 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm">
       {/* Main Tabs */}
       <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg">
         {['manifest', 'willcall', 'fleet'].map(tab => (
@@ -1360,13 +1360,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
         <UploadCloud size={13} /> Upload
       </button>
-      <button onClick={() => onOpenSequencer?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
-        <Route size={13} /> Routes
-      </button>
-      <button onClick={() => onOpenLiveMap?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
-        <MapPin size={13} /> Map
-      </button>
-
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
       {/* Search */}
@@ -1378,32 +1371,19 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
       {/* Sort */}
-      {[
-        { id: 'time', label: 'Time' },
-        { id: 'assignment', label: 'Driver' },
-        { id: 'status', label: 'Status' },
-        { id: 'patient', label: 'Client' },
-        { id: 'urgency', label: 'Urgency' }
-      ].map(option => (
-        <button
-          key={option.id}
-          onClick={() => {
-            if (sortBy === option.id) {
-              setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-            } else {
-              handleSortSelect(option.id);
-            }
-          }}
-          className={`flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 ${
-            sortBy === option.id
-              ? 'bg-blue-100 text-blue-700'
-              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-          }`}
-        >
-          {option.label}
-          {sortBy === option.id && (sortDirection === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+      <label className="inline-flex shrink-0 items-center gap-1">
+        <span className="sr-only">Sort trips by</span>
+        <select aria-label="Sort trips" value={sortBy} onChange={(event) => handleSortSelect(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="time">Sort: Time</option>
+          <option value="assignment">Sort: Driver</option>
+          <option value="status">Sort: Status</option>
+          <option value="patient">Sort: Client</option>
+          <option value="urgency">Sort: Urgency</option>
+        </select>
+        <button type="button" onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="flex min-h-[28px] min-w-[28px] items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-700" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
+          {sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
         </button>
-      ))}
+      </label>
 
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
@@ -1433,22 +1413,12 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
       {/* View + AI */}
-      <div className="flex items-center gap-0.5 shrink-0">
-        {MANIFEST_VIEW_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setManifestView(option.value)}
-            className={`rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors whitespace-nowrap ${
-              manifestView === option.value
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-            }`}
-          >
-            {option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}
-          </button>
-        ))}
-      </div>
+      <label className="shrink-0">
+        <span className="sr-only">Manifest layout</span>
+        <select aria-label="Manifest layout" value={manifestView} onChange={(event) => setManifestView(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+          {MANIFEST_VIEW_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}</option>)}
+        </select>
+      </label>
 
       <button
         onClick={() => setShowIntelligence(prev => !prev)}
@@ -1800,14 +1770,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== DISPATCH CARDS ====================
   const renderDispatchCards = () => {
-    const CARD_SORT_OPTIONS = [
-      { value: 'time', label: 'Time' },
-      { value: 'assignment', label: 'Driver' },
-      { value: 'vehicle', label: 'Car' },
-      { value: 'distance', label: 'Distance' },
-      { value: 'trips', label: 'Trips' },
-      { value: 'status', label: 'Availability' },
-    ];
     const getMinutesUntil = (tripTime) => {
       if (!tripTime || tripTime === 'Will Call') return null;
       const mins = timeToMinutes(tripTime);
@@ -1832,41 +1794,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           </div>
         ) : (
           <>
-            {/* Sort Toolbar */}
-            <div className="mb-3 rounded-xl border border-slate-100/50 bg-white px-3 py-2 shadow-sm">
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-slate-200">
-                  {CARD_SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        if (sortBy === opt.value) {
-                          setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-                        } else {
-                          setSortBy(opt.value);
-                          setSortDirection('asc');
-                        }
-                      }}
-                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs transition-all ${
-                        sortBy === opt.value
-                          ? 'bg-slate-900 text-white shadow-sm'
-                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  className="shrink-0 px-3 py-1.5 rounded-xl text-xs bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-1"
-                >
-                  {sortDirection === 'asc' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  {sortDirection === 'asc' ? 'Asc' : 'Desc'}
-                </button>
-              </div>
-            </div>
-
             {/* Trip Cards */}
             <div className="space-y-3">
               {visibleTrips.map((trip) => {

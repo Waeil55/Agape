@@ -91,7 +91,7 @@ const ReportsPage = (props) => {
             {sections.map((item) => <option key={item.id} value={item.id}>{item.label}{Number.isFinite(item.count) ? ` (${item.count})` : ''}</option>)}
           </select>
         </label>
-        <div className="hidden gap-2 overflow-x-auto no-scrollbar sm:flex" role="tablist" aria-label="Reports and records sections">
+        <div className="app-filter-bar hidden gap-2 sm:flex" role="tablist" aria-label="Reports and records sections">
           {sections.map((item) => {
             const Icon = item.icon;
             const active = section === item.id;
@@ -102,7 +102,7 @@ const ReportsPage = (props) => {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setSection(item.id)}
-                className={`group flex min-h-12 shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors sm:min-w-[180px] ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
+                className={`group flex min-h-12 min-w-0 flex-1 basis-[180px] items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
               >
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-blue-700'}`}>
                   <Icon size={16} aria-hidden="true" />

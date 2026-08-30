@@ -660,6 +660,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const currentVehicleOdometer = vehicleOdometerState.miles || 0;
 
   const [maintenanceResetting, setMaintenanceResetting] = useState('');
+  const [showToast, setShowToast] = useState(null);
 
   const resetVehicleMaintenanceCycle = useCallback((type) => {
     if (!assignedVehicleRecord?.id || !vehicleMaintenance || maintenanceResetting) return;
@@ -927,7 +928,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [showMoreOptions, setShowMoreOptions] = useState(null);
   const [quickSmsMenuTrip, setQuickSmsMenuTrip] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
-  const [showToast, setShowToast] = useState(null);
   const toastTimeoutRef = useRef(null);
   useEffect(() => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -6280,7 +6280,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {activeNav === 'history' && (
         <div className="agape-mobile-page agape-mobile-history flex-1 overflow-y-auto">
           <div className="agape-mobile-toolbar">
-            <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar whitespace-nowrap">
+            <div className="app-filter-bar gap-2">
 
               <button
                 type="button"

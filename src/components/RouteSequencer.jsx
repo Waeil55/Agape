@@ -839,14 +839,14 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto hide-scrollbar pb-0.5">
+        <div className="app-filter-bar gap-2 pb-0.5 lg:w-auto">
           {/* Day Selector */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl flex overflow-hidden p-0.5 shadow-inner flex-shrink-0">
+          <div className="flex min-w-0 flex-1 flex-wrap overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-0.5 shadow-inner">
             {DAY_FILTERS.map(day => (
               <button
                 key={day}
                 onClick={() => { setCurrentDay(day); setSequence([]); setStopOverrides({}); setStopMenuId(null); }}
-                className={`min-h-9 px-2.5 lg:px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                className={`min-h-9 min-w-0 flex-1 basis-[72px] px-2.5 lg:px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
                   currentDay === day
                     ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
                     : 'text-slate-500 hover:text-slate-600'
@@ -887,8 +887,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       </div>
 
       {/* ===== METRICS BAR ===== */}
-      <div className="bg-white border border-slate-200 px-3 lg:px-5 py-2 flex items-center gap-3 overflow-x-auto hide-scrollbar flex-shrink-0">
-        <div className="flex gap-2 sm:gap-5 min-w-max">
+      <div className="app-filter-bar flex-shrink-0 gap-3 border border-slate-200 bg-white px-3 py-2 lg:px-5">
+        <div className="flex flex-wrap gap-2 sm:gap-5">
           <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
             <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
             <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Stops:</span>

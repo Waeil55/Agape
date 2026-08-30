@@ -1792,14 +1792,35 @@ main,
    second horizontal viewport. Dense records wrap or truncate inside their
    assigned columns; they do not widen the application. */
 :root {
-  --app-page-max-width: 1440px;
+  --app-page-width: 92%;
 }
 
 .app-page-frame {
   width: 100%;
-  max-width: var(--app-page-max-width);
+  max-width: var(--app-page-width);
   min-width: 0;
   margin-inline: auto;
+}
+
+.app-filter-bar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+.app-filter-bar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .app-page-frame {
+    max-width: 100%;
+  }
 }
 
 .app-table-frame {

@@ -469,19 +469,19 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
   };
 
   const renderEnterpriseTopBar = () => (
-    <header className="enterprise-topbar sticky top-0 z-30 hidden h-20 items-center gap-4 border-b border-white/10 bg-[var(--brand-primary)] px-6 text-white md:flex shadow-sm">
-      <div className="flex min-w-[200px] items-center gap-3 shrink-0">
-        <div className="flex h-11 w-11 items-center justify-center rounded-[1.2rem] border border-slate-200 bg-white shadow-sm p-2">
+    <header className="enterprise-topbar sticky top-0 z-30 hidden h-14 items-center gap-3 border-b border-white/10 bg-[var(--brand-primary)] px-4 text-white md:flex shadow-sm">
+      <div className="flex min-w-[160px] items-center gap-2.5 shrink-0">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm p-1.5">
           <img src="/agape.png" alt="Agape Care" className="h-full w-full object-contain" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-base font-black text-white leading-none">Agape Care</p>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200 mt-1">Enterprise Fleet OS</p>
+          <p className="truncate text-sm font-black text-white leading-none">Agape Care</p>
+          <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-blue-200">Enterprise Fleet OS</p>
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar flex justify-center">
-        <div className="flex min-w-max items-center gap-0.5 rounded-full bg-white/10 p-1 border border-white/10">
+      <div className="min-w-0 flex-1 overflow-hidden flex justify-center">
+        <div className="flex min-w-0 items-center gap-0.5 rounded-full bg-white/10 p-0.5 border border-white/10">
           {topNavItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -490,7 +490,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                 type="button"
                 onClick={item.action}
                 aria-label={item.label}
-                className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+                className={`inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wide transition-all duration-200 xl:px-3.5 ${
                   item.active
                     ? 'bg-white text-[var(--brand-primary)] shadow-md'
                     : 'text-blue-100 hover:text-white hover:bg-white/10'
@@ -501,7 +501,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                   <Icon size={13} />
                   {item.badge > 0 && <span className="absolute -right-2 -top-2 min-w-[16px] h-[16px] px-1 rounded-full bg-blue-600 text-white text-[9px] font-black leading-[16px] text-center">{item.badge > 99 ? '99+' : item.badge}</span>}
                 </span>
-                <span>{item.label}</span>
+                <span className="hidden lg:inline">{item.label}</span>
               </button>
             );
           })}

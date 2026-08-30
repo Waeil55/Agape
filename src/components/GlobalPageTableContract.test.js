@@ -12,14 +12,35 @@ const collectSourceFiles = (directory) => readdirSync(directory, { withFileTypes
 });
 
 describe('global page and table layout contract', () => {
-  it('uses one shared maximum width for desktop, mobile, and driver pages', () => {
+  it('uses one shared 4 percent desktop gutter for desktop, mobile, and driver pages', () => {
     const css = read('src/index.css');
-    expect(css).toContain('--app-page-max-width: 1440px;');
-    expect(css).toMatch(/\.app-page-frame\s*\{[\s\S]*?max-width:\s*var\(--app-page-max-width\);[\s\S]*?margin-inline:\s*auto;/);
+    expect(css).toContain('--app-page-width: 92%;');
+    expect(css).toMatch(/\.app-page-frame\s*\{[\s\S]*?max-width:\s*var\(--app-page-width\);[\s\S]*?margin-inline:\s*auto;/);
     expect(css).toMatch(/html,\s*body,\s*#root\s*\{[\s\S]*?overflow-x:\s*hidden;/);
     expect(read('src/components/DesktopEnterpriseDashboard.jsx')).toContain('app-page-frame flex-1 min-h-0');
     expect(read('src/components/MobileEnterpriseDashboard.jsx')).toContain('app-page-frame mobile-enterprise-dashboard-wrapper');
     expect(read('src/components/DriverPage.jsx')).toContain('app-page-frame w-full h-full');
+  });
+
+  it('wraps filter controls without horizontal scrolling and keeps the desktop header compact', () => {
+    const files = collectSourceFiles(join(root, 'src'));
+    const css = read('src/index.css');
+    const dashboard = read('src/components/DesktopEnterpriseDashboard.jsx');
+    const operations = read('src/components/OperationsCommandCenter.jsx');
+    const reports = read('src/components/DesktopReportsPage.jsx');
+    const portal = read('src/features/welltrans-sync/components/WellTransSyncPage.jsx');
+
+    expect(css).toMatch(/\.app-filter-bar\s*\{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?overflow-x:\s*hidden;/);
+    for (const path of files) {
+      expect(readFileSync(path, 'utf8'), path).not.toMatch(/overflow-x-(?:auto|scroll)/);
+    }
+    expect(dashboard).toContain('hidden h-14 items-center');
+    expect(dashboard).not.toContain('hidden h-20 items-center');
+    expect(operations).toContain('aria-label="Sort trips"');
+    expect(operations).toContain('aria-label="Manifest layout"');
+    expect(reports).toContain('<CompactSelect ariaLabel="Report view"');
+    expect(portal).not.toContain('{/* Control bar */}');
+    expect(portal).not.toContain('bulkMenuOpen');
   });
 
   it('keeps every real table inside the page without horizontal table scrolling', () => {

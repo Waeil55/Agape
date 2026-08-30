@@ -801,7 +801,7 @@ const LiveMapPage = ({ role = 'dispatcher', currentUser = '', drivers = [], trip
             </div>
 
             {/* Tabs */}
-            <div className="flex overflow-x-auto px-4 pt-2 border-b border-slate-100 bg-white sm:px-6">
+            <div className="app-filter-bar border-b border-slate-100 bg-white px-4 pt-2 sm:px-6">
               {[
                 { id: 'overview', label: 'Overview', icon: Gauge },
                 { id: 'trips', label: 'Trips', icon: Route },

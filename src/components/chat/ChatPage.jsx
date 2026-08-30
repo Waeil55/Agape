@@ -329,7 +329,7 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
           />
         </div>
 
-        <div className="agape-chat-filterbar flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3" aria-label="Conversation filters">
+        <div className="app-filter-bar agape-chat-filterbar shrink-0 gap-2 border-b border-slate-100 px-4 py-3" aria-label="Conversation filters">
           {[
             ['all', 'All'],
             ['unread', `Unread${unreadCount ? ` ${unreadCount}` : ''}`],

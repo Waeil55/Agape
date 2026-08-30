@@ -399,7 +399,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-5 bg-slate-200/60 p-1.5 rounded-2xl overflow-x-auto w-fit max-w-full">
+        <div className="app-filter-bar mb-5 gap-1 rounded-2xl bg-slate-200/60 p-1.5">
           {[{ id: 'sessions', label: 'Timesheets' }, { id: 'requests', label: `Driver requests (${correctionRequests.filter((request) => request.status === 'pending').length})` }, { id: 'gaps', label: 'Activity audit' }, { id: 'abuse', label: 'Integrity signals' }, { id: 'payroll', label: 'Payroll review' }].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap px-4 py-2.5 text-sm font-semibold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
               {tab.label}
