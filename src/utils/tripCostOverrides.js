@@ -3,6 +3,14 @@ import { buildDriverIndex, findDriverInIndex } from './driverIndex';
 import { timeToMinutes, tripCalendarDateKey } from './tripDate';
 
 export const DEFAULT_OVERRIDE_POLICY = Object.freeze({
+  homeAddress: '',
+  homeAddress2: '',
+  homeCity: '',
+  homeState: 'IN',
+  homeZip: '',
+  homeLat: null,
+  homeLng: null,
+  homeFormattedAddress: '',
   unloadedThresholdMiles: 20,
   unloadedRate: 0.8,
   sameCityExemption: true,
@@ -28,6 +36,11 @@ const finiteNonNegative = (value, fallback) => {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
 };
+const finiteCoordinate = (value) => {
+  if (value === '' || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
 
 export const normalizeCityName = (value) => normalizeText(value)
   .toLowerCase()
@@ -43,6 +56,14 @@ const normalizeStringList = (value, fallback = []) => {
 };
 
 export const normalizeOverridePolicy = (policy = {}) => ({
+  homeAddress: normalizeText(policy.homeAddress),
+  homeAddress2: normalizeText(policy.homeAddress2),
+  homeCity: normalizeText(policy.homeCity),
+  homeState: normalizeText(policy.homeState || DEFAULT_OVERRIDE_POLICY.homeState).toUpperCase().slice(0, 2),
+  homeZip: normalizeText(policy.homeZip),
+  homeLat: finiteCoordinate(policy.homeLat),
+  homeLng: finiteCoordinate(policy.homeLng),
+  homeFormattedAddress: normalizeText(policy.homeFormattedAddress),
   unloadedThresholdMiles: finiteNonNegative(policy.unloadedThresholdMiles, DEFAULT_OVERRIDE_POLICY.unloadedThresholdMiles),
   unloadedRate: finiteNonNegative(policy.unloadedRate, DEFAULT_OVERRIDE_POLICY.unloadedRate),
   sameCityExemption: policy.sameCityExemption !== false,
@@ -63,13 +84,18 @@ export const isOverridePolicyDocumentValid = (policy) => {
     policy.waitRate,
   ];
   const stringList = (value) => Array.isArray(value) && value.every((item) => typeof item === 'string');
+  const optionalString = (value) => value === undefined || typeof value === 'string';
+  const optionalCoordinate = (value) => value === undefined || value === null || Number.isFinite(value);
   return nonNegativeNumbers.every((value) => Number.isFinite(value) && value >= 0)
     && Number.isFinite(policy.waitRoundingMinutes)
     && policy.waitRoundingMinutes >= 1
     && typeof policy.sameCityExemption === 'boolean'
     && typeof policy.excludeOvernightGaps === 'boolean'
     && stringList(policy.sameCityNames)
-    && stringList(policy.excludedCityPairs);
+    && stringList(policy.excludedCityPairs)
+    && ['homeAddress', 'homeAddress2', 'homeCity', 'homeState', 'homeZip', 'homeFormattedAddress'].every((key) => optionalString(policy[key]))
+    && optionalCoordinate(policy.homeLat)
+    && optionalCoordinate(policy.homeLng);
 };
 
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && normalizeText(value) !== '');
@@ -308,16 +334,21 @@ const tripPoint = (trip, side) => {
   return lat !== null && lng !== null ? `${lat},${lng}` : getTripAddress(trip, side);
 };
 
-const getDriverHome = (driver) => {
-  if (!driver) return { city: '', address: '', routeQuery: '' };
-  const lat = numeric(firstValue(driver?.homeLat, driver?.homeLocation?.lat, driver?.homeLocation?.latitude));
-  const lng = numeric(firstValue(driver?.homeLng, driver?.homeLocation?.lng, driver?.homeLocation?.longitude));
-  const homeAddress = normalizeText(firstValue(driver?.homeAddress, driver?.address));
-  const address = normalizeText([homeAddress, driver?.address2, driver?.city, driver?.state, driver?.zip].filter(Boolean).join(', '));
+const getPolicyHome = (policy) => {
+  const lat = numeric(policy?.homeLat);
+  const lng = numeric(policy?.homeLng);
+  const enteredAddress = normalizeText([
+    policy?.homeAddress,
+    policy?.homeAddress2,
+    policy?.homeCity,
+    policy?.homeState,
+    policy?.homeZip,
+  ].filter(Boolean).join(', '));
+  const address = normalizeText(policy?.homeFormattedAddress || enteredAddress);
   return {
-    city: normalizeText(firstValue(driver?.city, driver?.homeCity, extractCityFromAddress(address))),
-    address: address || homeAddress,
-    routeQuery: lat !== null && lng !== null ? `${lat},${lng}` : (address || homeAddress),
+    city: normalizeText(policy?.homeCity || extractCityFromAddress(address)),
+    address,
+    routeQuery: lat !== null && lng !== null ? `${lat},${lng}` : address,
   };
 };
 
@@ -377,18 +408,12 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
     }
     const serviceDate = tripCalendarDateKey(pickupTimestamp);
     if (!allDates && ((fromDate && serviceDate < fromDate) || (toDate && serviceDate > toDate))) return;
-    const identity = {
-      driverId: firstValue(trip?.driverId, trip?.completedDriverId, trip?.assignedDriverId),
-      driverEmail: firstValue(trip?.driverEmail, trip?.completedDriverEmail, trip?.assignedDriverEmail),
-      driverName: firstValue(trip?.completedDriverName, trip?.driverName, trip?.assignedDriverName, trip?.driver),
-    };
     eligible.push({
       trip,
       pickupTimestamp,
       dropoffTimestamp,
       serviceDate,
       driver: driverKey(trip, driverIndex) || `unassigned:${trip.id}`,
-      driverRecord: findDriverInIndex(driverIndex, identity),
     });
   });
 
@@ -559,7 +584,7 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
   groups.forEach((groupEntries) => {
     const entries = orderDriverDayEntries(groupEntries);
     const groupTripIds = new Set(entries.map((entry) => entry.trip.id));
-    const home = getDriverHome(entries[0]?.driverRecord);
+    const home = getPolicyHome(policy);
     entries.forEach((entry, index) => {
       rows.push(buildRow({ entry, previous: entries[index - 1] || null, home, groupTripIds, groupIndex: index }));
     });

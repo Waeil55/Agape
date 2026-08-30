@@ -28,7 +28,7 @@ describe('override policy UI integration contract', () => {
     expect(reports).toContain('overridePolicyStatus={props.overridePolicyStatus}');
     expect(reports).toContain('updateOverridePolicy={props.updateOverridePolicy}');
     expect(settings).toContain("const canSaveOverridePolicy = ['ready', 'error'].includes(overridePolicyStatus)");
-    expect(settings).toContain('disabled={!canSaveOverridePolicy}');
+    expect(settings).toContain('disabled={!canSaveOverridePolicy || overrideSaving}');
     expect(settings).toContain("'Repair override policy'");
   });
 

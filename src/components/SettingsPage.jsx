@@ -1,8 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge } from 'lucide-react';
+import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge, MapPin } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
 import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
+import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -87,6 +89,38 @@ const ROLE_COLORS = {
   supervisor: 'bg-indigo-100 text-indigo-800',
 };
 
+const addressPart = (place, type, short = false) => place?.address_components
+  ?.find((part) => part.types?.includes(type))?.[short ? 'short_name' : 'long_name'] || '';
+
+const placeToSharedHomePolicy = (place, current) => {
+  const street = [addressPart(place, 'street_number'), addressPart(place, 'route')].filter(Boolean).join(' ');
+  return {
+    ...current,
+    homeAddress: street || place?.formatted_address || current.homeAddress,
+    homeCity: addressPart(place, 'locality') || addressPart(place, 'postal_town') || current.homeCity,
+    homeState: addressPart(place, 'administrative_area_level_1', true) || current.homeState,
+    homeZip: addressPart(place, 'postal_code') || current.homeZip,
+    homeLat: null,
+    homeLng: null,
+    homeFormattedAddress: '',
+  };
+};
+
+const geocodeHomeAddress = async (address) => {
+  const maps = await loadGoogleMapsApi();
+  if (!maps?.Geocoder) throw new Error('Google address verification is unavailable.');
+  return new Promise((resolve, reject) => {
+    new maps.Geocoder().geocode({ address }, (results, status) => {
+      const result = results?.[0];
+      const location = result?.geometry?.location;
+      const lat = typeof location?.lat === 'function' ? location.lat() : Number(location?.lat);
+      const lng = typeof location?.lng === 'function' ? location.lng() : Number(location?.lng);
+      if (status === 'OK' && Number.isFinite(lat) && Number.isFinite(lng)) resolve({ result, lat, lng });
+      else reject(new Error(`Home address could not be verified: ${status || 'UNKNOWN_ERROR'}`));
+    });
+  });
+};
+
 const SettingsPage = ({
   currentUser,
   role,
@@ -148,6 +182,7 @@ const SettingsPage = ({
   const [chatPolicyStatus, setChatPolicyStatus] = useState('');
   const [overrideDraft, setOverrideDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
   const [overrideStatus, setOverrideStatus] = useState('');
+  const [overrideSaving, setOverrideSaving] = useState(false);
   const canSaveOverridePolicy = ['ready', 'error'].includes(overridePolicyStatus);
 
   useEffect(() => setOverrideDraft(normalizeOverridePolicy(overridePolicy)), [overridePolicy]);
@@ -161,12 +196,30 @@ const SettingsPage = ({
       setOverrideStatus('Shared override settings are unavailable.');
       return;
     }
-    setOverrideStatus('Saving shared policy…');
+    const normalizedDraft = normalizeOverridePolicy(overrideDraft);
+    if (!normalizedDraft.homeAddress || !normalizedDraft.homeCity || !normalizedDraft.homeState || !/^\d{5}(?:-\d{4})?$/.test(normalizedDraft.homeZip)) {
+      setOverrideStatus('Enter one shared street address, city, state, and valid ZIP code.');
+      return;
+    }
+    const fullHomeAddress = [normalizedDraft.homeAddress, normalizedDraft.homeAddress2, normalizedDraft.homeCity, normalizedDraft.homeState, normalizedDraft.homeZip].filter(Boolean).join(', ');
+    setOverrideSaving(true);
+    setOverrideStatus('Verifying the shared home address…');
     try {
-      await updateOverridePolicy(overrideDraft);
-      setOverrideStatus('Override policy saved for administrators and dispatchers.');
+      const verified = await geocodeHomeAddress(fullHomeAddress);
+      const verifiedPolicy = {
+        ...placeToSharedHomePolicy(verified.result, normalizedDraft),
+        homeAddress2: normalizedDraft.homeAddress2,
+        homeLat: verified.lat,
+        homeLng: verified.lng,
+        homeFormattedAddress: verified.result.formatted_address || fullHomeAddress,
+      };
+      await updateOverridePolicy(verifiedPolicy);
+      setOverrideDraft(normalizeOverridePolicy(verifiedPolicy));
+      setOverrideStatus(`Shared home verified and saved: ${verifiedPolicy.homeFormattedAddress}. Every driver's home-route mileage will recalculate from this address.`);
     } catch (error) {
       setOverrideStatus(error?.message || 'Override policy could not be saved.');
+    } finally {
+      setOverrideSaving(false);
     }
   };
 
@@ -231,6 +284,13 @@ const SettingsPage = ({
       case 'overrides': {
         const updateNumber = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.value }));
         const updateToggle = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.checked }));
+        const updateHomeField = (key) => (value) => setOverrideDraft((current) => ({
+          ...current,
+          [key]: value,
+          homeLat: null,
+          homeLng: null,
+          homeFormattedAddress: '',
+        }));
         return (
           <div className="space-y-4">
             <div>
@@ -244,6 +304,22 @@ const SettingsPage = ({
                   : 'Loading and verifying the shared override policy…'}
               </div>
             )}
+            <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+              <div>
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><MapPin size={16} className="text-blue-600" /> Home address</h4>
+                <p className="mt-1 text-xs font-semibold text-slate-500">This one shared address is used for every driver’s first trip from home and last trip returning home. Driver-profile addresses are not used for override mileage.</p>
+              </div>
+              <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+                <label className="text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">Street address
+                  <PlacesAutocompleteInput value={overrideDraft.homeAddress} onChange={updateHomeField('homeAddress')} onPlaceSelect={(place) => setOverrideDraft((current) => placeToSharedHomePolicy(place, current))} placeholder="Start typing your home street address" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900" disabled={overrideSaving} />
+                </label>
+                <label className="text-xs font-semibold text-slate-600 lg:col-span-1">Apt / unit<input value={overrideDraft.homeAddress2} onChange={(event) => updateHomeField('homeAddress2')(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold" disabled={overrideSaving} /></label>
+                <label className="text-xs font-semibold text-slate-600 lg:col-span-2">City<input value={overrideDraft.homeCity} onChange={(event) => updateHomeField('homeCity')(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold" disabled={overrideSaving} /></label>
+                <label className="text-xs font-semibold text-slate-600 sm:col-span-1 lg:col-span-2">State<input value={overrideDraft.homeState} onChange={(event) => updateHomeField('homeState')(event.target.value.toUpperCase().slice(0, 2))} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold uppercase" disabled={overrideSaving} /></label>
+                <label className="text-xs font-semibold text-slate-600 sm:col-span-1 lg:col-span-2">ZIP code<input value={overrideDraft.homeZip} onChange={(event) => updateHomeField('homeZip')(event.target.value.replace(/[^0-9-]/g, '').slice(0, 10))} inputMode="numeric" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold" disabled={overrideSaving} /></label>
+                <div className="flex items-end sm:col-span-2 lg:col-span-2"><p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">The address is verified with Google when the policy is saved.</p></div>
+              </div>
+            </div>
             <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 ['unloadedThresholdMiles', 'Unloaded mile threshold', 'miles', '0.1'],
@@ -282,7 +358,7 @@ const SettingsPage = ({
               </label>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={saveOverridePolicy} disabled={!canSaveOverridePolicy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><Save size={16} /> {overridePolicyStatus === 'error' ? 'Repair override policy' : 'Save override policy'}</button>
+              <button type="button" onClick={saveOverridePolicy} disabled={!canSaveOverridePolicy || overrideSaving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><Save size={16} /> {overrideSaving ? 'Verifying and saving…' : overridePolicyStatus === 'error' ? 'Repair override policy' : 'Save override policy'}</button>
               {overrideStatus && <p className="text-xs font-semibold text-slate-600" role="status">{overrideStatus}</p>}
             </div>
           </div>

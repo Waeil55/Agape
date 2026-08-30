@@ -4,6 +4,7 @@ import {
   analyzeTripCostOverrides,
   extractCityFromAddress,
   filterTripCostOverrideRows,
+  getBoundaryDistanceKey,
   isOverridePolicyDocumentValid,
   normalizeOverridePolicy,
 } from './tripCostOverrides';
@@ -17,6 +18,16 @@ const driver = {
   homeAddress: '10409 Parmer Cir',
   homeLat: 39.993689,
   homeLng: -85.988494,
+};
+
+const sharedHomePolicy = {
+  homeAddress: '10409 Parmer Cir',
+  homeCity: 'Fishers',
+  homeState: 'IN',
+  homeZip: '46038',
+  homeLat: 39.993689,
+  homeLng: -85.988494,
+  homeFormattedAddress: '10409 Parmer Cir, Fishers, IN 46038, USA',
 };
 
 const trip = (id, overrides = {}) => ({
@@ -43,6 +54,7 @@ const analyze = (trips, options = {}) => analyzeTripCostOverrides(trips, {
   allDates: true,
   drivers: [driver],
   ...options,
+  policy: { ...sharedHomePolicy, ...(options.policy || {}) },
 });
 
 const rowFor = (result, bookingId, legType = 'before_pickup') => result.rows.find((row) => (
@@ -125,6 +137,36 @@ describe('trip cost override calculation', () => {
     expect(rowFor(result, 'B-1', 'home_return')).toMatchObject({ legLabel: 'Return home', originCity: 'Muncie', destinationCity: 'Fishers', unloadedMiles: 55 });
   });
 
+  it('uses the one shared policy home for every driver and ignores driver-profile homes', () => {
+    const secondDriver = {
+      id: 'driver-2',
+      name: 'Driver Two',
+      homeAddress: '500 Personal Address',
+      city: 'Muncie',
+      state: 'IN',
+      zip: '47302',
+      homeLat: 40.1934,
+      homeLng: -85.3864,
+    };
+    const firstDriverTrip = trip('SHARED-1', { pickupCity: 'Carmel', dropoffCity: 'Noblesville' });
+    const secondDriverTrip = trip('SHARED-2', {
+      driverId: secondDriver.id,
+      pickupCity: 'Greenwood',
+      dropoffCity: 'Plainfield',
+      arrivalTime: '2026-08-01T08:00:00-04:00',
+      arrivalDropoffTime: '2026-08-01T08:30:00-04:00',
+    });
+    const result = analyze([firstDriverTrip, secondDriverTrip], { drivers: [driver, secondDriver] });
+    const firstRows = result.rows.filter((row) => row.legType === 'before_pickup');
+    const returnRows = result.rows.filter((row) => row.legType === 'home_return');
+
+    expect(firstRows).toHaveLength(2);
+    expect(returnRows).toHaveLength(2);
+    expect(firstRows.every((row) => row.originCity === 'Fishers' && row.originAddress === sharedHomePolicy.homeFormattedAddress)).toBe(true);
+    expect(returnRows.every((row) => row.destinationCity === 'Fishers' && row.destinationAddress === sharedHomePolicy.homeFormattedAddress)).toBe(true);
+    expect(result.boundaryRequests.filter((request) => request.legType === 'before_pickup').every((request) => request.origin === `${sharedHomePolicy.homeLat},${sharedHomePolicy.homeLng}`)).toBe(true);
+  });
+
   it('assigns between-trip mileage and waiting to the current pickup Booking ID', () => {
     const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffOdometer: 120, dropoffCity: 'Rushville' });
     const current = trip('2', {
@@ -197,8 +239,9 @@ describe('trip cost override calculation', () => {
 
   it('fails closed for missing home data, missing cities, vehicle changes, and unavailable routed mileage', () => {
     const single = trip('solo');
-    const missingHome = analyzeTripCostOverrides([single], { allDates: true, drivers: [{ id: driver.id }] });
+    const missingHome = analyzeTripCostOverrides([single], { allDates: true, drivers: [driver], policy: DEFAULT_OVERRIDE_POLICY });
     expect(rowFor(missingHome, 'solo')).toMatchObject({ requiresReview: true, isOverrideCandidate: false });
+    expect(rowFor(missingHome, 'solo').originCity).toBe('');
 
     const first = trip('1', { dropoffCity: '', dropoff: '', dropoffOdometer: 120 });
     const current = trip('2', { arrivalTime: '2026-08-01T09:00:00-04:00', arrivalDropoffTime: '2026-08-01T09:30:00-04:00', pickupOdometer: 170 });
@@ -251,7 +294,7 @@ describe('trip cost override calculation', () => {
       pickupOdometer: undefined,
       startMileage: '1,170',
     });
-    const result = analyzeTripCostOverrides([first, current], { drivers: [driver], fromDate: '2026-08-01', toDate: '2026-08-01' });
+    const result = analyzeTripCostOverrides([first, current], { drivers: [driver], policy: sharedHomePolicy, fromDate: '2026-08-01', toDate: '2026-08-01' });
     expect(rowFor(result, '2')).toMatchObject({ serviceDate: '2026-08-01', unloadedMiles: 50, waitHours: 1 });
   });
 
@@ -297,5 +340,11 @@ describe('trip cost override calculation', () => {
     expect(normalizeOverridePolicy({ unloadedRate: -1, waitRoundingMinutes: 0 })).toMatchObject({ unloadedRate: DEFAULT_OVERRIDE_POLICY.unloadedRate, waitRoundingMinutes: 1 });
     expect(isOverridePolicyDocumentValid(DEFAULT_OVERRIDE_POLICY)).toBe(true);
     expect(isOverridePolicyDocumentValid({ ...DEFAULT_OVERRIDE_POLICY, waitRate: '9' })).toBe(false);
+  });
+
+  it('invalidates cached home mileage when the shared home address changes', () => {
+    const base = { driverKey: 'driver-1', serviceDate: '2026-08-30', legType: 'home_return', tripId: 'B-100', origin: 'Boonville, IN' };
+    expect(getBoundaryDistanceKey({ ...base, destination: 'Old home, Fishers, IN' }))
+      .not.toBe(getBoundaryDistanceKey({ ...base, destination: 'New home, Fishers, IN' }));
   });
 });

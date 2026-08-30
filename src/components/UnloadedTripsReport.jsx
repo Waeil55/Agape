@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Ban, ChevronDown, ChevronLeft, ChevronRight, Download, RotateCcw, Search } from 'lucide-react';
-import { getDistanceMiles } from '../config/maps';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
 import { analyzeTripCostOverrides, filterTripCostOverrideRows, normalizeCityPair } from '../utils/tripCostOverrides';
 import { downloadTripOverrideWorkbook } from '../utils/tripOverrideWorkbook';
 import { localCalendarYmd } from '../utils/tripDate';
+import { getGoogleDrivingRouteMiles } from '../utils/routedMileage';
 
 const currentWeek = () => {
   const today = new Date();
@@ -49,7 +49,7 @@ const TABLE_COLUMNS = [
   ['Total', 'Total Cost', '7%'],
 ];
 
-const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overridePolicyStatus = 'ready', overridePolicyError = '', updateOverridePolicy, routeDistanceResolver = getDistanceMiles }) => {
+const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overridePolicyStatus = 'ready', overridePolicyError = '', updateOverridePolicy, routeDistanceResolver = getGoogleDrivingRouteMiles }) => {
   const initialWeek = useMemo(() => currentWeek(), []);
   const [fromDate, setFromDate] = useState(initialWeek.from);
   const [toDate, setToDate] = useState(initialWeek.to);
@@ -142,10 +142,13 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
     waiting: sum.waiting + row.waitCost,
     total: sum.total + row.totalCost,
   }), { original: 0, unloaded: 0, waiting: 0, total: 0 }), [rows]);
-  const boundaryStatus = useMemo(() => [...boundaryDistances.values()].reduce((summary, value) => ({
-    loading: summary.loading + (value?.status === 'loading' ? 1 : 0),
-    errors: summary.errors + (value?.status === 'error' ? 1 : 0),
-  }), { loading: 0, errors: 0 }), [boundaryDistances]);
+  const boundaryStatus = useMemo(() => {
+    const activeIds = new Set(result.boundaryRequests.map((request) => request.id));
+    return [...boundaryDistances].reduce((summary, [id, value]) => ({
+      loading: summary.loading + (activeIds.has(id) && value?.status === 'loading' ? 1 : 0),
+      errors: summary.errors + (activeIds.has(id) && value?.status === 'error' ? 1 : 0),
+    }), { loading: 0, errors: 0 });
+  }, [boundaryDistances, result.boundaryRequests]);
 
   const driverName = (row) => driverById.get(row.trip.driverId)?.name
     || row.trip.completedDriverName
@@ -268,7 +271,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
 
       {(boundaryStatus.loading > 0 || boundaryStatus.errors > 0 || actionMessage) && (
         <div className={`mx-3 mb-2 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-[10px] font-semibold ${boundaryStatus.errors > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-blue-200 bg-blue-50 text-blue-900'}`} role={boundaryStatus.errors > 0 ? 'alert' : 'status'}>
-          <span>{actionMessage || (boundaryStatus.errors > 0 ? `${boundaryStatus.errors} home-route mileage calculation${boundaryStatus.errors === 1 ? '' : 's'} failed. Those legs remain blocked.` : `Calculating ${boundaryStatus.loading} home-route mileage${boundaryStatus.loading === 1 ? '' : 's'}…`)}</span>
+          <span>{actionMessage || (boundaryStatus.errors > 0 ? `${boundaryStatus.errors} home-route mileage calculation${boundaryStatus.errors === 1 ? '' : 's'} failed. Check the shared home address in Settings → Override Pricing, then retry.` : `Calculating ${boundaryStatus.loading} home-route mileage${boundaryStatus.loading === 1 ? '' : 's'}…`)}</span>
           {boundaryStatus.errors > 0 && <button type="button" onClick={retryBoundaryMileage} className="shrink-0 rounded-lg border border-amber-300 bg-white px-2 py-1 font-bold">Retry</button>}
         </div>
       )}
