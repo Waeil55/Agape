@@ -1466,6 +1466,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const root = document.documentElement;
+    const visualViewport = window.visualViewport || null;
     const virtualKeyboard = navigator.virtualKeyboard || null;
     let frame = 0;
     let cancelled = false;
@@ -1486,6 +1487,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         left: document.body.style.left,
         right: document.body.style.right,
         width: document.body.style.width,
+        transform: document.body.style.transform,
+        transition: document.body.style.transition,
+        willChange: document.body.style.willChange,
       };
       root.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
@@ -1494,6 +1498,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       document.body.style.left = '0';
       document.body.style.right = '0';
       document.body.style.width = '100%';
+      document.body.style.transition = 'none';
+      document.body.style.willChange = 'transform';
     };
 
     const unlockBackground = () => {
@@ -1517,6 +1523,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       }
       panelOpen = nextPanelOpen;
       root.classList.toggle('trip-window-open', panelOpen);
+      if (panelOpen) {
+        // iOS can pan the visual viewport even when body/WebView resizing is
+        // disabled. Counter that camera offset on the frozen body so every
+        // app pixel remains at its pre-keyboard screen coordinate.
+        const viewportPan = Math.max(0, Math.round(Number(visualViewport?.offsetTop) || 0));
+        document.body.style.transform = viewportPan > 0 ? `translate3d(0, ${viewportPan}px, 0)` : 'none';
+      }
     };
 
     const scheduleWindowLock = () => {
@@ -1538,6 +1551,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       if (tripWindowChanged) scheduleWindowLock();
     });
     mutationObserver.observe(document.body, { childList: true, subtree: true });
+    visualViewport?.addEventListener('resize', scheduleWindowLock);
+    visualViewport?.addEventListener('scroll', scheduleWindowLock);
     document.addEventListener('touchmove', preventBackgroundTouch, { capture: true, passive: false });
 
     if (virtualKeyboard) {
@@ -1558,6 +1573,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       cancelled = true;
       if (frame) cancelAnimationFrame(frame);
       mutationObserver.disconnect();
+      visualViewport?.removeEventListener('resize', scheduleWindowLock);
+      visualViewport?.removeEventListener('scroll', scheduleWindowLock);
       document.removeEventListener('touchmove', preventBackgroundTouch, true);
       if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: false }).catch(() => {});
       unlockBackground();

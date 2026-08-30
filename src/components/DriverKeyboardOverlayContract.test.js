@@ -20,7 +20,7 @@ describe('driver odometer keyboard overlay contract', () => {
       });
     }
     expect(read('index.html')).toContain('interactive-widget=overlays-content');
-    expect(read('index.html')).toContain('UI-KB-FIXED-20260829C');
+    expect(read('index.html')).toContain('UI-KB-IOS-PAN-20260829D');
     expect(read('src/App.jsx')).toContain('interactive-widget=overlays-content');
   });
 
@@ -34,6 +34,9 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(driver).toContain("node.matches?.('.trip-window-panel')");
     expect(driver).toContain('Keyboard.setScroll({ isDisabled: true })');
     expect(driver).toContain('inputRect.bottom > bodyRect.bottom - edgePadding');
+    expect(driver).toContain('const viewportPan = Math.max(0, Math.round(Number(visualViewport?.offsetTop) || 0))');
+    expect(driver).toContain('translate3d(0, ${viewportPan}px, 0)');
+    expect(driver).toContain("visualViewport?.addEventListener('scroll', scheduleWindowLock)");
     expect(driver).not.toContain('trip-window-keyboard-visible');
     expect(driver).not.toContain('--trip-window-keyboard-inset');
     expect(css).not.toContain('trip-window-keyboard-visible');
