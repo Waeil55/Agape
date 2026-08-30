@@ -1574,20 +1574,35 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   useEffect(() => {
     let didShowCancel = null;
     let didHideCancel = null;
+    let virtualKeyboard = null;
+    let removeVirtualKeyboardListener = null;
     let cancelled = false;
     const setKeyboardHeight = (px) => {
-      document.documentElement.style.setProperty('--kbh', px > 0 ? `${px}px` : '0px');
-      document.documentElement.classList.toggle('trip-window-kb-open', px > 0);
+      const keyboardHeight = Math.max(0, Math.round(Number(px) || 0));
+      document.documentElement.style.setProperty('--kbh', keyboardHeight > 0 ? `${keyboardHeight}px` : '0px');
+      document.documentElement.classList.toggle('trip-window-kb-open', keyboardHeight > 0);
+      document.documentElement.classList.toggle('trip-window-kb-bounds', keyboardHeight > 0);
       if (isNativeShell()) {
-        document.documentElement.classList.toggle('trip-window-kb-native', px > 0);
+        document.documentElement.classList.toggle('trip-window-kb-native', keyboardHeight > 0);
       }
     };
     const register = () => {
+      virtualKeyboard = navigator.virtualKeyboard || null;
+      if (virtualKeyboard) {
+        try { virtualKeyboard.overlaysContent = true; } catch { /* unsupported policy */ }
+        const syncVirtualKeyboardBounds = () => setKeyboardHeight(virtualKeyboard?.boundingRect?.height || 0);
+        virtualKeyboard.addEventListener?.('geometrychange', syncVirtualKeyboardBounds);
+        removeVirtualKeyboardListener = () => virtualKeyboard?.removeEventListener?.('geometrychange', syncVirtualKeyboardBounds);
+        syncVirtualKeyboardBounds();
+      }
       if (!isNativeShell()) return;
       Promise.all([
-        import('@capacitor/keyboard').then(({ Keyboard }) => {
-          didShowCancel = Keyboard.addListener('keyboardDidShow', (info) => setKeyboardHeight(info?.keyboardHeight || 0));
-          didHideCancel = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+        import('@capacitor/keyboard').then(async ({ Keyboard, KeyboardResize }) => {
+          // The checked-in config protects future native builds; this runtime
+          // override also fixes shells built with the former `body` setting.
+          void Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {});
+          didShowCancel = await Keyboard.addListener('keyboardDidShow', (info) => setKeyboardHeight(info?.keyboardHeight || 0));
+          didHideCancel = await Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
           return null;
         }).catch(() => null),
         new Promise((resolve) => setTimeout(resolve, 50)),
@@ -1597,11 +1612,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     register();
     return () => {
       cancelled = true;
-      if (didShowCancel) didShowCancel.remove();
-      if (didHideCancel) didHideCancel.remove();
+      if (didShowCancel) void didShowCancel.remove();
+      if (didHideCancel) void didHideCancel.remove();
+      if (removeVirtualKeyboardListener) removeVirtualKeyboardListener();
       document.documentElement.style.removeProperty('--kbh');
       document.documentElement.classList.remove('trip-window-kb-open');
       document.documentElement.classList.remove('trip-window-kb-native');
+      document.documentElement.classList.remove('trip-window-kb-bounds');
     };
   }, []);
 

@@ -2467,14 +2467,9 @@ textarea {
 
 /* ===== TRIP ACTION WINDOWS (odometer / signature / completion / password) =====
    Centered dialog on every size, height-bounded with internal scrolling.
-   Keyboard stability, two modes:
-   - Resizing viewports (Android, interactive-widget=resizes-content): the
-     overlay simply fills the visible area, so the browser itself keeps the
-     window centered and fully visible above the keyboard — no JS math, no
-     possible gap.
-   - Non-resizing viewports (iOS): the overlay remains fixed in one painting
-     coordinate system after focus. The focused field scrolls inside the
-     panel instead of moving the fixed ancestor under its native caret. */
+   The app viewport stays fixed while the keyboard overlays it. Only this
+   overlay is shortened to the keyboard's reported top edge, so opening an
+   odometer field cannot resize or push the Driver Portal shell. */
 
 .trip-window-overlay {
   position: fixed;
@@ -2545,6 +2540,25 @@ html.trip-window-kb-native .trip-window-panel {
   margin-top: 0;
   margin-bottom: 0;
   max-height: min(34rem, calc(100% - 1rem));
+}
+
+/* Chrome's VirtualKeyboard API and Capacitor both expose the keyboard's exact
+   bounding height while the page itself remains unresized. This rule wins
+   over the visualViewport fallback above and moves only the trip window—not
+   the application behind it. */
+html.trip-window-kb-bounds .trip-window-overlay {
+  top: 0;
+  right: 0;
+  bottom: var(--kbh, 0px);
+  left: 0;
+  height: auto;
+  align-items: flex-end;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+html.trip-window-kb-bounds .trip-window-panel {
+  max-height: min(34rem, calc(100% - 1rem));
+  margin: 0;
 }
 
 /* Touch hardening: no double-tap-zoom delay or ghost highlights inside
