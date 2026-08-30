@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Route, MapPin, Clock, Users, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2, GripVertical, ChevronRight, Search, Flag, Plus, Trash2, Play, BrainCircuit, Loader2, Sparkles, Copy, Sun, Moon, Eye, ArrowLeftRight, LogIn, LogOut, Save } from 'lucide-react';
+import { Route, MapPin, Clock, Users, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2, GripVertical, ChevronRight, Search, Flag, Plus, Trash2, Play, BrainCircuit, Loader2, Sparkles, Copy, Eye, ArrowLeftRight, LogIn, LogOut, Save } from 'lucide-react';
 import { timeToMinutes } from '../utils/tripDate';
 import { tripMatchesRoutePlannerServiceDate } from '../utils/portalSelectors';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
@@ -53,7 +53,6 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
   const [searchQ, setSearchQ] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [aiMsg, setAiMsg] = useState('');
-  const [dark, setDark] = useState(false);
   const [savedPlans, setSavedPlans] = useState([]);
   const [showSavedPlans, setShowSavedPlans] = useState(false);
 
@@ -296,10 +295,10 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
 
   // === RENDER HELPERS ===
 
-  const bg = dark ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900';
-  const cardBg = dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200';
-  const muted = dark ? 'text-slate-400' : 'text-slate-500';
-  const inputBg = dark ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-white border-slate-200 text-slate-800';
+  const bg = 'bg-slate-100 text-slate-900';
+  const cardBg = 'bg-white border-slate-200';
+  const muted = 'text-slate-500';
+  const inputBg = 'bg-white border-slate-200 text-slate-800';
 
   const renderScheduleTrip = (trip) => {
     const existing = tripStopTypes[trip.id] || {};
@@ -409,9 +408,9 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
     const isPuNav = current.type === 'pickup';
     return (
       <div className={`flex-1 flex flex-col min-h-0 ${bg}`}>
-        <div className={`sticky top-0 z-10 ${dark ? 'bg-slate-800' : 'bg-white/95 backdrop-blur-sm'} border-b ${dark ? 'border-slate-700' : 'border-slate-100'} px-4 py-3`}>
+        <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setNavMode(false)} className={`p-1.5 rounded-lg ${dark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}><X size={16} /></button>
+            <button onClick={() => setNavMode(false)} className="rounded-lg p-1.5 hover:bg-slate-100"><X size={16} /></button>
             <span className={`text-xs font-bold ${muted}`}>{navStep + 1}/{stops.length}</span>
           </div>
           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -423,7 +422,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
             <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-lg font-black mx-auto mb-3 shadow-lg ${isPuNav ? 'bg-blue-600 text-white' : 'bg-amber-600 text-white'}`}>
               {isPuNav ? 'PU' : 'DO'}
             </div>
-            <p className={`text-lg font-semibold ${dark ? 'text-slate-200' : 'text-slate-800'}`}>{current.patient}</p>
+            <p className="text-lg font-semibold text-slate-800">{current.patient}</p>
             <p className={`text-sm ${muted} mt-0.5`}>Stop {navStep + 1} — {isPuNav ? 'Pickup' : 'Dropoff'}</p>
           </div>
           <div className={`${cardBg} rounded-xl border p-4 mb-4 space-y-3 shadow-sm`}>
@@ -433,14 +432,14 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
               </div>
               <div className="min-w-0">
                 <p className={`text-[10px] font-semibold ${muted} uppercase tracking-wider`}>{isPuNav ? 'Pickup' : 'Dropoff'} Address</p>
-                <p className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{current.address || '—'}</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-800">{current.address || '—'}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0"><Clock size={14} className="text-amber-600" /></div>
               <div className="min-w-0">
                 <p className={`text-[10px] font-semibold ${muted} uppercase tracking-wider`}>Time</p>
-                <p className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{to12hr(current.time)}</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-800">{to12hr(current.time)}</p>
               </div>
             </div>
             {current.notes && (
@@ -448,14 +447,14 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
                 <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><AlertTriangle size={14} className="text-slate-500" /></div>
                 <div className="min-w-0">
                   <p className={`text-[10px] font-semibold ${muted} uppercase tracking-wider`}>Notes</p>
-                  <p className={`text-sm ${dark ? 'text-slate-200' : 'text-slate-800'} mt-0.5`}>{current.notes}</p>
+                  <p className="mt-0.5 text-sm text-slate-800">{current.notes}</p>
                 </div>
               </div>
             )}
           </div>
           <div className="flex gap-2">
             <button onClick={() => completeStop(current.id)} className="flex-1 h-12 bg-emerald-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-700 active:scale-95"><CheckCircle2 size={16} /> Complete</button>
-            <button onClick={skipStop} className={`h-12 px-4 rounded-xl font-bold text-sm active:scale-95 ${dark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Skip</button>
+            <button onClick={skipStop} className="h-12 rounded-xl bg-slate-100 px-4 text-sm font-bold text-slate-500 hover:bg-slate-200 active:scale-95">Skip</button>
           </div>
           {navStep + 1 < stops.length && (
             <div className="mt-6 pt-4 border-t border-slate-100">
@@ -465,7 +464,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
                   {stops[navStep + 1].type === 'pickup' ? 'PU' : 'DO'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold ${dark ? 'text-slate-200' : 'text-slate-700'} truncate`}>{stops[navStep + 1].patient}</p>
+                  <p className="truncate text-sm font-semibold text-slate-700">{stops[navStep + 1].patient}</p>
                   <p className="text-xs text-slate-400">{to12hr(stops[navStep + 1].time)}</p>
                 </div>
                 <ChevronRight size={16} className="text-slate-300" />
@@ -481,8 +480,8 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
   return (
     <div className={`flex-1 flex min-h-0 overflow-hidden flex-col max-md:[&_button]:min-h-11 md:flex-row ${bg}`}>
       {/* === LEFT: Schedule / Trip List === */}
-      <div className={`w-full max-h-[42dvh] shrink-0 border-b md:w-72 md:max-h-none md:border-b-0 md:border-r xl:w-80 ${dark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} flex flex-col`}>
-        <div className={`sticky top-0 px-3 py-3 border-b ${dark ? 'border-slate-700 bg-slate-900/95' : 'border-slate-100 bg-white/95'} shrink-0 backdrop-blur-sm`}>
+      <div className="flex max-h-[42dvh] w-full shrink-0 flex-col border-b border-slate-200 bg-white md:max-h-none md:w-72 md:border-b-0 md:border-r xl:w-80">
+        <div className="sticky top-0 shrink-0 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur-sm">
           <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -532,7 +531,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
       {/* === RIGHT: Route Builder === */}
       <div className="flex-1 flex flex-col min-h-[55dvh] md:min-h-0 overflow-hidden">
         {/* Top Bar */}
-        <div className={`sticky top-0 z-10 ${dark ? 'bg-slate-800' : 'bg-white/95 backdrop-blur-sm'} border-b ${dark ? 'border-slate-700' : 'border-slate-100'} shrink-0`}>
+        <div className="sticky top-0 z-10 shrink-0 border-b border-slate-100 bg-white/95 backdrop-blur-sm">
           <div className="px-3 py-3 sm:px-4">
             <div className="rounded-[24px] border border-slate-200 bg-gradient-to-br from-white via-blue-50/40 to-slate-50 p-3 shadow-sm">
               <div className="flex items-start gap-3 flex-wrap">
@@ -542,7 +541,7 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-600">Tools</p>
-                    <input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Create plan name..." className={`mt-1 w-full bg-transparent text-base font-semibold outline-none placeholder:text-slate-300 ${dark ? 'text-slate-100' : 'text-slate-900'}`} />
+                    <input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Create plan name..." className="mt-1 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300" />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -578,11 +577,10 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
                 <Route size={11} /> Plan
               </button>
               <button onClick={clearRoute} disabled={stops.length === 0} className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl disabled:opacity-30" title="Clear route"><Trash2 size={13} /></button>
-              <button onClick={() => setDark(v => !v)} className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">{dark ? <Sun size={13} /> : <Moon size={13} />}</button>
             </div>
           </div>
           <div className={`flex items-center gap-3 px-4 pb-3 text-[10px] ${muted} flex-wrap`}>
-            <span><strong className={dark ? 'text-slate-200' : 'text-slate-700'}>{stops.filter(s => s.type === 'pickup').length}</strong> PU</span>
+            <span><strong className="text-slate-700">{stops.filter(s => s.type === 'pickup').length}</strong> PU</span>
             <span><strong>{stops.filter(s => s.type === 'dropoff').length}</strong> DO</span>
             <span><strong>{savedPlans.length}</strong> saved plans</span>
             {conflicts.length > 0 && <span className="text-rose-600 font-bold flex items-center gap-1"><AlertTriangle size={10} />{conflicts.length} clash</span>}
@@ -596,9 +594,9 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
 
         {/* AI Message */}
         {aiMsg && (
-          <div className={`px-4 py-2 flex items-center gap-2 text-xs border-b ${dark ? 'border-slate-700 bg-slate-800' : 'border-indigo-100 bg-indigo-50'}`}>
+          <div className="flex items-center gap-2 border-b border-indigo-100 bg-indigo-50 px-4 py-2 text-xs">
             <Sparkles size={12} className="text-indigo-600 shrink-0" />
-            <span className={`${dark ? 'text-slate-200' : 'text-indigo-800'} flex-1`}>{aiMsg}</span>
+            <span className="flex-1 text-indigo-800">{aiMsg}</span>
             <button onClick={() => setAiMsg('')} className="text-slate-400 hover:text-slate-600"><X size={12} /></button>
           </div>
         )}

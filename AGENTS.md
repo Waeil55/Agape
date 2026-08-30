@@ -35,6 +35,10 @@ runtime state before changing or reporting anything.
 10. Do not call work complete from a build alone. Verify the actual affected
     workflow with proportionate automated tests and, for UI/runtime work,
     rendered or live behavioral inspection.
+11. When a replacement is verified, remove the superseded implementation,
+    unused imports/exports, obsolete compatibility styling, and tests that
+    exist only for unreachable code. Keep compatibility paths only when they
+    still protect real stored data or supported clients.
 
 ## Completion evidence
 

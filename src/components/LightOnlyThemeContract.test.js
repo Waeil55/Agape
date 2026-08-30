@@ -8,6 +8,7 @@ describe('light-only application contract', () => {
     const app = read('src/App.jsx');
     const settings = read('src/components/SettingsPage.jsx');
     const driver = read('src/components/DriverPage.jsx');
+    const routePlanner = read('src/components/RoutePlannerPage.jsx');
     const css = read('src/index.css');
     const tailwind = read('tailwind.config.js');
 
@@ -16,6 +17,8 @@ describe('light-only application contract', () => {
     expect(settings).not.toContain('THEME_OPTIONS');
     expect(settings).not.toContain("id: 'appearance'");
     expect(driver).not.toContain("value: 'dark', label: 'Dark'");
+    expect(routePlanner).not.toContain('setDark');
+    expect(routePlanner).not.toContain('dark ?');
     expect(css).not.toContain('[data-theme="dark"]');
     expect(css).not.toContain('theme-dark');
     expect(tailwind).not.toContain('darkMode:');
