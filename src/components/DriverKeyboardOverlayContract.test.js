@@ -20,7 +20,7 @@ describe('driver odometer keyboard overlay contract', () => {
       });
     }
     expect(read('index.html')).toContain('interactive-widget=overlays-content');
-    expect(read('index.html')).toContain('UI-ODO-KEYPAD-20260829F');
+    expect(read('index.html')).toContain('UI-ODO-NATIVE-STABLE-20260830G');
     expect(read('src/App.jsx')).toContain('interactive-widget=overlays-content');
   });
 
@@ -54,18 +54,22 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(css).not.toContain('html.trip-window-kb-bounds');
   });
 
-  it('keeps odometer entry inside the app without opening Safari keyboard UI', () => {
+  it('opens the native numeric keyboard through a fixed proxy instead of scrolling visible fields', () => {
     const driver = read('src/components/DriverPage.jsx');
     const css = read('src/index.css');
-    expect(driver).toContain('const OdometerKeypad =');
-    expect(driver).toContain('className="trip-odometer-keypad"');
     expect(driver.match(/inputMode="none"/g)).toHaveLength(4);
-    expect(driver).toContain("setActiveOdometerKeypad('pickup')");
-    expect(driver).toContain("setActiveOdometerKeypad('route')");
-    expect(driver).toContain("setActiveOdometerKeypad('arrival')");
-    expect(driver).toContain("setActiveOdometerKeypad('complete')");
-    expect(css).toContain('.trip-odometer-keypad {');
+    expect(driver.match(/inputMode="numeric"/g)).toHaveLength(1);
+    expect(driver).toContain('ref={odometerKeyboardProxyRef}');
+    expect(driver).toContain('className="trip-odometer-native-proxy"');
+    expect(driver).toContain("openNativeOdometerKeyboard('pickup')");
+    expect(driver).toContain("openNativeOdometerKeyboard('route')");
+    expect(driver).toContain("openNativeOdometerKeyboard('arrival')");
+    expect(driver).toContain("openNativeOdometerKeyboard('complete')");
+    expect(driver).toContain('proxy.focus({ preventScroll: true })');
+    expect(css).toContain('.trip-odometer-native-proxy {');
     expect(css).toContain('position: fixed;');
-    expect(css).toContain('bottom: 0;');
+    expect(css).toContain('top: max(1px, env(safe-area-inset-top, 0px));');
+    expect(driver).not.toContain('OdometerKeypad');
+    expect(css).not.toContain('.trip-odometer-keypad');
   });
 });
