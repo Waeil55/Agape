@@ -56,6 +56,7 @@ import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
 import { queueSyncOperation } from '../utils/localDB';
 import { normalizeTenantId } from '../utils/tenantScope';
+import { applyOdometerKey } from '../utils/odometerKeypad';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -163,15 +164,42 @@ const OdometerBaselineLine = ({ vehicleName, miles }) => (
   </p>
 );
 
-// Mobile soft keyboards only appear for focus that happens close to the
-// user's tap. autoFocus alone is unreliable inside async React commits, so
-// every trip-window opener calls this right after mounting its window.
+const OdometerKeypad = ({ value, onChange, onDone }) => {
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'backspace'];
+  return (
+    <div className="trip-odometer-keypad" role="dialog" aria-label="Odometer keypad">
+      <div className="trip-odometer-keypad-bar">
+        <span className="trip-odometer-keypad-reading" aria-live="polite">
+          {value ? Number(value).toLocaleString() : 'Enter odometer'}
+        </span>
+        <button type="button" className="trip-odometer-keypad-done" onClick={onDone}>Done</button>
+      </div>
+      <div className="trip-odometer-keypad-grid" role="group" aria-label="Odometer digits">
+        {keys.map((key) => (
+          <button
+            type="button"
+            key={key}
+            className={`trip-odometer-keypad-key${key === 'clear' || key === 'backspace' ? ' trip-odometer-keypad-key-secondary' : ''}`}
+            aria-label={key === 'backspace' ? 'Delete last digit' : key === 'clear' ? 'Clear odometer' : `Digit ${key}`}
+            onClick={() => onChange(applyOdometerKey(value, key))}
+          >
+            {key === 'backspace' ? '⌫' : key === 'clear' ? 'Clear' : key}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Focus the primary trip-window field after an async React commit. Odometer
+// fields are read-only and open the app keypad; time fields keep their native
+// picker so drivers can still correct pickup and dropoff times.
 const focusTripWindowInput = () => {
   setTimeout(() => {
     // Prefer the explicit autoFocus field (odometer) over type="time" so
     // the completion modal lands on the odometer, not the time picker.
     const el = document.querySelector('.trip-window-panel input[autofocus]')
-      || document.querySelector('.trip-window-panel input[type="text"][inputmode="numeric"]')
+      || document.querySelector('.trip-window-panel input[readonly][inputmode="none"]')
       || document.querySelector('.trip-window-panel input[type="time"]');
     if (!el) return;
     try { el.focus({ preventScroll: true }); } catch { el.focus(); }
@@ -860,6 +888,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [routeStopSignatureConfirmed, setRouteStopSignatureConfirmed] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
+  const [activeOdometerKeypad, setActiveOdometerKeypad] = useState(null);
   const [completeError, setCompleteError] = useState('');
   const [completeTimeNotice, setCompleteTimeNotice] = useState('');
   const [completeAck, setCompleteAck] = useState(false);
@@ -867,6 +896,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [odometerAck, setOdometerAck] = useState(false);
   const [departedTime, setDepartedTime] = useState('');
   const [arrivalDropoffTime, setArrivalDropoffTime] = useState('');
+
+  useEffect(() => {
+    if (!activeOdometerKeypad) return;
+    const activeWindowExists = {
+      pickup: Boolean(showOdometerPrompt),
+      route: Boolean(routeStopOdometerPrompt),
+      arrival: Boolean(showArrivalConfirm),
+      complete: Boolean(showCompleteModal),
+    }[activeOdometerKeypad];
+    if (!activeWindowExists) setActiveOdometerKeypad(null);
+  }, [activeOdometerKeypad, routeStopOdometerPrompt, showArrivalConfirm, showCompleteModal, showOdometerPrompt]);
 
   // Strict odometer gate shared by every trip window that records a reading.
   // The baseline is the global per-vehicle value; `lastOdometer` is only a
@@ -5708,11 +5748,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <div className="text-center">
                 <input
                   type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode="none"
+                  readOnly
                   autoFocus
                   value={odometerValue}
-                  onChange={(e) => { setOdometerValue(e.target.value.replace(/[^0-9]/g, '')); setOdometerError(''); }}
+                  onFocus={() => setActiveOdometerKeypad('pickup')}
+                  onClick={() => setActiveOdometerKeypad('pickup')}
+                  aria-label="Current odometer. Opens numeric keypad."
                   placeholder='Enter full odometer reading'
                   className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
@@ -5760,11 +5802,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <div className="text-center">
                 <input
                   type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode="none"
+                  readOnly
                   autoFocus
                   value={routeStopOdometerValue}
-                  onChange={(e) => { setRouteStopOdometerValue(e.target.value.replace(/[^0-9]/g, '')); setOdometerError(''); }}
+                  onFocus={() => setActiveOdometerKeypad('route')}
+                  onClick={() => setActiveOdometerKeypad('route')}
+                  aria-label="Route stop odometer. Opens numeric keypad."
                   placeholder="Enter odometer reading"
                   className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
@@ -5838,7 +5882,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <div>
                   <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival (mi)</label>
                   <div className="text-center">
-                  <input type="text" inputMode="numeric" pattern="[0-9]*" value={arrivalOdometer} onChange={e => setArrivalOdometer(e.target.value.replace(/[^0-9]/g, ''))}
+                  <input type="text" inputMode="none" readOnly value={arrivalOdometer}
+                    onFocus={() => setActiveOdometerKeypad('arrival')} onClick={() => setActiveOdometerKeypad('arrival')}
+                    aria-label="Arrival odometer. Opens numeric keypad."
                     className="trip-odometer-input w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none"
                   />
                   </div>
@@ -5959,11 +6005,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     <div className="text-center">
                     <input
                       type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                      inputMode="none"
+                      readOnly
                       autoFocus
                       value={completeOdometer}
-                      onChange={(e) => { setCompleteOdometer(e.target.value.replace(/[^0-9]/g, '')); setCompleteError(''); }}
+                      onFocus={() => setActiveOdometerKeypad('complete')}
+                      onClick={() => setActiveOdometerKeypad('complete')}
+                      aria-label="Final odometer. Opens numeric keypad."
                       placeholder="Final reading"
                       className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                     />
@@ -7854,6 +7902,37 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             </div>
           </div>
         );
+      })()}
+
+      {/* App-owned odometer keypad: read-only odometer fields never invoke
+          Safari's system keyboard, so the portal and trip window stay fixed. */}
+      {activeOdometerKeypad && (() => {
+        const config = {
+          pickup: showOdometerPrompt ? {
+            value: odometerValue,
+            setValue: (next) => { setOdometerValue(next); setOdometerError(''); },
+          } : null,
+          route: routeStopOdometerPrompt ? {
+            value: routeStopOdometerValue,
+            setValue: (next) => { setRouteStopOdometerValue(next); setOdometerError(''); },
+          } : null,
+          arrival: showArrivalConfirm ? {
+            value: arrivalOdometer,
+            setValue: setArrivalOdometer,
+          } : null,
+          complete: showCompleteModal ? {
+            value: completeOdometer,
+            setValue: (next) => { setCompleteOdometer(next); setCompleteError(''); },
+          } : null,
+        }[activeOdometerKeypad];
+
+        return config ? (
+          <OdometerKeypad
+            value={config.value}
+            onChange={config.setValue}
+            onDone={() => setActiveOdometerKeypad(null)}
+          />
+        ) : null;
       })()}
 
       {/* ===== GEOFENCE TOAST ===== */}

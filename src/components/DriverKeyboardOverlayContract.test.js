@@ -20,7 +20,7 @@ describe('driver odometer keyboard overlay contract', () => {
       });
     }
     expect(read('index.html')).toContain('interactive-widget=overlays-content');
-    expect(read('index.html')).toContain('UI-KB-IOS-PAN-20260829E');
+    expect(read('index.html')).toContain('UI-ODO-KEYPAD-20260829F');
     expect(read('src/App.jsx')).toContain('interactive-widget=overlays-content');
   });
 
@@ -52,5 +52,20 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(css).not.toContain('html.trip-window-kb-open');
     expect(css).not.toContain('html.trip-window-kb-native');
     expect(css).not.toContain('html.trip-window-kb-bounds');
+  });
+
+  it('keeps odometer entry inside the app without opening Safari keyboard UI', () => {
+    const driver = read('src/components/DriverPage.jsx');
+    const css = read('src/index.css');
+    expect(driver).toContain('const OdometerKeypad =');
+    expect(driver).toContain('className="trip-odometer-keypad"');
+    expect(driver.match(/inputMode="none"/g)).toHaveLength(4);
+    expect(driver).toContain("setActiveOdometerKeypad('pickup')");
+    expect(driver).toContain("setActiveOdometerKeypad('route')");
+    expect(driver).toContain("setActiveOdometerKeypad('arrival')");
+    expect(driver).toContain("setActiveOdometerKeypad('complete')");
+    expect(css).toContain('.trip-odometer-keypad {');
+    expect(css).toContain('position: fixed;');
+    expect(css).toContain('bottom: 0;');
   });
 });
