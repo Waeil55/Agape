@@ -20,7 +20,7 @@ describe('driver odometer keyboard overlay contract', () => {
       });
     }
     expect(read('index.html')).toContain('interactive-widget=overlays-content');
-    expect(read('index.html')).toContain('HOME-ADDRESS-ROUTING-20260830V');
+    expect(read('index.html')).toContain('OVERRIDE-QUICK-HOME-20260830W');
     expect(read('src/App.jsx')).toContain('interactive-widget=overlays-content');
   });
 

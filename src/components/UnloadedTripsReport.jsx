@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Ban, ChevronDown, ChevronLeft, ChevronRight, Download, RotateCcw, Search } from 'lucide-react';
+import { AlertTriangle, Ban, ChevronDown, ChevronLeft, ChevronRight, Download, MapPin, RotateCcw, Save, Search } from 'lucide-react';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
-import { analyzeTripCostOverrides, filterTripCostOverrideRows, normalizeCityPair } from '../utils/tripCostOverrides';
+import { analyzeTripCostOverrides, filterTripCostOverrideRows, normalizeCityPair, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 import { downloadTripOverrideWorkbook } from '../utils/tripOverrideWorkbook';
 import { localCalendarYmd } from '../utils/tripDate';
 import { getGoogleDrivingRouteMiles } from '../utils/routedMileage';
+import OverrideHomeAddressEditor, { getOverrideHomePolicyUpdates, verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
 
 const currentWeek = () => {
   const today = new Date();
@@ -67,7 +68,17 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
   const [boundaryDistances, setBoundaryDistances] = useState(() => new Map());
   const [excludingRowId, setExcludingRowId] = useState('');
   const [actionMessage, setActionMessage] = useState('');
+  const [homeEditorOpen, setHomeEditorOpen] = useState(false);
+  const [homeDraft, setHomeDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
+  const [homeSaving, setHomeSaving] = useState(false);
+  const [homeStatus, setHomeStatus] = useState('');
   const policyReady = overridePolicyStatus === 'ready';
+  const sharedHomeMissing = !overridePolicy?.homeAddress || !overridePolicy?.homeCity || !overridePolicy?.homeState || !overridePolicy?.homeZip;
+  const showHomeEditor = sharedHomeMissing || homeEditorOpen;
+  const sharedHomeLabel = sharedHomeMissing
+    ? 'Not set'
+    : (overridePolicy?.homeFormattedAddress
+      || [overridePolicy?.homeAddress, overridePolicy?.homeCity, overridePolicy?.homeState].filter(Boolean).join(', '));
 
   const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
   const result = useMemo(() => {
@@ -182,6 +193,40 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
   const retryBoundaryMileage = () => {
     setBoundaryDistances((current) => new Map([...current].filter(([, value]) => value?.status !== 'error')));
   };
+  const openHomeEditor = () => {
+    setHomeDraft(normalizeOverridePolicy(overridePolicy));
+    setHomeStatus('');
+    setHomeEditorOpen(true);
+  };
+  const saveSharedHome = async () => {
+    if (!updateOverridePolicy) {
+      setHomeStatus('Shared override settings are unavailable.');
+      return;
+    }
+    if (!policyReady) {
+      setHomeStatus(overridePolicyError || 'Wait until the shared override policy finishes loading.');
+      return;
+    }
+    setHomeSaving(true);
+    setHomeStatus('Verifying the shared home address…');
+    try {
+      const verifiedPolicy = await verifyOverrideHomePolicy({
+        ...normalizeOverridePolicy(overridePolicy),
+        ...getOverrideHomePolicyUpdates(homeDraft),
+      });
+      const homeUpdates = getOverrideHomePolicyUpdates(verifiedPolicy);
+      const savedPolicy = await updateOverridePolicy(homeUpdates);
+      setHomeDraft(normalizeOverridePolicy(savedPolicy || { ...overridePolicy, ...homeUpdates }));
+      setBoundaryDistances(new Map());
+      setHomeEditorOpen(false);
+      setHomeStatus('');
+      setActionMessage(`Shared home saved: ${verifiedPolicy.homeFormattedAddress}. Home-route mileage is recalculating.`);
+    } catch (error) {
+      setHomeStatus(error instanceof Error ? error.message : 'The shared home address could not be saved.');
+    } finally {
+      setHomeSaving(false);
+    }
+  };
   const excludeRoute = async (row) => {
     if (!updateOverridePolicy || !row.originCity || !row.destinationCity) return;
     const route = `${row.originCity} > ${row.destinationCity}`;
@@ -227,6 +272,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
             <button type="button" onClick={() => moveWeek(7)} className="grid h-full w-8 place-items-center text-slate-600 hover:bg-slate-50" aria-label="Next week"><ChevronRight size={15} /></button>
           </div>
           <select aria-label="Driver" value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)} className="h-9 min-w-[145px] px-2 text-xs font-semibold"><option value="all">All drivers</option>{driverOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>
+          <button type="button" onClick={openHomeEditor} aria-expanded={showHomeEditor} aria-label="Edit shared home address" className={`inline-flex h-9 min-w-0 max-w-[260px] items-center gap-1.5 rounded-xl border px-3 text-xs font-bold ${sharedHomeMissing ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><MapPin size={14} className="shrink-0" /><span className="shrink-0">Home:</span><span className="truncate font-semibold">{sharedHomeLabel}</span></button>
           <button type="button" onClick={resetFilters} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><RotateCcw size={14} /> Reset</button>
           <button type="button" onClick={exportRows} disabled={!policyReady || !rows.length} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Download size={14} /> Excel</button>
         </div>
@@ -277,6 +323,16 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 md:pb-3">
+        {showHomeEditor && (
+          <div className="mb-3">
+            <OverrideHomeAddressEditor policy={homeDraft} onChange={setHomeDraft} disabled={homeSaving} compact />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => void saveSharedHome()} disabled={homeSaving || !policyReady || !updateOverridePolicy} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Save size={14} />{homeSaving ? 'Verifying and saving…' : 'Save home address'}</button>
+              {!sharedHomeMissing && <button type="button" onClick={() => { setHomeEditorOpen(false); setHomeStatus(''); }} disabled={homeSaving} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700">Cancel</button>}
+              {homeStatus && <p className="text-xs font-semibold text-amber-800" role="status">{homeStatus}</p>}
+            </div>
+          </div>
+        )}
         {candidateType === 'review' && rows.length > 0 && (
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900"><AlertTriangle size={14} className="shrink-0" /> These gaps are blocked from cost calculation until the shown trip data is corrected.</div>
         )}

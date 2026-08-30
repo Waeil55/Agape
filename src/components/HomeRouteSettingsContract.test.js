@@ -6,14 +6,25 @@ const read = (path) => readFileSync(path, 'utf8');
 describe('shared home route settings contract', () => {
   it('allows administrators and dispatchers to verify and save one shared home address', () => {
     const settings = read('src/components/SettingsPage.jsx');
-    expect(settings).toContain('Home address');
-    expect(settings).toContain('This one shared address is used for every driver’s first trip from home and last trip returning home.');
-    expect(settings).toContain('Driver-profile addresses are not used for override mileage.');
-    expect(settings).toContain('PlacesAutocompleteInput');
-    expect(settings).toContain('geocodeHomeAddress(fullHomeAddress)');
+    const editor = read('src/components/OverrideHomeAddressEditor.jsx');
+    expect(settings).toContain('<OverrideHomeAddressEditor');
+    expect(settings).toContain('verifyOverrideHomePolicy(overrideDraft)');
     expect(settings).toContain('await updateOverridePolicy(verifiedPolicy)');
-    expect(settings).not.toContain('DriverHomeAddressEditor');
-    expect(settings).not.toContain('upsertDriverProfile(driver.id');
+    expect(editor).toContain('This one shared address is used for every driver’s first trip from home and last trip returning home.');
+    expect(editor).toContain('Driver-profile addresses are not used for override mileage.');
+    expect(editor).toContain('PlacesAutocompleteInput');
+    expect(editor).toContain('geocodeHomeAddress(fullHomeAddress)');
+  });
+
+  it('adds the shared home editor directly to the override report', () => {
+    const report = read('src/components/UnloadedTripsReport.jsx');
+    expect(report).toContain('aria-label="Edit shared home address"');
+    expect(report).toContain('<OverrideHomeAddressEditor');
+    expect(report).toContain('Save home address');
+    expect(report).toContain("sharedHomeMissing\n    ? 'Not set'");
+    expect(report).toContain('verifyOverrideHomePolicy({');
+    expect(report).toContain('updateOverridePolicy(homeUpdates)');
+    expect(report).toContain('setBoundaryDistances(new Map())');
   });
 
   it('uses only the shared policy home and the browser driving-route service', () => {
