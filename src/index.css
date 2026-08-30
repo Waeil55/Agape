@@ -2504,6 +2504,13 @@ html.trip-window-open body {
   overflow: hidden !important;
 }
 
+/* Safari exposes the root canvas between its compact domain pill and the
+   keyboard. Match that exposed canvas to the modal scrim instead of showing a
+   bright blank strip. Safari's own domain pill remains browser-owned UI. */
+html.trip-window-open {
+  background: #94979d !important;
+}
+
 /* Touch hardening: no double-tap-zoom delay or ghost highlights inside
    trip windows, and no scroll chaining from the overlay to the page. */
 .trip-window-overlay button,

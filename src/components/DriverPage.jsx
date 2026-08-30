@@ -1474,12 +1474,24 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     let savedScrollY = 0;
     let savedRootOverflow = '';
     let savedBodyStyles = null;
+    let savedThemeColor = null;
     let nativeKeyboard = null;
+    let baselineVisualPageTop = 0;
+
+    const getVisualPageTop = () => {
+      const reportedPageTop = Number(visualViewport?.pageTop);
+      if (Number.isFinite(reportedPageTop)) return reportedPageTop;
+      return (window.scrollY || root.scrollTop || 0) + (Number(visualViewport?.offsetTop) || 0);
+    };
 
     const lockBackground = () => {
       if (savedBodyStyles) return;
       savedScrollY = window.scrollY || root.scrollTop || 0;
+      baselineVisualPageTop = getVisualPageTop();
       savedRootOverflow = root.style.overflow;
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+      savedThemeColor = themeColorMeta?.content ?? null;
+      if (themeColorMeta) themeColorMeta.content = '#94979d';
       savedBodyStyles = {
         overflow: document.body.style.overflow,
         position: document.body.style.position,
@@ -1505,6 +1517,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const unlockBackground = () => {
       if (!savedBodyStyles) return;
       root.style.overflow = savedRootOverflow;
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeColorMeta && savedThemeColor !== null) themeColorMeta.content = savedThemeColor;
+      savedThemeColor = null;
       Object.assign(document.body.style, savedBodyStyles);
       savedBodyStyles = null;
       window.scrollTo(0, savedScrollY);
@@ -1527,8 +1542,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         // iOS can pan the visual viewport even when body/WebView resizing is
         // disabled. Counter that camera offset on the frozen body so every
         // app pixel remains at its pre-keyboard screen coordinate.
-        const viewportPan = Math.max(0, Math.round(Number(visualViewport?.offsetTop) || 0));
-        document.body.style.transform = viewportPan > 0 ? `translate3d(0, ${viewportPan}px, 0)` : 'none';
+        const viewportPan = Math.max(0, getVisualPageTop() - baselineVisualPageTop);
+        document.body.style.transform = viewportPan > 0.01 ? `translate3d(0, ${viewportPan.toFixed(3)}px, 0)` : 'none';
       }
     };
 
