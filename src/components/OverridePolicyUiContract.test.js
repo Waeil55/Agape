@@ -35,4 +35,15 @@ describe('override policy UI integration contract', () => {
     const report = read('src/components/UnloadedTripsReport.jsx');
     expect(report).toMatch(/analyzeTripCostOverrides\(trips, \{[\s\S]*?drivers,[\s\S]*?fromDate/);
   });
+
+  it('defaults to genuine override candidates and labels the empty leg instead of the passenger leg', () => {
+    const report = read('src/components/UnloadedTripsReport.jsx');
+    expect(report).toContain("useState('override')");
+    expect(report).toContain("['review', 'Needs review']");
+    expect(report).toContain("['all', 'All evaluated gaps']");
+    expect(report).toContain("row.dropoffCity || 'Missing'");
+    expect(report).toContain("row.nextPickupCity || 'Missing'");
+    expect(report).toContain('Next Booking ID');
+    expect(report).toContain('data-agape-detail-row="true"');
+  });
 });

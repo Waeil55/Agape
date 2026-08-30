@@ -56,6 +56,7 @@ describe('trip cost override calculation', () => {
     expect(row.rawGapHours).toBeCloseTo(61 / 60);
     expect(row.waitHours).toBe(0.5);
     expect(row.waitCost).toBe(4.5);
+    expect(row.waitReason).toBe('Billable time after threshold, rounded up to 30 min');
   });
 
   it('uses every configurable threshold, rate, and rounding value', () => {
@@ -252,6 +253,11 @@ describe('trip cost override calculation', () => {
   it('extracts city names and normalizes incomplete settings to safe defaults', () => {
     expect(extractCityFromAddress('10409 Parmer Cir, Fishers, IN 46038, USA')).toBe('Fishers');
     expect(extractCityFromAddress('500 Main St, Louisville, Kentucky, USA')).toBe('Louisville');
+    expect(extractCityFromAddress('13000 North Main Street  Rushville In 46173')).toBe('Rushville');
+    expect(extractCityFromAddress('4485 Malden Ln  Beech Grove Indiana 46107')).toBe('Beech Grove');
+    expect(extractCityFromAddress('7910 E WASHINGTON ST 110 INDIANAPOLIS IN 46219')).toBe('INDIANAPOLIS');
+    expect(extractCityFromAddress('808 W Riverside Ave Apt 217 Muncie IN 47303')).toBe('Muncie');
+    expect(extractCityFromAddress('6855 Shore Terrace Suite 130 and 220 Indianapolis IN 46254')).toBe('Indianapolis');
     expect(normalizeOverridePolicy({ unloadedRate: -1, waitRoundingMinutes: 0 })).toMatchObject({
       unloadedRate: DEFAULT_OVERRIDE_POLICY.unloadedRate,
       waitRoundingMinutes: 1,
@@ -292,8 +298,8 @@ describe('trip cost override calculation', () => {
 
   it('applies minimum, driver, directional city, and search filters together', () => {
     const rows = [
-      { trip: { id: '1', bookingId: 'B-100', driverId: 'd1', patient: 'First Rider' }, driverKey: 'd1', pickupCity: 'Rushville', dropoffCity: 'Indianapolis', nextPickupCity: 'Carmel', unloadedMiles: 25, waitHours: 1 },
-      { trip: { id: '2', bookingId: 'B-200', driverId: 'd2', patient: 'Second Rider' }, driverKey: 'd2', pickupCity: 'Fishers', dropoffCity: 'Carmel', nextPickupCity: 'Indianapolis', unloadedMiles: 50, waitHours: 2 },
+      { trip: { id: '1', bookingId: 'B-100', driverId: 'd1', patient: 'First Rider' }, driverKey: 'd1', pickupCity: 'Rushville', dropoffCity: 'Indianapolis', nextPickupCity: 'Carmel', unloadedMiles: 25, waitHours: 1, isOverrideCandidate: true, overrideType: 'both' },
+      { trip: { id: '2', bookingId: 'B-200', driverId: 'd2', patient: 'Second Rider' }, driverKey: 'd2', pickupCity: 'Fishers', dropoffCity: 'Carmel', nextPickupCity: 'Indianapolis', unloadedMiles: 50, waitHours: 2, isOverrideCandidate: true, overrideType: 'both' },
     ];
     const filtered = filterTripCostOverrideRows(rows, {
       search: 'second driver',
@@ -305,5 +311,21 @@ describe('trip cost override calculation', () => {
       driverNamesById: new Map([['d2', 'Second Driver']]),
     });
     expect(filtered.map((row) => row.trip.bookingId)).toEqual(['B-200']);
+  });
+
+  it('shows only real supplement candidates by default and keeps explicit audit views', () => {
+    const rows = [
+      { trip: { id: 'mileage' }, driverKey: 'd1', unloadedMiles: 30, waitHours: 0, isOverrideCandidate: true, overrideType: 'mileage', requiresReview: false },
+      { trip: { id: 'waiting' }, driverKey: 'd1', unloadedMiles: 0, waitHours: 1.5, isOverrideCandidate: true, overrideType: 'waiting', requiresReview: false },
+      { trip: { id: 'both' }, driverKey: 'd1', unloadedMiles: 35, waitHours: 2, isOverrideCandidate: true, overrideType: 'both', requiresReview: false },
+      { trip: { id: 'zero' }, driverKey: 'd1', unloadedMiles: 0, waitHours: 0, isOverrideCandidate: false, overrideType: 'none', requiresReview: false },
+      { trip: { id: 'review' }, driverKey: 'd1', unloadedMiles: 0, waitHours: 0, isOverrideCandidate: false, overrideType: 'none', requiresReview: true },
+    ];
+    expect(filterTripCostOverrideRows(rows).map((row) => row.trip.id)).toEqual(['mileage', 'waiting', 'both']);
+    expect(filterTripCostOverrideRows(rows, { candidateType: 'mileage' }).map((row) => row.trip.id)).toEqual(['mileage', 'both']);
+    expect(filterTripCostOverrideRows(rows, { candidateType: 'waiting' }).map((row) => row.trip.id)).toEqual(['waiting', 'both']);
+    expect(filterTripCostOverrideRows(rows, { candidateType: 'both' }).map((row) => row.trip.id)).toEqual(['both']);
+    expect(filterTripCostOverrideRows(rows, { candidateType: 'review' }).map((row) => row.trip.id)).toEqual(['review']);
+    expect(filterTripCostOverrideRows(rows, { candidateType: 'all' })).toHaveLength(5);
   });
 });

@@ -4,6 +4,7 @@ const navigableRows = (body) => Array.from(body?.children || []).filter((row) =>
   row.tagName === 'TR'
   && !row.hidden
   && row.getAttribute('aria-hidden') !== 'true'
+  && row.dataset.agapeDetailRow !== 'true'
 ));
 
 const prepareTable = (table) => {

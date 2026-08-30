@@ -75,7 +75,7 @@ export const isOverridePolicyDocumentValid = (policy) => {
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && normalizeText(value) !== '');
 
 export const extractCityFromAddress = (address) => {
-  const text = normalizeText(address);
+  const text = String(address ?? '').trim();
   if (!text) return '';
   const parts = text.split(',').map((part) => part.trim()).filter(Boolean)
     .filter((part) => !/^(?:USA|United States(?: of America)?)$/i.test(part));
@@ -87,7 +87,27 @@ export const extractCityFromAddress = (address) => {
   if (stateIndex > 0) return parts[stateIndex - 1];
   const postalIndex = parts.findIndex((part, index) => index > 0 && /^\d{5}(?:-\d{4})?$/.test(part));
   if (postalIndex > 0) return parts[postalIndex - 1];
-  if (parts.length >= 2) return parts[parts.length - 1];
+
+  const stateNames = [...US_STATE_NAMES]
+    .sort((left, right) => right.length - left.length)
+    .map((state) => state.replace(/\s+/g, '\\s+'))
+    .join('|');
+  const stateTail = text.match(new RegExp(`^(.*?)[,\\s]+(?:[A-Z]{2}|${stateNames})(?:\\s+\\d{5}(?:-?\\d{4})?)?\\s*$`, 'i'));
+  if (stateTail?.[1]) {
+    const beforeState = stateTail[1].trim().replace(/[,\s]+$/, '');
+    const spacedParts = beforeState.split(/\s{2,}/).map((part) => part.trim()).filter(Boolean);
+    if (spacedParts.length > 1) return spacedParts[spacedParts.length - 1];
+
+    const streetSuffix = '(?:street|st|road|rd|avenue|ave|boulevard|blvd|drive|dr|lane|ln|court|ct|circle|cir|way|pike|highway|hwy|trail|trl|parkway|pkwy|terrace|place|pl|plaza)';
+    const afterStreet = beforeState.match(new RegExp(`^.*\\b${streetSuffix}\\b[,.\\s#-]*(.+)$`, 'i'))?.[1] || '';
+    const locality = afterStreet
+      .replace(/^(?:apt|apartment|suite|ste|unit|room|rm|#)\s*[A-Z0-9-]+(?:\s+(?:and|&)\s+[A-Z0-9-]+)?\s+/i, '')
+      .replace(/^\d+[A-Z]?(?:\s+(?:and|&)\s+\d+[A-Z]?)?\s+/i, '')
+      .trim();
+    if (locality && /[A-Za-z]/.test(locality)) return locality;
+  }
+
+  if (parts.length >= 2 && !/^(?:[A-Z]{2}|\d{5}(?:-\d{4})?)$/i.test(parts[parts.length - 1])) return parts[parts.length - 1];
   return '';
 };
 
@@ -101,6 +121,10 @@ export const getTripCity = (trip, side) => {
     ? firstValue(trip?.pickup, trip?.pickupAddress, trip?.originAddress)
     : firstValue(trip?.dropoff, trip?.dropoffAddress, trip?.destinationAddress)));
 };
+
+export const getTripAddress = (trip, side) => normalizeText(side === 'pickup'
+  ? firstValue(trip?.pickup, trip?.pickupAddress, trip?.originAddress)
+  : firstValue(trip?.dropoff, trip?.dropoffAddress, trip?.destinationAddress));
 
 const parseRecordedTimestamp = (value, serviceDate) => {
   if (value === null || value === undefined || value === '') return null;
@@ -244,9 +268,6 @@ const makeWorkInterval = (trip, driverIndex) => {
 const getRawUnloadedMiles = (currentTrip, nextTrip) => {
   const currentVehicle = vehicleKey(currentTrip);
   const nextVehicle = vehicleKey(nextTrip);
-  if (currentVehicle && nextVehicle && currentVehicle !== nextVehicle) {
-    return { miles: 0, valid: false, reason: 'Vehicle changed before the next pickup' };
-  }
   const dropoffOdometer = numeric(firstValue(
     currentTrip?.dropoffOdometer,
     currentTrip?.endOdometer,
@@ -261,12 +282,15 @@ const getRawUnloadedMiles = (currentTrip, nextTrip) => {
     nextTrip?.pickupMileage,
     nextTrip?.startOdo,
   ));
+  if (currentVehicle && nextVehicle && currentVehicle !== nextVehicle) {
+    return { miles: 0, valid: false, reason: 'Vehicle changed before the next pickup', dropoffOdometer, nextPickupOdometer };
+  }
   if (dropoffOdometer === null || nextPickupOdometer === null) {
-    return { miles: 0, valid: false, reason: 'Recorded dropoff or next-pickup odometer is missing' };
+    return { miles: 0, valid: false, reason: 'Recorded dropoff or next-pickup odometer is missing', dropoffOdometer, nextPickupOdometer };
   }
   const miles = nextPickupOdometer - dropoffOdometer;
-  if (miles < 0) return { miles: 0, valid: false, reason: 'Next pickup odometer is below the prior dropoff odometer' };
-  return { miles, valid: true, reason: '' };
+  if (miles < 0) return { miles: 0, valid: false, reason: 'Next pickup odometer is below the prior dropoff odometer', dropoffOdometer, nextPickupOdometer };
+  return { miles, valid: true, reason: '', dropoffOdometer, nextPickupOdometer };
 };
 
 export const analyzeTripCostOverrides = (trips = [], options = {}) => {
@@ -311,6 +335,9 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       const pickupCity = getTripCity(entry.trip, 'pickup');
       const dropoffCity = getTripCity(entry.trip, 'dropoff');
       const nextPickupCity = next ? getTripCity(next.trip, 'pickup') : '';
+      const pickupAddress = getTripAddress(entry.trip, 'pickup');
+      const dropoffAddress = getTripAddress(entry.trip, 'dropoff');
+      const nextPickupAddress = next ? getTripAddress(next.trip, 'pickup') : '';
       const cityPairComplete = Boolean(next && dropoffCity && nextPickupCity);
       const pairKey = normalizeCityPair({ from: dropoffCity, to: nextPickupCity }, policy.sameCityNames);
       const pairExcluded = Boolean(cityPairComplete && excludedPairs.has(pairKey));
@@ -343,6 +370,19 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       const waitCost = roundCurrency(waitHours * policy.waitRate);
       const originalTripCost = getOriginalTripCost(entry.trip);
       const totalCost = roundCurrency(originalTripCost + unloadedAmount + waitCost);
+      const isOverrideCandidate = unloadedAmount > 0 || waitCost > 0;
+      const overrideType = unloadedAmount > 0 && waitCost > 0
+        ? 'both'
+        : unloadedAmount > 0
+          ? 'mileage'
+          : waitCost > 0
+            ? 'waiting'
+            : 'none';
+      const requiresReview = Boolean(next && (
+        !chronologyValid
+        || !cityPairComplete
+        || (!sameCity && !pairExcluded && !interveningWork && !mileage.valid)
+      ));
 
       let unloadedReason = 'No next trip in the selected range';
       if (next) {
@@ -363,7 +403,7 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
         else if (interveningWork) waitReason = 'Another trip overlaps this gap';
         else if (policy.excludeOvernightGaps && crossesServiceDate) waitReason = 'Overnight gap excluded';
         else if (gapMinutes <= policy.waitingThresholdHours * 60) waitReason = `Gap does not exceed ${policy.waitingThresholdHours} hr`;
-        else waitReason = `Gap less threshold, rounded up to ${policy.waitRoundingMinutes} min`;
+        else waitReason = `Billable time after threshold, rounded up to ${policy.waitRoundingMinutes} min`;
       }
 
       rows.push({
@@ -376,10 +416,15 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
         pickupCity,
         dropoffCity,
         nextPickupCity,
+        pickupAddress,
+        dropoffAddress,
+        nextPickupAddress,
         driverKey: entry.driver,
         originalTripCost,
         tripType: getAmbulatoryWheelchairCode(entry.trip),
         rawUnloadedMiles: mileage.miles,
+        dropoffOdometer: mileage.dropoffOdometer,
+        nextPickupOdometer: mileage.nextPickupOdometer,
         unloadedMiles,
         unloadedRate: policy.unloadedRate,
         unloadedAmount,
@@ -394,6 +439,9 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
         sameCity,
         cityPairComplete,
         interveningWork,
+        isOverrideCandidate,
+        overrideType,
+        requiresReview,
       });
     });
   });
@@ -409,10 +457,16 @@ export const filterTripCostOverrideRows = (rows = [], options = {}) => {
   const unloadedFloor = finiteNonNegative(options.minimumUnloadedMiles, 0);
   const waitFloor = finiteNonNegative(options.minimumWaitHours, 0);
   const driverFilter = normalizeText(options.driverKey || 'all').toLowerCase();
+  const candidateType = normalizeText(options.candidateType || 'override').toLowerCase();
   const fromFilter = normalizeCityName(options.gapFromCity === 'all' ? '' : options.gapFromCity);
   const toFilter = normalizeCityName(options.gapToCity === 'all' ? '' : options.gapToCity);
   const driverNamesById = options.driverNamesById instanceof Map ? options.driverNamesById : new Map();
   return (rows || []).filter((row) => {
+    if (candidateType === 'override' && !row.isOverrideCandidate) return false;
+    if (candidateType === 'mileage' && row.overrideType !== 'mileage' && row.overrideType !== 'both') return false;
+    if (candidateType === 'waiting' && row.overrideType !== 'waiting' && row.overrideType !== 'both') return false;
+    if (candidateType === 'both' && row.overrideType !== 'both') return false;
+    if (candidateType === 'review' && !row.requiresReview) return false;
     if (driverFilter !== 'all' && row.driverKey !== driverFilter) return false;
     if (row.unloadedMiles < unloadedFloor || row.waitHours < waitFloor) return false;
     if (fromFilter && normalizeCityName(row.dropoffCity) !== fromFilter) return false;

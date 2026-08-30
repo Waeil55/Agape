@@ -38,4 +38,16 @@ describe('global table keyboard navigation', () => {
     expect(rows[2].tabIndex).toBe(0);
     cleanup();
   });
+
+  it('skips expanded audit-detail rows while moving through records', () => {
+    document.body.innerHTML = '<table><tbody><tr><td>One</td></tr><tr data-agape-detail-row="true"><td>Details</td></tr><tr><td>Two</td></tr></tbody></table>';
+    document.querySelectorAll('tr').forEach((row) => { row.scrollIntoView = vi.fn(); });
+    const rows = [...document.querySelectorAll('tr')];
+    const cleanup = installTableKeyboardNavigation(document);
+    rows[0].focus();
+    rows[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(rows[2]);
+    expect(rows[1].dataset.agapeKeyboardRow).toBeUndefined();
+    cleanup();
+  });
 });
