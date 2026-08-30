@@ -382,6 +382,16 @@ const getManifestDensityProfile = (density) => {
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+const OPERATIONS_COMPACT_DEFAULTS_VERSION = '1';
+const readOperationsLayoutPreference = () => {
+  const migrated = localStorage.getItem('agape_opsCompactDefaultsVersion') === OPERATIONS_COMPACT_DEFAULTS_VERSION;
+  const storedView = localStorage.getItem('agape_opsManifestView');
+  return {
+    manifestView: migrated && ['table', 'card', 'board'].includes(storedView) ? storedView : 'table',
+    showIntelligence: migrated && localStorage.getItem('agape_opsShowIntelligence') === 'true',
+  };
+};
+
 
 
 const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatchers, selectedTasks, setSelectedTasks, searchQuery, setSearchQuery, operationsTab, setOperationsTab, setManualAssignTrip, addToast, addAuditLog, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, requestDeleteTrip, updateTrip, makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onOpenLiveMap, onDriveTrip, logs = [] }) => {
@@ -396,7 +406,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const [manifestLimit, setManifestLimit] = useState(() => Number(localStorage.getItem('agape_opsManifestLimit') || 150));
   const [fleetLimit, setFleetLimit] = useState(() => Number(localStorage.getItem('agape_opsFleetLimit') || 60));
   const [expandedDriver, setExpandedDriver] = useState(() => localStorage.getItem('agape_opsExpandedDriver') || null);
-  const [manifestView, setManifestView] = useState(() => localStorage.getItem('agape_opsManifestView') || 'board');
+  const [manifestView, setManifestView] = useState(() => readOperationsLayoutPreference().manifestView);
   const [manifestGroupBy] = useState(() => localStorage.getItem('agape_opsManifestGroupBy') || 'driver');
   const [manifestDensity] = useState(() => 'minimal');
   const [showSmsModal, setShowSmsModal] = useState(false);
@@ -404,7 +414,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const openSmsForTrip = (trip) => { setSelectedTasks([trip.id]); setShowSmsModal(true); };
   const [showOnlyAttention, setShowOnlyAttention] = useState(() => localStorage.getItem('agape_opsShowOnlyAttention') === 'true');
   const [routeTemplates, setRouteTemplates] = useState([]);
-  const [showIntelligence, setShowIntelligence] = useState(() => localStorage.getItem('agape_opsShowIntelligence') !== 'false');
+  const [showIntelligence, setShowIntelligence] = useState(() => readOperationsLayoutPreference().showIntelligence);
   const [expandedTripIds, setExpandedTripIds] = useState([]);
 
 
@@ -525,6 +535,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     localStorage.setItem('agape_opsManifestDensity', manifestDensity);
     localStorage.setItem('agape_opsShowOnlyAttention', String(showOnlyAttention));
     localStorage.setItem('agape_opsShowIntelligence', String(showIntelligence));
+    localStorage.setItem('agape_opsCompactDefaultsVersion', OPERATIONS_COMPACT_DEFAULTS_VERSION);
     if (expandedDriver) {
       localStorage.setItem('agape_opsExpandedDriver', expandedDriver);
     } else {
@@ -1692,7 +1703,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const renderManifestBoard = () => (
     <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_360px] gap-4 px-3 pb-3 h-full overflow-hidden">
       {/* Board View (Left Column) */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y pr-1">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <div className="max-w-sm rounded-xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
@@ -1808,7 +1819,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       return Math.round(diffMs / 60000);
     };
     return (
-      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-3">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <div className="max-w-sm rounded-xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
@@ -2103,7 +2114,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== TRIP TABLE ====================
   const renderTripTable = () => (
-    <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+    <div data-scroll-region="operations-ledger" className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-3">
       {manifestFeedTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="bg-white border border-slate-100/50 rounded-xl p-8 text-center max-w-xs shadow-sm">
@@ -2607,7 +2618,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== Fleet Matrix ====================
   const renderFleetMatrix = () => (
-    <div className="flex-1 overflow-y-auto overscroll-contain p-3">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-3">
       <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-100/50 bg-white px-4 py-3 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-slate-500">Drivers</div>
@@ -2797,7 +2808,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== WILL CALL VIEW ====================
   const renderWillCall = () => (
-    <div className="flex-1 overflow-y-auto overscroll-contain p-3">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-3">
       {willCallTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="bg-white border border-slate-200 rounded-xl p-8 text-center max-w-xs shadow-sm">
@@ -2921,7 +2932,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== MAIN RENDER ====================
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       {/* Unified Control Bar */}
       {renderControlBar()}
 

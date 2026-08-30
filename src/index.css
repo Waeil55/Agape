@@ -3458,6 +3458,9 @@ html, body {
 .adm-content {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   padding: var(--space-6) var(--space-6) var(--space-10);
   min-height: 0;
 }

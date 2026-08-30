@@ -1259,7 +1259,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
 
         {/* Panel content wrapper */}
         <div className="flex-1 flex min-h-0 relative">
-            <div className={`flex-1 min-h-0 ${['reports', 'admin', 'drive', 'chat'].includes(activePanel) ? 'flex flex-col' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
+            <div className={`flex-1 min-h-0 ${['operations', 'reports', 'admin', 'drive', 'chat'].includes(activePanel) ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'} bg-[var(--bg-app)] ${['operations', 'reports', 'admin', 'drive', 'liveMap', 'chat'].includes(activePanel) ? '' : 'p-3 sm:p-4 lg:p-6'}`}>
             {activePanel === 'operations' ? (
               renderPanelContent()
             ) : activePanel === 'reports' ? (
