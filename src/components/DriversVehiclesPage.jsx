@@ -51,6 +51,7 @@ const [form, setForm] = useState({
   const [fleetSummaryLoading, setFleetSummaryLoading] = useState(false);
   const [assignmentError, setAssignmentError] = useState('');
   const [savingAssignment, setSavingAssignment] = useState('');
+  const [savingVehicle, setSavingVehicle] = useState(false);
 
   const persistVehicleAssignment = useCallback(async (driverId, vehicleName) => {
     if (!driverId || savingAssignment) return false;
@@ -100,33 +101,61 @@ const [form, setForm] = useState({
   }, [createIntent?.nonce]);
 
   const saveVehicle = async () => {
-    if (!vForm.name.trim()) return;
+    if (savingVehicle) return;
     setAssignmentError('');
+    const vehicleName = vForm.name.trim();
+    if (!vehicleName) {
+      setAssignmentError('Vehicle name is required.');
+      return;
+    }
+    if (!setVehicles) {
+      setAssignmentError('Vehicle persistence is unavailable.');
+      return;
+    }
+    setSavingVehicle(true);
     try {
-      const normalizedName = vForm.name.trim().toLowerCase();
+      const normalizedName = vehicleName.toLowerCase();
       const duplicate = vehicles.find(vehicle => vehicle.id !== editVehicleId
         && String(vehicle.name || '').trim().toLowerCase() === normalizedName);
-      if (duplicate) throw new Error(`Vehicle name “${vForm.name.trim()}” is already in use.`);
+      if (duplicate) throw new Error(`Vehicle name “${vehicleName}” is already in use.`);
+      const normalizedVehicle = {
+        ...vForm,
+        name: vehicleName,
+        make: vForm.make.trim(),
+        model: vForm.model.trim(),
+        color: vForm.color.trim(),
+        plate: vForm.plate.trim().toUpperCase(),
+        vin: vForm.vin.trim().toUpperCase(),
+        year: vForm.year ? Number(vForm.year) : '',
+        odometer: Math.max(0, Number(vForm.odometer || 0)),
+        lastOilChangeOdometer: vForm.lastOilChangeOdometer === '' ? '' : Math.max(0, Number(vForm.lastOilChangeOdometer)),
+        oilChangeIntervalMiles: Math.max(500, Number(vForm.oilChangeIntervalMiles || maintenancePolicy.oilChangeIntervalMiles)),
+        oilDueSoonMiles: Math.max(50, Number(vForm.oilDueSoonMiles || maintenancePolicy.oilDueSoonMiles)),
+        filterChangeIntervalMonths: Math.max(1, Number(vForm.filterChangeIntervalMonths || maintenancePolicy.filterChangeIntervalMonths)),
+        filterDueSoonDays: Math.max(1, Number(vForm.filterDueSoonDays || maintenancePolicy.filterDueSoonDays)),
+      };
       const previouslyAssignedDriver = editVehicleId
         ? drivers.find(driver => driver.vehicleId === editVehicleId
           || String(driver.vehicle || '').trim().toLowerCase() === String(vehicles.find(vehicle => vehicle.id === editVehicleId)?.name || '').trim().toLowerCase())
         : null;
       const saved = editVehicleId
-        ? await setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...vForm, updatedAt: new Date().toISOString() } : v))
-        : await setVehicles(prev => [...prev, { ...vForm, id: `VHC-${Date.now()}`, status: 'Available', createdAt: new Date().toISOString(), inServiceOdometer: Number(vForm.odometer || 0) }]);
+        ? await setVehicles(prev => prev.map(v => v.id === editVehicleId ? { ...v, ...normalizedVehicle, updatedAt: new Date().toISOString() } : v))
+        : await setVehicles(prev => [...prev, { ...normalizedVehicle, id: `VHC-${Date.now()}`, status: 'Available', createdAt: new Date().toISOString(), inServiceOdometer: normalizedVehicle.odometer }]);
       if (saved === false) throw new Error('Firestore did not confirm the vehicle save.');
       if (editVehicleId && previouslyAssignedDriver && assignVehicleToDriver) {
-        await assignVehicleToDriver(previouslyAssignedDriver.id, vForm.name.trim());
+        await assignVehicleToDriver(previouslyAssignedDriver.id, vehicleName);
       }
       addAuditLog(
         editVehicleId ? 'Vehicle Updated' : 'Vehicle Added',
-        `${currentUser} ${editVehicleId ? 'updated' : 'added'} vehicle ${vForm.name}.`,
+        `${currentUser} ${editVehicleId ? 'updated' : 'added'} vehicle ${vehicleName}.`,
         editVehicleId ? 'blue' : 'emerald',
       );
       setVehicleForm(false);
       resetVForm();
     } catch (error) {
       setAssignmentError(error.message || 'Vehicle could not be saved.');
+    } finally {
+      setSavingVehicle(false);
     }
   };
 
@@ -1175,18 +1204,21 @@ const [form, setForm] = useState({
 
       {/* Vehicle Form Modal */}
       {vehicleForm && (
-        <section className="mx-2 my-4 scroll-mt-24 rounded-2xl border border-blue-200 bg-blue-50/30 p-2 sm:mx-4 sm:p-3">
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm w-full">
-            <div className="p-8">
-              <div className="flex justify-between items-center mb-6">
+        <section className="vehicle-form-overlay fixed inset-0 z-[180] flex items-center justify-center overflow-hidden bg-slate-950/50 p-3 sm:p-4">
+          <div className="flex max-h-[calc(100dvh-1.5rem)] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label={editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}>
+              <div className="flex shrink-0 justify-between items-center border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
                 <h3 className="text-xl font-semibold text-slate-900">{editVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
-                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="p-2 hover:bg-slate-100 rounded-lg" aria-label="Close"><X size={20} /></button>
+                <button type="button" disabled={savingVehicle} onClick={() => { setVehicleForm(false); resetVForm(); setAssignmentError(''); }} className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-50" aria-label="Close"><X size={20} /></button>
               </div>
+              <div data-scroll-region="vehicle-form" className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 sm:px-6">
+              {assignmentError && (
+                <div className="mb-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700" role="alert"><AlertCircle size={16} /> {assignmentError}</div>
+              )}
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Vehicle Name</label>
-                    <input autoFocus type="text" required value={vForm.name} onChange={(e) => setVForm({ ...vForm, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Van #42" />
+                    <input type="text" required value={vForm.name} onChange={(e) => setVForm({ ...vForm, name: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Van #42" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Make</label>
@@ -1246,12 +1278,12 @@ const [form, setForm] = useState({
                   </div>
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
-                <button onClick={() => { setVehicleForm(false); resetVForm(); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold">Cancel</button>
-                <button onClick={saveVehicle} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"><Save size={16} /> {editVehicleId ? 'Update' : 'Add'}</button>
+              </div>
+              <div className="flex shrink-0 gap-3 border-t border-slate-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
+                <button type="button" disabled={savingVehicle} onClick={() => { setVehicleForm(false); resetVForm(); setAssignmentError(''); }} className="flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold disabled:opacity-50">Cancel</button>
+                <button type="button" disabled={savingVehicle} onClick={saveVehicle} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">{savingVehicle ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {savingVehicle ? 'Saving…' : editVehicleId ? 'Update Vehicle' : 'Add Vehicle'}</button>
               </div>
             </div>
-          </div>
         </section>
       )}
     </div>

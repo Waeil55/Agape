@@ -358,7 +358,7 @@ const DesktopAdminPage = ({
   };
 
   const openVehicleCreate = () => {
-    setActiveSection('vehicles');
+    setActiveSection('drivers');
     setVehicleCreateIntent({ nonce: Date.now() });
   };
 

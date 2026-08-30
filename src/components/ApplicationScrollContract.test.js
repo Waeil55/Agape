@@ -13,7 +13,7 @@ describe('application scrolling contract', () => {
 
   it('provides a touch-scroll fallback for full-screen overlays without changing trip windows', () => {
     const css = read('src/index.css');
-    expect(css).toContain('.fixed.inset-0:not(.trip-window-overlay)');
+    expect(css).toContain('.fixed.inset-0:not(.trip-window-overlay):not(.vehicle-form-overlay)');
     expect(css).toContain('overflow-y: auto;');
     expect(css).toContain('.fixed.inset-0.items-center:not(.trip-window-overlay)');
     expect(css).toContain('align-items: safe center;');

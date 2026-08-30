@@ -700,7 +700,13 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         const ODOMETER_OWNED_FIELDS = ['odometer', 'odometerUpdatedAt', 'odometerSourceTripId'];
         const docs = (dataRef.current.vehicles || []).filter((v) => v?.id).map((v) => {
           const payload = { ...v, updatedAtLocal: v.updatedAtLocal || now };
-          ODOMETER_OWNED_FIELDS.forEach((key) => { delete payload[key]; });
+          const existedBeforeWrite = (previousData.vehicles || []).some((previousVehicle) => previousVehicle?.id === v.id);
+          if (existedBeforeWrite) {
+            ODOMETER_OWNED_FIELDS.forEach((key) => { delete payload[key]; });
+          } else {
+            payload.odometer = Math.max(0, Number(v.odometer || 0));
+            payload.odometerUpdatedAt = payload.odometerUpdatedAt || now;
+          }
           return { id: String(v.id), data: sanitizeForFirestore(attachTenantScope(payload, activeTenantId)) };
         });
         for (let i = 0; i < docs.length; i += 450) {
