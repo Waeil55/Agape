@@ -1,24 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  BrainCircuit, Sparkles, Activity, AlertTriangle, CheckCircle2, RefreshCw,
-  Zap, Users, Truck, DollarSign, FileText, ChevronRight, ShieldAlert,
-  Clock, ArrowUpRight, Filter, Info, ChevronDown, Check, X
-} from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { BrainCircuit, Sparkles, Activity, CheckCircle2, RefreshCw, Zap, Users, DollarSign, ShieldAlert, Clock, ArrowUpRight, X } from 'lucide-react';
 import { analyzeFleetCommand } from '../config/ai';
 import { localCalendarYmd, tripCalendarDateKey, isTripLate } from '../utils/tripDate';
 
-export default function AgapeCommandCenter({
-  trips = [],
-  drivers = [],
-  vehicles = [],
-  dispatchers = [],
-  welltransLogs = [],
-  onNavigateTab,
-  onOpenWellTrans,
-  onAssignTrips,
-  onFilterLate,
-  onClose,
-}) {
+export default function AgapeCommandCenter({ trips = [], drivers = [], vehicles = [], onOpenWellTrans, onAssignTrips, onFilterLate, onClose }) {
   const [activeTab, setActiveTab] = useState('summary');
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);

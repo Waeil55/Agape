@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, X, ArrowUp } from 'lucide-react';
 import { getDB, readSyncQueue } from '../../utils/localDB';
 import { getUnsafeUpdateReasons } from './pwaUpdateSafety';

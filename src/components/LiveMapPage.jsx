@@ -1,37 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import {
-  Activity,
-  ArrowRight,
-  BrainCircuit,
-  CheckCircle2,
-  Clock,
-  Compass,
-  Crosshair,
-  Gauge,
-  Layers,
-  Loader2,
-  Map as MapIcon,
-  MapPin,
-  Navigation,
-  Phone,
-  Radio,
-  RefreshCw,
-  Route,
-  Search,
-  ShieldCheck,
-  Target,
-  Truck,
-  Users,
-  Wifi,
-  WifiOff,
-  X,
-  Zap,
-} from 'lucide-react';
-import { GOOGLE_MAPS_API_KEY, db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Activity, ArrowRight, BrainCircuit, CheckCircle2, Gauge, Loader2, Map as MapIcon, MapPin, Navigation, RefreshCw, Route, Search, Wifi, WifiOff, X, Zap } from 'lucide-react';
+import { db, collection, query, orderBy, limit as firestoreLimit, getDocs } from '../config/firebase';
 import { GOOGLE_MAPS_AUTH_FAILURE_EVENT, loadGoogleMapsApi } from '../hooks/useGoogleMaps';
 import { openMapLink } from '../utils/nativeActions';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
-import AIInsightsBanner from './AIInsightsBanner';
+
 import { aiOptimizeFleet } from '../config/ai';
 import { getDistanceMiles, hasGoogleMapsConfigured } from '../config/maps';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
@@ -143,15 +116,7 @@ function getTripPhase(trip) {
   return { label: trip.status || 'Active', color: 'amber', destination: trip.pickup || trip.dropoff };
 }
 
-function getPhaseIconClass(color) {
-  const classes = {
-    blue: 'text-blue-600',
-    emerald: 'text-emerald-600',
-    amber: 'text-amber-600',
-    slate: 'text-slate-500',
-  };
-  return classes[color] || classes.slate;
-}
+
 
 function openDirections(origin, destination) {
   if (!destination) return;
@@ -234,46 +199,21 @@ function createMarkerIcon(mapsLib, initial, fillColor, isSelected = false, isPul
   };
 }
 
-const StatusPill = ({ children, tone = 'slate' }) => {
-  const classes = {
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200',
-    rose: 'bg-rose-50 text-rose-700 border-rose-200',
-    slate: 'bg-slate-50 text-slate-600 border-slate-200',
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${classes[tone] || classes.slate}`}>
-      {children}
-    </span>
-  );
-};
 
-const LiveMapPage = ({
-  role = 'dispatcher',
-  currentUser = '',
-  drivers = [],
-  trips = [],
-  driverTelemetry = [],
-  onUpdateDriverLocation,
-  assignTripToDriver,
-  triggerSmartAssign,
-  setManualAssignTrip,
-  makeCall,
-  sendSMS,
-}) => {
+
+const LiveMapPage = ({ role = 'dispatcher', currentUser = '', drivers = [], trips = [], driverTelemetry = [], onUpdateDriverLocation, assignTripToDriver, triggerSmartAssign, setManualAssignTrip }) => {
   const [selectedDriverId, setSelectedDriverId] = useState(() => drivers[0]?.id || '');
   const [gpsActive, setGpsActive] = useState(false);
   const [nearestTrips, setNearestTrips] = useState([]);
-  const [distanceLoading, setDistanceLoading] = useState(false);
-  const [lastIntelRefresh, setLastIntelRefresh] = useState(null);
+  const [, setDistanceLoading] = useState(false);
+  const [, setLastIntelRefresh] = useState(null);
   const [intelRefreshToken, setIntelRefreshToken] = useState(0);
-  const [fleetAiResult, setFleetAiResult] = useState(null);
+  const [, setFleetAiResult] = useState(null);
   const [fleetAiLoading, setFleetAiLoading] = useState(false);
   const [driverTrailPoints, setDriverTrailPoints] = useState([]);
   const [trailLoading, setTrailLoading] = useState(false);
   const [showTrail, setShowTrail] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailTab, setDetailTab] = useState('overview');
   const [hudSearch, setHudSearch] = useState('');
@@ -697,19 +637,7 @@ const LiveMapPage = ({
 
   useEffect(() => () => stopMyGpsTracking(), []);
 
-  const handleOpenStreetView = (destStr) => {
-    if (!destStr) return;
-    const mapsLib = window.google.maps;
-    if (!mapsLib) return;
-    const geocoder = new mapsLib.Geocoder();
-    geocoder.geocode({ address: destStr }, (results, status) => {
-      if (status === 'OK' && results[0]) {
-        setStreetViewLoc(results[0].geometry.location);
-      } else {
-        console.warn('Geocode failed for street view:', status);
-      }
-    });
-  };
+
 
   return (
     <div className="h-full w-full min-h-0 bg-slate-50 flex flex-col overflow-hidden select-none font-outfit max-md:[&_button]:min-h-11">
@@ -760,9 +688,9 @@ const LiveMapPage = ({
 
       {/* ===== COMMAND CENTER LAYOUT ===== */}
       <div className="flex-1 flex flex-col-reverse overflow-hidden bg-slate-50 md:flex-row">
-        
+
         {/* ===== LEFT DATA PANEL ===== */}
-        <CommandSidebar 
+        <CommandSidebar
           driverSummaries={driverSummaries}
           todaysTrips={todaysTrips}
           unassignedTrips={unassignedTrips}
@@ -805,7 +733,7 @@ const LiveMapPage = ({
               </div>
             </div>
           )}
-          
+
           {/* Map Overlays */}
           {!mapsLoadError && <div className="absolute left-3 right-3 top-3 flex flex-wrap gap-2 z-20 md:left-4 md:right-auto md:top-4">
             <button type="button" onClick={() => setShowTraffic(t => !t)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md backdrop-blur-md border ${showTraffic ? 'bg-amber-500/90 text-white border-amber-400' : 'bg-white/90 text-slate-700 border-slate-200/50 hover:bg-white'}`}>

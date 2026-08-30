@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CheckCircle2, RotateCcw, Search, Send, XCircle } from 'lucide-react';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';

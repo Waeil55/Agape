@@ -1,20 +1,13 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import {
-  Truck, Activity, ExternalLink, KeyRound, Trash2,
-  UserCog, Loader2, ShieldCheck, AlertTriangle, Plus, Save, X, Briefcase,
-  MessageCircle, DollarSign, LayoutDashboard, Users, Search,
-  RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2,
-  CalendarClock, Wrench, ServerCog,
-} from 'lucide-react';
-import { sendPasswordResetEmail, auth, functions, httpsCallable } from '../config/firebase';
-import AIInsightsBanner from './AIInsightsBanner';
-import { aiSecurityAnalysis } from '../config/ai';
-import { isInOutTrip } from '../utils/inOutTrips';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Truck, Activity, ExternalLink, UserCog, AlertTriangle, Plus, Save, X, Briefcase, MessageCircle, DollarSign, LayoutDashboard, RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2, CalendarClock, Wrench, ServerCog } from 'lucide-react';
+import { functions, httpsCallable } from '../config/firebase';
+
+
 import { recordMatchesSearch } from '../utils/search';
 import DriversVehiclesPage from './DriversVehiclesPage';
 import UsersPage from './UsersPage';
-import DriverAvatar from './DriverAvatar';
-import DriverPerformanceCard from './DriverPerformanceCard';
+
+
 
 import { getDriverLiveStatus } from '../constants/statuses';
 import PayrollReportPage from './PayrollReportPage';
@@ -24,22 +17,9 @@ import { summarizeFleetMaintenance } from '../utils/fleetMaintenance';
 import { ChatPage } from './chat/ChatPage';
 import SystemControlCenter from './admin/SystemControlCenter';
 import { useChat } from '../hooks/useChat';
-import {
-  AdminShell, AdminCard, AdminButton, AdminBadge,
-  AdminAvatar, AdminSearch, AdminEmpty, AdminCardHead,
-} from './admin/AdminKit';
+import { AdminShell, AdminCard, AdminButton, AdminBadge, AdminAvatar, AdminEmpty, AdminCardHead } from './admin/AdminKit';
 
-const getEntityType = (log) => {
-  const action = String(log?.t || '').toLowerCase();
-  const details = String(log?.d || '').toLowerCase();
-  const meta = log?.meta;
-  if (meta?.entity) return meta.entity;
-  if (action.includes('vehicle') || details.includes('vehicle')) return 'vehicle';
-  if (action.includes('driver') || details.includes('driver')) return 'driver';
-  if (action.includes('dispatcher') || action.includes('user') || details.includes('dispatcher') || details.includes('user')) return 'dispatcher';
-  if (action.includes('trip') || details.includes('trip')) return 'trip';
-  return 'other';
-};
+
 
 const getTripIdFromLog = (log) => {
   if (log?.meta?.entity === 'trip' && log?.meta?.id) return log.meta.id;
@@ -48,7 +28,7 @@ const getTripIdFromLog = (log) => {
 };
 
 const fmtTime = (t) => t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-const displayRef = (trip) => (trip.bookingId || trip.id || '').replace(/^TRIP-/, 'Trip ID: ');
+
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 const normalizeUsername = (value = '') => String(value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
@@ -228,219 +208,11 @@ const AdminPriorityQueue = ({ trips = [], onViewTrip }) => (
   </AdminCard>
 );
 
-const TeamMemberCard = ({ user, role, live, pwResetMsg, onRoleChange, onResetPassword, onDelete }) => (
-  <AdminCard className="admin-person-card" pad={false}>
-    <div className="admin-person-top">
-      <AdminAvatar name={user.name} brand={user._role === 'driver'} size={46} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h3 className="truncate text-sm font-semibold text-slate-950">{user.name || 'Unnamed'}</h3>
-          <AdminBadge tone={user._role === 'driver' ? liveTone(live?.label) : 'info'} dot>
-            {user._role === 'driver' ? live?.label : 'Dispatcher'}
-          </AdminBadge>
-        </div>
-        <p className="truncate text-xs font-medium text-slate-500">{user.email || 'No email'}</p>
-      </div>
-    </div>
-    <div className="admin-person-body">
-      <div>
-        <p className="admin-field-label">Role</p>
-        <select value={user._role} onChange={(e) => onRoleChange(user, e.target.value)} className="adm-select w-full">
-          {role === 'admin' && <option value="admin">Admin</option>}
-          <option value="dispatcher">Dispatcher</option>
-          <option value="driver">Driver</option>
-        </select>
-      </div>
-      <div>
-        <p className="admin-field-label">Contact</p>
-        <p className="truncate text-sm font-semibold text-slate-800">{user.phone || user.vehicle || 'Not set'}</p>
-      </div>
-    </div>
-    <div className="admin-person-actions">
-      {user.email && (
-        <AdminButton variant="ghost" size="sm" onClick={() => onResetPassword(user.email)}>
-          <KeyRound size={13} /> Reset
-        </AdminButton>
-      )}
-      <AdminButton variant="danger" size="sm" onClick={() => onDelete(user)}>
-        <Trash2 size={13} /> Delete
-      </AdminButton>
-      {pwResetMsg[user.email] && (
-        <span className={`ml-auto text-[11px] font-semibold ${pwResetMsg[user.email] === 'Email sent!' ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {pwResetMsg[user.email]}
-        </span>
-      )}
-    </div>
-  </AdminCard>
-);
 
-const DriverActivityCard = ({ driver, trips, logs, onViewTrip }) => {
-  const driverTrips = trips.filter(t => t.driverId === driver.id || t.driverName === driver.name);
-  const currentTrip = driverTrips.find(t => ['Assigned', 'In Progress', 'Navigating Pickup', 'At Pickup', 'In Transit', 'En Route', 'Arrived'].includes(t.status));
-  const completedTrips = driverTrips.filter(t => t.status === 'Completed').slice(-3);
-  const nextTrip = driverTrips.find(t => t.status === 'Assigned' && t.id !== currentTrip?.id);
-  const driverLogs = logs.filter(l => String(l?.d || '').toLowerCase().includes(driver.name.toLowerCase())).slice(0, 5);
 
-  if (!driver.name) return null;
 
-  return (
-    <AdminCard pad>
-      <div className="p-4 border-b border-slate-100 bg-slate-50/70">
-        <div className="flex items-center gap-3">
-          <DriverAvatar driver={driver} size="md" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-semibold text-slate-900 truncate">{driver.name}</p>
-              <AdminBadge tone={getDriverLiveStatus(driver).label.toLowerCase().includes('offline') ? 'offline' : getDriverLiveStatus(driver).label.toLowerCase().includes('trip') || getDriverLiveStatus(driver).label.toLowerCase().includes('busy') ? 'busy' : 'online'} dot>
-                {getDriverLiveStatus(driver).label}
-              </AdminBadge>
-            </div>
-            <p className="text-xs text-slate-500">{driver.vehicle || 'No vehicle'} {driver.phone ? `- ${driver.phone}` : ''}</p>
-          </div>
-          <DriverPerformanceCard driver={driver} trips={trips} compact />
-        </div>
-      </div>
 
-      <div className="p-4 space-y-3">
-        {currentTrip && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">Current Trip</span>
-              {isInOutTrip(currentTrip) && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
-                  {currentTrip.inOutLeg ? `${currentTrip.inOutLeg} LEG` : 'IN/OUT'}
-                </span>
-              )}
-              {onViewTrip && (
-                <button onClick={() => onViewTrip(currentTrip.id)} className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-lg text-[9px] font-bold hover:bg-blue-700 transition-colors">
-                  <ExternalLink size={7} /> View
-                </button>
-              )}
-            </div>
-            <p className="font-semibold text-slate-900 text-sm">{currentTrip.patient}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">{currentTrip.time} - {displayRef(currentTrip)}</p>
-            <div className="mt-2 space-y-1">
-              <div className="flex items-start gap-2 text-[10px]">
-                <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-px"><span className="text-[6px] font-black text-white">P</span></div>
-                <span className="text-slate-600">{currentTrip.pickup || '-'}</span>
-              </div>
-              <div className="flex items-start gap-2 text-[10px]">
-                <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center shrink-0 mt-px"><span className="text-[6px] font-black text-white">D</span></div>
-                <span className="text-slate-600">{currentTrip.dropoff || '-'}</span>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {nextTrip && !currentTrip && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 mb-1">Next Trip</p>
-            <p className="font-semibold text-slate-900 text-sm">{nextTrip.patient}</p>
-            <p className="text-[10px] text-slate-500">{nextTrip.time} - {nextTrip.pickup} to {nextTrip.dropoff}</p>
-          </div>
-        )}
-
-        {completedTrips.length > 0 && (
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Recent Completed</p>
-            <div className="space-y-1">
-              {completedTrips.map((trip, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-emerald-50/50 rounded-lg px-2.5 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="font-semibold text-slate-700 min-w-[80px]">{trip.time}</span>
-                  <span className="text-slate-600 truncate">{trip.patient}</span>
-                  {isInOutTrip(trip) && (
-                    <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">I/O</span>
-                  )}
-                  {onViewTrip && (
-                    <button onClick={() => onViewTrip(trip.id)} className="ml-auto text-blue-600 hover:text-blue-800 font-bold text-[9px] shrink-0">View</button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {driverLogs.length > 0 && (
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Activity</p>
-            <div className="space-y-1">
-              {driverLogs.map((log, i) => (
-                <div key={i} className="flex items-center gap-2 text-[10px] text-slate-500">
-                  <span className={`w-1 h-1 rounded-full shrink-0 ${log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-blue-500'}`} />
-                  <span className="font-semibold text-slate-600 capitalize shrink-0">{log.t}</span>
-                  <span className="truncate">{log.meta?.summary || log.d}</span>
-                  <span className="ml-auto text-slate-400 shrink-0">{fmtTime(log.time)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!currentTrip && completedTrips.length === 0 && driverLogs.length === 0 && (
-          <p className="text-xs text-slate-400 text-center py-4">No activity yet for this driver.</p>
-        )}
-      </div>
-    </AdminCard>
-  );
-};
-
-const DispatcherActivityCard = ({ dispatcher, logs, onViewTrip }) => {
-  const dispLogs = logs.filter(l => {
-    const d = String(l?.d || '').toLowerCase();
-    return d.includes(dispatcher.name.toLowerCase()) || d.includes((dispatcher.email || '').toLowerCase());
-  }).slice(0, 8);
-
-  return (
-    <AdminCard pad>
-      <div className="p-3.5 border-b border-slate-100 bg-slate-50/70">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-sm font-black text-indigo-700 uppercase shrink-0">
-            {(dispatcher.name || '?')[0]}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="font-semibold text-slate-900 text-sm truncate">{dispatcher.name}</p>
-              {dispatcher.clockedIn !== undefined && (
-                <AdminBadge tone={dispatcher.clockedIn ? 'online' : 'offline'} dot>
-                  {dispatcher.clockedIn ? 'Active' : 'Offline'}
-                </AdminBadge>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-500">{dispatcher.email || ''}</p>
-          </div>
-        </div>
-      </div>
-      <div className="p-3.5">
-        {dispLogs.length > 0 ? (
-          <div className="space-y-1.5">
-            {dispLogs.map((log, i) => {
-              const tripId = getTripIdFromLog(log);
-              return (
-                <div key={i} className="flex items-start gap-2 text-[10px] group hover:bg-slate-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors">
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-0.5 ${log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-blue-500'}`} />
-                  <div className="flex-1 min-w-0">
-                    <span className="font-semibold text-slate-700">{log.t}</span>
-                    <p className="text-slate-500 truncate">{log.meta?.summary || log.d}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-slate-400">{fmtTime(log.time)}</span>
-                    {tripId && onViewTrip && (
-                      <button onClick={() => onViewTrip(tripId)} className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 bg-blue-600 text-white rounded text-[8px] font-bold transition-opacity"><ExternalLink size={7} /></button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-slate-400 text-center py-4">No activity logged for this dispatcher.</p>
-        )}
-      </div>
-    </AdminCard>
-  );
-};
 
 const buildCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""').replace(/—/g, '')}"`;
 
@@ -501,9 +273,7 @@ const DesktopAdminPage = ({
 }) => {
   const { unreadCount } = useChat({ alerts: true });
   const [activeSection, setActiveSection] = useState('overview');
-  const [pwResetMsg, setPwResetMsg] = useState({});
-  const [aiSecurity, setAiSecurity] = useState(null);
-  const [aiSecLoading, setAiSecLoading] = useState(false);
+
   const [createUserRole, setCreateUserRole] = useState(null);
   const [createForm, setCreateForm] = useState({ username: '', password: '', phone: '' });
   const [createError, setCreateError] = useState('');
@@ -511,8 +281,7 @@ const DesktopAdminPage = ({
   const [vehicleCreateIntent, setVehicleCreateIntent] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [payrollPolicy, setPayrollPolicy] = useState('SMART_MODE');
-  const [driverQuery, setDriverQuery] = useState('');
-  const [teamQuery, setTeamQuery] = useState('');
+  const [driverQuery] = useState('');
   const exportRef = useRef(null);
 
   useEffect(() => {
@@ -523,12 +292,7 @@ const DesktopAdminPage = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const runSecurityAnalysis = useCallback(async () => {
-    setAiSecLoading(true);
-    const r = await aiSecurityAnalysis([...drivers, ...dispatchers].map(u => ({ email: u.email, role: u.role, lastLogin: u.lastLogin, disabled: u.disabled })), logs || []);
-    setAiSecurity(r);
-    setAiSecLoading(false);
-  }, [drivers, dispatchers, logs]);
+
 
   const openCreateUser = (targetRole) => {
     if (targetRole === 'dispatcher' && role !== 'admin') return;
@@ -605,45 +369,11 @@ const DesktopAdminPage = ({
     return users;
   }, [dispatchers, drivers]);
 
-  const handlePasswordReset = async (email) => {
-    if (!email) return;
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setPwResetMsg(prev => ({ ...prev, [email]: 'Email sent!' }));
-      setTimeout(() => setPwResetMsg(prev => { const n = { ...prev }; delete n[email]; return n; }), 3000);
-    } catch (err) {
-      setPwResetMsg(prev => ({ ...prev, [email]: err.message || 'Failed' }));
-      setTimeout(() => setPwResetMsg(prev => { const n = { ...prev }; delete n[email]; return n; }), 3000);
-    }
-  };
 
-  const handleRoleChange = (user, newRole) => {
-    if (!user || !newRole || user._role === newRole) return;
-    if (user._source === 'dispatchers') {
-      setDispatchers(prev => prev.filter(d => d.id !== user.id));
-      if (newRole === 'driver') {
-        setDrivers(prev => [...prev, { id: user.id, name: user.name, email: user.email, status: 'Available', vehicle: '', phone: user.phone || '', schedule: [] }]);
-      }
-    } else if (user._source === 'drivers') {
-      setDrivers(prev => prev.filter(d => d.id !== user.id));
-      if (newRole === 'dispatcher') {
-        setDispatchers(prev => [...prev, { id: user.id, name: user.name, email: user.email || `${String(user.name || 'dispatcher').replace(/\s+/g, '.').toLowerCase()}@auth.agapecare.local`, clockedIn: false, phone: user.phone || '' }]);
-      }
-    }
-    addAuditLog?.('Role Changed', `${currentUser} changed ${user.name} from ${user._role} to ${newRole}`, 'amber');
-  };
 
-  const handleDeleteUser = (user) => {
-    if (!requestAuthAction) return;
-    requestAuthAction('Delete User', () => {
-      if (user._source === 'dispatchers') {
-        setDispatchers(prev => prev.filter(d => d.id !== user.id));
-      } else if (user._source === 'drivers') {
-        setDrivers(prev => prev.filter(d => d.id !== user.id));
-      }
-      addAuditLog('User Deleted', `${currentUser} deleted ${user.name} (${user._role})`, 'rose');
-    });
-  };
+
+
+
 
   const activeDrivers = useMemo(() => {
     return drivers
@@ -655,11 +385,7 @@ const DesktopAdminPage = ({
       });
   }, [drivers, trips]);
 
-  const entityLogs = useMemo(() => ({
-    dispatcher: logs.filter(l => getEntityType(l) === 'dispatcher'),
-    driver: logs.filter(l => getEntityType(l) === 'driver'),
-    vehicle: logs.filter(l => getEntityType(l) === 'vehicle'),
-  }), [logs]);
+
 
   const activeTrips = useMemo(() => trips.filter(t => ACTIVE_TRIP_STATUSES.has(t.status)), [trips]);
   const completedTrips = useMemo(() => trips.filter(t => t.status === 'Completed'), [trips]);
@@ -701,14 +427,7 @@ const DesktopAdminPage = ({
     ]));
   }, [activeDrivers, driverQuery]);
 
-  const filteredUsers = useMemo(() => {
-    const q = teamQuery.trim().toLowerCase();
-    const sorted = [...allUsers].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-    if (!q) return sorted;
-    return sorted.filter(user => recordMatchesSearch(user, q, [
-      'name', 'email', 'phone', 'vehicle', '_role',
-    ]));
-  }, [allUsers, teamQuery]);
+
 
   const overviewDrivers = filteredDrivers.slice(0, 6);
   const overviewDispatchers = dispatchers.filter(d => d.name).slice(0, 4);
@@ -941,9 +660,6 @@ const DesktopAdminPage = ({
       hideBrand
       navInline
     >
-      {role === 'admin' && aiSecurity && (
-        <AIInsightsBanner insights={aiSecurity} loading={aiSecLoading} onClose={() => setAiSecurity(null)} />
-      )}
       {activeSectionConfig?.content}
 
       {/* Create User Modal */}

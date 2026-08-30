@@ -1,10 +1,7 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Archive, Calendar, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Check, Edit2, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { localCalendarYmd } from '../utils/tripDate';
+import { useState, useMemo, useEffect } from 'react';
+import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
 import TripActionCenter from './trips/TripActionCenter';
-
-const today = localCalendarYmd();
 
 const formatClock24 = (value) => {
   if (!value) return '—';
@@ -92,45 +89,18 @@ const getDriverLabel = (trip, drivers) => {
   return driver?.name || trip.driverName || '—';
 };
 
-const Columns = [
-  { key: 'date', label: 'Date', sortKey: 'date' },
-  { key: 'driver', label: 'Driver', sortKey: 'driver' },
-  { key: 'time', label: 'Scheduled Time', sortKey: 'time' },
-  { key: 'bookingId', label: 'Trip ID', sortKey: 'bookingId' },
-  { key: 'patient', label: 'Passenger', sortKey: 'patient' },
-  { key: 'pickup', label: 'Pickup Address', sortKey: 'pickup' },
-  { key: 'dropoff', label: 'Dropoff Address', sortKey: 'dropoff' },
-  { key: 'arrivalTime', label: 'Pickup Arrival', sortKey: 'arrivalTime' },
-  { key: 'departedPickupTime', label: 'Departed Pickup', sortKey: 'departedPickupTime' },
-  { key: 'arrivalDropoffTime', label: 'Dropoff Arrival', sortKey: 'arrivalDropoffTime' },
-  { key: 'pickupOdometer', label: 'Start Odometer', sortKey: 'pickupOdometer' },
-  { key: 'dropoffOdometer', label: 'End Odometer', sortKey: 'dropoffOdometer' },
-  { key: 'travelTime', label: 'Travel Time', sortKey: 'travelTime' },
-  { key: 'distance', label: 'Distance (mi)', sortKey: 'distance' },
-  { key: 'signature', label: 'Signature', sortKey: 'signature' },
-  { key: 'vehicle', label: 'Vehicle', sortKey: 'vehicle' },
-];
 
-const FIELD_FOR_COL = {
-  date: 'date', driver: 'driverId', time: 'time', bookingId: 'bookingId',
-  patient: 'patient', pickup: 'pickup', dropoff: 'dropoff',
-  arrivalTime: 'arrivalTime', departedPickupTime: 'departedPickupTime', arrivalDropoffTime: 'arrivalDropoffTime',
-  pickupOdometer: 'pickupOdometer', dropoffOdometer: 'dropoffOdometer',
-  travelTime: 'travelTime', distance: 'distance',
-  signature: 'paperSignatureConfirmed', vehicle: 'completedVehicle',
-};
 
-const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, updateTrashedTrip }) => {
+
+
+const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) => {
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_archiveSearch') || '');
-  const [sortColumn, setSortColumn] = useState(() => localStorage.getItem('agape_archiveSortCol') || 'time');
-  const [sortDirection, setSortDirection] = useState(() => localStorage.getItem('agape_archiveSortDir') || 'asc');
+  const [sortColumn] = useState(() => localStorage.getItem('agape_archiveSortCol') || 'time');
+  const [sortDirection] = useState(() => localStorage.getItem('agape_archiveSortDir') || 'asc');
   const [startDate, setStartDate] = useState(() => localStorage.getItem('agape_archiveStartDate') || '');
   const [endDate, setEndDate] = useState(() => localStorage.getItem('agape_archiveEndDate') || '');
-  const [editingCell, setEditingCell] = useState(null);
-  const [editValue, setEditValue] = useState('');
   const [activeRow, setActiveRow] = useState(null);
   const [actionTrip, setActionTrip] = useState(null);
-  const inputRef = useRef(null);
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('agape_archiveExpandedGroups') || '{}');
@@ -161,63 +131,15 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
     pickupOdometer: 90, dropoffOdometer: 90,
     travelTime: 80, distance: 80, signature: 75, vehicle: 80,
   };
-  const [colWidths, setColWidths] = useState(() => {
+  const [colWidths] = useState(() => {
     try { return { ...DEFAULT_COL_WIDTHS, ...JSON.parse(localStorage.getItem('agape_archiveColWidths') || '{}') }; } catch { return { ...DEFAULT_COL_WIDTHS }; }
   });
-  const resizingRef = useRef(null);
-
-  const startColResize = useCallback((e, colKey) => {
-    e.preventDefault();
-    e.stopPropagation();
-    resizingRef.current = { colKey, startX: e.clientX, startWidth: colWidths[colKey] || 100 };
-    const onMove = (me) => {
-      if (!resizingRef.current) return;
-      const dx = me.clientX - resizingRef.current.startX;
-      const newW = Math.max(50, resizingRef.current.startWidth + dx);
-      setColWidths(prev => ({ ...prev, [resizingRef.current.colKey]: newW }));
-    };
-    const onUp = () => {
-      resizingRef.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [colWidths]);
   useEffect(() => { localStorage.setItem('agape_archiveColWidths', JSON.stringify(colWidths)); }, [colWidths]);
   // =========================
 
-  useEffect(() => {
-    if (editingCell && inputRef.current) inputRef.current.focus();
-  }, [editingCell]);
 
-  const canEdit = role === 'admin' || role === 'dispatcher';
 
-  const startCellEdit = useCallback((tripId, field, currentVal) => {
-    setEditingCell({ tripId, field });
-    setEditValue(String(currentVal ?? ''));
-  }, []);
 
-  const saveCell = useCallback((trip, field, value) => {
-    if (!updateTrashedTrip) return;
-    let parsed = value;
-    if (field === 'pickupOdometer' || field === 'dropoffOdometer') parsed = value === '' ? '' : Number(value);
-    if (field === 'paperSignatureConfirmed') parsed = value === 'true' || value === true;
-    if ((field === 'arrivalTime' || field === 'departedPickupTime' || field === 'arrivalDropoffTime') && value) {
-      const parts = String(value).match(/(\d{1,2}):(\d{2})/);
-      if (parts) {
-        const d = new Date();
-        d.setHours(parseInt(parts[1], 10), parseInt(parts[2], 10), 0, 0);
-        parsed = d.toISOString();
-      }
-    }
-    updateTrashedTrip({ ...trip, [field]: parsed });
-    setEditingCell(null);
-  }, [updateTrashedTrip]);
-
-  const cancelEdit = useCallback(() => {
-    setEditingCell(null);
-  }, []);
 
   const getSortValue = (trip, key) => {
     switch (key) {
@@ -268,74 +190,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
     }
   };
 
-  const renderCellEditor = (trip, col) => {
-    const field = FIELD_FOR_COL[col.key];
-    if (!field) return null;
 
-    if (col.key === 'signature') {
-      return (
-        <select
-          ref={inputRef}
-          className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white"
-          value={String(trip.paperSignatureConfirmed ?? false)}
-          onChange={e => saveCell(trip, field, e.target.value)}
-          onBlur={() => cancelEdit()}
-          autoFocus
-        >
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
-      );
-    }
-
-    if (col.key === 'driver') {
-      return (
-        <select
-          ref={inputRef}
-          className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none bg-white"
-          value={trip.driverId || ''}
-          onChange={e => saveCell(trip, field, e.target.value)}
-          onBlur={() => cancelEdit()}
-          autoFocus
-        >
-          <option value="">—</option>
-          {drivers.map(d => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </select>
-      );
-    }
-
-    if (col.key === 'travelTime' || col.key === 'distance') {
-      return (
-        <input
-          ref={inputRef}
-          className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none"
-          type="text"
-          value={editValue}
-          onChange={e => setEditValue(e.target.value)}
-          onBlur={() => saveCell(trip, field, editValue)}
-          onKeyDown={e => { if (e.key === 'Enter') saveCell(trip, field, editValue); if (e.key === 'Escape') cancelEdit(); }}
-          autoFocus
-        />
-      );
-    }
-
-    const isNumeric = col.key === 'pickupOdometer' || col.key === 'dropoffOdometer' || col.key === 'distance';
-
-    return (
-      <input
-        ref={inputRef}
-        className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs outline-none"
-        type={isNumeric ? 'number' : col.key === 'date' ? 'date' : 'text'}
-        value={editValue}
-        onChange={e => setEditValue(e.target.value)}
-        onBlur={() => saveCell(trip, field, editValue)}
-        onKeyDown={e => { if (e.key === 'Enter') saveCell(trip, field, editValue); if (e.key === 'Escape') cancelEdit(); }}
-        autoFocus
-      />
-    );
-  };
 
   const filtered = useMemo(() => {
     let list = [...trashedTrips];
@@ -373,26 +228,13 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [filtered]);
 
-  const handleSort = (column) => {
-    if (sortColumn === column) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortColumn(column); setSortDirection('asc'); }
-  };
 
-  const renderSortIcon = (column) => {
-    if (sortColumn !== column) return <ArrowUpDown size={12} className="text-slate-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
-    return sortDirection === 'asc'
-      ? <ArrowUp size={12} className="text-blue-500 ml-1" />
-      : <ArrowDown size={12} className="text-blue-500 ml-1" />;
-  };
 
-  const renderSortableHeader = (column, children, className = '') => (
-    <th onClick={() => handleSort(column)}
-      className={`p-2 text-left whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors ${className}`}>
-      <div className="flex items-center"><span className="text-xs">{children}</span>{renderSortIcon(column)}</div>
-    </th>
-  );
 
-  const isEditingCell = (tripId, colKey) => editingCell?.tripId === tripId && editingCell?.field === colKey;
+
+
+
+
 
   const renderMobileArchiveCard = (trip) => (
     <div key={trip.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -463,7 +305,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
             const isExpanded = expandedGroups[dateLabel] !== false; // default to true
             return (
             <div key={dateLabel} className="border-b border-slate-200 last:border-b-0">
-              <div 
+              <div
                 className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 px-4 py-2 flex items-center gap-2 cursor-pointer hover:bg-slate-200 transition-colors"
                 onClick={() => toggleGroup(dateLabel)}
               >
@@ -571,7 +413,6 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, upda
         onClose={() => setActionTrip(null)}
         callbacks={{
           onView: (trip) => setActiveRow(trip.id),
-          onEdit: canEdit ? (trip) => startCellEdit(trip.id, 'patient', trip.patient) : undefined,
           onRestore: restoreTrip ? (trip) => restoreTrip(trip.id) : undefined,
         }}
       />

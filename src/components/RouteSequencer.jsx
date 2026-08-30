@@ -1,35 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import {
-  Clock,
-  MapPin,
-  Users,
-  Save,
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  X,
-  CheckCircle2,
-  Settings2,
-  CarFront,
-  Filter,
-  Ban,
-  CalendarDays,
-  Plus,
-  GripVertical,
-  Route,
-  Info,
-  RefreshCw,
-  Zap,
-  Navigation,
-  ChevronRight,
-  Search,
-  Flag,
-  MoreHorizontal,
-  UserX,
-  XCircle,
-  CalendarX,
-  Shield
-} from 'lucide-react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { Clock, MapPin, Users, Save, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2, Settings2, CarFront, Filter, Ban, CalendarDays, Plus, GripVertical, Route, Info, RefreshCw, Zap, Search, Flag, MoreHorizontal, UserX, XCircle, CalendarX } from 'lucide-react';
 import { db, doc, getDocFromServer, setDoc } from '../config/firebase';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { timeToMinutes, tripCalendarDateKey } from '../utils/tripDate';
@@ -1468,7 +1438,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                   </div>
                 </div>
               )}
-              
+
               {saveType === 'today' && (
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Assign To Driver (Optional)</label>
@@ -1587,7 +1557,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="p-3 sm:p-5 overflow-y-auto space-y-3 flex-1 bg-slate-50/50">
               {savedTemplates.length === 0 ? (
                 <div className="py-12 text-center text-slate-500 flex flex-col items-center">
@@ -1615,7 +1585,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                         <span className="text-xs font-semibold text-slate-600">By {tpl.createdBy}</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2 sm:gap-4 text-xs font-semibold text-slate-600 border-t border-slate-100 pt-2">
                       <span>{tpl.sequence?.length || 0} Stops</span>
                       <span>{tpl.metrics?.miles || 0} mi</span>
@@ -1655,7 +1625,7 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                           >
                             Reassign
                           </button>
-                          <button 
+                          <button
                             onClick={() => {
                               setSequence((tpl.sequence || []).map(s => ({ ...s, leg: s.leg || 'A', id: `${s.clientId}-${s.type}-${Date.now()}-${Math.random()}` })));
                               setSelectedDriver(tpl.assignedDriver || '');

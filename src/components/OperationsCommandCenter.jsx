@@ -1,15 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import {
-  FileText, Users, AlertCircle, Clock, CheckCircle2, XCircle,
-  Truck, Activity,
-  BrainCircuit, Phone, MessageSquare,
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTriangle, MapPin,
-  Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown,
-  Trash2, Archive, UploadCloud, Plus, Edit2, Route, Search, PanelRight, Loader2, Filter, RotateCcw,
-  User, Car, Map as MapIcon, Navigation, UserPlus, Flag, MoreVertical
-} from 'lucide-react';
+import { FileText, Users, AlertCircle, Clock, CheckCircle2, XCircle, Truck, Activity, BrainCircuit, Phone, MessageSquare, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTriangle, MapPin, Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown, Archive, UploadCloud, Plus, Edit2, Route, Search, RotateCcw, User, Car, Map as MapIcon, Navigation, UserPlus, Flag, MoreVertical } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
-import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
+import { localCalendarYmd } from '../utils/tripDate';
 import SendSmsModal from './SendSmsModal';
 import SmsConversationModal from './SmsConversationModal';
 import { getOperationalRoutes } from '../utils/routePlans';
@@ -17,7 +9,7 @@ import { isInOutTrip } from '../utils/inOutTrips';
 import CommandIntelligencePanel from './CommandIntelligencePanel';
 import { aiPrioritizeTrips } from '../config/ai';
 import { getDriverLiveStatus } from '../constants/statuses';
-import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+
 import { tripMatchesSearch } from '../utils/search';
 import { toValidDate } from '../utils/safeDate';
 import { scopeOperationsTripsByDate } from '../utils/portalSelectors';
@@ -33,30 +25,9 @@ const MANIFEST_VIEW_OPTIONS = [
   { value: 'card', label: 'Card' },
   { value: 'table', label: 'Table' },
 ];
-const SORT_OPTIONS = [
-  { value: 'time', label: 'Sort Time' },
-  { value: 'urgency', label: 'Sort Priority' },
-  { value: 'patient', label: 'Sort Client' },
-  { value: 'pickup', label: 'Sort Pickup' },
-  { value: 'dropoff', label: 'Sort Dropoff' },
-  { value: 'assignment', label: 'Sort Assignment' },
-  { value: 'tripId', label: 'Sort Trip ID' },
-  { value: 'status', label: 'Sort Status' },
-  { value: 'reply', label: 'Sort Reply' },
-  { value: 'vehicle', label: 'Sort Vehicle' },
-  { value: 'distance', label: 'Sort Distance' },
-  { value: 'trips', label: 'Sort Trip Count' },
-  { value: 'ai', label: 'AI Smart Sort' },
-];
-const MANIFEST_GROUP_OPTIONS = [
-  { value: 'driver', label: 'Group Driver' },
-  { value: 'status', label: 'Group Status' },
-  { value: 'service', label: 'Group Service' },
-  { value: 'urgency', label: 'Group Priority' },
-];
-const DENSITY_OPTIONS = [
-  { value: 'minimal', label: '1 Line' },
-];
+
+
+
 
 const MANIFEST_TABLE_COLUMNS = [
   { label: 'Trip #', sortKey: 'tripId' },
@@ -411,42 +382,23 @@ const getManifestDensityProfile = (density) => {
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-const formatControlBarTime = (value) => {
-  if (!value) return '';
-  return new Date(value).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-};
 
-const OperationsCommandCenter = ({
-  role, currentUser, trips, drivers, dispatchers,
-  selectedTasks, setSelectedTasks, searchQuery, setSearchQuery,
-  operationsTab, setOperationsTab,
-  smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
-  smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
-  addToast, addAuditLog, persistState, hasPermission, requestAuthAction,
-  triggerSmartAssign, triggerFleetOptimization, assignTripToDriver,
-  bulkAssignTrips, setBulkAssignModal, requestDeleteTrip, requestBulkDelete, updateTrip,
-  makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer,
-  onOpenLiveMap, onDriveTrip, showRightPanel, onTogglePanel,
-  phoneNumbers,
-  logs = []
-}) => {
+
+const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatchers, selectedTasks, setSelectedTasks, searchQuery, setSearchQuery, operationsTab, setOperationsTab, setManualAssignTrip, addToast, addAuditLog, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, requestDeleteTrip, updateTrip, makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onOpenLiveMap, onDriveTrip, logs = [] }) => {
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('agape_opsFilterStatus') || 'all');
   const [filterUrgency, setFilterUrgency] = useState(() => localStorage.getItem('agape_opsFilterUrgency') || 'all');
   const [filterInOut, setFilterInOut] = useState(() => localStorage.getItem('agape_opsFilterInOut') || 'all');
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('agape_opsSortBy') || 'time');
   const [sortDirection, setSortDirection] = useState(() => localStorage.getItem('agape_opsSortDirection') || 'asc');
-  const [timeSortBottomInactive, setTimeSortBottomInactive] = useState(() => localStorage.getItem('agape_opsTimeSortBottomInactive') !== 'false');
+  const [timeSortBottomInactive] = useState(() => localStorage.getItem('agape_opsTimeSortBottomInactive') !== 'false');
   const [driverFilter, setDriverFilter] = useState(() => localStorage.getItem('agape_opsDriverFilter') || 'all');
   const [serviceFilter, setServiceFilter] = useState(() => localStorage.getItem('agape_opsServiceFilter') || 'all');
   const [manifestLimit, setManifestLimit] = useState(() => Number(localStorage.getItem('agape_opsManifestLimit') || 150));
   const [fleetLimit, setFleetLimit] = useState(() => Number(localStorage.getItem('agape_opsFleetLimit') || 60));
   const [expandedDriver, setExpandedDriver] = useState(() => localStorage.getItem('agape_opsExpandedDriver') || null);
   const [manifestView, setManifestView] = useState(() => localStorage.getItem('agape_opsManifestView') || 'board');
-  const [manifestGroupBy, setManifestGroupBy] = useState(() => localStorage.getItem('agape_opsManifestGroupBy') || 'driver');
-  const [manifestDensity, setManifestDensity] = useState(() => 'minimal');
+  const [manifestGroupBy] = useState(() => localStorage.getItem('agape_opsManifestGroupBy') || 'driver');
+  const [manifestDensity] = useState(() => 'minimal');
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [smsConversationTrip, setSmsConversationTrip] = useState(null);
   const openSmsForTrip = (trip) => { setSelectedTasks([trip.id]); setShowSmsModal(true); };
@@ -454,10 +406,10 @@ const OperationsCommandCenter = ({
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [showIntelligence, setShowIntelligence] = useState(() => localStorage.getItem('agape_opsShowIntelligence') !== 'false');
   const [expandedTripIds, setExpandedTripIds] = useState([]);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [lastIntelRefresh, setLastIntelRefresh] = useState(() => new Date().toISOString());
+
+
   const [aiSortOrder, setAiSortOrder] = useState(null);
-  const [aiSortLoading, setAiSortLoading] = useState(false);
+  const [, setAiSortLoading] = useState(false);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [inlineEditSaving, setInlineEditSaving] = useState(false);
@@ -540,10 +492,10 @@ const OperationsCommandCenter = ({
     () => scopeOperationsTripsByDate(trips, selectedDate).scopedTrips,
     [trips, selectedDate],
   );
-  const unassignedTrips = useMemo(() => todayTrips.filter(t => t.status === 'Unassigned'), [todayTrips]);
+
   const inProgressTrips = useMemo(() => todayTrips.filter(t => ACTIVE_PROGRESS_STATUSES.includes(t.status)), [todayTrips]);
-  const completedToday = useMemo(() => todayTrips.filter(t => t.status === 'Completed'), [todayTrips]);
-  const lateTrips = useMemo(() => todayTrips.filter(t => isTripLate(t.time) && !TERMINAL_STATUSES.includes(t.status)), [todayTrips]);
+
+
   const willCallTrips = useMemo(() => todayTrips.filter(t => t.time === 'Will Call'), [todayTrips]);
   useEffect(() => {
     if (sortBy !== 'ai') { setAiSortOrder(null); return; }
@@ -610,10 +562,7 @@ const OperationsCommandCenter = ({
     }
     return sorted;
   }, [activeTripCountByDriver, driverFilter, drivers]);
-  const serviceOptions = useMemo(
-    () => [...new Set(todayTrips.map((trip) => trip.type || trip.serviceType).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b))),
-    [todayTrips]
-  );
+
   const handleSortSelect = useCallback((nextSortBy) => {
     setSortBy(nextSortBy);
     setSortDirection('asc');
@@ -962,7 +911,7 @@ const OperationsCommandCenter = ({
       notes: original.notes || '',
     });
     setInlineEditError('');
-    setSortKeyOverrides(prev => {
+    setSortKeyOverrides(() => {
       const next = {};
       next[original.id] = original.time || '';
       return next;
@@ -1091,8 +1040,7 @@ const OperationsCommandCenter = ({
     run();
   }, [applyTripStatusWithAudit, currentUser, getTripDriver, requestAuthAction, role, setManualAssignTrip]);
 
-  const renderExpandedTripDetails = (trip, options = {}) => {
-    const { compact = false, embeddedInTable = false } = options;
+  const renderExpandedTripDetails = (trip) => {
     const driver = drivers.find((entry) => entry.id === trip.driverId);
     const routeAssignments = routeTripMap[trip.id] || [];
     const bookingReference = getBookingReference(trip);
@@ -1436,8 +1384,8 @@ const OperationsCommandCenter = ({
             }
           }}
           className={`flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 ${
-            sortBy === option.id 
-              ? 'bg-blue-100 text-blue-700' 
+            sortBy === option.id
+              ? 'bg-blue-100 text-blue-700'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
           }`}
         >
@@ -1547,7 +1495,7 @@ const OperationsCommandCenter = ({
     const urgency = getTripUrgencyLevel(trip);
     const isLate = urgency === 'late';
     const driver = drivers.find((entry) => entry.id === trip.driverId);
-    
+
     // Formatting logic
     const timeDisplay = to12hr(trip.time);
     const urgencyDisplay = isLate ? 'LATE' : urgency === 'soon' ? 'SOON' : null;
@@ -1570,8 +1518,8 @@ const OperationsCommandCenter = ({
         {/* Top Row */}
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]); }}
               className={`shrink-0 transition-colors ${isSelected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-600'}`}
             >
@@ -1591,7 +1539,7 @@ const OperationsCommandCenter = ({
               {passengerName}
             </span>
           </div>
-          
+
           <div className="flex items-center gap-1 shrink-0 ml-1">
             {distanceTop && <span className="hidden md:inline text-xs text-slate-500 font-medium">{distanceTop}</span>}
             <span className="border border-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded uppercase bg-slate-50">
@@ -1618,7 +1566,7 @@ const OperationsCommandCenter = ({
             </div>
           </div>
 
-          <button 
+          <button
             onClick={() => toggleTripExpanded(trip.id)}
             className="ml-2 p-1 text-slate-500 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors shrink-0"
           >
@@ -2516,7 +2464,7 @@ const OperationsCommandCenter = ({
                                 {(() => {
                                   const rawStatus = trip.status === 'In Mission' ? 'En Route' : trip.status === 'Navigating Pickup' ? 'En Route' : trip.status === 'Navigating Dropoff' ? 'In Transit' : trip.status === 'Arrived' ? 'At Dropoff' : trip.status;
                                   const stepIdx = ['Assigned','En Route','At Pickup','In Transit','At Dropoff','Completed'].indexOf(rawStatus);
-                                  return ['Assigned','En Route','At Pickup','In Transit','At Dropoff','Completed'].map((step, stepIndex) => (
+                                  return ['Assigned','En Route','At Pickup','In Transit','At Dropoff','Completed'].map((_step, stepIndex) => (
                                     <div key={stepIndex} className={`h-1.5 w-1.5 rounded-full ${stepIndex <= stepIdx ? 'bg-amber-500' : 'bg-slate-200'}`} />
                                   ));
                                 })()}

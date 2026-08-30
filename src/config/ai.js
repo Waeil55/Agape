@@ -197,7 +197,7 @@ Return ONLY the JSON object. No markdown.`;
   try { return JSON.parse(text); } catch { return null; }
 }
 
-export async function aiGenerateNarrativeReport(trips, driverTelemetry, dateRange) {
+export async function aiGenerateNarrativeReport(trips, _driverTelemetry, dateRange) {
   if (!trips || trips.length === 0) return null;
   const prompt = `You are an executive reporting AI for a NEMT transportation company. Generate a comprehensive narrative report.
 

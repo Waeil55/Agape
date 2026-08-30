@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, lazy, Suspense, Component } from '
 import {
   Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle, Home, Search
 } from 'lucide-react';
-import { localCalendarYmd } from '../utils/tripDate';
+
 import { useChat } from '../hooks/useChat';
 
 class ErrorBoundary extends Component {

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { AlertTriangle, Clock, MapPin, Truck, X, Bell, BellOff, Filter } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { AlertTriangle, Clock, MapPin, Truck, X, Bell, BellOff } from 'lucide-react';
 
 const SEVERITY_STYLES = {
   critical: { bg: 'bg-rose-50', border: 'border-rose-200', icon: 'text-rose-600', badge: 'bg-rose-100 text-rose-700' },

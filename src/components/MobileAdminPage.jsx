@@ -1,9 +1,5 @@
 import React, { useDeferredValue, useMemo, useState, useRef, useEffect } from 'react';
-import {
-  Activity, BellRing, Briefcase, CheckCircle2, CircleDot, Clock3, KeyRound,
-  LayoutDashboard, Loader2, Mail, Phone, RadioTower, Search, ShieldCheck,
-  TrendingUp, Truck, Users, Wrench, ServerCog,
-} from 'lucide-react';
+import { Activity, BellRing, Briefcase, CheckCircle2, CircleDot, Clock3, KeyRound, LayoutDashboard, Mail, Phone, RadioTower, Search, ShieldCheck, TrendingUp, Truck, Users, Wrench, ServerCog } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
 import { recordMatchesSearch } from '../utils/search';
@@ -363,7 +359,7 @@ const MobileAdminPage = ({
   ];
 
   const activeSection = sections.find(section => section.id === activeTab) || sections[0];
-  const nav = [{ label: 'Mobile Admin', items: sections.map(({ label: _label, ...section }) => ({ ...section, label: section.title })) }];
+  const nav = [{ label: 'Mobile Admin', items: sections.map(({ ...section }) => ({ ...section, label: section.title })) }];
   const mobileNav = sections.map(section => ({ id: section.id, label: section.label, icon: section.icon }));
 
   return (

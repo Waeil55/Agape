@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Download, X, Smartphone, Shield, Zap, Wifi } from 'lucide-react';
 
 const PWAInstallPrompt = () => {

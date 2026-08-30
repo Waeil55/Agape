@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { tripMatchesCalendarDay, tripCalendarDateKey } from '../utils/tripDate';
 import { Clock, MapPin, Truck, BrainCircuit, X, Zap, AlertCircle, UserCheck } from 'lucide-react';
 import { suggestOptimalDriver, getDriverScheduleStatus, getScheduleBlocks } from '../config/ai';
@@ -60,7 +60,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const today = getTodayStr();
-  const [manifestDate, setManifestDate] = useState(today);
+  const [manifestDate] = useState(today);
 
   const [currentMinutes, setCurrentMinutes] = useState(() => {
     const n = new Date();
@@ -133,11 +133,11 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
     let conflicts = [];
     let latePickups = [];
     let idleDrivers = 0;
-    
+
     // Check late pickups
     const now = new Date();
     const currentMins = now.getHours() * 60 + now.getMinutes();
-    
+
     trips.forEach(t => {
       if (tripCalendarDateKey(t.date) !== manifestDate || ['Completed', 'Cancelled', 'No Show', 'At Dropoff'].includes(t.status)) return;
       const match = t.time?.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -171,7 +171,7 @@ const DispatchAssistant = ({ drivers = [], trips = [], onAssignTrip, addAuditLog
         driverTrips[t.driverId].push({ ...t, mins: h * 60 + parseInt(match[2]) });
       }
     });
-    
+
     Object.keys(driverTrips).forEach(dId => {
       const dts = driverTrips[dId].sort((a,b) => a.mins - b.mins);
       for (let i = 0; i < dts.length - 1; i++) {

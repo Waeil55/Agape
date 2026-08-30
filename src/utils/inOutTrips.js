@@ -152,7 +152,7 @@ export const annotateInOutPairs = (trips = []) => {
 
   return (trips || []).map((trip) => {
     const next = byId.get(trip.id) || trip;
-    const { _inOutOrder, _inOutBookingNumber, ...clean } = next;
+    const { ...clean } = next;
     return clean;
   });
 };

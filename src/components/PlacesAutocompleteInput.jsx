@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect } from 'react';
 import useGoogleMaps from '../hooks/useGoogleMaps';
 
 const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, required, onPlaceSelect, disabled }) => {

@@ -1,12 +1,12 @@
 /**
  * IndexedDB Data Layer — Enterprise-Grade Local Persistence
- * 
+ *
  * What Google Maps, Uber, DoorDash do:
  * - Store all data in IndexedDB for instant startup (<10ms)
  * - Write-through: write to local DB + cloud simultaneously
  * - Background sync queue: offline writes retried with exponential backoff
  * - Data survives SW cache clears (only cleared by explicit "Clear Browsing Data")
- * 
+ *
  * Architecture:
  *   IndexedDB (instant local) ←→ Firestore (cloud source of truth)
  *   On startup: read IndexedDB first, then sync from Firestore in background
@@ -67,7 +67,7 @@ export async function getDB() {
   if (dbPromise) return dbPromise;
 
   dbPromise = openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, _oldVersion, _newVersion) {
+    upgrade(db) {
       // Create object stores
       if (!db.objectStoreNames.contains(STORES.APP_DATA)) {
         db.createObjectStore(STORES.APP_DATA);

@@ -14,30 +14,10 @@ const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
-import {
-  Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle,
-  AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check,
-  ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward,
-  Home, Settings, LogOut,
-  ArrowRight, Search,
-  Repeat, Zap, X, Route, Plus,
-  CheckSquare, Map, BarChart3, Sun, Moon, Calendar,
-  Download, FileText, AlertTriangle, Info,
-  Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Wrench
-} from 'lucide-react';
+import { Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Sun, Moon, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { tripMatchesSearch } from '../utils/search';
-import {
-  TIME_TRACKING_STATES,
-  POLICY_MODES,
-  calculateAnchor,
-  calculateReturnToWorkFromPickup,
-  estimateTravelTimeMinutes,
-  evaluateVerifiedTripWorkEvidence,
-  classifyGap,
-  generatePendingClockOut,
-  buildTimeEvents,
-} from '../utils/timeTracking';
+import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, evaluateVerifiedTripWorkEvidence, classifyGap, buildTimeEvents } from '../utils/timeTracking';
 import { impact, selection } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 
@@ -258,13 +238,7 @@ const getTripCardTimeLabel = (trip) => {
   return to12hr(trip?.time);
 };
 
-const formatDuration = (minutes) => {
-  if (!minutes || minutes < 0) return '--';
-  if (minutes < 60) return `${Math.round(minutes)} min`;
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return `${h}h ${m}m`;
-};
+
 
 const buildFallbackDriverProfile = (email = '') => ({
   id: '',
@@ -655,7 +629,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], setVehicles, driverTelemetry = [], timeTrackingDeclarations = [], activeMission, onUpdateMission, onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onCompleteTrip, onOpenSettings, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], driverAssignments = [], assignmentUnreadCount = 0, onAcknowledgeAssignment, onAcceptAssignment, onAddTrip, showAddTripModal, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const phoneNumbers = phoneNumbersProp;
   const me = useMemo(
@@ -833,7 +807,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [routePlanStops, setRoutePlanStops] = useState(null);
   const [aiOptimizing, setAiOptimizing] = useState(false);
   const [aiSequence, setAiSequence] = useState(null);
-  const [locStreamDebug, setLocStreamDebug] = useState(null);
+
   const [adminDriverFilter, setAdminDriverFilter] = useState('all');
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [guidedMode, setGuidedMode] = useState(false);
@@ -993,11 +967,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [tomorrowExpanded, setTomorrowExpanded] = useState(false);
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
   const [etas, setEtas] = useState({});
-  const [backgroundLocation, setBackgroundLocation] = useState(false);
+  const [, setBackgroundLocation] = useState(false);
   const [conflicts, setConflicts] = useState([]);
-  const [touchStart, setTouchStart] = useState(null);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [undoableAction, setUndoableAction] = useState(null);
+
+
+  const [, setUndoableAction] = useState(null);
   const undoTimeoutRef = useRef(null);
   const [passwordPrompt, setPasswordPrompt] = useState(null);
   const [passwordValue, setPasswordValue] = useState('');
@@ -1224,7 +1198,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [trips, expandedTripId, setExpandedTripId]);
 
   const meRef = useRef(me);
-  const queueRef = useRef([]);
+
   const etasRef = useRef({});
   const positionRef = useRef(null);
   const activeTripsRef = useRef([]);
@@ -1381,17 +1355,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [driverScopedTrips]);
 
   // Count ACTIVE legs per patient for today/tomorrow (for no-show/cancel decision)
-  const patientActiveLegs = useMemo(() => {
-    const counts = {};
-    driverScopedTrips.forEach(t => {
-      if (!isTripDateToday(t.date)) return;
-      if (isWorkflowTerminalTrip(t)) return;
-      const key = (t.patient || '').trim().toLowerCase();
-      if (!key) return;
-      counts[key] = (counts[key] || 0) + 1;
-    });
-    return counts;
-  }, [driverScopedTrips]);
+
 
   const updateAssignedRouteRecord = useCallback(async (updates, auditTitle, auditMessage) => {
     if (!assignedSequence?.id || routeTemplates.length === 0) return;
@@ -1443,12 +1407,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     undoTimeoutRef.current = setTimeout(() => setUndoableAction(null), 10000);
   };
 
-  const handleUndo = () => {
-    if (!undoableAction) return;
-    advanceWorkflow(undoableAction.trip, undoableAction.previousStatus, {}, { allowRegression: true });
-    setUndoableAction(null);
-    if (undoTimeoutRef.current) { clearTimeout(undoTimeoutRef.current); undoTimeoutRef.current = null; }
-  };
+
 
   const revertTripStatus = (trip) => {
     const stepBackTarget = getTripWorkStepBackTarget(trip);
@@ -1680,7 +1639,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
   }, [anyTripWindowOpen]);
 
-  const getTodayStr = () => localCalendarYmd();
+
 
   const filteredDriverScopedTrips = useMemo(() => {
     if (role !== 'admin' && role !== 'dispatcher') return driverScopedTrips;
@@ -1875,7 +1834,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     });
   }, [trips, orderedTrips]);
 
-  const timedTrips = useMemo(() => orderedTrips.filter(t => !isWillCall(t)), [orderedTrips]);
+
   const willCallTrips = useMemo(() => orderedTrips.filter(t => isWillCall(t)), [orderedTrips]);
   const transferTargetDrivers = useMemo(() => (
     (allDrivers || drivers || [])
@@ -2772,7 +2731,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [driverScopedTrips, guidedMode, guidedStepIndex, guidedSteps, assignedSequence?.id, assignedSequence?.name, currentUser, updateAssignedRouteRecord]);
 
 
-  const suggestNavApp = (address) => {
+  const suggestNavApp = () => {
     return navApp;
   };
 
@@ -3012,9 +2971,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     openInNavApp(trip.dropoff, navApp);
   };
 
-  const handleStartTrip = (trip) => {
-    openInNavApp(trip.pickup, suggestNavApp(trip.pickup));
-  };
+
 
   const handleCall = async (phone, name) => {
     if (isNativeShell()) {
@@ -3528,12 +3485,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       notes: original.notes || '',
     });
     const frozenKey = getHistoryFinishedSortMs(original);
-    setHistorySortKeyOverrides(prev => {
+    setHistorySortKeyOverrides(() => {
       const next = {};
       next[original.id] = frozenKey;
       return next;
     });
-    setActiveSortKeyOverrides(prev => {
+    setActiveSortKeyOverrides(() => {
       const next = {};
       next[original.id] = original.time || '';
       return next;
@@ -3990,18 +3947,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   };
 
   // Swipe-to-complete gesture handler
-  const handleTouchStart = (e, trip) => {
-    setTouchStart({ x: e.touches[0].clientX, trip });
-  };
 
-  const handleTouchEnd = (e) => {
-    if (!touchStart) return;
-    const dx = e.changedTouches[0].clientX - touchStart.x;
-    if (dx < -80 && touchStart.trip.status === 'Arrived') {
-      openCompleteModal(touchStart.trip);
-    }
-    setTouchStart(null);
-  };
+
+
 
   const exportDailyLog = () => {
     const rows = [['Date', 'Patient', 'Booking ID', 'Time', 'Pickup', 'Dropoff', 'Status', 'Pickup Odo', 'Dropoff Odo', 'Distance', 'Completed At']];
@@ -5338,7 +5286,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                                   title="Undo last step"
                                   aria-label="Undo last workflow step"
                                 >
-<RotateCcw size={16} />                                       
+<RotateCcw size={16} />
                                 </button>
                               )}
                             </div>
@@ -7409,7 +7357,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">Confirm {passwordPrompt.type === 'route_stop_exception' ? passwordPrompt.status : passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Reroute' : passwordPrompt.type === 'restore' ? 'Restore' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Edit' : passwordPrompt.type === 'transfer_send' ? 'Transfer' : passwordPrompt.type === 'accept_transfer_trip' || passwordPrompt.type === 'accept_transfer_route' ? 'Accept Transfer' : passwordPrompt.type === 'decline_transfer_trip' || passwordPrompt.type === 'decline_transfer_route' ? 'Decline Transfer' : 'Cancel'}</h3>
                 <p className="text-sm text-slate-500 mt-0.5">
-                  {(role === 'admin' || role === 'dispatcher') 
+                  {(role === 'admin' || role === 'dispatcher')
                     ? `Confirm administrative action for ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip?.patient || 'this trip'}.`
                     : (passwordPrompt.type === 'restore' ? 'Enter your password to restore selected trips' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'Enter your password to save your trip changes' : String(passwordPrompt.type || '').includes('transfer') ? 'Enter your password to confirm this transfer decision.' : passwordPrompt.type === 'route_stop_exception' ? `Enter your password to mark ${passwordPrompt.trip?.patient || 'this route stop'} as ${passwordPrompt.status}.` : `Enter your password to mark ${passwordPrompt.selectedLegIds && passwordPrompt.selectedLegIds.length > 1 ? `${passwordPrompt.selectedLegIds.length} legs` : passwordPrompt.trip?.patient} as ${passwordPrompt.type === 'noshow' ? 'No Show' : passwordPrompt.type === 'reroute' ? 'Rerouted' : 'Cancelled'}`)}
                 </p>

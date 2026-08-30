@@ -1,10 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import {
-  Clock, DollarSign, AlertTriangle, CheckCircle, XCircle, Download,
-  User, Calendar, ChevronDown, ChevronUp, Shield, MapPin, Play, Pause,
-  FileText, TrendingUp, Filter, RefreshCw, Home, Navigation, Zap, Eye
-} from 'lucide-react';
-import { buildTimeEvents, generatePayrollOutput, POLICY_MODES, GAP_CLASSIFICATIONS } from '../utils/timeTracking';
+import { useState, useMemo, useCallback } from 'react';
+import { Clock, DollarSign, AlertTriangle, Download, Calendar, ChevronDown, ChevronUp, Shield, Play, FileText, TrendingUp, Navigation } from 'lucide-react';
+import { buildTimeEvents, generatePayrollOutput, POLICY_MODES } from '../utils/timeTracking';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { eventMatchesPayrollServiceDate, tripMatchesPayrollServiceDate } from '../utils/portalSelectors';
@@ -18,10 +14,7 @@ const fmtTime = (iso) => {
   if (!iso) return '--';
   try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch { return '--'; }
 };
-const fmtDate = (iso) => {
-  if (!iso) return '--';
-  try { return new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }); } catch { return iso; }
-};
+
 const fmtCurrency = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0);
 
 const POLICY_LABELS = {
@@ -36,7 +29,7 @@ const gapColor = (c) => ({
   VERIFIED_PERSONAL: 'bg-blue-100 text-blue-800',
 }[c] || 'bg-slate-100 text-slate-700');
 
-const abuseColor = (f) => f.length > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200';
+
 
 export default function PayrollReportPage({ drivers = [], trips = [], driverTelemetry = [], timeTrackingDeclarations = [], policyMode = POLICY_MODES.SMART_MODE, onPolicyChange }) {
   const [selectedDate, setSelectedDate] = useState(localCalendarYmd());

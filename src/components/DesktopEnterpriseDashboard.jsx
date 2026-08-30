@@ -1,19 +1,9 @@
-import React, { useState, lazy, Suspense, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-  Users, MapPin, Settings, BarChart2,
-  Archive, MessageCircle, Bell,
-  CheckCircle2, BrainCircuit, Upload, Wand2, Search,
-  AlertTriangle, X, Zap, Clock,
-  PanelRight,
-  Eye, Hash, Route, Activity,
-  CalendarDays, ClipboardList, ShieldCheck, Receipt, Siren, CarFront, Plus,
-  RefreshCw,
-} from 'lucide-react';
+import React, { useState, lazy, Suspense, useEffect, useCallback, useMemo } from 'react';
+import { Users, MapPin, Settings, BarChart2, Archive, MessageCircle, Bell, CheckCircle2, BrainCircuit, Upload, Wand2, Search, AlertTriangle, X, Zap, Clock, PanelRight, Eye, Hash, Route, Activity, ClipboardList, CarFront, RefreshCw } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
-import { openMapLink } from '../utils/nativeActions';
-import { timeToMinutes, isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
+
+import { isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 import { getDriverLiveStatus } from '../constants/statuses';
-import { tripMatchesSearch } from '../utils/search';
 import { toValidDate } from '../utils/safeDate';
 import { useChat } from '../hooks/useChat';
 import { buildGlobalSearchResults } from './GlobalEntitySearch';
@@ -157,13 +147,7 @@ const formatActivityTimestamp = (value) => {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 };
 
-const openAddressInMaps = (address = '') => {
-  if (!address) return;
-  const query = encodeURIComponent(address);
-  const googleWeb = `https://www.google.com/maps/search/?api=1&query=${query}`;
-  const googleIntent = `intent://maps.google.com/maps/search/?api=1&query=${query}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(googleWeb)};end;`;
-  openMapLink(googleIntent, googleWeb);
-};
+
 
 const findTripLocations = (trip, trips, trashedTrips, logs) => {
   const id = trip?.id || '';
@@ -177,24 +161,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
   return locations;
 };
 
-const DesktopEnterpriseDashboard = ({
-  role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers, vehicles = [], setVehicles,
-  trashedTrips = [], setTrashedTrips, restoreTrip, deleteTrashedTrip, logs = [], setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings,
-  selectedTasks = [], setSelectedTasks, searchQuery, setSearchQuery,
-  smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip,
-  smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing,
-  showOptimizeModal, setShowOptimizeModal, showUploadModal, setShowUploadModal,
-  uploadAssignDriver, setUploadAssignDriver, onTripsCreated, bulkAssignModal, setBulkAssignModal,
-  showDispatcherArchive, setShowDispatcherArchive,
-  addToast, addAuditLog, persistState, hasPermission, requestAuthAction,
-  triggerSmartAssign, triggerFleetOptimization, assignTripToDriver,
-  bulkAssignTrips, createSharedRide, createLegMission, requestDeleteTrip, requestBulkDelete, updateTrip, updateTrashedTrip,
-  makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal,
-  driverTelemetry = [],
-  timeTrackingDeclarations = [],
-  onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [],
-  onUpdateMission, onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout
-}) => {
+const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers, vehicles = [], setVehicles, trashedTrips = [], setTrashedTrips, restoreTrip, logs = [], setLogs, phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings, selectedTasks = [], setSelectedTasks, searchQuery, setSearchQuery, smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip, smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing, showOptimizeModal, setShowOptimizeModal, showUploadModal, setShowUploadModal, uploadAssignDriver, onTripsCreated, bulkAssignModal, setBulkAssignModal, addToast, addAuditLog, persistState, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, assignTripToDriver, bulkAssignTrips, requestDeleteTrip, requestBulkDelete, updateTrip, updateTrashedTrip, makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal, driverTelemetry = [], timeTrackingDeclarations = [], onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [], onUpdateDriverTrip, onDriverStatusUpdate, onCompleteTrip, onLogout }) => {
   const { unreadCount } = useChat({ alerts: true });
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
   const VALID_PANELS = ['operations', 'liveMap', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat'];
@@ -215,7 +182,7 @@ const DesktopEnterpriseDashboard = ({
   const [authActionPayload, setAuthActionPayload] = useState(null);
   const [authPassword, setAuthPassword] = useState('');
   const [reAuthError, setReAuthError] = useState('');
-  const optimizeTimerRef = useRef(null);
+
   const [tripDetails, setTripDetails] = useState(null);
   const [showTripLocations, setShowTripLocations] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
@@ -366,30 +333,10 @@ const DesktopEnterpriseDashboard = ({
   const todayTrips = trips.filter(t => tripCalendarDateKey(t.date) === todayStr);
   const activeTrips = todayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
   const unassignedTrips = activeTrips.filter(t => t.status === 'Unassigned');
-  const assignedTrips = activeTrips.filter(t => t.status === 'Assigned');
-  const inProgressTrips = activeTrips.filter(t => ['In Mission', 'En Route', 'At Pickup', 'At Dropoff', 'Assigned', 'In Progress', 'Navigating Pickup', 'Navigating Dropoff', 'In Transit', 'Arrived'].includes(t.status));
-  const completedToday = todayTrips.filter(t => t.status === 'Completed').length;
-  const availableDrivers = drivers.filter(d => d.status === 'Available').length;
   const lateTrips = activeTrips.filter(t => isTripLate(t.time || ''));
-  const dispatcherOnlineCount = dispatchers.filter((dispatcher) => dispatcher.clockedIn).length;
-  const activeDriverCount = drivers.filter((driver) => driver.status && !['Offline', 'Unavailable'].includes(driver.status)).length;
   const aiAlertCount = lateTrips.length + unassignedTrips.length;
 
-  const sortedScheduled = [...activeTrips]
-    .filter(t => t.time !== 'Will Call')
-    .sort((a, b) => {
-      if (a.status === 'Unassigned' && b.status !== 'Unassigned') return 1;
-      if (a.status !== 'Unassigned' && b.status === 'Unassigned') return -1;
-      return timeToMinutes(a.time) - timeToMinutes(b.time);
-    });
-
   const willCallTrips = activeTrips.filter(t => t.time === 'Will Call');
-
-  const searchedTrips = searchQuery
-    ? sortedScheduled.filter(t => tripMatchesSearch(t, searchQuery, [
-        drivers.find(driver => driver.id === t.driverId)?.phone,
-      ]))
-    : sortedScheduled;
 
   const workspaceMeta = {
     operations: {
@@ -449,33 +396,7 @@ const DesktopEnterpriseDashboard = ({
     return items;
   }, [activePanel, openOperationsWorkspace, openReportsWorkspace, role, setActivePanel, showSequencerModal, unreadCount]);
 
-  const topActionItems = useMemo(() => {
-    switch (activePanel) {
-      case 'operations':
-        return [];
-      case 'reports':
-        return [
-          { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
-          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
-        ];
-      case 'liveMap':
-        return [
-          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
-          { id: 'routes', label: 'Tools', icon: Route, action: () => setActivePanel('routePlanner') },
-        ];
-      case 'admin':
-        return [
-          { id: 'upload', label: 'Upload', icon: Upload, action: () => setShowUploadModal(true) },
-          { id: 'reports', label: 'Reports', icon: BarChart2, action: () => setActivePanel('reports') },
-        ];
-      case 'settings':
-        return [
-          { id: 'dispatch', label: 'Dispatch', icon: Zap, action: () => openOperationsWorkspace('manifest') },
-        ];
-      default:
-        return [];
-    }
-  }, [activePanel, openOperationsWorkspace, setShowUploadModal, setShowSequencerModal, setActivePanel]);
+
 
   // Command palette commands
   const commands = useMemo(() => [
@@ -769,10 +690,6 @@ const DesktopEnterpriseDashboard = ({
             return now > new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
           }).length;
           const availableDrivers = drivers.filter(d => d.status !== 'Unavailable').length;
-          const busyDrivers = drivers.filter(d => {
-            return todayTrips.some(t => t.driverId === d.id && ['In Progress', 'In Transit', 'At Pickup', 'At Dropoff'].includes(t.status));
-          }).length;
-
           return (
             <div className="space-y-3">
               {/* KPI Cards */}
@@ -1776,9 +1693,9 @@ const DesktopEnterpriseDashboard = ({
               <ErrorBoundary><Suspense fallback={<LazyFallback />}>
                 <RouteSequencerApp
                   key={routePlannerSequencerKey}
-                  trips={trips} 
+                  trips={trips}
                   drivers={drivers}
-                  currentUser={currentUser} 
+                  currentUser={currentUser}
                   role={role}
                   initialStops={routePlannerSequencerStops}
                   initialSequence={routePlannerSequencerSequence}

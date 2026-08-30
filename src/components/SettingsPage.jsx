@@ -1,10 +1,5 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import {
-  LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route,
-  Phone, ShieldCheck, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus,
-  LayoutDashboard, Users, Activity, Archive, Settings, User, Bell, KeyRound,
-  Truck, RefreshCw, Trash2, RotateCcw, FileText, MessageSquare
-} from 'lucide-react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
 
@@ -13,7 +8,7 @@ const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
 const LazyDocumentTracker = lazy(() => import('./DocumentExpirationTracker'));
 const LazyFleetUtilization = lazy(() => import('./FleetUtilizationReport'));
 
-const ActivityRow = ({ index, log }) => {
+const ActivityRow = ({ log }) => {
   const [open, setOpen] = useState(false);
   const colorClass = log.c === 'rose' ? 'bg-rose-500' : log.c === 'emerald' ? 'bg-emerald-500' : log.c === 'blue' ? 'bg-blue-500' : log.c === 'amber' ? 'bg-amber-500' : 'bg-slate-400';
   return (
@@ -261,7 +256,7 @@ const SettingsPage = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {dispatchers.map((d, i) => (
+                    {dispatchers.map((d) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 py-1.5 font-semibold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>
@@ -269,7 +264,7 @@ const SettingsPage = ({
                         <td className="px-3 py-1.5"><span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span></td>
                       </tr>
                     ))}
-                    {drivers.map((d, i) => (
+                    {drivers.map((d) => (
                       <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 py-1.5 font-semibold text-slate-900">{d.name || '—'}</td>
                         <td className="px-3 py-1.5 text-slate-600 font-mono text-xs">{d.email || '—'}</td>

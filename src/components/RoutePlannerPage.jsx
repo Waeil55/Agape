@@ -1,11 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import {
-  Route, MapPin, Clock, Users, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2,
-  GripVertical, ChevronRight, Search, Flag, Plus, Trash2,
-  Play, BrainCircuit, Loader2,
-  Sparkles, Copy, Sun, Moon, Eye, ArrowLeftRight,
-  LogIn, LogOut, Filter, Save
-} from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Route, MapPin, Clock, Users, AlertTriangle, ArrowDown, ArrowUp, X, CheckCircle2, GripVertical, ChevronRight, Search, Flag, Plus, Trash2, Play, BrainCircuit, Loader2, Sparkles, Copy, Sun, Moon, Eye, ArrowLeftRight, LogIn, LogOut, Save } from 'lucide-react';
 import { timeToMinutes } from '../utils/tripDate';
 import { tripMatchesRoutePlannerServiceDate } from '../utils/portalSelectors';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
@@ -45,7 +39,7 @@ const getTodayDateString = () => {
 
 const isActivePlanningStatus = (status) => !TERMINAL_STATUSES.has(status || '');
 
-const RoutePlannerPage = ({ trips = [], drivers = [], role, currentUser, onSendToSequencer }) => {
+const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
   const [stops, setStops] = useState([]);
   const [routeName, setRouteName] = useState('');
   const [selectedDriver, setSelectedDriver] = useState('');

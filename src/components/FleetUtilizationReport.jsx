@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Truck, TrendingUp, Calendar, Download, BarChart3, Clock, MapPin, Filter } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Truck, TrendingUp, Download, Clock, MapPin, Filter } from 'lucide-react';
 import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
 
 const DATE_RANGES = [

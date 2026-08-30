@@ -1,15 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { MapPin, AlertCircle, Users, UserCheck, X, Plus, Trash2, Edit2, Phone, MessageSquare, Flag, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal } from 'lucide-react';
-import { suggestBatchAssignment } from '../config/ai';
+import { AlertCircle, Users, UserCheck, X, Plus, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal } from 'lucide-react';
+
 import { makeCall, sendSMS } from '../utils/nativeActions';
-import { isNativeShell } from '../utils/platform';
+
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
 import TripActionCenter from './trips/TripActionCenter';
 
-const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
+
 
 const getManifestStatusClass = (status) => {
   if (status === 'Unassigned') return 'bg-rose-100 text-rose-700';
@@ -41,14 +41,14 @@ const toTimeInput = (value) => {
 
 const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
 
-const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onUnassignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
+const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
   const today = useMemo(() => getTodayStr(), []);
   const [sortBy, setSortBy] = useState('time');
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
   const [showAssign, setShowAssign] = useState(false);
   const [assignMode, setAssignMode] = useState('assign');
-  const [isBatchAssigning, setIsBatchAssigning] = useState(false);
+
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [assignmentFeedback, setAssignmentFeedback] = useState('');

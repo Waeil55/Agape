@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User, Truck, Plus, Trash2, Edit2, AlertCircle, X, Save, ClipboardList, Upload, CheckSquare, Clock, Phone, MessageSquare, BrainCircuit, Loader2, ChevronDown } from 'lucide-react';
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import AIInsightsBanner from './AIInsightsBanner';
@@ -15,7 +15,7 @@ const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfi
   const findAssignedDriver = useCallback((v) => {
     if (!v) return null;
     const targetName = String(v.name || '').trim().toLowerCase();
-    return drivers.find(d => 
+    return drivers.find(d =>
       (d.id && (d.id === v.driverId || d.id === v.assignedDriver)) ||
       (d.vehicleId && d.vehicleId === v.id) ||
       (d.vehicle && String(d.vehicle).trim().toLowerCase() === targetName)
@@ -25,7 +25,7 @@ const DriversVehiclesPage = ({ role, drivers = [], setDrivers, upsertDriverProfi
   const [activeTab, setActiveTab] = useState(mode !== 'all' ? mode : 'drivers');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-const [form, setForm] = useState({ 
+const [form, setForm] = useState({
   name: '', email: '', phone: '', vehicle: '', status: 'Available',
   currentZone: '', vin: '', insuranceExpiry: '', capacity: '1',
   licenseNumber: '', cdlStatus: 'Active', assignedDispatcher: '', assignedTo: '',
@@ -79,13 +79,13 @@ const [form, setForm] = useState({
       setSavingAssignment('');
     }
   }, [assignVehicleToDriver, drivers, savingAssignment, upsertDriverProfile, vehicles]);
-  
+
   useEffect(() => setPolicyDraft(maintenancePolicy), [appSettings.maintenancePolicy]);
 
   const resetVForm = () => setVForm({ name: '', make: '', model: '', year: '', color: '', plate: '', vin: '', odometer: '', lastOilChangeOdometer: '', oilChangeIntervalMiles: String(maintenancePolicy.oilChangeIntervalMiles), oilDueSoonMiles: String(maintenancePolicy.oilDueSoonMiles), lastOilChangeDate: '', lastFilterChangeDate: '', filterChangeIntervalMonths: String(maintenancePolicy.filterChangeIntervalMonths), filterDueSoonDays: String(maintenancePolicy.filterDueSoonDays) });
-  
+
   const openVAdd = () => { setEditVehicleId(null); resetVForm(); setVehicleForm(true); };
-  
+
   const openVEdit = (v) => {
     setEditVehicleId(v.id);
     setVForm({ name: v.name, make: v.make || '', model: v.model || '', year: v.year || '', color: v.color || '', plate: v.plate || '', vin: v.vin || '', odometer: v.odometer || '', lastOilChangeOdometer: v.lastOilChangeOdometer ?? '', oilChangeIntervalMiles: v.oilChangeIntervalMiles || String(maintenancePolicy.oilChangeIntervalMiles), oilDueSoonMiles: v.oilDueSoonMiles || String(maintenancePolicy.oilDueSoonMiles), lastOilChangeDate: v.lastOilChangeDate || '', lastFilterChangeDate: v.lastFilterChangeDate || '', filterChangeIntervalMonths: v.filterChangeIntervalMonths || String(maintenancePolicy.filterChangeIntervalMonths), filterDueSoonDays: v.filterDueSoonDays || String(maintenancePolicy.filterDueSoonDays) });
@@ -98,7 +98,7 @@ const [form, setForm] = useState({
     openVAdd();
     onCreateIntentHandled?.();
   }, [createIntent?.nonce]);
-  
+
   const saveVehicle = async () => {
     if (!vForm.name.trim()) return;
     setAssignmentError('');
@@ -129,7 +129,7 @@ const [form, setForm] = useState({
       setAssignmentError(error.message || 'Vehicle could not be saved.');
     }
   };
-  
+
   const deleteVehicle = async (v) => {
     if (!window.confirm(`Delete vehicle ${v.name}?`)) return;
     setAssignmentError('');
@@ -152,7 +152,7 @@ const [form, setForm] = useState({
     }
   };
 
-  
+
   // Filter drivers for dispatcher role — only show drivers assigned to this dispatcher
   const filteredDrivers = role === 'dispatcher'
     ? drivers.filter(d => {
@@ -247,9 +247,9 @@ const [form, setForm] = useState({
 
   const openEdit = (d) => {
     setEditing(d.id);
-    setForm({ 
-      name: d.name, email: d.email || '', phone: d.phone || '', 
-      vehicle: d.vehicle || '', status: d.status, 
+    setForm({
+      name: d.name, email: d.email || '', phone: d.phone || '',
+      vehicle: d.vehicle || '', status: d.status,
       currentZone: d.currentZone || '',
       vin: d.vin || '', insuranceExpiry: d.insuranceExpiry || '',
       capacity: d.capacity || '1', licenseNumber: d.licenseNumber || '',

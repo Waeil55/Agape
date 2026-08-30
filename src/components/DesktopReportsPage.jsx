@@ -1,9 +1,5 @@
-import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import {
-  BarChart2, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft,
-  ChevronRight, Clock, Download, Edit2, FileText, RefreshCw, Search, Upload,
-  XCircle,
-} from 'lucide-react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import { CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Edit2, Search, Upload, XCircle } from 'lucide-react';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { getReviewBatchScope } from '../utils/portalSelectors';
@@ -197,7 +193,7 @@ const DesktopReportsPage = ({
     setEditingCell(null);
     setEditValue('');
     const frozenKey = trip.arrivalDropoffTime || trip.completedAt || trip.time || '';
-    setSortKeyOverrides(prev => {
+    setSortKeyOverrides(() => {
       const next = {};
       next[trip.id] = frozenKey;
       return next;
@@ -262,7 +258,7 @@ const DesktopReportsPage = ({
 
   const renderCell = (trip, colKey, displayValue, fieldName, type = 'text') => {
     const isEditing = editingCell?.tripId === trip.id && editingCell?.field === colKey;
-    
+
     if (isEditing) {
       if (colKey === 'driver') {
         return (
@@ -453,15 +449,7 @@ const DesktopReportsPage = ({
       });
   }, [trips, drivers, dateStr, allDates, searchQuery, statusFilter, driverFilter, reviewFilter, sortKeyOverrides]);
 
-  const allDayRows = useMemo(() => trips
-    .filter((trip) => allDates || tripCalendarDateKey(trip.date) === dateStr)
-    .map((trip) => ({
-      trip,
-      driver: getTripDriver(trip, drivers),
-      travelMinutes: trip.travelTime
-        ? Number(trip.travelTime)
-        : calcDurationMinutes(trip.departedPickupTime || trip.arrivalTime, trip.arrivalDropoffTime || trip.completedAt),
-    })), [trips, drivers, dateStr, allDates]);
+
 
   const summary = useMemo(() => {
     const reviewed = reportRows.filter(({ trip }) => trip.reviewed).length;
@@ -477,10 +465,7 @@ const DesktopReportsPage = ({
     return { reviewed, done, noShow, cancelled, distance, moving, stopped };
   }, [reportRows]);
 
-  const setMode = (mode) => {
-    setViewMode(mode);
-    localStorage.setItem('agape_reportsDesktopView', mode);
-  };
+
 
   const shiftDate = (days) => {
     const next = new Date(`${dateStr}T12:00:00`);
@@ -593,7 +578,7 @@ const DesktopReportsPage = ({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {reportRows.map(({ trip, driver, travelMinutes }, index) => (
+          {reportRows.map(({ trip }, index) => (
             <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : index % 2 ? 'bg-slate-50/70' : 'bg-white'} hover:bg-blue-50/70 transition-colors cursor-pointer`} onClick={() => setActiveRow(trip.id)}>
               <td className="px-3 py-1.5">
                 <div className="flex items-center gap-2 text-slate-500">
@@ -689,7 +674,7 @@ const DesktopReportsPage = ({
       const tA = a.trip;
       const tB = b.trip;
       let valA, valB;
-      
+
       switch(k) {
         case 'date': valA = tA.date; valB = tB.date; break;
         case 'driver': valA = (a.driver?.name || tA.driverName || '').toLowerCase(); valB = (b.driver?.name || tB.driverName || '').toLowerCase(); break;
@@ -709,7 +694,7 @@ const DesktopReportsPage = ({
         case 'review': valA = tA.reviewed ? 1 : 0; valB = tB.reviewed ? 1 : 0; break;
         default: valA = ''; valB = '';
       }
-      
+
       if (valA < valB) return reviewSortConfig.direction === 'asc' ? -1 : 1;
       if (valA > valB) return reviewSortConfig.direction === 'asc' ? 1 : -1;
       return 0;

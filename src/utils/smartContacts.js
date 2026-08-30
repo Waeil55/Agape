@@ -22,7 +22,7 @@ const isLikelyHomeAddress = (address) => {
   return homeIndicators.some(ind => lower.includes(ind)) && !isLikelyFacilityAddress(address);
 };
 
-const detectContactTypeForNumber = (phone, contextAddress, patientName, allTrips) => {
+const detectContactTypeForNumber = (phone, contextAddress, _patientName, allTrips) => {
   if (!phone || !cleanPhone(phone)) return null;
   const cleaned = cleanPhone(phone);
 

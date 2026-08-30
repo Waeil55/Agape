@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Activity, AlertTriangle, BrainCircuit, CheckCircle2, Clock, MapPin,
   Route, ShieldCheck, TrendingUp, Truck, Users, Loader2, Sparkles,
@@ -50,10 +50,7 @@ const MetricCard = ({ icon: Icon, label, value, detail, tone = 'slate' }) => {
   );
 };
 
-const CommandIntelligencePanel = ({
-  trips, drivers, dispatchers, routeTemplates, logs = [],
-  onFocusLate, onFocusUpcoming, onFocusUnassigned, onFocusFleet, onFocusRoutes,
-}) => {
+const CommandIntelligencePanel = ({ trips, drivers, logs = [], onFocusLate, onFocusUpcoming, onFocusUnassigned, onFocusFleet }) => {
   const [aiInsights, setAiInsights] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDriverScores, setAiDriverScores] = useState({});

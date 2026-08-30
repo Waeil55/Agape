@@ -71,16 +71,7 @@ export const subscribeWellTransManifest = (serviceDate, callback, onError) => {
 };
 
 export const saveWellTransSettings = (settings, actorId) => {
-  const {
-    portalUsername: _portalUsername,
-    portalPassword: _portalPassword,
-    password: _password,
-    credentials: _credentials,
-    token: _token,
-    accessToken: _accessToken,
-    refreshToken: _refreshToken,
-    ...safeSettings
-  } = settings || {};
+  const { ...safeSettings } = settings || {};
   return setDoc(doc(db, 'welltrans_settings', 'primary'), {
     ...safeSettings,
     portalUsername: deleteField(),

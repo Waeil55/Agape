@@ -108,7 +108,7 @@ export function getTripEventType(beforeTrip, afterTrip) {
   return SYSTEM_EVENT_TYPES.TRIP_UPDATED;
 }
 
-export function getDriverEventType(_beforeDriver, _afterDriver) {
+export function getDriverEventType() {
   return SYSTEM_EVENT_TYPES.DRIVER_STATUS_CHANGED;
 }
 

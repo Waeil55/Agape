@@ -1,14 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { AlertTriangle, CheckCircle, Calendar, FileText, Filter, RefreshCw, X } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { AlertTriangle, CheckCircle, Calendar, FileText, Filter, RefreshCw } from 'lucide-react';
 import { localCalendarYmd } from '../utils/tripDate';
 
-const DOC_CATEGORIES = [
-  { id: 'driver_license', label: 'Driver License', source: 'driver' },
-  { id: 'vehicle_registration', label: 'Vehicle Registration', source: 'vehicle' },
-  { id: 'insurance', label: 'Insurance', source: 'vehicle' },
-  { id: 'medical_certificate', label: 'Medical Certificate', source: 'driver' },
-  { id: 'drug_test', label: 'Drug Test', source: 'driver' },
-];
+
 
 const STATUS_CONFIG = {
   expired: { color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700', label: 'Expired', icon: AlertTriangle },

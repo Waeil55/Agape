@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Loader2, MessageSquare, ChevronDown, ChevronUp, Phone } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Send, Loader2, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, collection, query, where, orderBy, getDocs } from '../config/firebase';
 import { limit } from 'firebase/firestore';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle, Edit2, BrainCircuit, Activity, UserCheck, UserX } from 'lucide-react';
 import { db, collection, getDocs, functions, httpsCallable } from '../config/firebase';
 import { analyzeActivityLogs } from '../config/ai';
@@ -27,7 +27,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const [editName, setEditName] = useState('');
   const [editHourlyRate, setEditHourlyRate] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
-  
+
   // AI Insights State
   const [aiInsights, setAiInsights] = useState(null);
   const [analyzingLogs, setAnalyzingLogs] = useState(false);
@@ -78,7 +78,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       const authEmail = usernameToAuthEmail(username);
       const createUserFn = httpsCallable(functions, 'createUser');
       await createUserFn({ email: authEmail, username, name: username, password: form.password, role: form.role, phone: form.phone, hourlyRate: form.hourlyRate });
-      
+
       addAuditLog('User Created', `${currentUser} created ${form.role} account: ${username}`, 'emerald', { entity: 'user', id: username, diffs: [{ field: 'role', before: null, after: form.role }, { field: 'username', before: null, after: username }] });
       await loadUsers();
       setShowForm(false);
@@ -122,7 +122,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       if (!result?.data?.success) throw new Error('The server did not confirm permanent deletion.');
       setDispatchers(prev => prev.filter(d => d.email !== user.email));
       setDrivers(prev => prev.filter(d => d.email !== user.email));
-      
+
       addAuditLog('User Removed', `${currentUser} removed ${user.role}: ${user.username || authEmailToUsername(user.email)}`, 'rose', { entity: 'user', id: user.username || user.email, diffs: [{ field: 'role', before: user.role, after: null }, { field: 'username', before: user.username || authEmailToUsername(user.email), after: null }] });
       setFormError('');
       await loadUsers();
@@ -249,7 +249,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                   <h4 className="text-xs font-semibold text-indigo-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Activity size={14} /> Team Activity Summary</h4>
                   <p className="text-xs text-slate-700 leading-relaxed">{aiInsights.summary}</p>
                 </div>
-                
+
                 {aiInsights.mistakes && aiInsights.mistakes.length > 0 && (
                   <div className="bg-rose-50/80 p-4 rounded-xl border border-rose-100/80">
                     <h4 className="text-xs font-semibold text-rose-800 uppercase tracking-wider mb-2 flex items-center gap-1.5"><AlertCircle size={14} /> AI Flagged Issues</h4>
@@ -502,10 +502,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           </table>
         </div>
       </div>
-      
+
       {/* Fleet Management injected here */}
       {children}
-      
+
       </div> // End Left Column
       )}
 
@@ -567,7 +567,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                       {log.time ? new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : log.timestamp}
                     </td>
                     <td className="px-3 sm:px-6 py-1.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold 
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold
                         ${log.c === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
                           log.c === 'rose' ? 'bg-rose-100 text-rose-700' :
                           log.c === 'amber' ? 'bg-amber-100 text-amber-700' :
@@ -716,7 +716,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 {selectedLog.time ? new Date(selectedLog.time).toLocaleString([], { dateStyle: 'full', timeStyle: 'medium' }) : selectedLog.timestamp}
               </p>
             </div>
-            
+
             <div className="p-6 bg-white">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Activity Details</h4>
               <p className="text-slate-800 leading-relaxed text-base bg-slate-50 p-4 rounded-xl border border-slate-100">
@@ -854,9 +854,9 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 return null;
               })()}
             </div>
-            
+
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <button 
+              <button
                 onClick={() => setSelectedLog(null)}
                 className="px-6 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-colors">
                 Close

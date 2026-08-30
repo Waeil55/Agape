@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 const SHAPES = {
   text: 'h-3.5 rounded-md',

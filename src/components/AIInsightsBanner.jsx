@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrainCircuit, Loader2, AlertTriangle, Lightbulb, TrendingUp, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, AlertTriangle, Lightbulb, TrendingUp, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
 const AIInsightsBanner = ({ insights, loading, error, onClose, compact }) => {
   const [expanded, setExpanded] = useState(true);

@@ -1,27 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  doc,
-  setDoc,
-  collection,
-  addDoc,
-  serverTimestamp,
-  writeBatch,
-  runTransaction,
-  getDocs,
-  getDoc,
-  onSnapshot,
-} from '../config/firebase';
+import { doc, setDoc, collection, addDoc, serverTimestamp, writeBatch, runTransaction, onSnapshot } from '../config/firebase';
 import { db, auth, functions, httpsCallable } from '../config/firebase';
 import {
   buildDriverEvents,
   buildTripEvents,
   emitSystemEvents,
 } from '../services/firestoreEventEngine';
-import {
-  buildOperationalTripRecord,
-  isOperationalTrip,
-  mergeTripCollections,
-} from '../utils/tripLifecycle';
+import { buildOperationalTripRecord, isOperationalTrip } from '../utils/tripLifecycle';
 import { ASSIGNMENT_STATUSES } from '../config/firestoreSchema';
 import { localCalendarYmd } from '../utils/tripDate';
 import {
@@ -166,15 +151,7 @@ async function deleteDocsById(collectionName, ids = []) {
   }
 }
 
-async function safeFirestoreDocId(value, fallbackPrefix = 'trip') {
-  const cleaned = String(value || '')
-    .trim()
-    .replace(/[\\/#?[\]\s]+/g, '_')
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 140);
-  return cleaned || `${fallbackPrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
+
 
 async function writeTripsToCollection(trips = [], tenantId, { strictAtomic = false } = {}) {
   const now = new Date().toISOString();
@@ -871,7 +848,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     if (!tripId) return false;
     const now = new Date().toISOString();
     const progressDoc = attachTenantScope({ ...updates, tripId, workflowUpdatedAt: now }, activeTenantId);
-    
+
     // Update local state optimistic UI
     const currentTrips = dataRef.current.trips || [];
     const nextTrips = currentTrips.map(t => t.id === tripId ? { ...t, ...updates } : t);

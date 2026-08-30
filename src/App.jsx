@@ -1,12 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
-import {
-  Truck, Users, Clock, ShieldCheck,
-  ArrowRight, CheckCircle2, AlertTriangle,
-  BrainCircuit, Zap,
-  Target, AlertCircle,
-  Activity, Wand2, Lock, Briefcase, User,
-  X
-} from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
+import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
@@ -111,16 +104,7 @@ const AddTripModal = lazyWithRetry(() => import('./components/AddTripModal'));
 
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
-const Badge = ({ children, variant = 'info' }) => {
-  const variants = {
-    info: "badge-info",
-    success: "badge-success",
-    warning: "badge-warning",
-    danger: "badge-danger",
-    ai: "badge-info",
-  };
-  return <span className={`badge ${variants[variant]}`}>{children}</span>;
-};
+
 
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted']);
@@ -405,7 +389,7 @@ const App = () => {
     const t = setTimeout(warm, 1500);
     return () => clearTimeout(t);
   }, [isAuthenticated]);
-  
+
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
@@ -482,7 +466,7 @@ const App = () => {
       try {
         // Register service worker
         await registerServiceWorker();
-        
+
         // Service worker is static-cache only; Firestore reads own data sync.
         cleanupSWMessages = setupSWMessageHandler(() => {});
 
@@ -713,8 +697,8 @@ const App = () => {
   useEffect(() => {
     const handleUpdate = () => {
       addToast(
-        'App Updated', 
-        'A new version of the app is ready. Pull down to refresh or reopen to apply.', 
+        'App Updated',
+        'A new version of the app is ready. Pull down to refresh or reopen to apply.',
         'success'
       );
     };
@@ -873,7 +857,7 @@ const App = () => {
     if (!isAuthenticated) {
       return undefined;
     }
-    
+
     const unsubscribe = onSnapshot(collection(db, 'driverTelemetry'), (snap) => {
       const recentDocs = [];
       snap.forEach((itemDoc) => {
@@ -1178,13 +1162,13 @@ const App = () => {
 
         loginInProgressRef.current = false;
         applySession(userRole, userEmail, userDoc, user);
-        
+
         try {
           const r = roleRef.current;
           if (r === 'admin' || r === 'dispatcher') {
             const usersResult = await getDocs(collection(db, 'users'));
             const allUsers = usersResult.docs.map(u => ({ id: u.id, ...u.data() }));
-            
+
             // Sync new drivers from users collection — batch into single write
             const activeDriverUsers = allUsers.filter(u => u.role && u.role.toLowerCase() === 'driver');
             const nonDriverEmails = new Set(
@@ -1216,7 +1200,7 @@ const App = () => {
               }
               return toAdd.length > 0 || normalizedPrev.length !== prev.length ? [...normalizedPrev, ...toAdd] : prev;
             });
-            
+
             // Sync new dispatchers — batch into single write
             const activeDispatcherUsers = allUsers.filter(u => u.role && u.role.toLowerCase() === 'dispatcher');
             const nonDispatcherEmails = new Set(
@@ -1503,7 +1487,7 @@ const App = () => {
     }
     const selectedTrips = trips.filter(t => selectedTasks.includes(t.id) && canControlTrip(t));
     if (selectedTrips.length === 0) return;
-    
+
     // Build map of patient → best client phone (detect home address as one that appears in both pickup and dropoff)
     const patientPhoneMap = {};
     const patientAddresses = {};
@@ -1519,16 +1503,16 @@ const App = () => {
       // Find home address (appears in both pickups and dropoffs for same patient)
       const homeAddr = pickups.find(p => dropoffs.includes(p)) || '';
       let clientPhone = '';
-      
+
       const allPossiblePhones = pTrips.flatMap(t => [t.pickupPhone, t.dropoffPhone]).filter(Boolean);
-      
+
       // Heuristic: A phone is a facility if it's shared by other patients in the main trips list
       const isShared = (p) => {
         if (!p) return false;
         const cleaned = cleanPhone(p);
         if (cleaned.length < 7) return false;
-        return trips.some(t => 
-          (t.patient || '').toLowerCase() !== (pTrips[0].patient || '').toLowerCase() && 
+        return trips.some(t =>
+          (t.patient || '').toLowerCase() !== (pTrips[0].patient || '').toLowerCase() &&
           (cleanPhone(t.pickupPhone) === cleaned || cleanPhone(t.dropoffPhone) === cleaned)
         );
       };
@@ -1540,8 +1524,8 @@ const App = () => {
           const returnTrip = pTrips.find(t => (t.dropoff || '').trim().toLowerCase() === homeAddr);
           if (returnTrip && !isShared(returnTrip.dropoffPhone)) clientPhone = returnTrip.dropoffPhone || '';
         }
-      } 
-      
+      }
+
       if (!clientPhone) {
         // Find any phone for this patient that is NOT shared
         clientPhone = allPossiblePhones.find(p => !isShared(p)) || '';
@@ -1550,9 +1534,9 @@ const App = () => {
       if (!clientPhone) {
         // Final fallback to existing keyword detection
         const trip = pTrips[0];
-        const isPickupFacility = FACILITY_KEYWORDS.some(k => (trip.pickup || '').toLowerCase().includes(k)) || 
+        const isPickupFacility = FACILITY_KEYWORDS.some(k => (trip.pickup || '').toLowerCase().includes(k)) ||
                                  FACILITY_KEYWORDS.some(k => (trip.pickupSiteName || '').toLowerCase().includes(k));
-        const isDropoffFacility = FACILITY_KEYWORDS.some(k => (trip.dropoff || '').toLowerCase().includes(k)) || 
+        const isDropoffFacility = FACILITY_KEYWORDS.some(k => (trip.dropoff || '').toLowerCase().includes(k)) ||
                                   FACILITY_KEYWORDS.some(k => (trip.dropoffSiteName || '').toLowerCase().includes(k));
         if (isPickupFacility && !isDropoffFacility) {
           clientPhone = trip.dropoffPhone || '';
@@ -1562,13 +1546,13 @@ const App = () => {
           clientPhone = trip.patientPhone || trip.pickupPhone || trip.dropoffPhone || '';
         }
       }
-      
+
       pTrips.forEach(t => {
         const key = (t.patient || '').trim().toLowerCase();
         patientPhoneMap[key] = clientPhone;
       });
     });
-    
+
     // Create legs: all pickups then all dropoffs (can be reordered later by driver)
     const legs = [];
     selectedTrips.forEach(t => {
@@ -1579,7 +1563,7 @@ const App = () => {
       const clientPhone = t.patientPhone || patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
       legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: clientPhone });
     });
-    
+
     // Update trips status and assign to driver
     setTrips(prev => prev.map(t => selectedTasks.includes(t.id) && canControlTrip(t) ? {
       ...t,
@@ -1588,13 +1572,13 @@ const App = () => {
       driverEmail: driver?.email || null,
       driverName: driver?.name || null,
     } : t));
-    
+
     // Save mission to driver document or a separate missions collection (using a special field for now)
     if (driver) {
       setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, activeMission: { id: `M-${Date.now()}`, legs, currentLegIndex: 0 } } : d));
       addAuditLog('Mission Created', `${currentUser} created a ${legs.length}-leg mission for ${driver.name} with ${selectedTrips.length} patients.`, 'indigo');
     }
-    
+
     setSelectedTasks([]);
     setBulkAssignModal(false);
     // Firestore auto-syncs via useFirestoreAppData
@@ -1843,7 +1827,7 @@ const App = () => {
       nextTripState.driverEmail = null;
       nextTripState.driverName = null;
     }
-    
+
     // Auto-complete trip if dropoffOdometer is filled and it's not already terminal
     const isTerminal = ['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted'].includes(String(nextTripState.status).toLowerCase().trim());
     if (nextTripState.dropoffOdometer !== undefined && nextTripState.dropoffOdometer !== '' && nextTripState.dropoffOdometer !== null) {
@@ -2047,21 +2031,21 @@ const App = () => {
         if (!tripToRestore) return currentTrashed;
         return currentTrashed.filter(t => t.id !== tripId);
       });
-      
+
       setTimeout(() => {
         if (tripToRestore) {
           setTrips(currentTrips => {
             const restoreKey = getTripKey(tripToRestore);
             const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
             if (alreadyExists) return currentTrips;
-            
+
             return dedupTrips([...currentTrips, tripToRestore]);
           });
 
           setDoc(doc(db, 'trips', tripId), { archiveState: null }, { merge: true }).catch(err => {
             console.error('Failed to clear archiveState in Firestore:', err);
           });
-          
+
           addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
         }
       }, 0);
@@ -2812,11 +2796,11 @@ const App = () => {
                   <p className="text-base font-semibold text-slate-900 capitalize">{pendingRole}</p>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
-                  <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)} 
+                  <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)}
                     className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
@@ -2824,15 +2808,15 @@ const App = () => {
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
-                  <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} 
+                  <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
                     className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
 
               {loginError && <p className={`text-sm font-semibold text-center mt-2 p-3 rounded-lg border ${loginError.toLowerCase().includes('sent') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>{loginError}</p>}
-              
+
               <button type="submit" className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">Authorize Access</button>
-              
+
               <div className="pt-2 flex items-center justify-between text-sm font-semibold">
                 <button type="button" onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
                 <button type="button" onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-semibold transition text-sm">Reset Help</button>
@@ -2876,248 +2860,12 @@ const App = () => {
     );
   };
 
-  const _renderBulkAssignModal = () => {
-    if (!bulkAssignModal) return null;
-    return (
-      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setBulkAssignModal(false)} />
-        <div className="bg-white/90 backdrop-blur-xl w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/50 max-h-[85vh] overflow-y-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-              <Truck size={24} className="text-emerald-600" /> Bulk Assignment
-            </h3>
-            <button onClick={() => setBulkAssignModal(false)} className="p-2 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
-          </div>
-          
-          <div className="bg-emerald-50 rounded-xl p-4 mb-6 border border-emerald-100">
-            <p className="text-sm font-semibold text-emerald-900">Assigning {selectedTasks.length} Trips</p>
-            <p className="text-sm font-medium text-emerald-700 mt-0.5">Select a driver below to assign all selected tasks.</p>
-          </div>
 
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest px-1">Available Fleet</h4>
-            <div className="grid grid-cols-1 gap-2">
-              {scopedDrivers.map(d => (
-                <button key={d.id} onClick={() => bulkAssignTrips(d.id)} className="w-full flex items-center justify-between p-4 bg-white/50 border border-slate-200 rounded-xl hover:bg-white hover:border-blue-300 hover:shadow-md transition-all group text-left">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                      <User size={20} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{d.name}</p>
-                      <p className="text-xs font-medium text-slate-500">{d.vehicle || 'No Vehicle'} &bull; Active</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge variant="success">Active</Badge>
-                    <span className="text-xs font-semibold text-blue-600">Assign &rarr;</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          <button onClick={() => setBulkAssignModal(false)} className="w-full mt-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold active:scale-95 transition-all">Cancel</button>
-        </div>
-      </div>
-    );
-  };
-  const _renderSmartAssignModal = () => {
-    if (!smartAssignTrip) return null;
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-12">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} />
-        <div className="bg-white/90 backdrop-blur-xl w-full max-w-2xl rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl relative z-10 border border-white/50 max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-md ${aiAnalyzing ? 'bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white animate-pulse' : 'bg-indigo-100 text-indigo-700'}`}>
-                {aiAnalyzing ? <Activity size={28} /> : <BrainCircuit size={28} />}
-              </div>
-              <div>
-                <h3 className="text-xl sm:text-2xl font-semibold text-slate-900">AI Chain-Route</h3>
-                <p className="text-sm font-semibold text-slate-500 mt-1 uppercase tracking-widest">Target: {smartAssignTrip.patient}</p>
-              </div>
-            </div>
-            <button onClick={() => { setSmartAssignTrip(null); setSmartAssignResult(null); }} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
-          </div>
-          <div className="bg-slate-50/80 rounded-xl p-4 mb-6 border border-slate-200/50">
-            <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-600">
-              <div><span className="text-slate-500 block mb-1">Time</span>{smartAssignTrip.time}</div>
-              <div><span className="text-slate-500 block mb-1">Type</span>{smartAssignTrip.type}</div>
-              <div className="col-span-2"><span className="text-slate-500 block mb-1">Route</span>{smartAssignTrip.pickup} <ArrowRight size={12} className="inline text-slate-300 mx-1" /> {(smartAssignTrip.dropoff || '').split(' ')[0]}</div>
-            </div>
-          </div>
-          {aiAnalyzing ? (
-            <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-16 h-16 relative">
-                <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-                <Zap className="absolute inset-0 m-auto text-indigo-600 animate-pulse" size={24} />
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-slate-800">Analyzing live telemetry...</p>
-                <p className="text-xs font-medium text-slate-500 mt-1">Checking schedules, traffic, and proximities.</p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Target size={14} /> AI Assignment Result</h4>
-              {smartAssignResult && smartAssignResult.driverId ? (
-                (() => {
-                  const d = scopedDrivers.find(drv => drv.id === smartAssignResult.driverId);
-                  if (!d) return <p className="text-sm text-slate-500">Suggested driver not found in fleet.</p>;
-                  const isHighScore = smartAssignResult.score >= 80;
-                  const isMidScore = smartAssignResult.score >= 50;
-                  const borderClass = isHighScore ? 'border-emerald-200 bg-emerald-50/50' : isMidScore ? 'border-amber-200 bg-amber-50/50' : 'border-slate-200 bg-slate-50';
-                  const badgeClass = isHighScore ? 'bg-emerald-500' : isMidScore ? 'bg-amber-500' : 'bg-slate-400';
-                  const btnClass = isHighScore ? 'bg-emerald-600 shadow-emerald-500/20' : isMidScore ? 'bg-amber-600 shadow-amber-500/20' : 'bg-slate-600 shadow-slate-500/20';
-                  return (
-                    <div className={`border ${borderClass} rounded-[1.5rem] p-5 shadow-sm relative overflow-hidden`}>
-                      <div className={`absolute top-0 right-0 ${badgeClass} text-white px-3 py-1 rounded-bl-xl font-bold text-xs tracking-wider`}>{smartAssignResult.score}% Match</div>
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-[1rem] bg-slate-200/50 text-slate-700 flex items-center justify-center font-semibold">{d.name.split(' ').map(n => n[0]).join('')}</div>
-                          <div>
-                            <h4 className="text-lg font-semibold text-slate-900">{d.name}</h4>
-                            <p className="text-sm font-semibold text-slate-500">{d.vehicle} &bull; {d.dist}</p>
-                          </div>
-                        </div>
-                        <button onClick={() => assignTripToDriver(smartAssignTrip.id, d.id)} className={`${btnClass} text-white px-5 py-2.5 rounded-[1rem] font-bold text-sm active:scale-95 transition-all shadow-md`}>Assign</button>
-                      </div>
-                      {smartAssignResult.reason && (
-                        <div className="mt-4 pt-4 border-t border-slate-200/50">
-                          <div className="flex gap-2 items-start">
-                            <BrainCircuit size={16} className="text-indigo-600 shrink-0 mt-0.5" />
-                            <p className="text-xs font-medium text-slate-700 leading-snug">{smartAssignResult.reason}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()
-              ) : smartAssignResult && !smartAssignResult.driverId ? (
-                <div className="p-6 text-center bg-slate-50 rounded-xl">
-                  <AlertCircle size={24} className="mx-auto text-amber-500 mb-2" />
-                  <p className="text-xs font-semibold text-slate-600">{smartAssignResult.reason || 'No suitable driver found'}</p>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
-  const _renderManualAssignModal = () => {
-    if (!manualAssignTrip) return null;
-    const availableDrivers = scopedDrivers.filter(d => d.status === 'Available');
-    const otherDrivers = scopedDrivers.filter(d => d.status !== 'Available');
-    
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-12">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setManualAssignTrip(null)} />
-        <div className="bg-white/95 backdrop-blur-xl w-full max-w-xl rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl relative z-10 border border-white/50 max-h-[90vh] flex flex-col">
-          <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[1rem] bg-blue-100 text-blue-700 flex items-center justify-center shadow-sm">
-                <Users size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-slate-900">Manual Assignment</h3>
-                <p className="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-widest">Assign: {manualAssignTrip.patient}</p>
-              </div>
-            </div>
-            <button onClick={() => setManualAssignTrip(null)} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin">
-            {availableDrivers.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-emerald-600 uppercase tracking-widest flex items-center gap-1.5"><CheckCircle2 size={12} /> Available Fleet</h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {availableDrivers.map(d => (
-                    <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
-                      className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl hover:bg-emerald-50 active:scale-[0.98] transition-all group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold">{String(d?.name || '?').charAt(0)}</div>
-                        <div className="text-left">
-                          <p className="text-sm font-semibold text-slate-900">{d.name}</p>
-                          <p className="text-xs font-medium text-slate-500">{d.vehicle} • {d.currentZone}</p>
-                        </div>
-                      </div>
-                      <ArrowRight size={16} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {otherDrivers.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Clock size={12} /> Other Drivers ({otherDrivers.length})</h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {otherDrivers.map(d => (
-                    <button key={d.id} onClick={() => { assignTripToDriver(manualAssignTrip.id, d.id); setManualAssignTrip(null); }}
-                      className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all group opacity-80 hover:opacity-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-semibold">{String(d?.name || '?').charAt(0)}</div>
-                        <div className="text-left">
-                          <p className="text-sm font-semibold text-slate-900">{d.name}</p>
-                          <p className="text-xs font-medium text-slate-500">Active &bull; {d.vehicle}</p>
-                        </div>
-                      </div>
-                      <ArrowRight size={16} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  const _renderOptimizeAllModal = () => {
-    if (!showOptimizeModal) return null;
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-12">
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => !aiAnalyzing && setShowOptimizeModal(false)} />
-        <div className="bg-white/90 backdrop-blur-xl w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/50">
-          <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white p-3 rounded-[1rem] shadow-md"><Wand2 size={24} /></div>
-              <h3 className="text-2xl font-semibold text-slate-900">Fleet AI Optimizer</h3>
-            </div>
-            {!aiAnalyzing && <button onClick={() => setShowOptimizeModal(false)} className="p-2.5 bg-slate-100 rounded-[1rem] text-slate-600 active:scale-95 transition-all"><X size={20} /></button>}
-          </div>
-          {aiAnalyzing ? (
-            <div className="py-8 flex flex-col items-center justify-center text-center space-y-6">
-              <div className="w-24 h-24 relative">
-                <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-                <BrainCircuit className="absolute inset-0 m-auto text-indigo-600 animate-pulse" size={32} />
-              </div>
-              <div>
-                <p className="text-xl font-semibold text-slate-800">Processing Daily Trips...</p>
-                <p className="text-sm font-medium text-slate-500 mt-2">Distributing for maximum fuel efficiency and zero wait time.</p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100 text-center">
-                <p className="text-sm font-semibold text-indigo-900 mb-2">Ready to optimize Agape Care routes?</p>
-                <p className="text-xs text-indigo-700/80">This will auto-assign all unassigned trips based on live traffic, capacity, and schedules.</p>
-              </div>
-              <button onClick={() => { triggerFleetOptimization().then(() => setShowOptimizeModal(false)); }} className="w-full py-4 bg-indigo-600 text-white rounded-[1rem] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-3 shadow-md shadow-indigo-500/30">
-                <Zap size={20} /> Launch Optimization
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+
+
+
 
 
   return (

@@ -141,7 +141,7 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
   // Build evidence records for every phone candidate found for this patient
   const phoneMap = new Map(); // phoneDigits -> Evidence object
 
-  const registerCandidate = (rawPhone, { locationText, siteName, side, trip, explicitLabel }) => {
+  const registerCandidate = (rawPhone, { locationText, siteName, side, explicitLabel }) => {
     const digits = normalizePhoneDigits(rawPhone);
     if (!isValidPhoneDigits(digits)) return;
     const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
@@ -355,7 +355,7 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
     const selectedFormatted = primaryPersonal.formatted;
     const resLoc = primaryPersonal.locations.find((l) => l.isHome);
     const locDesc = resLoc ? `associated with residential location (${resLoc.siteName || resLoc.locationText || 'HOME'})` : 'derived from personal pickup/dropoff contact';
-    
+
     let reasonText = `Selected ${selectedFormatted} as client phone (${locDesc} on ${primaryPersonal.appearsOnTrips} trip(s); confidence ${phoneConfidence}).`;
 
     if (facilityCandidates.length > 0) {
@@ -429,7 +429,7 @@ export const resolveClientPhoneForTrip = (trip, allTrips = []) => {
   const direct = [trip.patientPhone, trip.pickupPhone, trip.dropoffPhone]
     .map(normalizePhoneDigits)
     .find((digits) => isValidPhoneDigits(digits));
-  
+
   if (direct) {
     const ten = direct.length === 11 && direct.startsWith('1') ? direct.slice(1) : direct;
     return ten;

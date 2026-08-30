@@ -1,8 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import {
-  X, Plus, MapPin, Clock, User, Phone, FileText, Calendar,
-  CheckCircle2, AlertCircle, Repeat, Hash, Truck, Navigation
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Plus, MapPin, Clock, User, Phone, FileText, Calendar, Repeat, Hash, Truck, Navigation } from 'lucide-react';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -15,7 +12,7 @@ const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${Stri
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 const normalizeLogin = (value = '') => normalizeEmail(value).replace(/@auth\.agapecare\.local$/i, '');
 
-const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [], dispatchers = [] }) => {
+const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) => {
   const [form, setForm] = useState({
     patient: '',
     bookingId: generateBookingId(),

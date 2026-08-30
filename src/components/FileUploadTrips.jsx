@@ -1,30 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, ArrowRight, Download, Truck, X, Calendar, FileSpreadsheet } from 'lucide-react';
+import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, Truck, X, Calendar, FileSpreadsheet } from 'lucide-react';
 import { generateAiText } from '../services/secureAi';
 import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
-import { isCorruptedTripRecord } from '../utils/tripIntegrity';
+
 import { normalizeDateValue } from '../utils/normalizeDate';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 import { isCompanyDriverPlaceholder } from '../utils/driverIdentity';
-import { analyzePhoneOwnershipForTrips, isValidPhoneDigits } from '../utils/clientPhoneResolution';
+import { analyzePhoneOwnershipForTrips } from '../utils/clientPhoneResolution';
 
 
-const timeToMinutes = (t) => {
-  if (!t) return 1440;
-  const cleanTime = String(t).toUpperCase().trim();
-  if (cleanTime === 'WILL CALL' || cleanTime === 'WC') return 1440;
-  const m = cleanTime.match(/(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?/);
-  if (!m) return 1440;
-  let h = parseInt(m[1], 10);
-  let min = parseInt(m[2] || '0', 10);
-  const p = m[3];
-  if (p === 'PM' && h < 12) h += 12;
-  if (p === 'AM' && h === 12) h = 0;
-  return h * 60 + min;
-};
+
 
 const COLUMN_ALIASES = {
   bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id', 'tripid', 'trip_id', 'trip number', 'order id', 'order number', 'booking', 'confirmation #', 'confirmation', 'reservation'],
@@ -228,7 +216,7 @@ function parseExcel(buffer) {
 
 function processRawRows(rawRows) {
   if (!rawRows || rawRows.length === 0) return [];
-  
+
   // Detect Agape 2-row report format (check data rows, NOT the header row)
   let isAgapeReport = false;
   for (let ri = 1; ri < rawRows.length; ri++) {
@@ -238,7 +226,7 @@ function processRawRows(rawRows) {
     const hasSig = r.some(v => String(v).toUpperCase() === 'YES' || String(v).toUpperCase() === 'NO');
     if (hasActivity && hasSig) { isAgapeReport = true; break; }
   }
-  
+
   if (isAgapeReport) {
     const dataRows = rawRows.filter(r => r && (String(r[4]).toUpperCase() === 'PICKUP' || String(r[4]).toUpperCase() === 'DROPOFF' || String(r.join(' ')).toUpperCase().includes('PICKUP')));
     const grouped = [];
@@ -246,16 +234,16 @@ function processRawRows(rawRows) {
     // New format: p[6]=arrival, p[7]=odometer, p[8]=travel time, p[9]=address, p[10]=signature
     // Old format: p[6]="time odo", p[7]=travel time, p[8]=address, p[9]=distance, p[10]=signature
     const firstRow = dataRows[0];
-    const isNewFormat = firstRow && firstRow.length >= 10 && 
-      /^\d{1,2}:\d{2}$/.test(String(firstRow[6] || '').trim()) && 
+    const isNewFormat = firstRow && firstRow.length >= 10 &&
+      /^\d{1,2}:\d{2}$/.test(String(firstRow[6] || '').trim()) &&
       /^\d+$/.test(String(firstRow[7] || '').trim().replace(/,/g, ''));
-    
+
     for (let i = 0; i < dataRows.length; i += 2) {
       const p = dataRows[i];
       const d = dataRows[i + 1] || p;
-      
+
       let pArr, pOdo, dArr, dOdo, travelTime;
-      
+
       if (isNewFormat) {
         // New: separate columns
         pArr = String(p[6] || '').trim();
@@ -273,27 +261,27 @@ function processRawRows(rawRows) {
         dOdo = dSplit[1] || dSplit[0] || '';
         travelTime = String(p[7] || d[7] || '');
       }
-      
+
       const driverStr = String(p[5] || '');
       const dName = driverStr.split(' ')[0] || '';
       const veh = driverStr.split(' ').slice(1).join(' ') || '';
-      
+
       // Booking ID from column 0
       const bookingId = String(p[0] || '').trim();
-      
+
       // Address column index varies by format
       const addrIdx = isNewFormat ? 9 : 8;
       const shortAddrIdx = 1;
-      
+
       let pickupAddr = String(p[addrIdx] || p[shortAddrIdx] || '').trim();
       let dropoffAddr = String(d[addrIdx] || d[shortAddrIdx] || '').trim();
-      
+
       if (!pickupAddr && String(p[shortAddrIdx] || '').trim()) pickupAddr = String(p[shortAddrIdx] || '').trim();
       if (!dropoffAddr && String(d[shortAddrIdx] || '').trim()) dropoffAddr = String(d[shortAddrIdx] || '').trim();
-      
+
       // Signature column index varies
       const sigIdx = isNewFormat ? 10 : 10;
-      
+
       grouped.push({
         'Trip ID': bookingId,
         'Client Name': String(p[3] || d[3] || ''),
@@ -315,7 +303,7 @@ function processRawRows(rawRows) {
     }
     return grouped;
   }
-  
+
   // Standard format with headers
   const headers = rawRows[0].map(h => String(h || '').trim());
   const objects = [];
@@ -574,9 +562,9 @@ const Badge = ({ children, variant = 'info' }) => {
 const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', uploadContext = 'operations' }) => {
   const [file, setFile] = useState(null);
   const [step, setStep] = useState('upload');
-  const [parsedRows, setParsedRows] = useState([]);
+  const [, setParsedRows] = useState([]);
   const [mappedTrips, setMappedTrips] = useState([]);
-  const [aiResults, setAiResults] = useState([]);
+  const [, setAiResults] = useState([]);
   const [error, setError] = useState('');
   const [progressMsg, setProgressMsg] = useState('');
   const [progressPct, setProgressPct] = useState(0);
@@ -584,7 +572,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const [aiCanSkip, setAiCanSkip] = useState(false);
   const [detectedColumns, setDetectedColumns] = useState({});
   const [allColumnNames, setAllColumnNames] = useState([]);
-  const [selectedCount, setSelectedCount] = useState(0);
+  const [, setSelectedCount] = useState(0);
   const [assignToDriver, setAssignToDriver] = useState(preSelectDriver || '');
   const [showAssignPrompt, setShowAssignPrompt] = useState(true);
   // Date override: 'file' = use dates from file, 'manual' = use a single date for all trips
@@ -653,7 +641,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const buffer = await file.arrayBuffer();
         rows = parseExcel(buffer);
       }
-      
+
       // ALWAYS try to merge paired rows, regardless of file format
       rows = mergePairedActivityRows(rows);
 
@@ -671,7 +659,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const idx = findColumn(Object.keys(rows[0]), COLUMN_ALIASES[field]);
         colMap[field] = idx !== -1 ? Object.keys(rows[0])[idx] : null;
       });
-      
+
       // Detect Site Names
       const pickupSiteColIdx = findColumn(Object.keys(rows[0]), ['site name origin', 'pickup site', 'origin site', 'pickup location name']);
       const dropoffSiteColIdx = findColumn(Object.keys(rows[0]), ['site name destination', 'dropoff site', 'destination site', 'dropoff location name']);
@@ -818,7 +806,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       const mapped = rows.map((row, idx) => {
         const m = mapColumns(row);
         const pKey = (m.patient || '').trim().toLowerCase();
-        
+
         const puDigits = cleanPhone(m.pickupPhone);
         const doDigits = cleanPhone(m.dropoffPhone);
         const validPu = puDigits && isValidPhone(puDigits) ? puDigits : '';
@@ -861,11 +849,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         };
 
         // Parse signature from YES/NO text or boolean
-        const parseSig = (val) => {
-          if (typeof val === 'boolean') return val;
-          if (!val) return false;
-          return String(val).toUpperCase() === 'YES' || String(val).toUpperCase() === 'Y' || String(val).toUpperCase() === 'TRUE' || String(val) === '1';
-        };
+
 
         // Extract distance from multiple possible sources
         const distance = parseDistance(
@@ -1048,7 +1032,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         }
       });
 
-      inoutGroups.forEach((trips, groupId) => {
+      inoutGroups.forEach((trips) => {
         if (trips.length < 2) return;
 
         // Find the best client phone: the phone that is NOT a hospital/facility phone
@@ -1197,17 +1181,17 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const confirmImport = () => {
     const tripSource = uploadContext === 'reports' ? 'report_upload' : 'dispatch_upload';
-    
+
     const effectiveDateMode = fileDates.length > 0 ? dateMode : 'manual';
     if (uploadContext === 'reports' && effectiveDateMode === 'manual' && !manualDate) {
       setError('Please select a service date for this file before importing.');
       return;
     }
 
-    const cleanTrips = mappedTrips.map(({ _originalRow, _hasIssues, _issues, _confidence, ...trip }) => {
+    const cleanTrips = mappedTrips.map(({ _originalRow, ...trip }) => {
       const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
       let newStatus = trip.status;
-      
+
       if (forceCompleted) {
         newStatus = 'Completed';
       } else if (finalDriverId) {
@@ -1445,8 +1429,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
-                        <select 
-                          value={trip.driverId || ''} 
+                        <select
+                          value={trip.driverId || ''}
                           onChange={(e) => {
                             setMappedTrips(prev => prev.map((t, i) => i === idx ? { ...t, driverId: e.target.value } : t));
                           }}
@@ -1563,7 +1547,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                       </button>
                     )}
                   </div>
-                  
+
                   {assignToDriver && (
                     <p className="text-xs text-emerald-700 font-black flex items-center gap-1.5 uppercase tracking-wider">
                       <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {drivers.find(d => d.id === assignToDriver)?.name}

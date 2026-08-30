@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { X, Send, CheckCircle, AlertCircle, Loader2, MessageSquare } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 

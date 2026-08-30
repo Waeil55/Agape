@@ -27,7 +27,7 @@ describe('agape prime motion tokens', () => {
   });
 });
 
-describe('agape prime ui primitives', () => {
+describe('active shared loading primitive', () => {
   it('skeleton renders shimmer blocks without layout animation', () => {
     const source = readComponent('Skeleton.jsx');
     expect(source).toContain('ui-skeleton');
@@ -35,46 +35,4 @@ describe('agape prime ui primitives', () => {
     expect(source).not.toContain('width:');
   });
 
-  it('pressable card is keyboard operable and transform-based', () => {
-    const source = readComponent('PressableCard.jsx');
-    expect(source).toContain("role={interactive ? 'button' : undefined}");
-    expect(source).toContain("event.key === 'Enter'");
-    expect(source).toContain('active:scale-');
-    expect(source).not.toContain('transition-all');
-  });
-
-  it('segmented control exposes tablist semantics with sliding pill', () => {
-    const source = readComponent('SegmentedControl.jsx');
-    expect(source).toContain('role="tablist"');
-    expect(source).toContain('aria-selected={active}');
-    expect(source).toContain('translateX(');
-  });
-
-  it('sheet is a modal dialog with drag-to-dismiss and escape support', () => {
-    const source = readComponent('Sheet.jsx');
-    expect(source).toContain('role="dialog" aria-modal="true"');
-    expect(source).toContain("'Escape'");
-    expect(source).toContain('> 96');
-    expect(source).toContain('rounded-t-3xl');
-    expect(source).toContain('overscroll-contain');
-  });
-
-  it('stat tile uses tabular numerals and semantic tones', () => {
-    const source = readComponent('StatTile.jsx');
-    expect(source).toContain('tabular-nums');
-    expect(source).toContain('TONES[tone]');
-  });
-
-  it('sparkline stays dependency-free inline svg', () => {
-    const source = readComponent('Sparkline.jsx');
-    const externalImports = [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1]).filter((module) => module !== 'react');
-    expect(externalImports).toEqual([]);
-    expect(source).toContain('<path');
-  });
-
-  it('empty state offers action affordance and focus ring', () => {
-    const source = readComponent('EmptyState.jsx');
-    expect(source).toContain('actionLabel');
-    expect(source).toContain('focus-visible:ring-2');
-  });
 });

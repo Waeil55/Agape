@@ -16,7 +16,6 @@ describe('premium navy visual system contract', () => {
   it('uses navy for app chrome and keeps secondary surfaces neutral', () => {
     const styles = readSource('../index.css');
     const dashboard = readSource('./DesktopEnterpriseDashboard.jsx');
-    const table = readSource('./ui/AppTable.jsx');
 
     expect(styles).toContain('--brand-primary: #2A52AC');
     expect(styles).toContain('linear-gradient(110deg, #1F428F');
@@ -24,7 +23,6 @@ describe('premium navy visual system contract', () => {
     expect(styles).toContain('background-color: #f3f5fa !important');
     expect(styles).toContain('.bg-blue-600 { background-color: #2a52ac !important; }');
     expect(dashboard).toContain('bg-[var(--brand-primary)]');
-    expect(table).toContain('bg-[var(--brand-primary)]');
   });
 
   it('aligns web and native shell metadata to navy', () => {

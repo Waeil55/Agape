@@ -37,7 +37,7 @@ export function useDriverLocationStream({
   const flushingRef = useRef(false);
   const driverId = driver?.id || '';
   const batchQueueRef = useRef([]);
-  const lastTrailWriteRef = useRef(0);
+
   // UI-position throttle: raw GPS samples arrive every 1-2s; pushing each one
   // into React state re-renders the whole driver page. The stream's internal
   // ref stays per-sample accurate; consumers get at most ~4s staleness or a
@@ -138,7 +138,7 @@ export function useDriverLocationStream({
       const lastSent = lastSentRef.current;
       const lastSentMs = Date.parse(lastSent?.capturedAt || 0);
       const elapsedMs = Date.now() - lastSentMs;
-      
+
       let shouldFlush = false;
       if (!Number.isFinite(lastSentMs) || elapsedMs >= 10000) {
         shouldFlush = true; // throttle time

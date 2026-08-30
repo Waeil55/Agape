@@ -119,7 +119,7 @@ describe('SyncQueueProcessor ownership and terminal failure handling', () => {
   });
 
   it('does not replay an outbox concurrently in another browser tab', async () => {
-    const request = vi.fn(async (_name, options, callback) => callback(null));
+    const request = vi.fn(async (_name, _options, callback) => callback(null));
     vi.stubGlobal('navigator', { onLine: true, locks: { request } });
     const processor = authenticatedStartedProcessor();
     localDBMock.getPendingSyncOperations.mockResolvedValue([operation()]);

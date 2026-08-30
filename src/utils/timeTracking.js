@@ -1,7 +1,7 @@
 /**
  * AUTOMATED TIME TRACKING ENGINE
  * Event-driven, GPS-verified, audit-logged, multi-session aware.
- * 
+ *
  * States: OFF_SHIFT → ON_SHIFT_ACTIVE ↔ ON_BREAK → PENDING_RESUME → OFF_SHIFT
  * Payroll is based on EVENTS, not raw clock-in/out times.
  */
@@ -206,7 +206,7 @@ export const evaluateVerifiedTripWorkEvidence = ({ trip, driver, pickupLocation,
 // ─── GPS ANCHOR CALCULATION ──────────────────────────────────────
 /**
  * Calculate the auto clock-in time based on policy mode.
- * 
+ *
  * @param {Object} params
  * @param {string} params.policyMode - PAY_FROM_HOME | PAY_FROM_FIRST_PICKUP | SMART_MODE
  * @param {Object} params.driver - Driver profile with homeLat/homeLng
@@ -316,7 +316,7 @@ export const calculateAnchor = ({ policyMode, driver, lastWorkLocation, pickupLo
 // ─── GAP CLASSIFICATION ──────────────────────────────────────────
 /**
  * Classify the gap between two events.
- * 
+ *
  * @param {Date|string} lastEventTime
  * @param {Date|string} nextEventTime
  * @param {Object} lastLocation - { lat, lng }
@@ -393,7 +393,7 @@ export const classifyGap = (lastEventTime, nextEventTime, lastLocation, nextLoca
 /**
  * Stitch multiple trips/events into work sessions.
  * Connects trips but removes/excludes personal gap time.
- * 
+ *
  * @param {Array} events - Sorted array of time events
  * @returns {{ sessions: Array, totalBillableMinutes: number, gapLog: Array }}
  */
@@ -461,7 +461,7 @@ export const validateTimeEventSequence = (events, options = {}) => {
   return {
     valid: anomalies.length === 0,
     anomalies,
-    normalizedEvents: normalizedEvents.map(({ _sourceIndex, _ms, ...event }) => event),
+    normalizedEvents: normalizedEvents.map(({ ...event }) => event),
     hasOpenShift: onShift,
     hasOpenBreak: onShift && onBreak,
   };
@@ -616,7 +616,7 @@ export const stitchSessions = (events, options = {}) => {
   sessions.forEach((session) => {
     delete session.clockInMs;
     delete session.breakStartMs;
-    session.events = session.events.map(({ _ms, _index, ...event }) => event);
+    session.events = session.events.map(({ ...event }) => event);
     const maxShiftMilliseconds = Number(options.maxShiftHours || 18) * 3600000;
     const maxBreakMilliseconds = Number(options.maxBreakHours || 4) * 3600000;
     if (session.totalMilliseconds > maxShiftMilliseconds) {
@@ -635,7 +635,7 @@ export const stitchSessions = (events, options = {}) => {
 // ─── END OF DAY AUTO CLOCK-OUT ───────────────────────────────────
 /**
  * Generate a pending clock-out event after last trip.
- * 
+ *
  * @param {Object} params
  * @param {Object} params.lastTrip - Last completed trip
  * @param {Object} params.driver - Driver profile
@@ -715,7 +715,7 @@ export const generatePendingClockOut = ({ lastTrip, driver, policyMode }) => {
 // ─── ANTI-ABUSE DETECTION ────────────────────────────────────────
 /**
  * Detect potential time tracking abuse.
- * 
+ *
  * @param {Object} params
  * @param {Array} params.breadcrumbs - GPS trail during the period
  * @param {Object} params.clockInLocation - Where driver clocked in
@@ -723,7 +723,7 @@ export const generatePendingClockOut = ({ lastTrip, driver, policyMode }) => {
  * @param {number} params.durationMinutes - Total shift duration
  * @returns {{ flags: Array, suspicious: boolean, details: Object }}
  */
-export const detectAbuse = ({ breadcrumbs, clockInLocation, clockOutLocation, durationMinutes: _durationMinutes }) => {
+export const detectAbuse = ({ breadcrumbs, clockInLocation, clockOutLocation }) => {
   const flags = [];
   const details = {};
 
@@ -782,7 +782,7 @@ export const detectAbuse = ({ breadcrumbs, clockInLocation, clockOutLocation, du
 // ─── BUILD TIME EVENTS FROM TRIPS ────────────────────────────────
 /**
  * Convert trip data into time tracking events.
- * 
+ *
  * @param {Array} trips - Driver's trips for the day
  * @param {Object} driver - Driver profile
  * @param {Object} clockEvents - Clock in/out events
@@ -1196,7 +1196,7 @@ export const buildTimeEvents = (trips, driver, clockEvents, policyMode = POLICY_
 // ─── PAYROLL OUTPUT ──────────────────────────────────────────────
 /**
  * Generate payroll output for a day.
- * 
+ *
  * @param {Object} timeData - Output from buildTimeEvents
  * @param {number} hourlyRate - Driver's hourly rate
  * @returns {{ payTime: Object, sessionBreakdown: Array, gapLogs: Array, adminNotes: Array }}

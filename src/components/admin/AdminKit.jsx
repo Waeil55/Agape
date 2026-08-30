@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 /* =====================================================================
    Agape Admin Design System — Shared Primitives
@@ -6,12 +6,7 @@ import React from 'react';
    ===================================================================== */
 
 /* Lightweight inline glyphs so the kit has zero hard icon dependencies */
-const ShieldGlyph = ({ size = 20, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
-    <path d="M9 12l2 2 4-4" />
-  </svg>
-);
+
 
 const SearchGlyph = ({ size = 16, className }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>

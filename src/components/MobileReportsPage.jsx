@@ -1,9 +1,5 @@
-import React, { useDeferredValue, useState, useMemo, useEffect } from 'react';
-import { 
-  ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, 
-  XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Upload, FileText,
-  Download, Repeat
-} from 'lucide-react';
+import { useDeferredValue, useState, useMemo, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat } from 'lucide-react';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
@@ -320,8 +316,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         <div className="flex gap-2">
           <div className="agape-mobile-search flex-1">
             <Search className="w-5 h-5 text-slate-400 shrink-0" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Patient, trip, phone..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setExpandedTripId(null); }}
@@ -348,7 +344,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             <span className="agape-mobile-chip">{filteredTrips.length} trips</span>
             <span className="agape-mobile-chip agape-mobile-chip-success">{filteredTrips.filter(t => t.reviewed).length}/{filteredTrips.length} reviewed</span>
           </div>
-          <button 
+          <button
             disabled={readOnly || isLoading}
             className="agape-mobile-review-btn"
             onClick={async () => {
@@ -374,7 +370,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             const tone = getReportTripTone(trip);
             const StatusIcon = getReportStatusIcon(tone);
             const displayStatus = isEditing ? ie.status : (trip.status || (trip.reviewed ? 'Reviewed' : 'Pending'));
-            
+
             return (
               <div key={trip.id} className={`agape-trip-list-card agape-trip-${tone}`}>
                 <div className="agape-trip-card-summary">

@@ -1,11 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
-import {
-  Search, Plus, Upload, Route, Users, Truck, MapPin, Phone,
-  ChevronDown, X, User, Edit2, Archive, Ban, AlertTriangle,
-  Repeat, MessageSquare, SlidersHorizontal, ChevronRight,
-  Navigation, Clock, CheckCircle2, XCircle, Play, UserCheck,
-  MoreHorizontal
-} from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Search, Plus, Upload, Route, Users, Truck, MapPin, Phone, X, Edit2, Ban, Repeat, MessageSquare, SlidersHorizontal, ChevronRight, XCircle, Play, UserCheck, MoreHorizontal } from "lucide-react";
 import { getDriverLiveStatus } from "../constants/statuses";
 import { tripCalendarDateKey, localCalendarYmd } from "../utils/tripDate";
 import { tripMatchesSearch } from "../utils/search";
@@ -65,10 +59,7 @@ const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str 
 const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
 /* ─── Admin Trip Card ─────────────────────────────────────────────── */
-const AdminTripCard = ({ 
-  trip, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS,
-  requestDeleteTrip, updateTrip, requestAuthAction, currentUser, addToast, role
-}) => {
+const AdminTripCard = ({ trip, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role }) => {
   const [showActions, setShowActions] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -182,15 +173,15 @@ const AdminTripCard = ({
         type="button"
         onClick={() => onOpenTripDetails?.(trip)}
         className={`w-full min-h-11 text-left bg-white rounded-xl border shadow-sm active:scale-[0.985] transition-[border-color,box-shadow,transform] duration-150 overflow-hidden ${
-          isActive ? "border-amber-200 shadow-amber-100/60" : 
-          isTerminal ? "border-slate-100 opacity-80" : 
+          isActive ? "border-amber-200 shadow-amber-100/60" :
+          isTerminal ? "border-slate-100 opacity-80" :
           trip.status === "Unassigned" ? "border-rose-200 shadow-rose-50" : "border-slate-200"
         }`}
         style={{ WebkitTapHighlightColor: "transparent" }}
       >
         {/* Status accent line */}
         <div className={`h-0.5 w-full ${statusCfg.bg} opacity-60`} />
-        
+
         <div className="px-3.5 pt-3 pb-2.5">
           {/* Row 1: Time + Patient + Status */}
           <div className="flex items-start gap-2.5">
@@ -360,8 +351,8 @@ const AdminTripCard = ({
                           setShowActions(false);
                         }}
                         className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors active:scale-[0.98] text-left ${
-                          d.id === trip.driverId 
-                            ? "border-blue-200 bg-blue-50" 
+                          d.id === trip.driverId
+                            ? "border-blue-200 bg-blue-50"
                             : "border-slate-100 bg-white hover:bg-slate-50"
                         }`}
                       >
@@ -494,17 +485,7 @@ const DriverRow = ({ driver, trips }) => {
 };
 
 /* ─── Main Component ──────────────────────────────────────────────── */
-const MobileDispatchView = ({
-  role, currentUser, trips=[], drivers=[], dispatchers=[],
-  assignTripToDriver, bulkAssignTrips, setBulkAssignModal,
-  requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction,
-  setTripDetails, setShowAddTripModal, setShowUploadModal,
-  onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery,
-  addToast, phoneNumbers, onOpenTripDetails, onOpenTripWorkflow,
-  workspaceControls = null,
-  activeTab = "trips", // Controlled by parent bottom nav
-  expandedId: expandedIdProp, setExpandedId: setExpandedIdProp
-}) => {
+const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assignTripToDriver, setBulkAssignModal, requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery, addToast, onOpenTripDetails, onOpenTripWorkflow, workspaceControls = null, activeTab = "trips" }) => {
   const [filter, setFilter] = useState("all");
   const [showTools, setShowTools] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery || "");

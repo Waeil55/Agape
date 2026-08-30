@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   Activity, Wifi, AlertTriangle, CheckCircle, Clock,
   Truck, Database, RefreshCw, TrendingUp, TrendingDown, Shield, Zap
@@ -42,7 +42,7 @@ export const formatSystemSyncTime = (value) => {
   return Number.isNaN(parsed.getTime()) ? 'Not recorded' : parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
-export default function SystemHealthDashboard({ trips = [], drivers = [], logs = [], appSettings = {} }) {
+export default function SystemHealthDashboard({ trips = [], drivers = [], logs = [] }) {
   const todayKey = useMemo(() => localCalendarYmd(), []);
 
   const appStats = useMemo(() => {

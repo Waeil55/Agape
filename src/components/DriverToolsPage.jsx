@@ -4,7 +4,7 @@ import {
   Route, Repeat, AlertTriangle, Zap, ChevronDown, ChevronUp,
   Timer, Copy, CheckSquare, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { impact } from '../utils/haptics';
+
 import { openMapLink } from '../utils/nativeActions';
 import { GOOGLE_MAPS_API_KEY } from '../config/firebase';
 import { loadGoogleMapsApi } from '../hooks/useGoogleMaps';
@@ -196,15 +196,7 @@ const RouteStopRow = React.memo(({
 ));
 RouteStopRow.displayName = 'RouteStopRow';
 
-const RoutePlanSession = ({
-  routePlanStops = null,
-  onSetRoutePlanStops = null,
-  appSettings = {},
-  onSendToSequencer = null,
-  onOpenSequencer = null,
-  currentUser = 'driver',
-  driverPosition = null,
-}) => {
+const RoutePlanSession = ({ routePlanStops = null, onSetRoutePlanStops = null, appSettings = {}, onSendToSequencer = null, onOpenSequencer = null, driverPosition = null }) => {
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
   const [stops, setStops] = useState(() => normalizeStopOrder([createBlankStop('A')], driverPosition));
@@ -738,21 +730,7 @@ export const RoutePlanSection = (props) => {
   return <RoutePlanSession key={sessionIdentity} {...props} />;
 };
 
-const DriverToolsPage = ({
-  trips, activeTrips, aiSequence, aiSuggestions, aiRideShare, conflicts,
-  aiOptimizing, guidedMode, guidedStepIndex, guidedSteps,
-  driverPosition, appSettings, currentUser, role,
-  onSetGuidedMode, onSetGuidedStepIndex, onSetAiSequence, onSetAiSuggestions,
-  onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas = {},
-  onOpenInNav,
-  onOpenSequencer,
-  requestAuthAction = () => {},
-  routePlanStops = null,
-  onSetRoutePlanStops = null,
-  onSendToSequencer = null,
-  isLoading = false,
-  readOnly = false
-}) => {
+const DriverToolsPage = ({ trips, activeTrips, aiSequence, aiSuggestions, aiRideShare, conflicts, aiOptimizing, guidedMode, guidedStepIndex, driverPosition, appSettings, currentUser, role, onSetGuidedMode, onSetGuidedStepIndex, onSetAiSequence, onSetAiSuggestions, onRunAiOptimization, onSelectAllTrips, selectedTrips, onSetSelectedTrips, etas = {}, onOpenInNav, onOpenSequencer, requestAuthAction = () => {}, routePlanStops = null, onSetRoutePlanStops = null, onSendToSequencer = null, isLoading = false, readOnly = false }) => {
   const [expandedSection, setExpandedSection] = useState('route');
   const quickNavId = useId();
   const etasId = useId();

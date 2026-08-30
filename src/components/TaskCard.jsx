@@ -69,7 +69,7 @@ const getTimeUrgency = (timeOrTask, status) => {
   if (ampm === 'AM' && h === 12) h = 0;
   const tripMins = h * 60 + m;
   const diff = tripMins - nowMins;
-  const activeStatuses = ['IN PROGRESS', 'IN TRANSIT', 'AT PICKUP', 'AT DROPOFF', 'NAVIGATING PICKUP', 'NAVIGATING DROPOFF'];
+
   if (diff < 0) return { type: 'critical', diff, isPastDue: true };
   if (diff > 0 && diff <= 30) return { type: 'critical', diff };
   if (diff > 30 && diff <= 60) return { type: 'warning', diff };
@@ -130,7 +130,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
   const isAnotherExpanded = expandedId !== null && expandedId !== undefined && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const menuRef = useRef(null);
 
   useEffect(() => {
