@@ -17,6 +17,10 @@ const mainSource = readFileSync(
   new URL('../main.jsx', import.meta.url),
   'utf8',
 );
+const tableKeyboardSource = readFileSync(
+  new URL('./tableKeyboardNavigation.js', import.meta.url),
+  'utf8',
+);
 const appSource = readFileSync(
   new URL('../App.jsx', import.meta.url),
   'utf8',
@@ -74,14 +78,12 @@ describe('interaction latency regression contract', () => {
     expect(chatSource).toContain('if (!currentUser || alerts) return;');
   });
 
-  it('does not scan every table row in the global capture-phase click handler', () => {
-    const clickHandlerStart = mainSource.indexOf("document.addEventListener('click'");
-    const clickHandlerEnd = mainSource.indexOf("document.addEventListener('keydown'", clickHandlerStart);
-    const clickHandler = mainSource.slice(clickHandlerStart, clickHandlerEnd);
-
-    expect(clickHandlerStart).toBeGreaterThan(-1);
-    expect(mainSource).toContain('let selectedTableRow = null');
-    expect(clickHandler).not.toContain('querySelectorAll');
+  it('installs one delegated, mutation-aware table keyboard controller', () => {
+    expect(mainSource).toContain('installTableKeyboardNavigation(document)');
+    expect(mainSource).not.toContain("document.addEventListener('click'");
+    expect(tableKeyboardSource).toContain("rootDocument.addEventListener('keydown', handleKeyDown)");
+    expect(tableKeyboardSource).toContain('MutationObserver');
+    expect(tableKeyboardSource).not.toContain("handleClick = (event) => {\n    rootDocument.querySelectorAll");
   });
 
   it('marks telemetry and declaration echoes as non-urgent rendering work', () => {

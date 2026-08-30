@@ -1874,6 +1874,16 @@ table tbody tr:hover {
   background-color: rgba(248, 250, 252, 0.95);
 }
 
+table tbody tr[data-agape-selected='true'] {
+  background-color: rgba(219, 234, 254, 0.72);
+}
+
+table tbody tr:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  background-color: rgba(219, 234, 254, 0.82);
+}
+
 table tbody td {
   padding-top: 0.125rem;
   padding-bottom: 0.125rem;

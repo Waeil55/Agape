@@ -43,6 +43,13 @@ describe('global page and table layout contract', () => {
     expect(portal).not.toContain('bulkMenuOpen');
   });
 
+  it('keeps the reports workspace switcher at a compact accessible height', () => {
+    const reportsShell = read('src/components/ReportsPage.jsx');
+    expect(reportsShell).toContain('group flex h-11 min-w-0');
+    expect(reportsShell).not.toContain('group flex min-h-12 min-w-0');
+    expect(reportsShell).toContain('shrink-0 border-b border-slate-200 bg-white px-3 py-1.5');
+  });
+
   it('keeps every real table inside the page without horizontal table scrolling', () => {
     const files = collectSourceFiles(join(root, 'src'));
     const tableFiles = files.filter((path) => readFileSync(path, 'utf8').includes('<table'));

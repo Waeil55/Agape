@@ -4,6 +4,7 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
 import { AccessibilityProvider } from './contexts/AccessibilityContext';
+import { installTableKeyboardNavigation } from './utils/tableKeyboardNavigation';
 import './index.css';
 
 // Runtime safety net: unhandled failures must never die silently. They are
@@ -19,49 +20,7 @@ const reportUnhandled = (kind) => (event) => {
 window.addEventListener('unhandledrejection', reportUnhandled('unhandled-rejection'));
 window.addEventListener('error', reportUnhandled('unhandled-error'));
 
-// Global table row selection logic for desktop view. Keep one direct reference
-// instead of rescanning every table after every pointer interaction.
-let selectedTableRow = null;
-document.addEventListener('click', (e) => {
-  const tr = e.target.closest('table tbody tr');
-  if (tr) {
-    if (selectedTableRow && selectedTableRow !== tr) selectedTableRow.removeAttribute('data-agape-selected');
-    selectedTableRow = tr;
-    tr.setAttribute('data-agape-selected', 'true');
-  } else if (!e.target.closest('table')) {
-    selectedTableRow?.removeAttribute('data-agape-selected');
-    selectedTableRow = null;
-  }
-}, true);
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-    // Do not interfere if user is typing in an input field
-    const activeTagName = document.activeElement ? document.activeElement.tagName : '';
-    if (activeTagName === 'INPUT' || activeTagName === 'TEXTAREA' || activeTagName === 'SELECT') {
-      return;
-    }
-
-    if (selectedTableRow?.isConnected) {
-      const current = selectedTableRow;
-      let target = null;
-      
-      if (e.key === 'ArrowUp') {
-        target = current.previousElementSibling;
-      } else if (e.key === 'ArrowDown') {
-        target = current.nextElementSibling;
-      }
-      
-      if (target && target.tagName === 'TR') {
-        e.preventDefault(); // Prevent page scrolling
-        current.removeAttribute('data-agape-selected');
-        target.setAttribute('data-agape-selected', 'true');
-        selectedTableRow = target;
-        target.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }
-});
+installTableKeyboardNavigation(document);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

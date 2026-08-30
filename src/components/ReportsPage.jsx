@@ -82,9 +82,9 @@ const ReportsPage = (props) => {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Reports workspace">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
-        <label className="relative flex min-h-[64px] items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 sm:hidden">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><ActiveIcon size={18} /></span>
+      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5 sm:px-4">
+        <label className="relative flex min-h-14 items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3 sm:hidden">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><ActiveIcon size={17} /></span>
           <span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-700">Reports workspace</span><span className="block truncate text-sm font-bold text-slate-950">{activeSection.label}</span><span className="block truncate text-[10px] font-semibold text-slate-600">{activeSection.description}</span></span>
           <ChevronDown size={17} className="text-blue-700" />
           <select aria-label="Reports section" value={section} onChange={(event) => setSection(event.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
@@ -102,10 +102,10 @@ const ReportsPage = (props) => {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setSection(item.id)}
-                className={`group flex min-h-12 min-w-0 flex-1 basis-[180px] items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
+                className={`group flex h-11 min-w-0 flex-1 basis-[180px] items-center gap-2 rounded-xl border px-2.5 py-1 text-left transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-blue-700'}`}>
-                  <Icon size={16} aria-hidden="true" />
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-blue-700'}`}>
+                  <Icon size={15} aria-hidden="true" />
                 </span>
                 <span className="min-w-0">
                   <span className="flex items-center gap-1.5 text-xs font-bold">
