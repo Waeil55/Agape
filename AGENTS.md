@@ -54,7 +54,7 @@ without direct evidence. State any external or human verification that remains.
 
 ## Agape UI conventions
 
-- Default to light mode unless the user explicitly selects dark mode.
+- The application is light-only. Do not add theme selection or dark-mode variants.
 - Use the existing admin/mobile component systems and Tailwind `slate`
   palette. Do not introduce `gray-*` utility classes or unexplained hardcoded
   colors.

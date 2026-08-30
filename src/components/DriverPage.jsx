@@ -14,7 +14,7 @@ const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
-import { Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Sun, Moon, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
+import { Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { tripMatchesSearch } from '../utils/search';
 import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, evaluateVerifiedTripWorkEvidence, classifyGap, buildTimeEvents } from '../utils/timeTracking';
@@ -7050,24 +7050,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </div>
               </div>
               <div className="p-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: 'light', label: 'Light', icon: Sun },
-                    { value: 'dark', label: 'Dark', icon: Moon },
-                  ].map((option) => {
-                    const Icon = option.icon;
-                    const active = appSettings?.theme === option.value;
-                    return (
-                      <button key={option.value} type="button" aria-pressed={active}
-                        onClick={() => onUpdateAppSettings?.({ theme: option.value })}
-                        className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border text-xs font-semibold transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                      >
-                        <Icon size={15} /> {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Text size</p>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Text size</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: 'sm', label: 'Compact' },

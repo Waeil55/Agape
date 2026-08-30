@@ -67,9 +67,8 @@
   --touch-min: 48px;
 }
 
-/* ===== LIGHT THEME (Premium Enterprise) ===== */
-:root,
-[data-theme="light"] {
+/* ===== LIGHT-ONLY DESIGN (Premium Enterprise) ===== */
+:root {
   /* Prompt palette aliases */
   --primary: #2A52AC;
   --primary-hover: #1F428F;
@@ -235,73 +234,6 @@
   }
 }
 
-/* ===== DARK THEME (Ultra-Modern Space) ===== */
-[data-theme="dark"] {
-  --bg-app: #050505;
-  --bg-surface: #0a0a0a;
-  --bg-surface-elevated: #111111;
-  --bg-surface-subtle: #080808;
-  --bg-card: #111111;
-  --bg-input: #1a1a1a;
-  --bg-hover: #1a1a1a;
-  --bg-active: #222222;
-
-  --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #71717a;
-  --text-inverse: #000000;
-  --text-link: #7EA2FF;
-
-  --brand-primary: #5B84F1;
-  --brand-primary-hover: #7EA2FF;
-  --brand-primary-light: #3157B7;
-  --brand-primary-subtle: #172554;
-  --brand-accent: #6D91F5;
-
-  --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.1);
-  --success-border: rgba(16, 185, 129, 0.2);
-  --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.1);
-  --warning-border: rgba(245, 158, 11, 0.2);
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.1);
-  --danger-border: rgba(239, 68, 68, 0.2);
-  --info: #7EA2FF;
-  --info-bg: rgba(96, 165, 250, 0.1);
-  --info-border: rgba(96, 165, 250, 0.2);
-
-  --border-default: #27272a;
-  --border-subtle: #18181b;
-  --border-strong: #3f3f46;
-
-  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.8), 0 0 3px rgba(0, 0, 0, 0.6);
-  --shadow-elevated: 0 10px 40px -4px rgba(0, 0, 0, 0.9), 0 4px 10px -2px rgba(0, 0, 0, 0.8);
-
-  --nav-bg: rgba(10, 10, 10, 0.6);
-  --nav-border: rgba(39, 39, 42, 0.4);
-  --nav-blur: 24px;
-
-  --glass-bg: rgba(17, 17, 17, 0.6);
-  --glass-border: rgba(39, 39, 42, 0.5);
-  --glass-blur: 16px;
-
-  --gradient-brand: linear-gradient(135deg, #3468E8 0%, #5B84F1 100%);
-  --gradient-success: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
-  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
-  --gradient-surface: linear-gradient(180deg, #111111 0%, #050505 100%);
-
-  /* Admin/Enterprise theme */
-  --admin-bg: #050505;
-  --admin-surface: #0a0a0a;
-  --admin-elevated: #111111;
-  --admin-hover-subtle: rgba(255, 255, 255, 0.03);
-  --admin-hover-mid: rgba(255, 255, 255, 0.06);
-
-  color-scheme: dark;
-}
-
 /* ===== FONT SCALE: Extra Compact ===== */
 [data-fontscale="xs"] {
   --text-xs: 0.6rem;
@@ -427,11 +359,6 @@ html[data-readability="enhanced"] {
   --font-normal: 500;
   --font-medium: 600;
   --font-semibold: 600;
-}
-
-html[data-theme="dark"], html.theme-dark {
-  --bg-app: #0f172a;
-  --text-app: #f1f5f9;
 }
 
 body {
@@ -829,12 +756,6 @@ a,
   border-bottom: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255,255,255,0.8);
 }
-[data-theme="dark"] .nav-glass {
-  background: rgba(15, 20, 34, 0.88);
-  border-bottom: 1px solid rgba(51, 65, 85, 0.4);
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
-}
-
 /* ===== iOS-STYLE BADGE PULSE ANIMATION ===== */
 @keyframes badge-pulse {
   0% { transform: scale(1); }
@@ -913,7 +834,7 @@ a,
   min-height: 0;
 }
 
-html:not([data-theme="dark"]):not(.theme-dark) .bottom-nav {
+.bottom-nav {
   background: rgba(255, 255, 255, 0.94) !important;
   color: #334155;
   color-scheme: light;
@@ -929,38 +850,6 @@ html:not([data-theme="dark"]):not(.theme-dark) .bottom-nav {
 body:has(input:focus, textarea:focus) .bottom-nav,
 body:has(input:focus, textarea:focus) .adm-bottomnav {
   display: none !important;
-}
-
-[data-theme="dark"] .bottom-nav,
-html.theme-dark .bottom-nav,
-[data-theme="dark"] .adm-bottomnav,
-html.theme-dark .adm-bottomnav {
-  background: #0f172a !important;
-  color-scheme: dark;
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5), 0 2px 8px -2px rgba(0, 0, 0, 0.3) !important;
-}
-[data-theme="dark"] .bottom-nav .text-slate-900,
-[data-theme="dark"] .bottom-nav .text-slate-800,
-html.theme-dark .bottom-nav .text-slate-900,
-html.theme-dark .bottom-nav .text-slate-800 {
-  color: #e2e8f0 !important;
-}
-[data-theme="dark"] .bottom-nav .text-slate-700,
-html.theme-dark .bottom-nav .text-slate-700 {
-  color: #cbd5e1 !important;
-}
-[data-theme="dark"] .bottom-nav .text-slate-600,
-html.theme-dark .bottom-nav .text-slate-600 {
-  color: #94a3b8 !important;
-}
-[data-theme="dark"] .bottom-nav .bg-white,
-html.theme-dark .bottom-nav .bg-white {
-  background-color: #1e293b !important;
-}
-[data-theme="dark"] .bottom-nav .border-slate-200,
-html.theme-dark .bottom-nav .border-slate-200 {
-  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .mobile-enterprise-dashboard-wrapper {
@@ -1160,11 +1049,6 @@ table tbody tr:hover {
   box-shadow: var(--shadow-elevated);
   border-color: var(--border-strong);
 }
-[data-theme="dark"] .enterprise-card {
-  background: var(--bg-card);
-  border-color: var(--border-default);
-}
-
 /* ===== DARK BACKGROUND OVERRIDES =====
    Force all dark Tailwind backgrounds to light enterprise surfaces.
    bg-slate-900/950/800 → white, text stays dark. */
@@ -1455,16 +1339,9 @@ table tbody tr:hover {
 
 /* ===== LIGHT MODE TEXT READABILITY FIXES ===== */
 /* Override light slate colors in light mode for better contrast */
-:root,
-[data-theme="light"] {
+:root {
   .text-slate-300 { color: #64748b !important; }
   .text-slate-400 { color: #475569 !important; }
-}
-
-/* Dark mode keeps original colors */
-[data-theme="dark"] {
-  .text-slate-300 { color: #cbd5e1; }
-  .text-slate-400 { color: #94a3b8; }
 }
 
 /* ===== ENTERPRISE UI STABILIZATION LAYER =====
@@ -2078,10 +1955,6 @@ table tbody td {
   font-size: clamp(1rem, 0.95rem + 0.25vw, 1.25rem);
 }
 
-[data-theme="dark"] table tbody tr:hover {
-  background: rgba(30, 41, 59, 0.72);
-}
-
 /* ===== RESPONSIVE TABLE LAYOUT ===== */
 html,
 body,
@@ -2506,14 +2379,6 @@ html.trip-window-open {
     border: 1px solid rgba(15, 23, 42, 0.08) !important;
     background: rgba(255, 255, 255, 0.95) !important;
     box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.25), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
-  }
-
-  [data-theme="dark"] .bottom-nav,
-  html.theme-dark .bottom-nav,
-  [data-theme="dark"] .adm-bottomnav,
-  html.theme-dark .adm-bottomnav {
-    background: rgba(15, 23, 42, 0.94) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
   }
 
   .adm-bottomnav {
@@ -3071,14 +2936,9 @@ html, body {
     backdrop-filter: blur(8px) !important;
   }
 
-  html:not([data-theme="dark"]):not(.theme-dark) .bottom-nav {
+  .bottom-nav {
     background: rgba(255, 255, 255, 0.96) !important;
     color: #334155 !important;
-  }
-
-  [data-theme="dark"] .bottom-nav,
-  html.theme-dark .bottom-nav {
-    background: rgba(15, 23, 42, 0.94) !important;
   }
 
   .messenger-nav-badge,
@@ -5700,8 +5560,7 @@ html, body {
    native-feeling interaction without expensive compositing.
    =================================================================== */
 
-:root,
-[data-theme="light"] {
+:root {
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -6165,18 +6024,15 @@ textarea:focus,
 /* ===== NAVY BRAND HARMONIZATION =====
    Keeps brand actions confident while replacing the old baby-blue wash with
    quiet cool-neutral tints. Status palettes (emerald/amber/rose) stay intact. */
-:root:not([data-theme="dark"]) .bg-blue-50,
-[data-theme="light"] .bg-blue-50 {
+.bg-blue-50 {
   background-color: #f3f5fa !important;
 }
 
-:root:not([data-theme="dark"]) .bg-blue-100,
-[data-theme="light"] .bg-blue-100 {
+.bg-blue-100 {
   background-color: #e9eefa !important;
 }
 
-:root:not([data-theme="dark"]) .bg-blue-200,
-[data-theme="light"] .bg-blue-200 {
+.bg-blue-200 {
   background-color: #dce5f8 !important;
 }
 
@@ -6191,12 +6047,9 @@ textarea:focus,
 .text-blue-800,
 .text-blue-900 { color: #18346f !important; }
 
-:root:not([data-theme="dark"]) .border-blue-50,
-[data-theme="light"] .border-blue-50 { border-color: #f0f3f8 !important; }
-:root:not([data-theme="dark"]) .border-blue-100,
-[data-theme="light"] .border-blue-100 { border-color: #e4e9f4 !important; }
-:root:not([data-theme="dark"]) .border-blue-200,
-[data-theme="light"] .border-blue-200 { border-color: #d3ddf1 !important; }
+.border-blue-50 { border-color: #f0f3f8 !important; }
+.border-blue-100 { border-color: #e4e9f4 !important; }
+.border-blue-200 { border-color: #d3ddf1 !important; }
 .border-blue-300 { border-color: #b7c8ee !important; }
 .border-blue-400 { border-color: #8eaaeb !important; }
 .border-blue-500,

@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw } from 'lucide-react';
+import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
 
@@ -47,12 +47,6 @@ const FONT_SCALE_OPTIONS = [
   { value: 'lg', label: 'Large', desc: 'Larger text — easier to read', icon: Plus },
   { value: 'xl', label: 'Extra Large', desc: 'Maximum readability — reduced eye strain', icon: Maximize2 },
   { value: 'driver', label: 'Driver Mode', desc: 'Ultra-readable — optimized for in-vehicle use', icon: Smartphone },
-];
-
-const THEME_OPTIONS = [
-  { value: 'light', label: 'Light', desc: 'Clean, bright interface', icon: Sun },
-  { value: 'dark', label: 'Dark', desc: 'Easy on the eyes at night', icon: Moon },
-  { value: 'system', label: 'Auto', desc: 'Follows your device theme', icon: Monitor },
 ];
 
 const NAV_OPTIONS = [
@@ -184,7 +178,6 @@ const SettingsPage = ({
 
   const personalNav = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'accessibility', label: 'Accessibility', icon: Accessibility },
     { id: 'navigation', label: 'Navigation', icon: Route },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -549,32 +542,6 @@ const SettingsPage = ({
                   <button onClick={() => onLogout?.()} className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-base">
                     <LogOut size={20} /> Sign Out
                   </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      // ===== APPEARANCE =====
-      case 'appearance':
-        return (
-          <div className="space-y-6">
-            <div><h3 className="text-heading text-slate-900 mb-1">Appearance</h3><p className="text-body text-slate-500">Choose the theme and reading size that work best for you.</p></div>
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
-              <div>
-                <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Palette size={20} /> Theme</div>
-                <div className="grid grid-cols-3 gap-3 max-w-lg">
-                  {THEME_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    const active = appSettings?.theme === option.value;
-                    return (
-                      <button key={option.value} onClick={() => saveSettings({ theme: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
-                        <div className="font-semibold text-sm text-slate-900">{option.label}</div>
-                        <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
             </div>

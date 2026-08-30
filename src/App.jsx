@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
 import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -123,7 +123,6 @@ const isRecentDriverHistoryTrip = (trip) => (
 );
 
 const DEFAULT_APP_SETTINGS = {
-  theme: 'light',
   fontScale: 'md',
   readability: 'normal',
   navigationApp: 'google',
@@ -135,6 +134,11 @@ const DEFAULT_APP_SETTINGS = {
     filterChangeIntervalMonths: 12,
     filterDueSoonDays: 30,
   },
+};
+
+const withoutLegacyTheme = (settings = {}) => {
+  const { theme: _removedTheme, ...lightOnlySettings } = settings || {};
+  return lightOnlySettings;
 };
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
@@ -680,7 +684,7 @@ const App = () => {
   const [appSettings, setAppSettings] = useState(() => {
     try {
       const local = localStorage.getItem('agape_appSettings');
-      return local ? { ...DEFAULT_APP_SETTINGS, ...JSON.parse(local) } : { ...DEFAULT_APP_SETTINGS };
+      return local ? { ...DEFAULT_APP_SETTINGS, ...withoutLegacyTheme(JSON.parse(local)) } : { ...DEFAULT_APP_SETTINGS };
     } catch {
       return { ...DEFAULT_APP_SETTINGS };
     }
@@ -726,7 +730,7 @@ const App = () => {
         addToast('Profile Updated', 'Your vehicle odometer has been synchronized.', 'success');
       }
     } else {
-      setAppSettings((prev) => ({ ...prev, ...updates }));
+      setAppSettings((prev) => ({ ...prev, ...withoutLegacyTheme(updates) }));
     }
   }, [role, currentUser, drivers, upsertDriverProfile, addToast]);
 
@@ -920,7 +924,7 @@ const App = () => {
       const uid = auth.currentUser.uid;
       await setDoc(
         doc(db, 'users', uid),
-        { settings: settingsToPersist },
+        { settings: { ...withoutLegacyTheme(settingsToPersist), theme: deleteField() } },
         { merge: true }
       );
     } catch (err) {
@@ -929,23 +933,11 @@ const App = () => {
   };
 
   useEffect(() => {
-    const theme = appSettings.theme === 'dark' ? 'dark' : 'light';
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.dataset.fontScale = appSettings.fontScale || 'md';
     document.documentElement.dataset.readability = appSettings.readability || 'normal';
 
-    const themeColor = theme === 'dark' ? '#020617' : '#f8fafc';
-    let themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (!themeMeta) {
-      themeMeta = document.createElement('meta');
-      themeMeta.name = 'theme-color';
-      document.head.appendChild(themeMeta);
-    }
-    themeMeta.setAttribute('content', themeColor);
-
     try {
-      localStorage.setItem('agape_appSettings', JSON.stringify(appSettings));
+      localStorage.setItem('agape_appSettings', JSON.stringify(withoutLegacyTheme(appSettings)));
     } catch {}
 
     // Persist settings to Firestore for logged in user
@@ -1017,7 +1009,7 @@ const App = () => {
       setActiveTab(validTab);
 
       if (userSettings && Object.keys(userSettings).length > 0) {
-        setAppSettings(prev => ({ ...prev, ...userSettings }));
+        setAppSettings(prev => ({ ...prev, ...withoutLegacyTheme(userSettings) }));
       }
 
       requestNotificationPermission().then(token => {
@@ -1078,11 +1070,11 @@ const App = () => {
               writeRoleCache(user.uid, freshRole || cached.role, userEmail, freshTenantId);
               setTenantId(freshTenantId);
             }
-            // Load user settings from Firestore (theme, nav app, etc.)
+            // Load user settings from Firestore so preferences survive hard refresh.
             // so they survive hard refresh even when the role cache is present.
             const settings = freshDoc.data()?.settings || {};
             if (Object.keys(settings).length > 0) {
-              setAppSettings(prev => ({ ...prev, ...settings }));
+              setAppSettings(prev => ({ ...prev, ...withoutLegacyTheme(settings) }));
             }
           }).catch(() => { /* background check — ignore network errors */ });
           return;

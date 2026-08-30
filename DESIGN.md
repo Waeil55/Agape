@@ -154,7 +154,7 @@ Use the slate-based neutral system already implemented in Tailwind and `src/inde
 - **Ink** `{colors.ink}` carries primary information. Secondary and tertiary ink are for metadata, never important warnings.
 - **Semantic colors** communicate verified state only. Never use green for an unverified success or red as decoration.
 - Never introduce Tailwind `gray-*`; use `slate-*` and the existing semantic tokens.
-- Dark mode is opt-in. Do not make dark mode the default or reduce contrast to look fashionable.
+- The product uses one accessible light visual system; do not add alternate color themes.
 
 ## Typography
 
