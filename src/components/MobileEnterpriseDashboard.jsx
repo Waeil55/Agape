@@ -543,7 +543,7 @@ const MobileEnterpriseDashboard = (props) => {
 
 
   return (
-    <div className="mobile-enterprise-dashboard-wrapper w-full h-full bg-white flex flex-col relative overflow-hidden">
+    <div className="app-page-frame mobile-enterprise-dashboard-wrapper w-full h-full bg-white flex flex-col relative overflow-hidden">
 
       {/* ── Trip Detail Overlay: opens full DriverPage for any trip ── */}
       {tripDetails && (() => {

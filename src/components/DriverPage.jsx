@@ -444,7 +444,7 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
     { label: 'SIGNATURE', value: trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No' },
   ];
   return (
-    <div className="overflow-hidden border-t border-slate-200 bg-white">
+    <div className="app-table-frame border-t border-slate-200 bg-white">
       <table className="driver-history-detail-table w-full table-fixed text-left">
         <tbody>
           {rows.map((row) => (
@@ -4339,7 +4339,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   return (
     <div
-      className="w-full h-full overflow-hidden flex flex-col bg-[var(--bg-app)] text-slate-900 relative"
+      className="app-page-frame w-full h-full overflow-hidden flex flex-col bg-[var(--bg-app)] text-slate-900 relative"
       onTouchStart={handlePullTouchStart}
       onTouchMove={handlePullTouchMove}
       onTouchEnd={handlePullTouchEnd}

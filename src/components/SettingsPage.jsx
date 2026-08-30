@@ -238,7 +238,7 @@ const SettingsPage = ({
               <p className="text-body text-slate-500">All registered drivers and dispatchers.</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
+              <div className="app-table-frame">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
@@ -309,7 +309,7 @@ const SettingsPage = ({
               <p className="text-body text-slate-500">Capability matrix for every role in the system.</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
-              <div className="overflow-x-auto">
+              <div className="app-table-frame">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
@@ -356,7 +356,7 @@ const SettingsPage = ({
               ) : (
                 <div>
                   <button onClick={() => setShowArchivedTrips(false)} className="mb-4 px-4 py-2 text-slate-600 hover:text-slate-900 font-semibold text-sm">← Hide</button>
-                  <div className="overflow-x-auto">
+                  <div className="app-table-frame">
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>

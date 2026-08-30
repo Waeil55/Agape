@@ -1771,12 +1771,6 @@ main,
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.05) !important;
   }
 
-  table th,
-  table td {
-    white-space: nowrap;
-    font-size: var(--text-xs);
-  }
-
   input, select, textarea {
     min-height: var(--touch-min);
   }
@@ -1793,9 +1787,33 @@ main,
   }
 }
 
-/* ===== ENTERPRISE TABLE & PAGE DENSITY CORRECTIONS ===== */
+/* ===== GLOBAL PAGE WIDTH & TABLE CONTRACT =====
+   One shell owns page width. Tables always fit that shell and never create a
+   second horizontal viewport. Dense records wrap or truncate inside their
+   assigned columns; they do not widen the application. */
+:root {
+  --app-page-max-width: 1440px;
+}
+
+.app-page-frame {
+  width: 100%;
+  max-width: var(--app-page-max-width);
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.app-table-frame {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 table {
-  min-width: 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
+  table-layout: fixed;
 }
 
 table thead,
@@ -1815,7 +1833,9 @@ table th {
   font-weight: 600 !important;
   line-height: 1.15;
   text-transform: none !important;
-  white-space: nowrap !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
   overflow: hidden;
 }
@@ -1824,12 +1844,15 @@ table td,
 table td *,
 table th,
 table th * {
-  white-space: nowrap;
+  min-width: 0 !important;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
 }
 
 table td {
-  max-width: 20rem;
+  max-width: 100%;
   overflow: hidden;
   vertical-align: middle;
 }
@@ -1843,16 +1866,6 @@ table tbody td {
   padding-top: 0.125rem;
   padding-bottom: 0.125rem;
   font-size: var(--text-xs);
-}
-
-.overflow-x-auto table,
-.overflow-auto table {
-  width: max-content;
-  min-width: 100%;
-}
-
-.min-w-0 table {
-  table-layout: auto;
 }
 
 .text-heading {
@@ -1880,41 +1893,17 @@ table tbody td {
   font-size: clamp(1rem, 0.95rem + 0.25vw, 1.25rem);
 }
 
-/* ===== RESPONSIVE TABLE LAYOUT ===== */
+/* Keep every application viewport inside the device width. */
 html,
 body,
 #root {
-  max-width: 100%;
-}
-
-
-
-table {
-  table-layout: auto;
   width: 100%;
-  min-width: 0;
   max-width: 100%;
-}
-
-table thead th,
-table tbody td {
-  overflow: visible;
-  text-overflow: ellipsis;
-}
-
-table tbody td {
-  max-width: 20rem;
+  overflow-x: hidden;
 }
 
 table tbody td[colspan] {
   max-width: none;
-}
-
-table thead th *,
-table tbody td * {
-  min-width: 0;
-  overflow: visible;
-  text-overflow: ellipsis;
 }
 
 table thead th,
@@ -1922,34 +1911,9 @@ table thead th[class] {
   max-width: none !important;
 }
 
-.overflow-x-auto,
-.overflow-x-scroll,
-.overflow-auto,
-.overflow-scroll,
-.no-scrollbar,
-.hide-scrollbar {
-  overflow-x: auto;
-  max-width: 100%;
-}
-
-.overflow-x-auto table,
-.overflow-x-scroll table,
-.overflow-auto table,
-.overflow-scroll table {
-  width: max-content;
-  min-width: 100%;
-  table-layout: auto;
-}
-
-.min-w-max,
-.w-max {
-  min-width: max-content;
-  width: auto;
-}
-
 .resizable-th,
 table th {
-  min-width: 4.5rem;
+  min-width: 0 !important;
 }
 
 @media (min-width: 768px) {

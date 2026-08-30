@@ -101,7 +101,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], onUpdateTrip }) => {
         Agape proposes completed one-leg rider days with at least {UNLOADED_MINIMUM_MILES} loaded miles. Return miles are estimates and require your confirmation before payment follow-up.
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto px-3 pb-24 md:pb-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 md:pb-3">
         <div className="space-y-2 md:hidden">
           {rows.map(row => {
             const { trip } = row;
@@ -125,7 +125,8 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], onUpdateTrip }) => {
             );
           })}
         </div>
-        <table className="hidden min-w-[980px] w-full overflow-hidden rounded-xl border border-slate-200 bg-white text-xs shadow-sm md:table">
+        <div className="app-table-frame hidden md:block">
+        <table className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white text-xs shadow-sm">
           <thead className="sticky top-0 bg-blue-600 text-white">
             <tr>{['Date', 'Trip ID', 'Passenger', 'Driver', 'Passenger phone', 'Loaded miles', 'Estimated empty return', 'Detection', 'Status', 'Actions'].map(label => <th key={label} className="px-3 py-2 text-left font-semibold">{label}</th>)}</tr>
           </thead>
@@ -159,6 +160,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], onUpdateTrip }) => {
             })}
           </tbody>
         </table>
+        </div>
         {!rows.length && <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-sm font-semibold text-slate-500">No unloaded-mileage records match this range and filter.</div>}
       </div>
     </div>

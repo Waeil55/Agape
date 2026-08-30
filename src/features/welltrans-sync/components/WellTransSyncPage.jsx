@@ -1254,25 +1254,25 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
         {loading ? (
           <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-500" /></div>
         ) : tab === 'queue' ? (
-          <div className="flex-1 overflow-auto">
-            <table className="w-full min-w-[1760px] table-fixed text-left text-[11px]">
+          <div className="app-table-frame flex-1 overflow-y-auto">
+            <table className="w-full table-fixed text-left text-[11px]">
               <colgroup>
-                <col className="w-[38px]" />
-                <col className="w-[88px]" />
-                <col className="w-[145px]" />
-                <col className="w-[115px]" />
-                <col className="w-[105px]" />
-                <col className="w-[74px]" />
-                <col className="w-[74px]" />
-                <col className="w-[82px]" />
-                <col className="w-[74px]" />
-                <col className="w-[74px]" />
-                <col className="w-[82px]" />
-                <col className="w-[72px]" />
-                <col className="w-[78px]" />
-                <col className="w-[245px]" />
-                <col className="w-[105px]" />
-                <col className="w-[90px]" />
+                <col className="w-[3%]" />
+                <col className="w-[8%]" />
+                <col className="w-[9%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[5%]" />
+                <col className="w-[5%]" />
+                <col className="w-[6%]" />
+                <col className="w-[5%]" />
+                <col className="w-[5%]" />
+                <col className="w-[6%]" />
+                <col className="w-[5%]" />
+                <col className="w-[5%]" />
+                <col className="w-[8%]" />
+                <col className="w-[7%]" />
+                <col className="w-[6%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-blue-700 bg-blue-600 text-white shadow-sm">
                 <tr>
@@ -1308,7 +1308,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
                   const isEditing = editingTrip?.id === trip.id;
                   const draft = isEditing ? editingTrip : null;
-                  const inlineInputClass = 'w-full min-w-[70px] rounded-md border border-blue-400 bg-white px-1.5 py-1 font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-200';
+                  const inlineInputClass = 'w-full min-w-0 rounded-md border border-blue-400 bg-white px-1.5 py-1 font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-200';
                   const draftMiles = calculateWellTransDraftMileage(draft);
                   return (
                     <React.Fragment key={trip.id}>

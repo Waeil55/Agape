@@ -604,7 +604,7 @@ const [form, setForm] = useState({
               })
             )}
           </div>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="app-table-frame hidden sm:block">
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
@@ -796,7 +796,7 @@ const [form, setForm] = useState({
               })
             )}
           </div>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="app-table-frame hidden sm:block">
             <table className="w-full">
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>

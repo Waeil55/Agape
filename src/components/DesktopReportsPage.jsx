@@ -547,7 +547,7 @@ const DesktopReportsPage = ({
   const renderInvoiceTable = () => (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
     <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
-      <div className="overflow-x-auto">
+      <div className="app-table-frame">
       <table className="w-full table-fixed text-xs">
         <colgroup>
           <col className="w-[8%]" />
@@ -703,7 +703,7 @@ const DesktopReportsPage = ({
     return (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
     <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
-      <div className="overflow-x-auto">
+      <div className="app-table-frame">
       <table className="w-full table-fixed text-xs">
         {(() => {
           const allCols = [
@@ -728,9 +728,6 @@ const DesktopReportsPage = ({
           const cols = allCols.filter(c => !hiddenColumns.includes(c.key));
           return (
             <>
-              <colgroup>
-                {cols.map(c => <col key={c.key} className={c.w} />)}
-              </colgroup>
               <thead className="sticky top-0 z-10 bg-blue-600 text-white shadow-sm">
                 <tr>
                   {cols.map((c, i) => (

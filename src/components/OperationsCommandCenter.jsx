@@ -2141,7 +2141,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="app-table-frame">
             <table className="w-full table-fixed text-xs">
               <colgroup>
                 <col className="w-8" />

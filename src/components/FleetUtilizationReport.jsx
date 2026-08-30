@@ -202,7 +202,7 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
           <Truck size={18} className="text-slate-600" />
           <h2 className="text-base font-semibold text-slate-900">Vehicle Utilization</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="app-table-frame">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left">
               <tr>
@@ -238,7 +238,7 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
           <TrendingUp size={18} className="text-slate-600" />
           <h2 className="text-base font-semibold text-slate-900">Driver Performance</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="app-table-frame">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left">
               <tr>

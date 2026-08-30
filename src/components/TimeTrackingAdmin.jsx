@@ -751,8 +751,8 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
                         </button>
                         {isExpanded && (
                           <div className="px-4 pb-4">
-                            <div className="bg-slate-50 rounded-xl overflow-x-auto">
-                              <div className="min-w-[480px]">
+                            <div className="app-table-frame bg-slate-50 rounded-xl">
+                              <div className="w-full min-w-0">
                                 <div className="grid grid-cols-5 gap-2 px-4 py-2 text-[10px] font-semibold text-slate-500 uppercase">
                                   <div>Date</div>
                                   <div className="text-center">Hours</div>

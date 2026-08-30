@@ -39,6 +39,10 @@ runtime state before changing or reporting anything.
     unused imports/exports, obsolete compatibility styling, and tests that
     exist only for unreachable code. Keep compatibility paths only when they
     still protect real stored data or supported clients.
+12. Never place a second implementation beside an older implementation for the
+    same responsibility. Before completion, search every equivalent path and
+    remove the replaced component, state, styles, utilities, and tests; verify
+    that one authoritative implementation remains.
 
 ## Completion evidence
 

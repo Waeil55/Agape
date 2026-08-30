@@ -41,8 +41,8 @@ export default function AdminActivityCenter({ logs = [], onViewTrip }) {
           <input className="adm-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-left text-xs">
+      <div className="app-table-frame">
+        <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Action</th><th className="px-4 py-3">Details</th><th className="px-4 py-3">Actor</th><th className="px-4 py-3">Entity</th><th className="px-4 py-3">Open</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((log, index) => {
