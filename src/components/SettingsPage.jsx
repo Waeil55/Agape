@@ -1,7 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw } from 'lucide-react';
+import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
+import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -97,6 +98,8 @@ const SettingsPage = ({
   appSettings,
   onUpdateAppSettings,
   updateAppSettings: updateAppSettingsAlias,
+  overridePolicy = DEFAULT_OVERRIDE_POLICY,
+  updateOverridePolicy,
   driverProfile,
   phoneNumbers,
   onUpdatePhoneNumbers,
@@ -115,6 +118,7 @@ const SettingsPage = ({
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const personalSectionIds = ['profile', 'appearance', 'accessibility', 'navigation', 'notifications', 'security'];
+  if (role === 'admin' || role === 'dispatcher') personalSectionIds.push('overrides');
   if (role === 'dispatcher') personalSectionIds.unshift('activity');
   const resolvedInitialSection = personalSectionIds.includes(initialSection) ? initialSection : 'profile';
   const [activeSection, setActiveSection] = useState(() => {
@@ -140,6 +144,24 @@ const SettingsPage = ({
   const [deleteConfirmTrip, setDeleteConfirmTrip] = useState(null);
   const [chatRetention, setChatRetention] = useState({ enabled: false, legalHold: false, retentionDays: 365 });
   const [chatPolicyStatus, setChatPolicyStatus] = useState('');
+  const [overrideDraft, setOverrideDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
+  const [overrideStatus, setOverrideStatus] = useState('');
+
+  useEffect(() => setOverrideDraft(normalizeOverridePolicy(overridePolicy)), [overridePolicy]);
+
+  const saveOverridePolicy = async () => {
+    if (!updateOverridePolicy) {
+      setOverrideStatus('Shared override settings are unavailable.');
+      return;
+    }
+    setOverrideStatus('Saving shared policy…');
+    try {
+      await updateOverridePolicy(overrideDraft);
+      setOverrideStatus('Override policy saved for administrators and dispatchers.');
+    } catch (error) {
+      setOverrideStatus(error?.message || 'Override policy could not be saved.');
+    }
+  };
 
   const saveSettings = async (updates, driverOnly = false) => {
     if (!_updateSettings) {
@@ -188,6 +210,9 @@ const SettingsPage = ({
   if (role === 'dispatcher' && !personalNav.find(p => p.id === 'activity')) {
     personalNav.unshift({ id: 'activity', label: 'System Activity', icon: Activity });
   }
+  if ((role === 'admin' || role === 'dispatcher') && !personalNav.find(p => p.id === 'overrides')) {
+    personalNav.push({ id: 'overrides', label: 'Override Pricing', icon: Gauge });
+  }
 
   const navItems = [
     { group: 'Account & preferences', items: personalNav },
@@ -196,6 +221,59 @@ const SettingsPage = ({
 
   const sectionContent = () => {
     switch (activeSection) {
+      case 'overrides': {
+        const updateNumber = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.value }));
+        const updateToggle = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.checked }));
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-heading font-semibold text-slate-900">Trip cost override policy</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Shared deterministic rules for unloaded mileage and waiting-time supplements.</p>
+            </div>
+            <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ['unloadedThresholdMiles', 'Unloaded mile threshold', 'miles', '0.1'],
+                ['unloadedRate', 'Cost per unloaded mile', '$ / mile', '0.01'],
+                ['waitingThresholdHours', 'Waiting threshold', 'hours', '0.25'],
+                ['waitRate', 'Cost per wait hour', '$ / hour', '0.01'],
+                ['waitRoundingMinutes', 'Wait rounding increment', 'minutes', '1'],
+              ].map(([key, label, suffix, step]) => (
+                <label key={key} className="min-w-0 text-xs font-semibold text-slate-600">
+                  <span className="block truncate" title={label}>{label}</span>
+                  <span className="mt-1 flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
+                    <input type="number" min="0" step={step} value={overrideDraft[key]} onChange={updateNumber(key)} className="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-sm font-semibold text-slate-900" />
+                    <span className="ml-2 shrink-0 text-[10px] text-slate-500">{suffix}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="rounded-xl border border-slate-200 bg-white p-4">
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="checkbox" checked={overrideDraft.sameCityExemption} onChange={updateToggle('sameCityExemption')} /> Same-city exemption</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500">Set unloaded mileage to zero when both cities normalize to the same city.</span>
+              </label>
+              <label className="rounded-xl border border-slate-200 bg-white p-4">
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="checkbox" checked={overrideDraft.excludeOvernightGaps} onChange={updateToggle('excludeOvernightGaps')} /> Exclude overnight waiting</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500">Do not bill waiting when the gap crosses service dates.</span>
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-slate-600">Same-city aliases
+                <textarea rows="4" value={overrideDraft.sameCityNames.join(', ')} onChange={(event) => setOverrideDraft((current) => ({ ...current, sameCityNames: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }))} className="mt-1 w-full resize-none p-3 text-sm" placeholder="Indianapolis, Indy, Indianapolis IN" />
+                <span className="mt-1 block text-[10px] text-slate-500">Comma-separated names treated as the same city.</span>
+              </label>
+              <label className="text-xs font-semibold text-slate-600">Excluded directional city pairs
+                <textarea rows="4" value={overrideDraft.excludedCityPairs.join('\n')} onChange={(event) => setOverrideDraft((current) => ({ ...current, excludedCityPairs: event.target.value.split('\n').map((value) => value.trim()).filter(Boolean) }))} className="mt-1 w-full resize-none p-3 text-sm" placeholder={'Indianapolis > Indianapolis\nCarmel > Fishers'} />
+                <span className="mt-1 block text-[10px] text-slate-500">One “From &gt; To” pair per line. The reverse direction remains included unless listed.</span>
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={saveOverridePolicy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"><Save size={16} /> Save override policy</button>
+              {overrideStatus && <p className="text-xs font-semibold text-slate-600" role="status">{overrideStatus}</p>}
+            </div>
+          </div>
+        );
+      }
       // ===== OVERVIEW =====
       case 'overview':
         return (

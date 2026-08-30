@@ -916,40 +916,51 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
-table {
-  border-collapse: separate;
-  border-spacing: 0;
+/* One visible, accessible checkbox contract for filters, rows, and select-all. */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  min-width: 1.125rem !important;
+  max-width: 1.125rem !important;
+  flex: 0 0 1.125rem;
+  margin: 0;
+  border: 2px solid #94a3b8 !important;
+  border-radius: 0.3rem !important;
+  background-color: #ffffff;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 0.78rem 0.78rem;
+  cursor: pointer;
+  vertical-align: middle;
 }
 
-table thead,
-table thead[class],
-table thead tr,
-table thead tr[class] {
-  background: var(--gradient-brand) !important;
+input[type="checkbox"]:checked {
+  border-color: #2563eb !important;
+  background-color: #2563eb;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='m3 8 3 3 7-7'/%3E%3C/svg%3E");
 }
 
-table thead th,
-table thead th[class] {
-  color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.10) !important;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+input[type="checkbox"]:indeterminate {
+  border-color: #2563eb !important;
+  background-color: #2563eb;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath stroke='white' stroke-linecap='round' stroke-width='2.5' d='M3 8h10'/%3E%3C/svg%3E");
 }
 
-table thead th:first-child {
-  border-top-left-radius: 1rem;
+input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2) !important;
 }
 
-table thead th:last-child {
-  border-top-right-radius: 1rem;
+table thead input[type="checkbox"] {
+  border-color: rgba(255, 255, 255, 0.9) !important;
 }
 
-table tbody tr {
-  transition: background-color 160ms ease, box-shadow 160ms ease;
-}
-
-table tbody tr:hover {
-  background-color: rgba(248, 250, 252, 0.95);
+table th input[type="checkbox"],
+table td input[type="checkbox"] {
+  display: block;
+  margin-inline: auto;
 }
 
 /* ===== RESIZABLE TABLE COLUMNS ===== */
@@ -1625,38 +1636,6 @@ textarea::placeholder {
   color: #94a3b8;
 }
 
-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-table thead,
-table thead tr,
-table thead[class],
-table thead tr[class] {
-  background: var(--enterprise-surface-muted) !important;
-}
-
-table th {
-  color: #334155 !important;
-  font-size: 0.8rem !important;
-  font-weight: 600 !important;
-  line-height: 1.25;
-  text-transform: none !important;
-  border-bottom: 1px solid var(--enterprise-border-soft);
-}
-
-table td {
-  color: #334155;
-  line-height: 1.35;
-  border-bottom-color: var(--enterprise-border-soft) !important;
-}
-
-tbody tr:hover {
-  background: rgba(241, 245, 249, 0.72);
-}
-
 .badge,
 .status-badge {
   border-radius: var(--enterprise-radius-pill) !important;
@@ -1789,10 +1768,10 @@ main,
 
 /* ===== GLOBAL PAGE WIDTH & TABLE CONTRACT =====
    One shell owns page width. Tables always fit that shell and never create a
-   second horizontal viewport. Dense records wrap or truncate inside their
+   second horizontal viewport. Dense records truncate inside their
    assigned columns; they do not widen the application. */
 :root {
-  --app-page-width: 92%;
+  --app-page-width: 96%;
 }
 
 .app-page-frame {
@@ -1817,12 +1796,6 @@ main,
   max-width: 100%;
 }
 
-@media (max-width: 767px) {
-  .app-page-frame {
-    max-width: 100%;
-  }
-}
-
 .app-table-frame {
   width: 100%;
   max-width: 100%;
@@ -1835,13 +1808,17 @@ table {
   max-width: 100%;
   min-width: 0 !important;
   table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 table thead,
 table thead[class],
 table thead tr,
 table thead tr[class] {
-  background: #2A52AC !important;
+  background: var(--gradient-table-head) !important;
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 10%);
 }
 
 table thead th,
@@ -1855,10 +1832,18 @@ table th {
   line-height: 1.15;
   text-transform: none !important;
   min-width: 0 !important;
-  white-space: normal !important;
-  overflow-wrap: anywhere;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
   text-overflow: ellipsis;
   overflow: hidden;
+}
+
+table thead th:first-child {
+  border-top-left-radius: 1rem;
+}
+
+table thead th:last-child {
+  border-top-right-radius: 1rem;
 }
 
 table td,
@@ -1867,9 +1852,10 @@ table th,
 table th * {
   min-width: 0 !important;
   max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
   text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 table td {
@@ -1881,6 +1867,11 @@ table td {
 table tbody tr {
   min-height: 1.5rem;
   height: 1.5rem;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+table tbody tr:hover {
+  background-color: rgba(248, 250, 252, 0.95);
 }
 
 table tbody td {
@@ -1958,15 +1949,6 @@ table th {
 
 .driver-history-detail-table .driver-history-detail-label {
   color: #475569 !important;
-}
-
-.driver-history-detail-table td,
-.driver-history-detail-table td[class],
-.driver-history-detail-table td * {
-  white-space: normal !important;
-  text-wrap: wrap !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
 }
 
 .driver-history-detail-table .driver-history-detail-label {
@@ -5641,29 +5623,6 @@ button:not(:disabled):active,
 .bottom-nav button,
 .adm-bottomnav button {
   min-height: 48px;
-}
-
-table {
-  font-variant-numeric: tabular-nums;
-}
-
-table thead,
-table thead[class],
-table thead tr,
-table thead tr[class] {
-  background: var(--gradient-table-head) !important;
-  color: #ffffff !important;
-  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 10%);
-}
-
-table thead th,
-table thead th[class],
-table thead th * {
-  color: #ffffff !important;
-}
-
-table tbody tr {
-  transition: background-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
 input,

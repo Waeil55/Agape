@@ -20,7 +20,7 @@ describe('driver odometer keyboard overlay contract', () => {
       });
     }
     expect(read('index.html')).toContain('interactive-widget=overlays-content');
-    expect(read('index.html')).toContain('APP-WIDE-FILTERS-20260830P');
+    expect(read('index.html')).toContain('OVERRIDE-TABLE-20260830Q');
     expect(read('src/App.jsx')).toContain('interactive-widget=overlays-content');
   });
 

@@ -32,6 +32,27 @@ service cloud.firestore {
     function userEmail() {
       return request.auth.token.email;
     }
+    function validOverrideCostPolicy() {
+      let data = request.resource.data;
+      return data.keys().hasAll([
+          'unloadedThresholdMiles', 'unloadedRate', 'sameCityExemption', 'sameCityNames',
+          'waitingThresholdHours', 'waitRate', 'waitRoundingMinutes', 'excludeOvernightGaps',
+          'excludedCityPairs', 'updatedAt', 'updatedBy'
+        ])
+        && data.keys().hasOnly([
+          'unloadedThresholdMiles', 'unloadedRate', 'sameCityExemption', 'sameCityNames',
+          'waitingThresholdHours', 'waitRate', 'waitRoundingMinutes', 'excludeOvernightGaps',
+          'excludedCityPairs', 'updatedAt', 'updatedBy'
+        ])
+        && data.unloadedThresholdMiles is number && data.unloadedThresholdMiles >= 0
+        && data.unloadedRate is number && data.unloadedRate >= 0
+        && data.sameCityExemption is bool && data.sameCityNames is list
+        && data.waitingThresholdHours is number && data.waitingThresholdHours >= 0
+        && data.waitRate is number && data.waitRate >= 0
+        && data.waitRoundingMinutes is number && data.waitRoundingMinutes >= 1
+        && data.excludeOvernightGaps is bool && data.excludedCityPairs is list
+        && data.updatedAt is string && data.updatedBy == request.auth.uid;
+    }
     match /users/{userId} {
       allow read: if signedIn();
       allow create: if isAdmin();
@@ -139,7 +160,9 @@ service cloud.firestore {
     }
     match /systemConfig/{document} {
       allow read: if signedIn() && (isDispatcher() || document == 'phoneNumbers');
-      allow write: if signedIn() && isAdmin();
+      allow create, update: if isAdmin()
+        || (isDispatcher() && document == 'overrideCostPolicy' && validOverrideCostPolicy());
+      allow delete: if isAdmin();
     }
     match /welltrans_settings/{document} {
       allow read: if signedIn() && isAdmin();

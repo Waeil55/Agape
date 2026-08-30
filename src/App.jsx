@@ -34,11 +34,12 @@ import useEnterpriseSessionSecurity, { beginSecuritySession, clearSecuritySessio
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
 import { hydrateTripDriverIdentity } from './utils/driverIdentity';
+import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from './utils/tripCostOverrides';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v362';
+const APP_VERSION = 'v363';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -689,12 +690,27 @@ const App = () => {
       return { ...DEFAULT_APP_SETTINGS };
     }
   });
+  const [overridePolicy, setOverridePolicy] = useState(() => normalizeOverridePolicy(DEFAULT_OVERRIDE_POLICY));
 
   const addToast = useCallback((title, message, type = 'info') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, title, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !['admin', 'dispatcher'].includes(role)) {
+      return undefined;
+    }
+    return onSnapshot(
+      doc(db, 'systemConfig', 'overrideCostPolicy'),
+      (snapshot) => setOverridePolicy(normalizeOverridePolicy(snapshot.exists() ? snapshot.data() : DEFAULT_OVERRIDE_POLICY)),
+      (error) => {
+        console.error('[OverridePolicy] Unable to read shared policy', error);
+        addToast('Override settings unavailable', 'Using safe default override rates until the shared settings can be loaded.', 'danger');
+      },
+    );
+  }, [addToast, isAuthenticated, role]);
 
   // Show a non-blocking toast notification when the service worker updates,
   // prompting the user to reload instead of calling location.reload() automatically (which hangs/freezes WebKit PWAs)
@@ -733,6 +749,18 @@ const App = () => {
       setAppSettings((prev) => ({ ...prev, ...withoutLegacyTheme(updates) }));
     }
   }, [role, currentUser, drivers, upsertDriverProfile, addToast]);
+
+  const updateOverridePolicy = useCallback(async (updates) => {
+    if (!['admin', 'dispatcher'].includes(role)) throw new Error('Only administrators and dispatchers can update override settings.');
+    const next = normalizeOverridePolicy({ ...overridePolicy, ...updates });
+    await setDoc(doc(db, 'systemConfig', 'overrideCostPolicy'), {
+      ...next,
+      updatedAt: new Date().toISOString(),
+      updatedBy: auth.currentUser?.uid || '',
+    }, { merge: false });
+    setOverridePolicy(next);
+    return next;
+  }, [overridePolicy, role]);
 
   const requestAuthAction = useCallback((label, callback) => {
     setReAuthError('');
@@ -3013,6 +3041,8 @@ const App = () => {
               setTrashedTrips={setTrashedTrips}
               appSettings={appSettings}
               updateAppSettings={updateAppSettings}
+              overridePolicy={overridePolicy}
+              updateOverridePolicy={updateOverridePolicy}
               selectedTasks={selectedTasks}
               setSelectedTasks={setSelectedTasks}
               searchQuery={searchQuery}

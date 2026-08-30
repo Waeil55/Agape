@@ -44,14 +44,14 @@ const ReportsPage = (props) => {
 
   const sections = useMemo(() => [
     { id: 'trips', label: 'All trips', description: 'Review, export, and reconcile trip records', icon: ClipboardList, count: props.trips?.length || 0 },
-    { id: 'unloaded', label: 'Unloaded mileage', description: 'Track non-passenger vehicle mileage', icon: Gauge },
+    { id: 'unloaded', label: 'Trip cost overrides', description: 'Calculate verified empty mileage and waiting supplements', icon: Gauge },
     { id: 'archive', label: 'Archived trips', description: 'Historical records, edits, and recovery', icon: Archive, count: props.trashedTrips?.length || 0 },
     ...(canUsePortalCompletion ? [{ id: 'portal', label: 'Portal Completion', description: 'Validate and fill completed trips into the broker portal', icon: PanelTopOpen }] : []),
   ], [canUsePortalCompletion, props.trashedTrips?.length, props.trips?.length]);
 
   const renderSection = () => {
     if (section === 'unloaded') {
-      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} onUpdateTrip={props.onUpdateTrip} />;
+      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} overridePolicy={props.overridePolicy} />;
     }
     if (section === 'archive') {
       return (

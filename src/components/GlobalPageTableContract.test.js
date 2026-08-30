@@ -12,9 +12,9 @@ const collectSourceFiles = (directory) => readdirSync(directory, { withFileTypes
 });
 
 describe('global page and table layout contract', () => {
-  it('uses one shared 4 percent desktop gutter for desktop, mobile, and driver pages', () => {
+  it('uses one shared 2 percent desktop gutter for desktop, mobile, and driver pages', () => {
     const css = read('src/index.css');
-    expect(css).toContain('--app-page-width: 92%;');
+    expect(css).toContain('--app-page-width: 96%;');
     expect(css).toMatch(/\.app-page-frame\s*\{[\s\S]*?max-width:\s*var\(--app-page-width\);[\s\S]*?margin-inline:\s*auto;/);
     expect(css).toMatch(/html,\s*body,\s*#root\s*\{[\s\S]*?overflow-x:\s*hidden;/);
     expect(read('src/components/DesktopEnterpriseDashboard.jsx')).toContain('app-page-frame flex-1 min-h-0');
@@ -58,8 +58,20 @@ describe('global page and table layout contract', () => {
 
     const css = read('src/index.css');
     expect(css).toMatch(/table\s*\{[\s\S]*?min-width:\s*0\s*!important;[\s\S]*?table-layout:\s*fixed;/);
+    expect(css).toMatch(/table td,[\s\S]*?white-space:\s*nowrap\s*!important;/);
     expect(css).not.toContain('.overflow-x-auto table');
     expect(css).not.toContain('width: max-content;');
+  });
+
+  it('uses a visible native checkbox and an indeterminate select-all state', () => {
+    const css = read('src/index.css');
+    const checkbox = read('src/components/ui/TableCheckbox.jsx');
+    const operations = read('src/components/OperationsCommandCenter.jsx');
+    expect(css).toMatch(/input\[type="checkbox"\][\s\S]*?appearance:\s*none;[\s\S]*?border:\s*2px solid/);
+    expect(css).toContain('input[type="checkbox"]:checked');
+    expect(css).toContain('input[type="checkbox"]:indeterminate');
+    expect(checkbox).toContain('inputRef.current.indeterminate');
+    expect(operations).toContain('label="Select all visible trips"');
   });
 
   it('records the no-parallel-implementation cleanup rule for future work', () => {

@@ -15,6 +15,7 @@ import { toValidDate } from '../utils/safeDate';
 import { scopeOperationsTripsByDate } from '../utils/portalSelectors';
 import TripActionCenter from './trips/TripActionCenter';
 import { OPERATIONAL_VIEW_PRESETS, getOperationalViewPreset } from '../utils/operationalViews';
+import TableCheckbox from './ui/TableCheckbox';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -1243,6 +1244,8 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   }, [filteredTrips, showOnlyAttention]);
 
   const visibleTrips = useMemo(() => manifestFeedTrips.slice(0, manifestLimit), [manifestFeedTrips, manifestLimit]);
+  const visibleTripIds = useMemo(() => new Set(visibleTrips.map((trip) => trip.id)), [visibleTrips]);
+  const selectedVisibleCount = useMemo(() => selectedTasks.filter((id) => visibleTripIds.has(id)).length, [selectedTasks, visibleTripIds]);
   const intelligenceScore = useMemo(() => {
     const lateCount = visibleTrips.filter((trip) => getTripUrgencyLevel(trip) === 'late').length;
     const unassignedCount = visibleTrips.filter((trip) => trip.status === 'Unassigned').length;
@@ -2085,19 +2088,15 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
               <thead className="sticky top-0 z-10 border-b border-blue-900/20 text-slate-100">
                 <tr>
                   <th className={`${densityProfile.tableHead} text-left align-middle`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedTasks.length === visibleTrips.length) {
-                          setSelectedTasks([]);
-                        } else {
-                          setSelectedTasks(visibleTrips.map((trip) => trip.id));
-                        }
-                      }}
-                      className={`rounded p-0.5 transition-all duration-150 ${selectedTasks.length === visibleTrips.length && visibleTrips.length > 0 ? 'text-blue-300' : 'text-slate-300 hover:text-white'}`}
-                    >
-                      {selectedTasks.length === visibleTrips.length && visibleTrips.length > 0 ? <CheckSquare size={15} /> : <Square size={15} />}
-                    </button>
+                    <TableCheckbox
+                      checked={selectedVisibleCount === visibleTrips.length && visibleTrips.length > 0}
+                      indeterminate={selectedVisibleCount > 0 && selectedVisibleCount < visibleTrips.length}
+                      disabled={!visibleTrips.length}
+                      label="Select all visible trips"
+                      onChange={() => setSelectedTasks((current) => selectedVisibleCount === visibleTrips.length
+                        ? current.filter((id) => !visibleTripIds.has(id))
+                        : [...new Set([...current, ...visibleTrips.map((trip) => trip.id)])])}
+                    />
                   </th>
                   {MANIFEST_TABLE_COLUMNS.map(({ label, sortKey }) => (
                     <th key={label} className={`${densityProfile.tableHead} text-left text-xs uppercase tracking-widest text-slate-200 align-middle`}>
@@ -2171,16 +2170,11 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                               <button type="button" onClick={(event) => { event.stopPropagation(); saveInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-emerald-100 p-1.5 text-emerald-700 disabled:opacity-50" title="Save row"><CheckCircle2 size={15} /></button>
                               <button type="button" onClick={(event) => { event.stopPropagation(); cancelInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-rose-50 p-1.5 text-rose-600 disabled:opacity-50" title="Cancel"><X size={15} /></button>
                             </div>
-                          ) : <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]);
-                            }}
-                            className={`rounded p-0.5 transition-all duration-150 ${isSelected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-600'}`}
-                          >
-                            {isSelected ? <CheckSquare size={15} /> : <Square size={15} />}
-                          </button>}
+                          ) : <TableCheckbox
+                            checked={isSelected}
+                            label={`Select trip ${trip.bookingId || trip.id}`}
+                            onChange={() => setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id])}
+                          />}
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
