@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Ban, ChevronDown, ChevronLeft, ChevronRight, Download, MapPin, RotateCcw, Save, Search } from 'lucide-react';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
-import { analyzeTripCostOverrides, filterTripCostOverrideRows, normalizeCityPair, normalizeOverridePolicy } from '../utils/tripCostOverrides';
+import { addOverrideExclusionRule, analyzeTripCostOverrides, filterTripCostOverrideRows, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 import { downloadTripOverrideWorkbook } from '../utils/tripOverrideWorkbook';
 import { localCalendarYmd } from '../utils/tripDate';
 import { getGoogleDrivingRouteMiles } from '../utils/routedMileage';
 import OverrideHomeAddressEditor, { getOverrideHomePolicyUpdates, verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
+import OverrideExclusionRulesEditor, { getOverrideExclusionPolicyUpdates } from './OverrideExclusionRulesEditor';
 
 const currentWeek = () => {
   const today = new Date();
@@ -72,6 +73,10 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
   const [homeDraft, setHomeDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
   const [homeSaving, setHomeSaving] = useState(false);
   const [homeStatus, setHomeStatus] = useState('');
+  const [rulesEditorOpen, setRulesEditorOpen] = useState(false);
+  const [rulesDraft, setRulesDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
+  const [rulesSaving, setRulesSaving] = useState(false);
+  const [rulesStatus, setRulesStatus] = useState('');
   const policyReady = overridePolicyStatus === 'ready';
   const sharedHomeMissing = !overridePolicy?.homeAddress || !overridePolicy?.homeCity || !overridePolicy?.homeState || !overridePolicy?.homeZip;
   const showHomeEditor = sharedHomeMissing || homeEditorOpen;
@@ -79,6 +84,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
     ? 'Not set'
     : (overridePolicy?.homeFormattedAddress
       || [overridePolicy?.homeAddress, overridePolicy?.homeCity, overridePolicy?.homeState].filter(Boolean).join(', '));
+  const exclusionRuleCount = normalizeOverridePolicy(overridePolicy).overrideExclusionRules.length;
 
   const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
   const result = useMemo(() => {
@@ -227,20 +233,55 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
       setHomeSaving(false);
     }
   };
+  const openRulesEditor = () => {
+    setRulesDraft(normalizeOverridePolicy(overridePolicy));
+    setRulesStatus('');
+    setRulesEditorOpen(true);
+  };
+  const saveExclusionRules = async () => {
+    if (!updateOverridePolicy) {
+      setRulesStatus('Shared override settings are unavailable.');
+      return;
+    }
+    if (!policyReady) {
+      setRulesStatus(overridePolicyError || 'Wait until the shared override policy finishes loading.');
+      return;
+    }
+    setRulesSaving(true);
+    setRulesStatus('Saving directional exclusion rules…');
+    try {
+      const updates = getOverrideExclusionPolicyUpdates(rulesDraft);
+      const savedPolicy = await updateOverridePolicy(updates);
+      setRulesDraft(normalizeOverridePolicy(savedPolicy || { ...overridePolicy, ...updates }));
+      setBoundaryDistances(new Map());
+      setRulesEditorOpen(false);
+      setRulesStatus('');
+      setActionMessage('Directional exclusion rules saved. Override rows were recalculated.');
+    } catch (error) {
+      setRulesStatus(error instanceof Error ? error.message : 'Directional exclusion rules could not be saved.');
+    } finally {
+      setRulesSaving(false);
+    }
+  };
   const excludeRoute = async (row) => {
     if (!updateOverridePolicy || !row.originCity || !row.destinationCity) return;
     const route = `${row.originCity} > ${row.destinationCity}`;
-    const existing = Array.isArray(overridePolicy?.excludedCityPairs) ? overridePolicy.excludedCityPairs : [];
-    const routeKey = normalizeCityPair(route, overridePolicy?.sameCityNames);
-    if (existing.some((pair) => normalizeCityPair(pair, overridePolicy?.sameCityNames) === routeKey)) {
-      setActionMessage(`${route} is already excluded.`);
+    const normalizedPolicy = normalizeOverridePolicy(overridePolicy);
+    const nextRules = addOverrideExclusionRule(normalizedPolicy, {
+      scope: 'all',
+      fromCity: row.originCity,
+      toCity: row.destinationCity,
+    });
+    if (nextRules.length === normalizedPolicy.overrideExclusionRules.length
+      && nextRules.every((rule, index) => rule.id === normalizedPolicy.overrideExclusionRules[index]?.id)) {
+      setActionMessage(`All overrides for ${route} are already excluded.`);
       return;
     }
     setExcludingRowId(row.rowId);
     setActionMessage('');
     try {
-      await updateOverridePolicy({ excludedCityPairs: [...existing, route] });
-      setActionMessage(`Excluded ${route}. You can remove it later in Settings.`);
+      await updateOverridePolicy({ excludedCityPairs: [], overrideExclusionRules: nextRules });
+      setActionMessage(`Excluded all override calculations for ${route}. Edit the rule to limit it to waiting or mileage only.`);
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : 'The route exclusion could not be saved.');
     } finally {
@@ -273,6 +314,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
           </div>
           <select aria-label="Driver" value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)} className="h-9 min-w-[145px] px-2 text-xs font-semibold"><option value="all">All drivers</option>{driverOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>
           <button type="button" onClick={openHomeEditor} aria-expanded={showHomeEditor} aria-label="Edit shared home address" className={`inline-flex h-9 min-w-0 max-w-[260px] items-center gap-1.5 rounded-xl border px-3 text-xs font-bold ${sharedHomeMissing ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><MapPin size={14} className="shrink-0" /><span className="shrink-0">Home:</span><span className="truncate font-semibold">{sharedHomeLabel}</span></button>
+          <button type="button" onClick={openRulesEditor} aria-expanded={rulesEditorOpen} aria-label="Edit override exclusion rules" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Ban size={14} /> Rules: {exclusionRuleCount}</button>
           <button type="button" onClick={resetFilters} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><RotateCcw size={14} /> Reset</button>
           <button type="button" onClick={exportRows} disabled={!policyReady || !rows.length} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Download size={14} /> Excel</button>
         </div>
@@ -317,12 +359,22 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
 
       {(boundaryStatus.loading > 0 || boundaryStatus.errors > 0 || actionMessage) && (
         <div className={`mx-3 mb-2 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-[10px] font-semibold ${boundaryStatus.errors > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-blue-200 bg-blue-50 text-blue-900'}`} role={boundaryStatus.errors > 0 ? 'alert' : 'status'}>
-          <span>{actionMessage || (boundaryStatus.errors > 0 ? `${boundaryStatus.errors} home-route mileage calculation${boundaryStatus.errors === 1 ? '' : 's'} failed. Check the shared home address in Settings → Override Pricing, then retry.` : `Calculating ${boundaryStatus.loading} home-route mileage${boundaryStatus.loading === 1 ? '' : 's'}…`)}</span>
+          <span>{actionMessage || (boundaryStatus.errors > 0 ? `${boundaryStatus.errors} home-route mileage calculation${boundaryStatus.errors === 1 ? '' : 's'} failed. Use the Home button above to verify the shared address, then retry.` : `Calculating ${boundaryStatus.loading} home-route mileage${boundaryStatus.loading === 1 ? '' : 's'}…`)}</span>
           {boundaryStatus.errors > 0 && <button type="button" onClick={retryBoundaryMileage} className="shrink-0 rounded-lg border border-amber-300 bg-white px-2 py-1 font-bold">Retry</button>}
         </div>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 md:pb-3">
+        {rulesEditorOpen && (
+          <div className="mb-3">
+            <OverrideExclusionRulesEditor policy={rulesDraft} onChange={setRulesDraft} disabled={rulesSaving} compact />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => void saveExclusionRules()} disabled={rulesSaving || !policyReady || !updateOverridePolicy} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Save size={14} />{rulesSaving ? 'Saving rules…' : 'Save exclusion rules'}</button>
+              <button type="button" onClick={() => { setRulesEditorOpen(false); setRulesStatus(''); }} disabled={rulesSaving} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700">Cancel</button>
+              {rulesStatus && <p className="text-xs font-semibold text-amber-800" role="status">{rulesStatus}</p>}
+            </div>
+          </div>
+        )}
         {showHomeEditor && (
           <div className="mb-3">
             <OverrideHomeAddressEditor policy={homeDraft} onChange={setHomeDraft} disabled={homeSaving} compact />
@@ -344,7 +396,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
               <p className="mt-1 truncate text-xs font-semibold text-slate-800" title={`${row.originCity} to ${row.destinationCity}`}>{row.originCity || 'Missing city'} → {row.destinationCity || 'Missing city'}</p>
               <p className="mt-1 truncate text-[10px] font-semibold text-slate-500">{row.legLabel} · {driverName(row)}</p>
               <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]"><div><p className="text-slate-500">Empty miles</p><p className="font-bold text-slate-900">{decimal(row.unloadedMiles)}</p></div><div><p className="text-slate-500">Mileage</p><p className="font-bold text-blue-700">{money(row.unloadedAmount)}</p></div><div><p className="text-slate-500">Wait</p><p className="font-bold text-slate-900">{decimal(row.waitHours)} hr · {money(row.waitCost)}</p></div></div>
-              <details className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-600"><summary className="cursor-pointer text-blue-700">Audit details</summary><div className="mt-2 space-y-1"><p>Passenger trip: {row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p>Empty leg: {row.originAddress || 'Missing origin'} → {row.destinationAddress || 'Missing destination'}</p><p>{row.mileageSource}: {row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${decimal(row.rawUnloadedMiles)} mi`}</p><p>{row.unloadedReason}</p><p>{row.waitReason}</p><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={() => void excludeRoute(row)} className="mt-2 inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'Route excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude this route'}</button></div></details>
+              <details className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-600"><summary className="cursor-pointer text-blue-700">Audit details</summary><div className="mt-2 space-y-1"><p>Passenger trip: {row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p>Empty leg: {row.originAddress || 'Missing origin'} → {row.destinationAddress || 'Missing destination'}</p><p>{row.mileageSource}: {row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${decimal(row.rawUnloadedMiles)} mi`}</p><p>{row.unloadedReason}</p><p>{row.waitReason}</p><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={() => void excludeRoute(row)} className="mt-2 inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'All overrides excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude all for this route'}</button></div></details>
             </article>
           ))}
         </div>
@@ -382,7 +434,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Mileage evidence</p><p className="mt-1">{row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${row.mileageSource} · raw ${decimal(row.rawUnloadedMiles)} mi`}</p><p className="text-slate-500">{decimal(row.unloadedMiles)} × {money(row.unloadedRate)} = {money(row.unloadedAmount)}</p></div>
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Waiting evidence</p><p className="mt-1">{row.originTimestamp ? `${dateTime(row.originTimestamp)} → ${dateTime(row.destinationTimestamp)}` : 'Not applicable to this home boundary leg'} · raw gap {decimal(row.rawGapHours)} hr</p><p className="text-slate-500">Billable {decimal(row.waitHours)} hr × {money(row.waitRate)} = {money(row.waitCost)}</p></div>
                           </div>
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold"><div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2"><p className={row.unloadedAmount > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Mileage: {row.unloadedReason}</p><p className={row.waitCost > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Waiting: {row.waitReason}</p></div><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={(event) => { event.stopPropagation(); void excludeRoute(row); }} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'Route excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude route'}</button></div>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold"><div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2"><p className={row.unloadedAmount > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Mileage: {row.unloadedReason}</p><p className={row.waitCost > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Waiting: {row.waitReason}</p></div><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={(event) => { event.stopPropagation(); void excludeRoute(row); }} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'All overrides excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude all for route'}</button></div>
                         </td>
                       </tr>
                     )}

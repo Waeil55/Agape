@@ -20,6 +20,7 @@ export const DEFAULT_OVERRIDE_POLICY = Object.freeze({
   waitRoundingMinutes: 30,
   excludeOvernightGaps: true,
   excludedCityPairs: [],
+  overrideExclusionRules: [],
 });
 
 const normalizeText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
@@ -55,25 +56,64 @@ const normalizeStringList = (value, fallback = []) => {
   return unique.length ? unique : [...fallback];
 };
 
-export const normalizeOverridePolicy = (policy = {}) => ({
-  homeAddress: normalizeText(policy.homeAddress),
-  homeAddress2: normalizeText(policy.homeAddress2),
-  homeCity: normalizeText(policy.homeCity),
-  homeState: normalizeText(policy.homeState || DEFAULT_OVERRIDE_POLICY.homeState).toUpperCase().slice(0, 2),
-  homeZip: normalizeText(policy.homeZip),
-  homeLat: finiteCoordinate(policy.homeLat),
-  homeLng: finiteCoordinate(policy.homeLng),
-  homeFormattedAddress: normalizeText(policy.homeFormattedAddress),
-  unloadedThresholdMiles: finiteNonNegative(policy.unloadedThresholdMiles, DEFAULT_OVERRIDE_POLICY.unloadedThresholdMiles),
-  unloadedRate: finiteNonNegative(policy.unloadedRate, DEFAULT_OVERRIDE_POLICY.unloadedRate),
-  sameCityExemption: policy.sameCityExemption !== false,
-  sameCityNames: normalizeStringList(policy.sameCityNames, DEFAULT_OVERRIDE_POLICY.sameCityNames),
-  waitingThresholdHours: finiteNonNegative(policy.waitingThresholdHours, DEFAULT_OVERRIDE_POLICY.waitingThresholdHours),
-  waitRate: finiteNonNegative(policy.waitRate, DEFAULT_OVERRIDE_POLICY.waitRate),
-  waitRoundingMinutes: Math.max(1, finiteNonNegative(policy.waitRoundingMinutes, DEFAULT_OVERRIDE_POLICY.waitRoundingMinutes)),
-  excludeOvernightGaps: policy.excludeOvernightGaps !== false,
-  excludedCityPairs: normalizeStringList(policy.excludedCityPairs, []),
-});
+export const OVERRIDE_EXCLUSION_SCOPES = Object.freeze(['waiting', 'mileage', 'all']);
+
+const normalizeRuleCity = (value) => {
+  const city = normalizeText(value);
+  return city === '*' || /^any(?: city| origin| destination)?$/i.test(city) ? '*' : city;
+};
+
+export const normalizeOverrideExclusionRules = (rules = []) => {
+  const normalized = (Array.isArray(rules) ? rules : []).map((rule) => {
+    const scope = OVERRIDE_EXCLUSION_SCOPES.includes(rule?.scope) ? rule.scope : 'all';
+    const fromCity = normalizeRuleCity(rule?.fromCity ?? rule?.from);
+    const toCity = normalizeRuleCity(rule?.toCity ?? rule?.to);
+    if (!fromCity || !toCity) return null;
+    return { scope, fromCity, toCity };
+  }).filter(Boolean);
+
+  const routes = new Map();
+  normalized.forEach((rule) => {
+    const routeKey = `${rule.fromCity.toLowerCase()}=>${rule.toCity.toLowerCase()}`;
+    const existing = routes.get(routeKey);
+    if (!existing || rule.scope === 'all') {
+      routes.set(routeKey, rule);
+      return;
+    }
+    if (existing.scope !== rule.scope) routes.set(routeKey, { ...rule, scope: 'all' });
+  });
+  return [...routes.values()].map((rule) => ({
+    ...rule,
+    id: `${rule.scope}:${rule.fromCity.toLowerCase()}:${rule.toCity.toLowerCase()}`,
+  }));
+};
+
+export const normalizeOverridePolicy = (policy = {}) => {
+  const legacyRules = normalizeStringList(policy.excludedCityPairs, []).map((pair) => {
+    const [fromCity, toCity] = String(pair).split(/\s*(?:=>|>|→|\|)\s*/);
+    return { scope: 'all', fromCity, toCity };
+  });
+  return {
+    homeAddress: normalizeText(policy.homeAddress),
+    homeAddress2: normalizeText(policy.homeAddress2),
+    homeCity: normalizeText(policy.homeCity),
+    homeState: normalizeText(policy.homeState || DEFAULT_OVERRIDE_POLICY.homeState).toUpperCase().slice(0, 2),
+    homeZip: normalizeText(policy.homeZip),
+    homeLat: finiteCoordinate(policy.homeLat),
+    homeLng: finiteCoordinate(policy.homeLng),
+    homeFormattedAddress: normalizeText(policy.homeFormattedAddress),
+    unloadedThresholdMiles: finiteNonNegative(policy.unloadedThresholdMiles, DEFAULT_OVERRIDE_POLICY.unloadedThresholdMiles),
+    unloadedRate: finiteNonNegative(policy.unloadedRate, DEFAULT_OVERRIDE_POLICY.unloadedRate),
+    sameCityExemption: policy.sameCityExemption !== false,
+    sameCityNames: normalizeStringList(policy.sameCityNames, DEFAULT_OVERRIDE_POLICY.sameCityNames),
+    waitingThresholdHours: finiteNonNegative(policy.waitingThresholdHours, DEFAULT_OVERRIDE_POLICY.waitingThresholdHours),
+    waitRate: finiteNonNegative(policy.waitRate, DEFAULT_OVERRIDE_POLICY.waitRate),
+    waitRoundingMinutes: Math.max(1, finiteNonNegative(policy.waitRoundingMinutes, DEFAULT_OVERRIDE_POLICY.waitRoundingMinutes)),
+    excludeOvernightGaps: policy.excludeOvernightGaps !== false,
+    excludedCityPairs: [],
+    overrideExclusionRules: normalizeOverrideExclusionRules([...(Array.isArray(policy.overrideExclusionRules) ? policy.overrideExclusionRules : []), ...legacyRules]),
+  };
+};
 
 export const isOverridePolicyDocumentValid = (policy) => {
   if (!policy || typeof policy !== 'object' || Array.isArray(policy)) return false;
@@ -86,6 +126,14 @@ export const isOverridePolicyDocumentValid = (policy) => {
   const stringList = (value) => Array.isArray(value) && value.every((item) => typeof item === 'string');
   const optionalString = (value) => value === undefined || typeof value === 'string';
   const optionalCoordinate = (value) => value === undefined || value === null || Number.isFinite(value);
+  const optionalRules = (value) => value === undefined || (Array.isArray(value) && value.every((rule) => (
+    rule && typeof rule === 'object'
+    && OVERRIDE_EXCLUSION_SCOPES.includes(rule.scope)
+    && typeof rule.fromCity === 'string'
+    && typeof rule.toCity === 'string'
+    && Boolean(normalizeRuleCity(rule.fromCity))
+    && Boolean(normalizeRuleCity(rule.toCity))
+  )));
   return nonNegativeNumbers.every((value) => Number.isFinite(value) && value >= 0)
     && Number.isFinite(policy.waitRoundingMinutes)
     && policy.waitRoundingMinutes >= 1
@@ -95,7 +143,8 @@ export const isOverridePolicyDocumentValid = (policy) => {
     && stringList(policy.excludedCityPairs)
     && ['homeAddress', 'homeAddress2', 'homeCity', 'homeState', 'homeZip', 'homeFormattedAddress'].every((key) => optionalString(policy[key]))
     && optionalCoordinate(policy.homeLat)
-    && optionalCoordinate(policy.homeLng);
+    && optionalCoordinate(policy.homeLng)
+    && optionalRules(policy.overrideExclusionRules);
 };
 
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && normalizeText(value) !== '');
@@ -281,6 +330,27 @@ export const normalizeCityPair = (value, aliasNames = []) => {
   return `${canonicalCity(from || '', aliases)}=>${canonicalCity(to || '', aliases)}`;
 };
 
+export const addOverrideExclusionRule = (policy, rule) => normalizeOverrideExclusionRules([
+  ...normalizeOverridePolicy(policy).overrideExclusionRules,
+  rule,
+]);
+
+export const getOverrideRouteExclusion = (policy, originCity, destinationCity) => {
+  const aliases = Array.isArray(policy?.sameCityNames) ? policy.sameCityNames : [];
+  const origin = canonicalCity(originCity, aliases);
+  const destination = canonicalCity(destinationCity, aliases);
+  const matchedRules = (policy?.overrideExclusionRules || []).filter((rule) => {
+    const fromMatches = rule.fromCity === '*' || canonicalCity(rule.fromCity, aliases) === origin;
+    const toMatches = rule.toCity === '*' || canonicalCity(rule.toCity, aliases) === destination;
+    return fromMatches && toMatches;
+  });
+  return {
+    mileageExcluded: matchedRules.some((rule) => rule.scope === 'mileage' || rule.scope === 'all'),
+    waitingExcluded: matchedRules.some((rule) => rule.scope === 'waiting' || rule.scope === 'all'),
+    matchedRules,
+  };
+};
+
 const makeWorkInterval = (trip, driverIndex) => {
   if (isNonWorkStatus(trip)) return null;
   const start = getTripPickupTimestamp(trip);
@@ -423,7 +493,6 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
     const groupKey = `${entry.driver}|${entry.serviceDate}`;
     groups.set(groupKey, [...(groups.get(groupKey) || []), entry]);
   });
-  const excludedPairs = new Set(policy.excludedCityPairs.map((pair) => normalizeCityPair(pair, policy.sameCityNames)));
   const rows = [];
   const boundaryRequests = [];
 
@@ -440,7 +509,11 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
     const legLabel = isHomeReturn ? 'Return home' : (previous ? 'Before pickup' : 'Home to first pickup');
     const cityPairComplete = Boolean(originCity && destinationCity);
     const pairKey = normalizeCityPair({ from: originCity, to: destinationCity }, policy.sameCityNames);
-    const pairExcluded = Boolean(cityPairComplete && excludedPairs.has(pairKey));
+    const routeExclusion = cityPairComplete
+      ? getOverrideRouteExclusion(policy, originCity, destinationCity)
+      : { mileageExcluded: false, waitingExcluded: false, matchedRules: [] };
+    const { mileageExcluded, waitingExcluded } = routeExclusion;
+    const pairExcluded = mileageExcluded && waitingExcluded;
     const sameCity = Boolean(cityPairComplete && policy.sameCityExemption
       && canonicalCity(originCity, policy.sameCityNames)
       && canonicalCity(originCity, policy.sameCityNames) === canonicalCity(destinationCity, policy.sameCityNames));
@@ -456,7 +529,7 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       destination: routeDestination,
     }) : '';
     const boundaryDistance = isBoundary ? getBoundaryDistance(boundaryDistances, boundaryKey) : null;
-    const canRequestBoundary = Boolean(isBoundary && cityPairComplete && !pairExcluded && !sameCity && routeOrigin && routeDestination);
+    const canRequestBoundary = Boolean(isBoundary && cityPairComplete && !mileageExcluded && !sameCity && routeOrigin && routeDestination);
     if (canRequestBoundary) boundaryRequests.push({
       id: boundaryKey,
       origin: routeOrigin,
@@ -485,11 +558,11 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       && interval.startMs < entry.pickupTimestamp.getTime()
       && interval.endMs > previous.dropoffTimestamp.getTime()
     )));
-    const unloadedQualified = Boolean(cityPairComplete && !pairExcluded && !sameCity
+    const unloadedQualified = Boolean(cityPairComplete && !mileageExcluded && !sameCity
       && !interveningWork && mileage.valid && mileage.miles > policy.unloadedThresholdMiles);
     const unloadedMiles = unloadedQualified ? mileage.miles : 0;
     const unloadedAmount = roundCurrency(unloadedMiles * policy.unloadedRate);
-    const waitEligible = Boolean(previous && !isHomeReturn && chronologyValid && cityPairComplete && !pairExcluded
+    const waitEligible = Boolean(previous && !isHomeReturn && chronologyValid && cityPairComplete && !waitingExcluded
       && !interveningWork && gapMinutes > policy.waitingThresholdHours * 60);
     const rawBillableWaitMinutes = waitEligible ? gapMinutes - policy.waitingThresholdHours * 60 : 0;
     const billedWaitMinutes = rawBillableWaitMinutes > 0
@@ -510,13 +583,13 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       !chronologyValid
       || !cityPairComplete
       || boundaryFailed
-      || (!isBoundary && !sameCity && !pairExcluded && !interveningWork && !mileage.valid)
-      || (isBoundary && cityPairComplete && !pairExcluded && !sameCity && (!routeOrigin || !routeDestination))
+      || (!isBoundary && !sameCity && !mileageExcluded && !interveningWork && !mileage.valid)
+      || (isBoundary && cityPairComplete && !mileageExcluded && !sameCity && (!routeOrigin || !routeDestination))
     );
 
     let unloadedReason = mileage.reason || 'Mileage evidence is unavailable';
     if (!cityPairComplete) unloadedReason = 'Unloaded-leg origin or destination city is missing';
-    else if (pairExcluded) unloadedReason = 'City pair excluded by policy';
+    else if (mileageExcluded) unloadedReason = 'Unloaded mileage excluded by directional route rule';
     else if (interveningWork) unloadedReason = 'Another worked trip occurs inside this unloaded leg';
     else if (sameCity) unloadedReason = 'Same-city exemption';
     else if (!mileage.valid) unloadedReason = mileage.reason;
@@ -527,7 +600,7 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
     if (previous && !isHomeReturn) {
       if (!chronologyValid) waitReason = 'Recorded trip times overlap; waiting is blocked';
       else if (!cityPairComplete) waitReason = 'Unloaded-leg origin or destination city is missing';
-      else if (pairExcluded) waitReason = 'City pair excluded by policy';
+      else if (waitingExcluded) waitReason = 'Waiting time excluded by directional route rule';
       else if (interveningWork) waitReason = 'Another worked trip overlaps this gap';
       else if (gapMinutes <= policy.waitingThresholdHours * 60) waitReason = `Gap does not exceed ${policy.waitingThresholdHours} hr`;
       else waitReason = `Billable time after threshold, rounded up to ${policy.waitRoundingMinutes} min`;
@@ -570,6 +643,9 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       unloadedReason,
       waitReason,
       pairExcluded,
+      mileageExcluded,
+      waitingExcluded,
+      matchedExclusionRules: routeExclusion.matchedRules,
       sameCity,
       cityPairComplete,
       interveningWork,

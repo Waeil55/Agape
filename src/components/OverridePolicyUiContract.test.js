@@ -46,7 +46,21 @@ describe('override policy UI integration contract', () => {
     expect(report).toContain("row.destinationCity || 'Missing'");
     expect(report).toContain("['Leg', 'Empty-leg type'");
     expect(report).not.toContain('Next Booking ID');
-    expect(report).toContain('Exclude route');
+    expect(report).toContain('Exclude all for route');
     expect(report).toContain('data-agape-detail-row="true"');
+  });
+
+  it('provides scoped directional exclusions in settings and the override report', () => {
+    const settings = read('src/components/SettingsPage.jsx');
+    const report = read('src/components/UnloadedTripsReport.jsx');
+    const editor = read('src/components/OverrideExclusionRulesEditor.jsx');
+    expect(settings).toContain('<OverrideExclusionRulesEditor');
+    expect(settings).not.toContain('Excluded directional city pairs');
+    expect(report).toContain('aria-label="Edit override exclusion rules"');
+    expect(report).toContain('Save exclusion rules');
+    expect(editor).toContain('Waiting time only');
+    expect(editor).toContain('Unloaded mileage only');
+    expect(editor).toContain('All override calculations');
+    expect(editor).toContain('Any destination');
   });
 });

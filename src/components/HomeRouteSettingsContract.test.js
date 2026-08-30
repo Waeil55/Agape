@@ -33,7 +33,7 @@ describe('shared home route settings contract', () => {
     const analyzer = read('src/utils/tripCostOverrides.js');
     expect(desktop).not.toContain('drivers={drivers} upsertDriverProfile={upsertDriverProfile} dispatchers={dispatchers}');
     expect(report).toContain('routeDistanceResolver = getGoogleDrivingRouteMiles');
-    expect(report).toContain('shared home address in Settings → Override Pricing');
+    expect(report).toContain('Use the Home button above to verify the shared address');
     expect(analyzer).toContain('const getPolicyHome = (policy) =>');
     expect(analyzer).toContain('const home = getPolicyHome(policy);');
     expect(analyzer).not.toContain('const getDriverHome');

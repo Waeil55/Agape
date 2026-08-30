@@ -237,6 +237,54 @@ describe('trip cost override calculation', () => {
     expect(reverse).toMatchObject({ pairExcluded: false, unloadedMiles: 50 });
   });
 
+  it('excludes waiting only without losing qualifying unloaded mileage', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffCity: 'Indianapolis', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T10:00:00-04:00', arrivalDropoffTime: '2026-08-01T10:30:00-04:00', pickupCity: 'Carmel', pickupOdometer: 180 });
+    const row = rowFor(analyze([first, current], {
+      policy: { overrideExclusionRules: [{ scope: 'waiting', fromCity: 'Indianapolis', toCity: 'Carmel' }] },
+    }), '2');
+
+    expect(row).toMatchObject({ mileageExcluded: false, waitingExcluded: true, unloadedMiles: 60, unloadedAmount: 48, waitHours: 0, waitCost: 0, pairExcluded: false });
+    expect(row.waitReason).toContain('Waiting time excluded');
+  });
+
+  it('supports directional any-destination waiting exclusions without affecting reverse routes', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffCity: 'Indianapolis', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T10:00:00-04:00', arrivalDropoffTime: '2026-08-01T10:30:00-04:00', pickupCity: 'Carmel', pickupOdometer: 180 });
+    const policy = { overrideExclusionRules: [{ scope: 'waiting', fromCity: 'Indianapolis', toCity: '*' }] };
+    expect(rowFor(analyze([first, current], { policy }), '2')).toMatchObject({ waitingExcluded: true, unloadedMiles: 60, waitCost: 0 });
+
+    const reverseFirst = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffCity: 'Carmel', dropoffOdometer: 120 });
+    const reverseCurrent = trip('2', { arrivalTime: '2026-08-01T10:00:00-04:00', arrivalDropoffTime: '2026-08-01T10:30:00-04:00', pickupCity: 'Indianapolis', pickupOdometer: 180 });
+    expect(rowFor(analyze([reverseFirst, reverseCurrent], { policy }), '2')).toMatchObject({ waitingExcluded: false, unloadedMiles: 60, waitHours: 1, waitCost: 9 });
+  });
+
+  it('keeps same-city waiting unless a waiting rule explicitly excludes it', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffCity: 'Indianapolis', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T10:00:00-04:00', arrivalDropoffTime: '2026-08-01T10:30:00-04:00', pickupCity: 'Indy', pickupOdometer: 180 });
+    const included = rowFor(analyze([first, current]), '2');
+    expect(included).toMatchObject({ sameCity: true, unloadedMiles: 0, waitingExcluded: false, waitHours: 1, waitCost: 9 });
+
+    const excluded = rowFor(analyze([first, current], {
+      policy: { overrideExclusionRules: [{ scope: 'waiting', fromCity: 'Indianapolis', toCity: 'Indianapolis' }] },
+    }), '2');
+    expect(excluded).toMatchObject({ sameCity: true, waitingExcluded: true, waitHours: 0, waitCost: 0 });
+  });
+
+  it('supports mileage-only and all-override exclusions independently', () => {
+    const first = trip('1', { arrivalDropoffTime: '2026-08-01T08:00:00-04:00', dropoffCity: 'Indianapolis', dropoffOdometer: 120 });
+    const current = trip('2', { arrivalTime: '2026-08-01T10:00:00-04:00', arrivalDropoffTime: '2026-08-01T10:30:00-04:00', pickupCity: 'Carmel', pickupOdometer: 180 });
+    const mileageOnly = rowFor(analyze([first, current], {
+      policy: { overrideExclusionRules: [{ scope: 'mileage', fromCity: 'Indianapolis', toCity: '*' }] },
+    }), '2');
+    expect(mileageOnly).toMatchObject({ mileageExcluded: true, waitingExcluded: false, unloadedMiles: 0, waitHours: 1, waitCost: 9, pairExcluded: false });
+
+    const all = rowFor(analyze([first, current], {
+      policy: { overrideExclusionRules: [{ scope: 'all', fromCity: 'Indianapolis', toCity: '*' }] },
+    }), '2');
+    expect(all).toMatchObject({ mileageExcluded: true, waitingExcluded: true, unloadedMiles: 0, waitHours: 0, waitCost: 0, pairExcluded: true });
+  });
+
   it('fails closed for missing home data, missing cities, vehicle changes, and unavailable routed mileage', () => {
     const single = trip('solo');
     const missingHome = analyzeTripCostOverrides([single], { allDates: true, drivers: [driver], policy: DEFAULT_OVERRIDE_POLICY });
@@ -340,6 +388,14 @@ describe('trip cost override calculation', () => {
     expect(normalizeOverridePolicy({ unloadedRate: -1, waitRoundingMinutes: 0 })).toMatchObject({ unloadedRate: DEFAULT_OVERRIDE_POLICY.unloadedRate, waitRoundingMinutes: 1 });
     expect(isOverridePolicyDocumentValid(DEFAULT_OVERRIDE_POLICY)).toBe(true);
     expect(isOverridePolicyDocumentValid({ ...DEFAULT_OVERRIDE_POLICY, waitRate: '9' })).toBe(false);
+    expect(isOverridePolicyDocumentValid({ ...DEFAULT_OVERRIDE_POLICY, overrideExclusionRules: [{ scope: 'wrong', fromCity: 'Indianapolis', toCity: '*' }] })).toBe(false);
+    expect(isOverridePolicyDocumentValid({ ...DEFAULT_OVERRIDE_POLICY, overrideExclusionRules: [{ scope: 'waiting', fromCity: '', toCity: '*' }] })).toBe(false);
+    expect(normalizeOverridePolicy({
+      overrideExclusionRules: [
+        { scope: 'waiting', fromCity: 'Indianapolis', toCity: 'Carmel' },
+        { scope: 'mileage', fromCity: 'Indianapolis', toCity: 'Carmel' },
+      ],
+    }).overrideExclusionRules).toEqual([{ id: 'all:indianapolis:carmel', scope: 'all', fromCity: 'Indianapolis', toCity: 'Carmel' }]);
   });
 
   it('invalidates cached home mileage when the shared home address changes', () => {

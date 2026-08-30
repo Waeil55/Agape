@@ -4,6 +4,7 @@ import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
 import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 import OverrideHomeAddressEditor, { verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
+import OverrideExclusionRulesEditor from './OverrideExclusionRulesEditor';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -272,23 +273,20 @@ const SettingsPage = ({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="rounded-xl border border-slate-200 bg-white p-4">
                 <span className="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="checkbox" checked={overrideDraft.sameCityExemption} onChange={updateToggle('sameCityExemption')} /> Same-city exemption</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-500">Set unloaded mileage to zero when both cities normalize to the same city.</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500">Set unloaded mileage to zero when both cities normalize to the same city. Waiting remains eligible unless a waiting rule excludes it.</span>
               </label>
               <label className="rounded-xl border border-slate-200 bg-white p-4">
                 <span className="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="checkbox" checked={overrideDraft.excludeOvernightGaps} onChange={updateToggle('excludeOvernightGaps')} /> Exclude overnight waiting</span>
                 <span className="mt-1 block text-xs font-semibold text-slate-500">Do not bill waiting when the gap crosses service dates.</span>
               </label>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3">
               <label className="text-xs font-semibold text-slate-600">Same-city aliases
                 <textarea rows="4" value={overrideDraft.sameCityNames.join(', ')} onChange={(event) => setOverrideDraft((current) => ({ ...current, sameCityNames: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }))} className="mt-1 w-full resize-none p-3 text-sm" placeholder="Indianapolis, Indy, Indianapolis IN" />
                 <span className="mt-1 block text-[10px] text-slate-500">Comma-separated names treated as the same city.</span>
               </label>
-              <label className="text-xs font-semibold text-slate-600">Excluded directional city pairs
-                <textarea rows="4" value={overrideDraft.excludedCityPairs.join('\n')} onChange={(event) => setOverrideDraft((current) => ({ ...current, excludedCityPairs: event.target.value.split('\n').map((value) => value.trim()).filter(Boolean) }))} className="mt-1 w-full resize-none p-3 text-sm" placeholder={'Indianapolis > Indianapolis\nCarmel > Fishers'} />
-                <span className="mt-1 block text-[10px] text-slate-500">One “From &gt; To” pair per line. The reverse direction remains included unless listed.</span>
-              </label>
             </div>
+            <OverrideExclusionRulesEditor policy={overrideDraft} onChange={setOverrideDraft} disabled={overrideSaving} />
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" onClick={saveOverridePolicy} disabled={!canSaveOverridePolicy || overrideSaving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><Save size={16} /> {overrideSaving ? 'Verifying and saving…' : overridePolicyStatus === 'error' ? 'Repair override policy' : 'Save override policy'}</button>
               {overrideStatus && <p className="text-xs font-semibold text-slate-600" role="status">{overrideStatus}</p>}

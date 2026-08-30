@@ -13,6 +13,8 @@ describe('trip override workbook', () => {
       unloadedAmount: 20, rawGapHours: 2.25, waitHours: 1.5, waitRate: 9,
       waitCost: 13.5, totalCost: 73.5, unloadedReason: 'Qualifying empty segment',
       waitReason: 'Billable time after threshold, rounded up to 30 min',
+      mileageExcluded: false, waitingExcluded: true,
+      matchedExclusionRules: [{ scope: 'waiting', fromCity: 'Carmel', toCity: 'Fishers' }],
     }], new Map([['d1', { name: 'Driver One' }]]));
     const sheet = workbook.Sheets['Trip Cost Overrides'];
     expect(XLSX.utils.sheet_to_json(sheet, { header: 1 })[0]).toEqual(OVERRIDE_EXPORT_HEADERS);
@@ -23,12 +25,15 @@ describe('trip override workbook', () => {
     expect(sheet.E2.v).toBe('Carmel');
     expect(sheet.F2.v).toBe('Fishers');
     expect(OVERRIDE_EXPORT_HEADERS).not.toContain('Next Booking ID');
-    expect(sheet.S2.v).toBe('Indianapolis');
-    expect(sheet.T2.v).toBe('Carmel');
+    expect(sheet.S2.v).toBe('No');
+    expect(sheet.T2.v).toBe('Yes');
+    expect(sheet.U2.v).toBe('waiting: Carmel > Fishers');
+    expect(sheet.V2.v).toBe('Indianapolis');
+    expect(sheet.W2.v).toBe('Carmel');
     expect(sheet['!cols']).toHaveLength(OVERRIDE_EXPORT_HEADERS.length);
     expect(sheet.G3.f).toBe('SUM(G2:G2)');
     expect(sheet.P3.f).toBe('SUM(P2:P2)');
-    expect(sheet['!autofilter'].ref).toBe('A1:T2');
+    expect(sheet['!autofilter'].ref).toBe('A1:W2');
 
     const serialized = writeTripOverrideWorkbook([{
       serviceDate: '2026-08-01', trip: { id: 't1' }, legLabel: 'Before pickup',
