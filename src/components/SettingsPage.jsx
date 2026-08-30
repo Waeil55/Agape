@@ -99,6 +99,8 @@ const SettingsPage = ({
   onUpdateAppSettings,
   updateAppSettings: updateAppSettingsAlias,
   overridePolicy = DEFAULT_OVERRIDE_POLICY,
+  overridePolicyStatus = 'ready',
+  overridePolicyError = '',
   updateOverridePolicy,
   driverProfile,
   phoneNumbers,
@@ -146,10 +148,15 @@ const SettingsPage = ({
   const [chatPolicyStatus, setChatPolicyStatus] = useState('');
   const [overrideDraft, setOverrideDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
   const [overrideStatus, setOverrideStatus] = useState('');
+  const canSaveOverridePolicy = ['ready', 'error'].includes(overridePolicyStatus);
 
   useEffect(() => setOverrideDraft(normalizeOverridePolicy(overridePolicy)), [overridePolicy]);
 
   const saveOverridePolicy = async () => {
+    if (!canSaveOverridePolicy) {
+      setOverrideStatus(overridePolicyError || 'Wait until the shared override policy has been verified before saving changes.');
+      return;
+    }
     if (!updateOverridePolicy) {
       setOverrideStatus('Shared override settings are unavailable.');
       return;
@@ -230,6 +237,13 @@ const SettingsPage = ({
               <h3 className="text-heading font-semibold text-slate-900">Trip cost override policy</h3>
               <p className="mt-1 text-sm font-semibold text-slate-500">Shared deterministic rules for unloaded mileage and waiting-time supplements.</p>
             </div>
+            {overridePolicyStatus !== 'ready' && (
+              <div className={`rounded-xl border px-4 py-3 text-xs font-semibold ${overridePolicyStatus === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-blue-200 bg-blue-50 text-blue-800'}`} role={overridePolicyStatus === 'error' ? 'alert' : 'status'}>
+                {overridePolicyStatus === 'error'
+                  ? `${overridePolicyError || 'Shared override settings could not be verified.'} Review this draft and save it to repair the shared policy.`
+                  : 'Loading and verifying the shared override policy…'}
+              </div>
+            )}
             <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 ['unloadedThresholdMiles', 'Unloaded mile threshold', 'miles', '0.1'],
@@ -268,7 +282,7 @@ const SettingsPage = ({
               </label>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={saveOverridePolicy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"><Save size={16} /> Save override policy</button>
+              <button type="button" onClick={saveOverridePolicy} disabled={!canSaveOverridePolicy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><Save size={16} /> {overridePolicyStatus === 'error' ? 'Repair override policy' : 'Save override policy'}</button>
               {overrideStatus && <p className="text-xs font-semibold text-slate-600" role="status">{overrideStatus}</p>}
             </div>
           </div>

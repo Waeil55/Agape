@@ -23,8 +23,13 @@ export const OVERRIDE_EXPORT_HEADERS = [
 
 const currencyColumns = [6, 9, 10, 13, 14, 15];
 const numberColumns = [8, 11, 12];
+const excelServiceDate = (value) => {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value || '';
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0);
+};
 const rowValues = (row, driverName) => [
-  row.serviceDate,
+  excelServiceDate(row.serviceDate),
   row.trip.bookingId || row.trip.id || '',
   driverName || row.trip.completedDriverName || row.trip.driverName || '',
   row.pickupCity,
@@ -51,14 +56,15 @@ export const buildTripOverrideWorkbook = (rows = [], driverById = new Map()) => 
     values.push(rowValues(row, driver?.name));
   });
   const subtotalRow = rows.length + 2;
+  const subtotal = (column) => (rows.length ? { f: `SUM(${column}2:${column}${subtotalRow - 1})` } : { f: '0' });
   values.push([
     'SUBTOTALS', '', '', '', '', '',
-    { f: `SUM(G2:G${subtotalRow - 1})` }, '',
-    { f: `SUM(I2:I${subtotalRow - 1})` }, '',
-    { f: `SUM(K2:K${subtotalRow - 1})` }, '',
-    { f: `SUM(M2:M${subtotalRow - 1})` }, '',
-    { f: `SUM(O2:O${subtotalRow - 1})` },
-    { f: `SUM(P2:P${subtotalRow - 1})` }, '', '',
+    subtotal('G'), '',
+    subtotal('I'), '',
+    subtotal('K'), '',
+    subtotal('M'), '',
+    subtotal('O'),
+    subtotal('P'), '', '',
   ]);
 
   const sheet = XLSX.utils.aoa_to_sheet(values, { cellDates: true });
@@ -71,6 +77,8 @@ export const buildTripOverrideWorkbook = (rows = [], driverById = new Map()) => 
   sheet['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
 
   for (let row = 1; row < subtotalRow; row += 1) {
+    const dateCell = sheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
+    if (dateCell && dateCell.t === 'd') dateCell.z = 'yyyy-mm-dd';
     currencyColumns.forEach((column) => {
       const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
       if (cell) cell.z = '$#,##0.00';

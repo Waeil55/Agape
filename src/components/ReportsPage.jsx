@@ -51,7 +51,7 @@ const ReportsPage = (props) => {
 
   const renderSection = () => {
     if (section === 'unloaded') {
-      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} overridePolicy={props.overridePolicy} />;
+      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} overridePolicy={props.overridePolicy} overridePolicyStatus={props.overridePolicyStatus} overridePolicyError={props.overridePolicyError} />;
     }
     if (section === 'archive') {
       return (

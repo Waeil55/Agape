@@ -1,5 +1,6 @@
 import { hasExplicitTime, toValidDate } from './safeDate';
-import { localCalendarYmd, timeToMinutes, tripCalendarDateKey } from './tripDate';
+import { buildDriverIndex, findDriverInIndex } from './driverIndex';
+import { timeToMinutes, tripCalendarDateKey } from './tripDate';
 
 export const DEFAULT_OVERRIDE_POLICY = Object.freeze({
   unloadedThresholdMiles: 20,
@@ -14,6 +15,15 @@ export const DEFAULT_OVERRIDE_POLICY = Object.freeze({
 });
 
 const normalizeText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
+const US_STATE_NAMES = new Set([
+  'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware',
+  'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky',
+  'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi',
+  'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey', 'new mexico',
+  'new york', 'north carolina', 'north dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania',
+  'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas', 'utah', 'vermont',
+  'virginia', 'washington', 'west virginia', 'wisconsin', 'wyoming', 'district of columbia',
+]);
 const finiteNonNegative = (value, fallback) => {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
@@ -44,15 +54,40 @@ export const normalizeOverridePolicy = (policy = {}) => ({
   excludedCityPairs: normalizeStringList(policy.excludedCityPairs, []),
 });
 
+export const isOverridePolicyDocumentValid = (policy) => {
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) return false;
+  const nonNegativeNumbers = [
+    policy.unloadedThresholdMiles,
+    policy.unloadedRate,
+    policy.waitingThresholdHours,
+    policy.waitRate,
+  ];
+  const stringList = (value) => Array.isArray(value) && value.every((item) => typeof item === 'string');
+  return nonNegativeNumbers.every((value) => Number.isFinite(value) && value >= 0)
+    && Number.isFinite(policy.waitRoundingMinutes)
+    && policy.waitRoundingMinutes >= 1
+    && typeof policy.sameCityExemption === 'boolean'
+    && typeof policy.excludeOvernightGaps === 'boolean'
+    && stringList(policy.sameCityNames)
+    && stringList(policy.excludedCityPairs);
+};
+
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && normalizeText(value) !== '');
 
 export const extractCityFromAddress = (address) => {
   const text = normalizeText(address);
   if (!text) return '';
-  const parts = text.split(',').map((part) => part.trim()).filter(Boolean);
-  const stateIndex = parts.findIndex((part, index) => index > 0 && /^(?:[A-Z]{2}|Indiana)(?:\s+\d{5}(?:-\d{4})?)?$/i.test(part));
+  const parts = text.split(',').map((part) => part.trim()).filter(Boolean)
+    .filter((part) => !/^(?:USA|United States(?: of America)?)$/i.test(part));
+  const stateIndex = parts.findIndex((part, index) => {
+    if (index === 0) return false;
+    const state = part.replace(/\s+\d{5}(?:-\d{4})?$/, '').trim();
+    return /^[A-Z]{2}$/i.test(state) || US_STATE_NAMES.has(state.toLowerCase());
+  });
   if (stateIndex > 0) return parts[stateIndex - 1];
-  if (parts.length >= 3) return parts[parts.length - 2];
+  const postalIndex = parts.findIndex((part, index) => index > 0 && /^\d{5}(?:-\d{4})?$/.test(part));
+  if (postalIndex > 0) return parts[postalIndex - 1];
+  if (parts.length >= 2) return parts[parts.length - 1];
   return '';
 };
 
@@ -80,23 +115,34 @@ const parseRecordedTimestamp = (value, serviceDate) => {
   return toValidDate(value);
 };
 
+const tripServiceDate = (trip) => [trip?.date, trip?.serviceDate, trip?.dateKey, trip?.pickupDate]
+  .map((value) => tripCalendarDateKey(value))
+  .find(Boolean);
+
 export const getTripPickupTimestamp = (trip) => parseRecordedTimestamp(firstValue(
   trip?.arrivalTime,
+  trip?.pickupArrival,
+  trip?.pickupArrivalTime,
+  trip?.arrivedPickupTime,
+  trip?.arrivedPickupAt,
   trip?.pickupTimestamp,
   trip?.actualPickupTime,
   trip?.departedPickupTime,
   trip?.startedAt,
   trip?.startTime,
-), trip?.date);
+), tripServiceDate(trip));
 
 export const getTripDropoffTimestamp = (trip, pickupTimestamp = getTripPickupTimestamp(trip)) => {
   const value = firstValue(
     trip?.arrivalDropoffTime,
+    trip?.dropoffArrival,
+    trip?.dropoffArrivalTime,
+    trip?.arrivedDropoffAt,
     trip?.dropoffTimestamp,
     trip?.actualDropoffTime,
     trip?.completedAt,
   );
-  const parsed = parseRecordedTimestamp(value, trip?.date);
+  const parsed = parseRecordedTimestamp(value, tripServiceDate(trip));
   if (!parsed || !pickupTimestamp) return parsed;
   if (parsed.getTime() >= pickupTimestamp.getTime()) return parsed;
   if (typeof value === 'string' && !/^\d{4}-\d{1,2}-\d{1,2}/.test(value.trim())) {
@@ -107,16 +153,31 @@ export const getTripDropoffTimestamp = (trip, pickupTimestamp = getTripPickupTim
   return parsed;
 };
 
-const normalizedStatus = (trip) => normalizeText(trip?.status).toLowerCase().replace(/[_-]+/g, ' ');
-const isCompleted = (trip) => normalizedStatus(trip) === 'completed';
+const normalizedStatus = (trip) => normalizeText(firstValue(trip?.status, trip?.lifecycleStatus)).toLowerCase().replace(/[_-]+/g, ' ');
+const isCompleted = (trip) => ['completed', 'complete', 'done'].includes(normalizedStatus(trip));
 const isNonWorkStatus = (trip) => ['cancelled', 'canceled', 'no show', 'noshow'].includes(normalizedStatus(trip));
 
-const driverKey = (trip) => normalizeText(firstValue(
-  trip?.driverId,
-  trip?.driverEmail,
-  trip?.completedDriverName,
-  trip?.driverName,
-)).toLowerCase();
+const driverKey = (trip, driverIndex) => {
+  const resolved = findDriverInIndex(driverIndex, {
+    driverId: firstValue(trip?.driverId, trip?.completedDriverId, trip?.assignedDriverId),
+    driverEmail: firstValue(trip?.driverEmail, trip?.completedDriverEmail, trip?.assignedDriverEmail),
+    driverName: firstValue(trip?.completedDriverName, trip?.driverName, trip?.assignedDriverName, trip?.driver),
+  });
+  return normalizeText(firstValue(
+    resolved?.id,
+    resolved?.email,
+    trip?.driverId,
+    trip?.completedDriverId,
+    trip?.assignedDriverId,
+    trip?.driverEmail,
+    trip?.completedDriverEmail,
+    trip?.assignedDriverEmail,
+    trip?.completedDriverName,
+    trip?.driverName,
+    trip?.assignedDriverName,
+    trip?.driver,
+  )).toLowerCase();
+};
 
 const vehicleKey = (trip) => normalizeText(firstValue(
   trip?.vehicleId,
@@ -128,8 +189,10 @@ const numeric = (value) => {
   const number = Number.parseFloat(String(value ?? '').replace(/[^0-9.-]/g, ''));
   return Number.isFinite(number) ? number : null;
 };
+const roundCurrency = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 export const getOriginalTripCost = (trip) => {
+  const raw = trip?._originalRow || {};
   const value = numeric(firstValue(
     trip?.originalTripCost,
     trip?.originalCost,
@@ -137,6 +200,11 @@ export const getOriginalTripCost = (trip) => {
     trip?.baseCost,
     trip?.fare,
     trip?.cost,
+    raw['Original Trip Cost'],
+    raw['Original Cost'],
+    raw['Trip Cost'],
+    raw['Base Fare'],
+    raw.Cost,
   ));
   return value !== null && value >= 0 ? value : 0;
 };
@@ -155,20 +223,22 @@ const canonicalCity = (city, aliasNames) => {
   return aliases.has(normalized) ? '__configured_same_city__' : normalized;
 };
 
-export const normalizeCityPair = (value) => {
-  if (value && typeof value === 'object') {
-    return `${normalizeCityName(value.from)}=>${normalizeCityName(value.to)}`;
-  }
-  const [from = '', to = ''] = String(value ?? '').split(/\s*(?:=>|>|→|\|)\s*/);
-  return `${normalizeCityName(from)}=>${normalizeCityName(to)}`;
+export const normalizeCityPair = (value, aliasNames = []) => {
+  const aliases = Array.isArray(aliasNames) ? aliasNames : [];
+  const [from, to] = value && typeof value === 'object'
+    ? [value.from, value.to]
+    : String(value ?? '').split(/\s*(?:=>|>|→|\|)\s*/);
+  return `${canonicalCity(from || '', aliases)}=>${canonicalCity(to || '', aliases)}`;
 };
 
-const makeWorkInterval = (trip) => {
+const makeWorkInterval = (trip, driverIndex) => {
   if (isNonWorkStatus(trip)) return null;
   const start = getTripPickupTimestamp(trip);
   const end = getTripDropoffTimestamp(trip, start);
   if (!start || !end || end <= start) return null;
-  return { trip, driver: driverKey(trip), startMs: start.getTime(), endMs: end.getTime() };
+  const driver = driverKey(trip, driverIndex);
+  if (!driver) return null;
+  return { trip, driver, startMs: start.getTime(), endMs: end.getTime() };
 };
 
 const getRawUnloadedMiles = (currentTrip, nextTrip) => {
@@ -177,8 +247,20 @@ const getRawUnloadedMiles = (currentTrip, nextTrip) => {
   if (currentVehicle && nextVehicle && currentVehicle !== nextVehicle) {
     return { miles: 0, valid: false, reason: 'Vehicle changed before the next pickup' };
   }
-  const dropoffOdometer = numeric(firstValue(currentTrip?.dropoffOdometer, currentTrip?.endOdometer));
-  const nextPickupOdometer = numeric(firstValue(nextTrip?.pickupOdometer, nextTrip?.startOdometer));
+  const dropoffOdometer = numeric(firstValue(
+    currentTrip?.dropoffOdometer,
+    currentTrip?.endOdometer,
+    currentTrip?.endMileage,
+    currentTrip?.dropoffMileage,
+    currentTrip?.odometer,
+  ));
+  const nextPickupOdometer = numeric(firstValue(
+    nextTrip?.pickupOdometer,
+    nextTrip?.startOdometer,
+    nextTrip?.startMileage,
+    nextTrip?.pickupMileage,
+    nextTrip?.startOdo,
+  ));
   if (dropoffOdometer === null || nextPickupOdometer === null) {
     return { miles: 0, valid: false, reason: 'Recorded dropoff or next-pickup odometer is missing' };
   }
@@ -189,6 +271,7 @@ const getRawUnloadedMiles = (currentTrip, nextTrip) => {
 
 export const analyzeTripCostOverrides = (trips = [], options = {}) => {
   const policy = normalizeOverridePolicy(options.policy);
+  const driverIndex = buildDriverIndex(options.drivers || []);
   const allDates = options.allDates === true;
   const fromDate = normalizeText(options.fromDate);
   const toDate = normalizeText(options.toDate);
@@ -210,16 +293,16 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       excluded.invalidChronology += 1;
       return;
     }
-    const serviceDate = localCalendarYmd(pickupTimestamp);
+    const serviceDate = tripCalendarDateKey(pickupTimestamp);
     if (!allDates && ((fromDate && serviceDate < fromDate) || (toDate && serviceDate > toDate))) return;
-    eligible.push({ trip, pickupTimestamp, dropoffTimestamp, serviceDate, driver: driverKey(trip) || `unassigned:${trip.id}` });
+    eligible.push({ trip, pickupTimestamp, dropoffTimestamp, serviceDate, driver: driverKey(trip, driverIndex) || `unassigned:${trip.id}` });
   });
 
-  const workIntervals = (trips || []).map(makeWorkInterval).filter(Boolean);
+  const workIntervals = (trips || []).map((trip) => makeWorkInterval(trip, driverIndex)).filter(Boolean);
   const groups = new Map();
   eligible.forEach((entry) => groups.set(entry.driver, [...(groups.get(entry.driver) || []), entry]));
   groups.forEach((entries) => entries.sort((left, right) => left.pickupTimestamp - right.pickupTimestamp || String(left.trip.id).localeCompare(String(right.trip.id))));
-  const excludedPairs = new Set(policy.excludedCityPairs.map(normalizeCityPair));
+  const excludedPairs = new Set(policy.excludedCityPairs.map((pair) => normalizeCityPair(pair, policy.sameCityNames)));
   const rows = [];
 
   groups.forEach((entries) => {
@@ -228,18 +311,15 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       const pickupCity = getTripCity(entry.trip, 'pickup');
       const dropoffCity = getTripCity(entry.trip, 'dropoff');
       const nextPickupCity = next ? getTripCity(next.trip, 'pickup') : '';
-      const pairKey = normalizeCityPair({ from: dropoffCity, to: nextPickupCity });
-      const pairExcluded = Boolean(next && excludedPairs.has(pairKey));
+      const cityPairComplete = Boolean(next && dropoffCity && nextPickupCity);
+      const pairKey = normalizeCityPair({ from: dropoffCity, to: nextPickupCity }, policy.sameCityNames);
+      const pairExcluded = Boolean(cityPairComplete && excludedPairs.has(pairKey));
       const gapMinutes = next ? Math.max(0, (next.pickupTimestamp - entry.dropoffTimestamp) / 60000) : 0;
       const chronologyValid = !next || next.pickupTimestamp >= entry.dropoffTimestamp;
-      const sameCity = Boolean(next && policy.sameCityExemption
+      const sameCity = Boolean(cityPairComplete && policy.sameCityExemption
         && canonicalCity(dropoffCity, policy.sameCityNames)
         && canonicalCity(dropoffCity, policy.sameCityNames) === canonicalCity(nextPickupCity, policy.sameCityNames));
       const mileage = next && chronologyValid ? getRawUnloadedMiles(entry.trip, next.trip) : { miles: 0, valid: false, reason: next ? 'Trips overlap in time' : 'No next trip in the selected range' };
-      const unloadedQualified = Boolean(next && chronologyValid && !pairExcluded && !sameCity && mileage.valid
-        && mileage.miles > policy.unloadedThresholdMiles);
-      const unloadedMiles = unloadedQualified ? mileage.miles : 0;
-      const unloadedAmount = unloadedMiles * policy.unloadedRate;
       const crossesServiceDate = Boolean(next && entry.serviceDate !== next.serviceDate);
       const interveningWork = Boolean(next && workIntervals.some((interval) => (
         interval.driver === entry.driver
@@ -248,7 +328,11 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
         && interval.startMs < next.pickupTimestamp.getTime()
         && interval.endMs > entry.dropoffTimestamp.getTime()
       )));
-      const waitEligible = Boolean(next && chronologyValid && !pairExcluded && !interveningWork
+      const unloadedQualified = Boolean(next && chronologyValid && cityPairComplete && !pairExcluded && !sameCity
+        && !interveningWork && mileage.valid && mileage.miles > policy.unloadedThresholdMiles);
+      const unloadedMiles = unloadedQualified ? mileage.miles : 0;
+      const unloadedAmount = roundCurrency(unloadedMiles * policy.unloadedRate);
+      const waitEligible = Boolean(next && chronologyValid && cityPairComplete && !pairExcluded && !interveningWork
         && !(policy.excludeOvernightGaps && crossesServiceDate)
         && gapMinutes > policy.waitingThresholdHours * 60);
       const rawBillableWaitMinutes = waitEligible ? gapMinutes - policy.waitingThresholdHours * 60 : 0;
@@ -256,13 +340,16 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
         ? Math.ceil(rawBillableWaitMinutes / policy.waitRoundingMinutes) * policy.waitRoundingMinutes
         : 0;
       const waitHours = billedWaitMinutes / 60;
-      const waitCost = waitHours * policy.waitRate;
+      const waitCost = roundCurrency(waitHours * policy.waitRate);
       const originalTripCost = getOriginalTripCost(entry.trip);
+      const totalCost = roundCurrency(originalTripCost + unloadedAmount + waitCost);
 
       let unloadedReason = 'No next trip in the selected range';
       if (next) {
         if (!chronologyValid) unloadedReason = 'Trips overlap in time';
+        else if (!cityPairComplete) unloadedReason = 'Dropoff or next pickup city is missing';
         else if (pairExcluded) unloadedReason = 'City pair excluded by policy';
+        else if (interveningWork) unloadedReason = 'Another trip occurs before the next eligible completed trip';
         else if (sameCity) unloadedReason = 'Same-city exemption';
         else if (!mileage.valid) unloadedReason = mileage.reason;
         else if (mileage.miles <= policy.unloadedThresholdMiles) unloadedReason = `Empty segment does not exceed ${policy.unloadedThresholdMiles} mi`;
@@ -271,6 +358,7 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       let waitReason = 'No next trip in the selected range';
       if (next) {
         if (!chronologyValid) waitReason = 'Trips overlap in time';
+        else if (!cityPairComplete) waitReason = 'Dropoff or next pickup city is missing';
         else if (pairExcluded) waitReason = 'City pair excluded by policy';
         else if (interveningWork) waitReason = 'Another trip overlaps this gap';
         else if (policy.excludeOvernightGaps && crossesServiceDate) waitReason = 'Overnight gap excluded';
@@ -299,11 +387,12 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
         waitHours,
         waitRate: policy.waitRate,
         waitCost,
-        totalCost: originalTripCost + unloadedAmount + waitCost,
+        totalCost,
         unloadedReason,
         waitReason,
         pairExcluded,
         sameCity,
+        cityPairComplete,
         interveningWork,
       });
     });
@@ -314,3 +403,23 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
 };
 
 export const buildTripCostOverrideRows = (trips, options) => analyzeTripCostOverrides(trips, options).rows;
+
+export const filterTripCostOverrideRows = (rows = [], options = {}) => {
+  const query = normalizeText(options.search).toLowerCase();
+  const unloadedFloor = finiteNonNegative(options.minimumUnloadedMiles, 0);
+  const waitFloor = finiteNonNegative(options.minimumWaitHours, 0);
+  const driverFilter = normalizeText(options.driverKey || 'all').toLowerCase();
+  const fromFilter = normalizeCityName(options.gapFromCity === 'all' ? '' : options.gapFromCity);
+  const toFilter = normalizeCityName(options.gapToCity === 'all' ? '' : options.gapToCity);
+  const driverNamesById = options.driverNamesById instanceof Map ? options.driverNamesById : new Map();
+  return (rows || []).filter((row) => {
+    if (driverFilter !== 'all' && row.driverKey !== driverFilter) return false;
+    if (row.unloadedMiles < unloadedFloor || row.waitHours < waitFloor) return false;
+    if (fromFilter && normalizeCityName(row.dropoffCity) !== fromFilter) return false;
+    if (toFilter && normalizeCityName(row.nextPickupCity) !== toFilter) return false;
+    if (!query) return true;
+    const driverName = driverNamesById.get(row.trip.driverId);
+    return [row.trip.bookingId, row.trip.id, row.trip.patient, driverName, row.pickupCity, row.dropoffCity, row.nextPickupCity]
+      .some((value) => normalizeText(value).toLowerCase().includes(query));
+  });
+};

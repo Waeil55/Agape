@@ -34,12 +34,12 @@ import useEnterpriseSessionSecurity, { beginSecuritySession, clearSecuritySessio
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
 import { hydrateTripDriverIdentity } from './utils/driverIdentity';
-import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from './utils/tripCostOverrides';
+import { DEFAULT_OVERRIDE_POLICY, isOverridePolicyDocumentValid, normalizeOverridePolicy } from './utils/tripCostOverrides';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v364';
+const APP_VERSION = 'v365';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -691,6 +691,8 @@ const App = () => {
     }
   });
   const [overridePolicy, setOverridePolicy] = useState(() => normalizeOverridePolicy(DEFAULT_OVERRIDE_POLICY));
+  const [overridePolicyStatus, setOverridePolicyStatus] = useState('loading');
+  const [overridePolicyError, setOverridePolicyError] = useState('');
 
   const addToast = useCallback((title, message, type = 'info') => {
     const id = Date.now();
@@ -699,17 +701,54 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    let statusTimer;
     if (!isAuthenticated || !['admin', 'dispatcher'].includes(role)) {
-      return undefined;
+      statusTimer = window.setTimeout(() => {
+        if (!active) return;
+        setOverridePolicyStatus('idle');
+        setOverridePolicyError('');
+      }, 0);
+      return () => {
+        active = false;
+        window.clearTimeout(statusTimer);
+      };
     }
-    return onSnapshot(
+    statusTimer = window.setTimeout(() => {
+      if (!active) return;
+      setOverridePolicyStatus('loading');
+      setOverridePolicyError('');
+    }, 0);
+    const unsubscribe = onSnapshot(
       doc(db, 'systemConfig', 'overrideCostPolicy'),
-      (snapshot) => setOverridePolicy(normalizeOverridePolicy(snapshot.exists() ? snapshot.data() : DEFAULT_OVERRIDE_POLICY)),
+      (snapshot) => {
+        if (!active) return;
+        window.clearTimeout(statusTimer);
+        const storedPolicy = snapshot.exists() ? snapshot.data() : DEFAULT_OVERRIDE_POLICY;
+        if (!isOverridePolicyDocumentValid(storedPolicy)) {
+          setOverridePolicyStatus('error');
+          setOverridePolicyError('The saved override policy is incomplete or malformed. Cost calculations and export are blocked until it is corrected.');
+          addToast('Invalid override settings', 'The saved billing policy failed validation and was not used.', 'danger');
+          return;
+        }
+        setOverridePolicy(normalizeOverridePolicy(storedPolicy));
+        setOverridePolicyStatus('ready');
+        setOverridePolicyError('');
+      },
       (error) => {
+        if (!active) return;
+        window.clearTimeout(statusTimer);
         console.error('[OverridePolicy] Unable to read shared policy', error);
-        addToast('Override settings unavailable', 'Using safe default override rates until the shared settings can be loaded.', 'danger');
+        setOverridePolicyStatus('error');
+        setOverridePolicyError('Shared override settings could not be verified. Cost calculations and export are blocked.');
+        addToast('Override settings unavailable', 'Cost calculations and export are blocked until the shared settings can be verified.', 'danger');
       },
     );
+    return () => {
+      active = false;
+      window.clearTimeout(statusTimer);
+      unsubscribe();
+    };
   }, [addToast, isAuthenticated, role]);
 
   // Show a non-blocking toast notification when the service worker updates,
@@ -753,13 +792,21 @@ const App = () => {
   const updateOverridePolicy = useCallback(async (updates) => {
     if (!['admin', 'dispatcher'].includes(role)) throw new Error('Only administrators and dispatchers can update override settings.');
     const next = normalizeOverridePolicy({ ...overridePolicy, ...updates });
-    await setDoc(doc(db, 'systemConfig', 'overrideCostPolicy'), {
-      ...next,
-      updatedAt: new Date().toISOString(),
-      updatedBy: auth.currentUser?.uid || '',
-    }, { merge: false });
-    setOverridePolicy(next);
-    return next;
+    try {
+      await setDoc(doc(db, 'systemConfig', 'overrideCostPolicy'), {
+        ...next,
+        updatedAt: new Date().toISOString(),
+        updatedBy: auth.currentUser?.uid || '',
+      }, { merge: false });
+      setOverridePolicy(next);
+      setOverridePolicyStatus('ready');
+      setOverridePolicyError('');
+      return next;
+    } catch (error) {
+      setOverridePolicyStatus('error');
+      setOverridePolicyError('Shared override settings could not be saved or verified. Cost calculations and export are blocked.');
+      throw error;
+    }
   }, [overridePolicy, role]);
 
   const requestAuthAction = useCallback((label, callback) => {
@@ -3042,6 +3089,8 @@ const App = () => {
               appSettings={appSettings}
               updateAppSettings={updateAppSettings}
               overridePolicy={overridePolicy}
+              overridePolicyStatus={overridePolicyStatus}
+              overridePolicyError={overridePolicyError}
               updateOverridePolicy={updateOverridePolicy}
               selectedTasks={selectedTasks}
               setSelectedTasks={setSelectedTasks}

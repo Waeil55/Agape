@@ -160,8 +160,8 @@ service cloud.firestore {
     }
     match /systemConfig/{document} {
       allow read: if signedIn() && (isDispatcher() || document == 'phoneNumbers');
-      allow create, update: if isAdmin()
-        || (isDispatcher() && document == 'overrideCostPolicy' && validOverrideCostPolicy());
+      allow create, update: if (document == 'overrideCostPolicy' && isDispatcher() && validOverrideCostPolicy())
+        || (document != 'overrideCostPolicy' && isAdmin());
       allow delete: if isAdmin();
     }
     match /welltrans_settings/{document} {
