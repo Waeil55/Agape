@@ -410,6 +410,7 @@
 html {
   height: 100%;
   height: 100vh;
+  height: 100dvh;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -436,6 +437,7 @@ html[data-theme="dark"], html.theme-dark {
 body {
   height: 100%;
   height: 100vh;
+  height: 100dvh;
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -466,6 +468,8 @@ body {
 #root {
   height: 100%;
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -476,6 +480,8 @@ body {
 .App {
   height: 100%;
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1886,6 +1892,64 @@ tbody tr:hover {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ===== APPLICATION SCROLLING CONTRACT =====
+   The document stays locked to one app viewport. Every shrinking flex child
+   and explicit scroll utility must therefore own a real, touch-capable scroll
+   viewport instead of expanding behind an overflow-hidden ancestor. */
+.flex-1 {
+  min-height: 0;
+}
+
+.overflow-y-auto,
+.overflow-y-scroll {
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.overflow-auto,
+.overflow-scroll {
+  min-height: 0;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+main,
+[role="main"],
+[role="tabpanel"] {
+  min-height: 0;
+}
+
+/* Every conventional full-screen overlay gets a vertical fallback. Panels
+   with their own scroll body keep using it; panels without one can still be
+   reached on small phones, landscape screens, and enlarged text settings. */
+.fixed.inset-0:not(.trip-window-overlay) {
+  max-height: 100dvh;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fixed.inset-0.items-center:not(.trip-window-overlay) {
+  align-items: safe center;
+}
+
+.fixed.inset-0:not(.trip-window-overlay) > [role="dialog"],
+.fixed.inset-0:not(.trip-window-overlay) > .relative.z-10,
+.fixed.inset-0:not(.trip-window-overlay) > .bg-white.overflow-hidden {
+  max-height: calc(100dvh - 1rem);
+  min-height: 0;
+}
+
+.fixed.inset-0:not(.trip-window-overlay) > .bg-white.overflow-hidden {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .mobile-tabbar,
 [data-bottom-nav="true"] {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
@@ -3230,7 +3294,10 @@ html, body {
 
   background: var(--adm-bg);
   color: var(--adm-text);
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
   display: flex;
   font-family: 'Outfit', 'Inter', system-ui, sans-serif;
 }
@@ -3245,7 +3312,8 @@ html, body {
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: 100dvh;
+  height: 100%;
+  min-height: 0;
   padding: var(--space-4) var(--space-3);
   gap: var(--space-2);
   overflow-y: auto;
@@ -3356,7 +3424,9 @@ html, body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .adm-topbar {
@@ -5908,6 +5978,7 @@ textarea:focus,
 }
 
 .agape-login-panel {
+  flex-shrink: 0;
   box-shadow: 0 30px 90px rgb(2 6 23 / 34%), 0 2px 12px rgb(2 6 23 / 12%);
 }
 
@@ -5968,7 +6039,8 @@ textarea:focus,
   .agape-login-stage {
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: 100%;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
     gap: 1rem;

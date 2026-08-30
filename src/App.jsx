@@ -2870,7 +2870,7 @@ const App = () => {
 
   return (
     <>
-      <div className="h-full flex-1 flex flex-col bg-[var(--bg-app)] overflow-hidden w-full">
+      <div className="h-full min-h-0 flex-1 flex flex-col bg-[var(--bg-app)] overflow-hidden w-full">
       {/* Connectivity first: pushes content down instead of covering it */}
       {role !== 'driver' && <OfflineIndicator />}
       {/* Header removed: DriverPage handles its own UI */}
