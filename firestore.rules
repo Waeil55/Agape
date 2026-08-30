@@ -40,17 +40,30 @@ service cloud.firestore {
           'excludedCityPairs', 'updatedAt', 'updatedBy'
         ])
         && data.keys().hasOnly([
+          'homeAddress', 'homeAddress2', 'homeCity', 'homeState', 'homeZip',
+          'homeLat', 'homeLng', 'homeFormattedAddress',
           'unloadedThresholdMiles', 'unloadedRate', 'sameCityExemption', 'sameCityNames',
           'waitingThresholdHours', 'waitRate', 'waitRoundingMinutes', 'excludeOvernightGaps',
-          'excludedCityPairs', 'updatedAt', 'updatedBy'
+          'excludedCityPairs', 'overrideExclusionRules', 'updatedAt', 'updatedBy'
         ])
+        && data.get('homeAddress', '') is string && data.get('homeAddress', '').size() <= 240
+        && data.get('homeAddress2', '') is string && data.get('homeAddress2', '').size() <= 120
+        && data.get('homeCity', '') is string && data.get('homeCity', '').size() <= 100
+        && data.get('homeState', '') is string && data.get('homeState', '').size() <= 2
+        && data.get('homeZip', '') is string && data.get('homeZip', '').size() <= 10
+        && data.get('homeFormattedAddress', '') is string && data.get('homeFormattedAddress', '').size() <= 320
+        && (data.get('homeLat', null) == null
+          || (data.homeLat is number && data.homeLat >= -90 && data.homeLat <= 90))
+        && (data.get('homeLng', null) == null
+          || (data.homeLng is number && data.homeLng >= -180 && data.homeLng <= 180))
         && data.unloadedThresholdMiles is number && data.unloadedThresholdMiles >= 0
         && data.unloadedRate is number && data.unloadedRate >= 0
-        && data.sameCityExemption is bool && data.sameCityNames is list
+        && data.sameCityExemption is bool && data.sameCityNames is list && data.sameCityNames.size() <= 100
         && data.waitingThresholdHours is number && data.waitingThresholdHours >= 0
         && data.waitRate is number && data.waitRate >= 0
         && data.waitRoundingMinutes is number && data.waitRoundingMinutes >= 1
-        && data.excludeOvernightGaps is bool && data.excludedCityPairs is list
+        && data.excludeOvernightGaps is bool && data.excludedCityPairs is list && data.excludedCityPairs.size() <= 200
+        && data.get('overrideExclusionRules', []) is list && data.get('overrideExclusionRules', []).size() <= 200
         && data.updatedAt is string && data.updatedBy == request.auth.uid;
     }
     match /users/{userId} {
