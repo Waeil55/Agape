@@ -20,7 +20,7 @@ describe('driver odometer keyboard overlay contract', () => {
       });
     }
     expect(read('index.html')).toContain('interactive-widget=overlays-content');
-    expect(read('index.html')).toContain('UI-KB-STABLE-20260829B');
+    expect(read('index.html')).toContain('UI-KB-FIXED-20260829C');
     expect(read('src/App.jsx')).toContain('interactive-widget=overlays-content');
   });
 
@@ -29,11 +29,15 @@ describe('driver odometer keyboard overlay contract', () => {
     const css = read('src/index.css');
     expect(driver).toContain('virtualKeyboard.overlaysContent = true');
     expect(driver).toContain('Keyboard.setResizeMode({ mode: KeyboardResize.None })');
-    expect(driver).toContain("classList.toggle('trip-window-keyboard-visible', keyboardVisible)");
+    expect(driver).toContain('applyWindowLock');
     expect(driver).toContain('const mutationObserver = new MutationObserver((records) =>');
     expect(driver).toContain("node.matches?.('.trip-window-panel')");
-    expect(css).toContain('html.trip-window-keyboard-visible .trip-window-overlay');
-    expect(css).toContain('bottom: var(--trip-window-keyboard-inset, 0px)');
+    expect(driver).toContain('Keyboard.setScroll({ isDisabled: true })');
+    expect(driver).toContain('inputRect.bottom > bodyRect.bottom - edgePadding');
+    expect(driver).not.toContain('trip-window-keyboard-visible');
+    expect(driver).not.toContain('--trip-window-keyboard-inset');
+    expect(css).not.toContain('trip-window-keyboard-visible');
+    expect(css).not.toContain('--trip-window-keyboard-inset');
     expect(driver).not.toContain('trip-window-kb-open');
     expect(driver).not.toContain('trip-window-kb-native');
     expect(driver).not.toContain('trip-window-kb-bounds');

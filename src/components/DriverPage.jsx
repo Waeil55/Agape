@@ -178,8 +178,14 @@ const focusTripWindowInput = () => {
     requestAnimationFrame(() => {
       const body = el.closest('.trip-window-body') || document.querySelector('.trip-window-panel');
       if (body) {
-        const target = body.getBoundingClientRect().top + (el.getBoundingClientRect().top - body.getBoundingClientRect().top) - 16;
-        body.scrollTop = Math.max(0, target);
+        const bodyRect = body.getBoundingClientRect();
+        const inputRect = el.getBoundingClientRect();
+        const edgePadding = 12;
+        if (inputRect.bottom > bodyRect.bottom - edgePadding) {
+          body.scrollTop += inputRect.bottom - bodyRect.bottom + edgePadding;
+        } else if (inputRect.top < bodyRect.top + edgePadding) {
+          body.scrollTop -= bodyRect.top + edgePadding - inputRect.top;
+        }
       }
     });
   }, 120);
@@ -1453,29 +1459,21 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     if (completed.length > 0) setLastOdometer(completed[0].dropoffOdometer);
   }, [driverScopedTrips, me?.id, currentVehicleOdometer]);
 
-  // One keyboard controller owns the complete trip-window transition. It
-  // freezes the background as soon as React inserts a window (before focus),
-  // then shortens only the overlay to the keyboard's top edge. Keeping this in
-  // one effect prevents the old visualViewport/native/polling branches from
-  // fighting over the panel position during the keyboard animation.
+  // Keep the existing trip-window design in its original coordinates while
+  // the keyboard overlays it. The shell is frozen before autofocus runs; no
+  // keyboard event is allowed to recenter, bottom-align, translate, or resize
+  // the window. Native scroll is disabled only while a trip window is open.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const root = document.documentElement;
-    const visualViewport = window.visualViewport || null;
     const virtualKeyboard = navigator.virtualKeyboard || null;
     let frame = 0;
-    let settleTimer = 0;
     let cancelled = false;
     let panelOpen = false;
-    let tripInputFocused = false;
-    let nativeKeyboardHeight = 0;
-    let virtualKeyboardHeight = 0;
-    let baselineHeight = Math.max(window.innerHeight, root.clientHeight, visualViewport?.height || 0);
     let savedScrollY = 0;
     let savedRootOverflow = '';
     let savedBodyStyles = null;
-    let nativeShowListener = null;
-    let nativeHideListener = null;
+    let nativeKeyboard = null;
 
     const lockBackground = () => {
       if (savedBodyStyles) return;
@@ -1506,61 +1504,24 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       window.scrollTo(0, savedScrollY);
     };
 
-    const applyKeyboardInset = () => {
+    const applyWindowLock = () => {
       frame = 0;
-      const panel = document.querySelector('.trip-window-panel');
-      const nextPanelOpen = !!panel;
-      if (nextPanelOpen && !panelOpen) lockBackground();
-      if (!nextPanelOpen && panelOpen) unlockBackground();
+      const nextPanelOpen = !!document.querySelector('.trip-window-panel');
+      if (nextPanelOpen && !panelOpen) {
+        lockBackground();
+        if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: true }).catch(() => {});
+      }
+      if (!nextPanelOpen && panelOpen) {
+        if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: false }).catch(() => {});
+        unlockBackground();
+      }
       panelOpen = nextPanelOpen;
       root.classList.toggle('trip-window-open', panelOpen);
-
-      if (!panelOpen) {
-        tripInputFocused = false;
-        nativeKeyboardHeight = 0;
-        virtualKeyboardHeight = 0;
-        baselineHeight = Math.max(window.innerHeight, root.clientHeight, visualViewport?.height || 0);
-      }
-
-      const visualBottom = (visualViewport?.offsetTop || 0) + (visualViewport?.height || window.innerHeight);
-      const visualInset = tripInputFocused ? Math.max(0, baselineHeight - visualBottom) : 0;
-      const keyboardInset = Math.max(nativeKeyboardHeight, virtualKeyboardHeight, visualInset);
-      const keyboardVisible = panelOpen && keyboardInset >= 80;
-      root.style.setProperty('--trip-window-keyboard-inset', keyboardVisible ? `${Math.round(keyboardInset)}px` : '0px');
-      root.classList.toggle('trip-window-keyboard-visible', keyboardVisible);
     };
 
-    const scheduleApply = (settle = false) => {
+    const scheduleWindowLock = () => {
       if (frame) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(applyKeyboardInset);
-      if (settle) {
-        if (settleTimer) clearTimeout(settleTimer);
-        settleTimer = window.setTimeout(applyKeyboardInset, 240);
-      }
-    };
-
-    const onFocusIn = (event) => {
-      tripInputFocused = !!event.target?.closest?.('.trip-window-panel input, .trip-window-panel textarea, .trip-window-panel select');
-      scheduleApply(true);
-    };
-    const onFocusOut = () => {
-      window.setTimeout(() => {
-        tripInputFocused = !!document.activeElement?.closest?.('.trip-window-panel input, .trip-window-panel textarea, .trip-window-panel select');
-        scheduleApply(true);
-      }, 0);
-    };
-    const onViewportResize = () => {
-      if (!tripInputFocused) baselineHeight = Math.max(window.innerHeight, root.clientHeight, visualViewport?.height || 0);
-      scheduleApply(true);
-    };
-    const onViewportScroll = () => scheduleApply();
-    const onOrientationChange = () => {
-      baselineHeight = Math.max(window.innerHeight, root.clientHeight, visualViewport?.height || 0);
-      scheduleApply(true);
-    };
-    const onVirtualKeyboardGeometry = () => {
-      virtualKeyboardHeight = Math.max(0, Number(virtualKeyboard?.boundingRect?.height) || 0);
-      scheduleApply();
+      frame = requestAnimationFrame(applyWindowLock);
     };
     const preventBackgroundTouch = (event) => {
       if (!panelOpen || event.target?.closest?.('.trip-window-panel')) return;
@@ -1574,63 +1535,33 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           && (node.matches?.('.trip-window-panel') || node.querySelector?.('.trip-window-panel'))
         ))
       ));
-      if (tripWindowChanged) scheduleApply();
+      if (tripWindowChanged) scheduleWindowLock();
     });
     mutationObserver.observe(document.body, { childList: true, subtree: true });
-    visualViewport?.addEventListener('resize', onViewportResize);
-    visualViewport?.addEventListener('scroll', onViewportScroll);
-    window.addEventListener('resize', onViewportResize);
-    window.addEventListener('orientationchange', onOrientationChange);
-    document.addEventListener('focusin', onFocusIn, true);
-    document.addEventListener('focusout', onFocusOut, true);
     document.addEventListener('touchmove', preventBackgroundTouch, { capture: true, passive: false });
 
     if (virtualKeyboard) {
       try { virtualKeyboard.overlaysContent = true; } catch { /* unsupported policy */ }
-      virtualKeyboard.addEventListener?.('geometrychange', onVirtualKeyboardGeometry);
-      onVirtualKeyboardGeometry();
     }
 
     if (isNativeShell()) {
       import('@capacitor/keyboard').then(async ({ Keyboard, KeyboardResize }) => {
         await Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {});
-        const showListener = await Keyboard.addListener('keyboardDidShow', (info) => {
-          nativeKeyboardHeight = Math.max(0, Number(info?.keyboardHeight) || 0);
-          scheduleApply();
-        });
-        const hideListener = await Keyboard.addListener('keyboardDidHide', () => {
-          nativeKeyboardHeight = 0;
-          scheduleApply();
-        });
-        if (cancelled) {
-          void showListener.remove();
-          void hideListener.remove();
-        } else {
-          nativeShowListener = showListener;
-          nativeHideListener = hideListener;
-        }
+        if (cancelled) return;
+        nativeKeyboard = Keyboard;
+        if (panelOpen) await Keyboard.setScroll({ isDisabled: true }).catch(() => {});
       }).catch(() => {});
     }
 
-    applyKeyboardInset();
+    applyWindowLock();
     return () => {
       cancelled = true;
       if (frame) cancelAnimationFrame(frame);
-      if (settleTimer) clearTimeout(settleTimer);
       mutationObserver.disconnect();
-      visualViewport?.removeEventListener('resize', onViewportResize);
-      visualViewport?.removeEventListener('scroll', onViewportScroll);
-      window.removeEventListener('resize', onViewportResize);
-      window.removeEventListener('orientationchange', onOrientationChange);
-      document.removeEventListener('focusin', onFocusIn, true);
-      document.removeEventListener('focusout', onFocusOut, true);
       document.removeEventListener('touchmove', preventBackgroundTouch, true);
-      virtualKeyboard?.removeEventListener?.('geometrychange', onVirtualKeyboardGeometry);
-      if (nativeShowListener) void nativeShowListener.remove();
-      if (nativeHideListener) void nativeHideListener.remove();
+      if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: false }).catch(() => {});
       unlockBackground();
-      root.classList.remove('trip-window-open', 'trip-window-keyboard-visible');
-      root.style.removeProperty('--trip-window-keyboard-inset');
+      root.classList.remove('trip-window-open');
     };
   }, []);
 

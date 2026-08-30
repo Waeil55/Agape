@@ -2467,9 +2467,8 @@ textarea {
 
 /* ===== TRIP ACTION WINDOWS (odometer / signature / completion / password) =====
    Centered dialog on every size, height-bounded with internal scrolling.
-   The app viewport stays fixed while the keyboard overlays it. Only this
-   overlay is shortened to the keyboard's reported top edge, so opening an
-   odometer field cannot resize or push the Driver Portal shell. */
+   The app viewport and window keep the same coordinates while the keyboard
+   overlays them; keyboard opening must not alter this layout. */
 
 .trip-window-overlay {
   position: fixed;
@@ -2503,26 +2502,6 @@ textarea {
 html.trip-window-open,
 html.trip-window-open body {
   overflow: hidden !important;
-}
-
-/* A single keyboard state owns the window position. The background remains
-   fixed; only the overlay's bottom edge follows the keyboard. Keeping a plain
-   8px clearance here avoids the stale iOS safe-area inset that previously
-   left the window floating too high above the keyboard. */
-html.trip-window-keyboard-visible .trip-window-overlay {
-  top: 0;
-  right: 0;
-  bottom: var(--trip-window-keyboard-inset, 0px);
-  left: 0;
-  height: auto;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 0.5rem;
-}
-
-html.trip-window-keyboard-visible .trip-window-panel {
-  max-height: min(34rem, calc(100% - 1rem));
-  margin: 0;
 }
 
 /* Touch hardening: no double-tap-zoom delay or ghost highlights inside
