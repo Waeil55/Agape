@@ -49,6 +49,7 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(driver).toContain('if (nextPanel !== activePanel)');
     expect(driver).toContain("window.addEventListener('agape:trip-keyboard-open', handleKeyboardOpen)");
     expect(driver).toContain("document.addEventListener('focusout', handleKeyboardProxyBlur, true)");
+    expect(driver).toContain('.trip-window-panel [data-trip-initial-focus="true"]');
     expect(css).toContain('html.trip-window-open {');
     expect(css).toContain('background: #94979d !important');
     expect(driver).toContain("themeColorMeta.content = '#94979d'");
@@ -76,6 +77,9 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(footerKeyboard).not.toContain('box-shadow:');
     expect(panelKeyboard).toContain('transform: translate3d');
     expect(panelKeyboard).toContain('--trip-window-keyboard-top');
+    expect(css).toContain('@keyframes trip-window-panel-in');
+    expect(css).toContain('@keyframes trip-window-scrim-in');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
   });
 
   it('opens the native numeric keyboard through a fixed proxy instead of scrolling visible fields', () => {

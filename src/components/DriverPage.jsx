@@ -158,9 +158,10 @@ const OdometerEditingCaret = ({ active, value }) => active ? (
 // input; time fields keep their native picker for corrections.
 const focusTripWindowInput = () => {
   setTimeout(() => {
-    // Prefer the explicit autoFocus field (odometer) over type="time" so
-    // the completion modal lands on the odometer, not the time picker.
-    const el = document.querySelector('.trip-window-panel input[autofocus]')
+    // One explicit marker wins over DOM order so iOS cannot land on an earlier
+    // pickup field when the final/dropoff odometer is the current workflow step.
+    const el = document.querySelector('.trip-window-panel [data-trip-initial-focus="true"]')
+      || document.querySelector('.trip-window-panel input[autofocus]')
       || document.querySelector('.trip-window-panel input[readonly][inputmode="none"]')
       || document.querySelector('.trip-window-panel input[type="time"]');
     if (!el) return;
@@ -3790,13 +3791,18 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const openCompleteModal = (trip) => {
     setShowCompleteModal(trip);
+    const pickupOdometerSeed = sanitizeOdometerInput(
+      trip.pickupOdometer
+      || (currentVehicleOdometer > 0 ? currentVehicleOdometer : null)
+      || (lastOdometer > 0 ? lastOdometer : null),
+    );
     const odometerSeed = trip.dropoffOdometer
       || (currentVehicleOdometer > 0
         ? currentVehicleOdometer
-        : (lastOdometer > 0 ? lastOdometer : trip.pickupOdometer))
+        : (lastOdometer > 0 ? lastOdometer : pickupOdometerSeed))
       || '';
     setCompleteOdometer(odometerSeed ? String(odometerSeed) : '');
-    setCompletePickupOdometer(sanitizeOdometerInput(trip.pickupOdometer));
+    setCompletePickupOdometer(pickupOdometerSeed);
     setCompleteError('');
     setCompleteTimeNotice('');
     setCompleteAck(false);
@@ -5997,7 +6003,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       type="text"
                       inputMode="none"
                       readOnly
-                      autoFocus
+                      data-trip-initial-focus="true"
                       value={completeOdometer}
                       onPointerDown={(event) => { event.preventDefault(); openNativeOdometerKeyboard('complete'); }}
                       onFocus={() => openNativeOdometerKeyboard('complete')}

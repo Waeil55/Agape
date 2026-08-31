@@ -19,8 +19,21 @@ describe('driver completion odometer contract', () => {
 
   it('loads a recorded pickup reading but permits a missing reading to be entered', () => {
     const body = functionBody('openCompleteModal', 'updateCompletionDeparture');
-    expect(body).toContain('setCompletePickupOdometer(sanitizeOdometerInput(trip.pickupOdometer))');
+    expect(body).toContain('const pickupOdometerSeed = sanitizeOdometerInput(');
+    expect(body).toContain('trip.pickupOdometer');
+    expect(body).toContain('currentVehicleOdometer > 0 ? currentVehicleOdometer : null');
+    expect(body).toContain('lastOdometer > 0 ? lastOdometer : null');
+    expect(body).toContain('setCompletePickupOdometer(pickupOdometerSeed)');
     expect(source).toContain('placeholder="Pickup reading"');
+  });
+
+  it('makes the final/dropoff odometer the only explicit initial focus target', () => {
+    expect(source.match(/data-trip-initial-focus="true"/g)).toHaveLength(2);
+    expect(source).toContain("openNativeOdometerKeyboard('complete')");
+    const completionMarkup = source.slice(source.indexOf('{/* ===== COMPLETE TRIP MODAL ===== */'), source.indexOf('{/* ===== TRIP RECEIPT ===== */'));
+    expect(completionMarkup.indexOf('data-trip-initial-focus="true"')).toBeGreaterThan(completionMarkup.indexOf('Final Odometer (mi)'));
+    expect(completionMarkup.indexOf('data-trip-initial-focus="true"')).toBeLessThan(completionMarkup.indexOf("openNativeOdometerKeyboard('complete')"));
+    expect(completionMarkup.slice(0, completionMarkup.indexOf('Final Odometer (mi)'))).not.toContain('data-trip-initial-focus="true"');
   });
 
   it('requires and persists the entered pickup reading with the final reading', () => {
