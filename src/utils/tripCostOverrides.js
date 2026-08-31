@@ -149,6 +149,15 @@ export const isOverridePolicyDocumentValid = (policy) => {
 
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && normalizeText(value) !== '');
 
+const getTripClientName = (trip = {}) => normalizeText(firstValue(
+  trip.patient,
+  trip.patientName,
+  trip.clientName,
+  trip.memberName,
+  trip.passengerName,
+  trip.passenger,
+) || '');
+
 export const extractCityFromAddress = (address) => {
   const text = String(address ?? '').trim();
   if (!text) return '';
@@ -611,6 +620,7 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       legType,
       legLabel,
       trip: entry.trip,
+      clientName: getTripClientName(entry.trip),
       serviceDate: entry.serviceDate,
       pickupTimestamp: entry.pickupTimestamp,
       dropoffTimestamp: entry.dropoffTimestamp,
@@ -713,7 +723,11 @@ export const filterTripCostOverrideRows = (rows = [], options = {}) => {
     return [
       row.trip.bookingId,
       row.trip.id,
+      row.clientName,
       row.trip.patient,
+      row.trip.patientName,
+      row.trip.clientName,
+      row.trip.memberName,
       driverName,
       row.legLabel,
       row.originCity,

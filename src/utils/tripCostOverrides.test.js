@@ -364,6 +364,13 @@ describe('trip cost override calculation', () => {
     expect(filtered.map((row) => row.trip.bookingId)).toEqual(['B-200']);
   });
 
+  it('records and searches client names from supported trip name fields', () => {
+    const result = analyze([trip('client-name', { patient: '', clientName: '', memberName: 'Elizabeth McCandless' })]);
+    expect(result.rows).not.toHaveLength(0);
+    expect(result.rows.every((row) => row.clientName === 'Elizabeth McCandless')).toBe(true);
+    expect(filterTripCostOverrideRows(result.rows, { candidateType: 'all', search: 'elizabeth' })).toHaveLength(result.rows.length);
+  });
+
   it('shows only real candidates by default and keeps explicit audit views', () => {
     const rows = [
       { trip: { id: 'mileage' }, driverKey: 'd1', unloadedMiles: 30, waitHours: 0, isOverrideCandidate: true, overrideType: 'mileage', requiresReview: false },

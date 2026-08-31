@@ -6,7 +6,8 @@ describe('trip override workbook', () => {
   it('exports labeled typed rows, decisions, and formula subtotals', () => {
     const workbook = buildTripOverrideWorkbook([{
       serviceDate: '2026-08-01',
-      trip: { id: 't1', bookingId: 'B-100', driverId: 'd1' },
+      trip: { id: 't1', bookingId: 'B-100', driverId: 'd1', patient: 'Aaron King' },
+      clientName: 'Aaron King',
       legLabel: 'Before pickup', originCity: 'Carmel', destinationCity: 'Fishers',
       tripPickupCity: 'Indianapolis', tripDropoffCity: 'Carmel',
       originalTripCost: 40, tripType: 'A', unloadedMiles: 25, unloadedRate: 0.8,
@@ -19,21 +20,22 @@ describe('trip override workbook', () => {
     const sheet = workbook.Sheets['Trip Cost Overrides'];
     expect(XLSX.utils.sheet_to_json(sheet, { header: 1 })[0]).toEqual(OVERRIDE_EXPORT_HEADERS);
     expect(sheet.A2).toMatchObject({ t: 'd', z: 'yyyy-mm-dd' });
-    expect(sheet.G2).toMatchObject({ t: 'n', v: 40, z: '$#,##0.00' });
-    expect(sheet.I2).toMatchObject({ t: 'n', v: 25, z: '0.00' });
-    expect(sheet.D2.v).toBe('Before pickup');
-    expect(sheet.E2.v).toBe('Carmel');
-    expect(sheet.F2.v).toBe('Fishers');
+    expect(sheet.C2.v).toBe('Aaron King');
+    expect(sheet.H2).toMatchObject({ t: 'n', v: 40, z: '$#,##0.00' });
+    expect(sheet.J2).toMatchObject({ t: 'n', v: 25, z: '0.00' });
+    expect(sheet.E2.v).toBe('Before pickup');
+    expect(sheet.F2.v).toBe('Carmel');
+    expect(sheet.G2.v).toBe('Fishers');
     expect(OVERRIDE_EXPORT_HEADERS).not.toContain('Next Booking ID');
-    expect(sheet.S2.v).toBe('No');
-    expect(sheet.T2.v).toBe('Yes');
-    expect(sheet.U2.v).toBe('waiting: Carmel > Fishers');
-    expect(sheet.V2.v).toBe('Indianapolis');
-    expect(sheet.W2.v).toBe('Carmel');
+    expect(sheet.T2.v).toBe('No');
+    expect(sheet.U2.v).toBe('Yes');
+    expect(sheet.V2.v).toBe('waiting: Carmel > Fishers');
+    expect(sheet.W2.v).toBe('Indianapolis');
+    expect(sheet.X2.v).toBe('Carmel');
     expect(sheet['!cols']).toHaveLength(OVERRIDE_EXPORT_HEADERS.length);
-    expect(sheet.G3.f).toBe('SUM(G2:G2)');
-    expect(sheet.P3.f).toBe('SUM(P2:P2)');
-    expect(sheet['!autofilter'].ref).toBe('A1:W2');
+    expect(sheet.H3.f).toBe('SUM(H2:H2)');
+    expect(sheet.Q3.f).toBe('SUM(Q2:Q2)');
+    expect(sheet['!autofilter'].ref).toBe('A1:X2');
 
     const serialized = writeTripOverrideWorkbook([{
       serviceDate: '2026-08-01', trip: { id: 't1' }, legLabel: 'Before pickup',
@@ -53,9 +55,9 @@ describe('trip override workbook', () => {
 
   it('keeps an empty export subtotal valid without a reversed or circular range', () => {
     const sheet = buildTripOverrideWorkbook([]).Sheets['Trip Cost Overrides'];
-    expect(sheet.G2.f).toBe('0');
-    expect(sheet.K2.f).toBe('0');
-    expect(sheet.O2.f).toBe('0');
+    expect(sheet.H2.f).toBe('0');
+    expect(sheet.L2.f).toBe('0');
     expect(sheet.P2.f).toBe('0');
+    expect(sheet.Q2.f).toBe('0');
   });
 });

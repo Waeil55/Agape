@@ -37,18 +37,19 @@ const FILTER_VIEWS = [
 ];
 
 const TABLE_COLUMNS = [
-  ['Date', 'Trip Date', '8%'],
-  ['Booking ID', 'Booking ID receiving the override', '9%'],
-  ['Leg', 'Empty-leg type', '10%'],
-  ['Driver', 'Driver', '9%'],
-  ['Unloaded route', 'Empty vehicle origin to destination', '18%'],
+  ['Date', 'Trip Date', '7%'],
+  ['Booking ID', 'Booking ID receiving the override', '8%'],
+  ['Client', 'Client name', '11%'],
+  ['Leg', 'Empty-leg type', '8%'],
+  ['Driver', 'Driver', '8%'],
+  ['Unloaded route', 'Empty vehicle origin to destination', '16%'],
   ['A/W', 'Ambulatory or Wheelchair', '4%'],
   ['Empty mi', 'Billable Unloaded Miles', '7%'],
   ['Mileage', 'Mileage Override Amount', '8%'],
   ['Wait hr', 'Billable Waiting Hours', '6%'],
-  ['Wait cost', 'Waiting Cost', '8%'],
-  ['Original', 'Original Trip Cost', '6%'],
-  ['Total', 'Total Cost', '7%'],
+  ['Wait cost', 'Waiting Cost', '7%'],
+  ['Original', 'Original Trip Cost', '5%'],
+  ['Total', 'Total Cost', '5%'],
 ];
 
 const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overridePolicyStatus = 'ready', overridePolicyError = '', updateOverridePolicy, routeDistanceResolver = getGoogleDrivingRouteMiles }) => {
@@ -171,6 +172,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
     || row.trip.completedDriverName
     || row.trip.driverName
     || 'Unassigned';
+  const clientName = (row) => row.clientName || 'Client name missing';
   const toggleExpanded = (rowId) => setExpandedRowId((current) => current === rowId ? '' : rowId);
   const moveWeek = (days) => {
     setAllDates(false);
@@ -233,7 +235,12 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
       setHomeSaving(false);
     }
   };
-  const openRulesEditor = () => {
+  const toggleRulesEditor = () => {
+    if (rulesEditorOpen) {
+      setRulesEditorOpen(false);
+      setRulesStatus('');
+      return;
+    }
     setRulesDraft(normalizeOverridePolicy(overridePolicy));
     setRulesStatus('');
     setRulesEditorOpen(true);
@@ -314,7 +321,6 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
           </div>
           <select aria-label="Driver" value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)} className="h-9 min-w-[145px] px-2 text-xs font-semibold"><option value="all">All drivers</option>{driverOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>
           <button type="button" onClick={openHomeEditor} aria-expanded={showHomeEditor} aria-label="Edit shared home address" className={`inline-flex h-9 min-w-0 max-w-[260px] items-center gap-1.5 rounded-xl border px-3 text-xs font-bold ${sharedHomeMissing ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><MapPin size={14} className="shrink-0" /><span className="shrink-0">Home:</span><span className="truncate font-semibold">{sharedHomeLabel}</span></button>
-          <button type="button" onClick={openRulesEditor} aria-expanded={rulesEditorOpen} aria-label="Edit override exclusion rules" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Ban size={14} /> Rules: {exclusionRuleCount}</button>
           <button type="button" onClick={resetFilters} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><RotateCcw size={14} /> Reset</button>
           <button type="button" onClick={exportRows} disabled={!policyReady || !rows.length} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Download size={14} /> Excel</button>
         </div>
@@ -329,13 +335,26 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
         </div>
 
         {advancedOpen && (
-          <div className="mt-2 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-2 xl:grid-cols-6">
-            <label className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600">Minimum empty miles<input aria-label="Minimum unloaded miles" type="number" min="0" step="0.1" value={minimumUnloaded} onChange={(event) => setMinimumUnloaded(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent p-0 text-right text-xs" /></label>
-            <label className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600">Minimum wait hours<input aria-label="Minimum waiting hours" type="number" min="0" step="0.5" value={minimumWait} onChange={(event) => setMinimumWait(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent p-0 text-right text-xs" /></label>
-            <select aria-label="Empty leg from city" value={gapFromCity} onChange={(event) => setGapFromCity(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">Any empty-leg origin</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select>
-            <select aria-label="Empty leg to city" value={gapToCity} onChange={(event) => setGapToCity(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">Any empty-leg destination</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select>
-            <select aria-label="Empty leg type" value={legType} onChange={(event) => setLegType(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">All empty-leg types</option><option value="before_pickup">Before pickup</option><option value="home_return">Return home</option></select>
-            <label className="flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={allDates} onChange={(event) => setAllDates(event.target.checked)} /> Ignore date range</label>
+          <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+              <label className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600">Minimum empty miles<input aria-label="Minimum unloaded miles" type="number" min="0" step="0.1" value={minimumUnloaded} onChange={(event) => setMinimumUnloaded(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent p-0 text-right text-xs" /></label>
+              <label className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600">Minimum wait hours<input aria-label="Minimum waiting hours" type="number" min="0" step="0.5" value={minimumWait} onChange={(event) => setMinimumWait(event.target.value)} className="min-w-0 flex-1 border-0 bg-transparent p-0 text-right text-xs" /></label>
+              <select aria-label="Empty leg from city" value={gapFromCity} onChange={(event) => setGapFromCity(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">Any empty-leg origin</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select>
+              <select aria-label="Empty leg to city" value={gapToCity} onChange={(event) => setGapToCity(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">Any empty-leg destination</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select>
+              <select aria-label="Empty leg type" value={legType} onChange={(event) => setLegType(event.target.value)} className="h-9 px-2 text-xs font-semibold"><option value="all">All empty-leg types</option><option value="before_pickup">Before pickup</option><option value="home_return">Return home</option></select>
+              <label className="flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={allDates} onChange={(event) => setAllDates(event.target.checked)} /> Ignore date range</label>
+              <button type="button" onClick={toggleRulesEditor} aria-expanded={rulesEditorOpen} aria-label="Edit override exclusion rules" className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100"><Ban size={14} /> Exclusion rules ({exclusionRuleCount})</button>
+            </div>
+            {rulesEditorOpen && (
+              <div className="mt-2 border-t border-slate-200 pt-2">
+                <OverrideExclusionRulesEditor policy={rulesDraft} onChange={setRulesDraft} disabled={rulesSaving} compact />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => void saveExclusionRules()} disabled={rulesSaving || !policyReady || !updateOverridePolicy} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Save size={14} />{rulesSaving ? 'Saving rules…' : 'Save exclusion rules'}</button>
+                  <button type="button" onClick={toggleRulesEditor} disabled={rulesSaving} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700">Cancel</button>
+                  {rulesStatus && <p className="text-xs font-semibold text-amber-800" role="status">{rulesStatus}</p>}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -365,16 +384,6 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 md:pb-3">
-        {rulesEditorOpen && (
-          <div className="mb-3">
-            <OverrideExclusionRulesEditor policy={rulesDraft} onChange={setRulesDraft} disabled={rulesSaving} compact />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => void saveExclusionRules()} disabled={rulesSaving || !policyReady || !updateOverridePolicy} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Save size={14} />{rulesSaving ? 'Saving rules…' : 'Save exclusion rules'}</button>
-              <button type="button" onClick={() => { setRulesEditorOpen(false); setRulesStatus(''); }} disabled={rulesSaving} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700">Cancel</button>
-              {rulesStatus && <p className="text-xs font-semibold text-amber-800" role="status">{rulesStatus}</p>}
-            </div>
-          </div>
-        )}
         {showHomeEditor && (
           <div className="mb-3">
             <OverrideHomeAddressEditor policy={homeDraft} onChange={setHomeDraft} disabled={homeSaving} compact />
@@ -393,6 +402,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
           {rows.map((row) => (
             <article key={row.rowId} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2"><p className="truncate font-mono text-xs font-bold text-blue-700">#{row.trip.bookingId || row.trip.id}</p><p className="shrink-0 text-xs font-bold text-slate-900">{money(row.totalCost)}</p></div>
+              <p className="mt-1 truncate text-sm font-semibold text-slate-950" title={clientName(row)}>{clientName(row)}</p>
               <p className="mt-1 truncate text-xs font-semibold text-slate-800" title={`${row.originCity} to ${row.destinationCity}`}>{row.originCity || 'Missing city'} → {row.destinationCity || 'Missing city'}</p>
               <p className="mt-1 truncate text-[10px] font-semibold text-slate-500">{row.legLabel} · {driverName(row)}</p>
               <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]"><div><p className="text-slate-500">Empty miles</p><p className="font-bold text-slate-900">{decimal(row.unloadedMiles)}</p></div><div><p className="text-slate-500">Mileage</p><p className="font-bold text-blue-700">{money(row.unloadedAmount)}</p></div><div><p className="text-slate-500">Wait</p><p className="font-bold text-slate-900">{decimal(row.waitHours)} hr · {money(row.waitCost)}</p></div></div>
@@ -414,6 +424,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                     <tr tabIndex="0" data-agape-table-row="true" className="cursor-pointer border-b border-slate-100 hover:bg-blue-50/60 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" aria-expanded={expanded} aria-controls={`override-detail-${rowId}`} onClick={() => toggleExpanded(rowId)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleExpanded(rowId); } }}>
                       <td className="px-2 py-1.5" title={row.serviceDate}>{row.serviceDate}</td>
                       <td className="px-2 py-1.5 font-mono font-semibold text-blue-700" title={text(row.trip.bookingId || row.trip.id)}><span className="inline-flex max-w-full items-center gap-1"><ChevronRight size={12} className={`shrink-0 ${expanded ? 'rotate-90' : ''}`} /><span className="truncate">{row.trip.bookingId || row.trip.id}</span></span></td>
+                      <td className="px-2 py-1.5 font-semibold" title={clientName(row)}>{clientName(row)}</td>
                       <td className="px-2 py-1.5" title={row.legLabel}>{row.legLabel}</td>
                       <td className="px-2 py-1.5" title={driverName(row)}>{driverName(row)}</td>
                       <td className="px-2 py-1.5 font-semibold" title={`${row.originCity || 'Missing'} → ${row.destinationCity || 'Missing'}`}>{row.originCity || 'Missing'} → {row.destinationCity || 'Missing'}</td>
@@ -429,7 +440,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                       <tr id={`override-detail-${rowId}`} data-agape-detail-row="true" className="bg-slate-50">
                         <td colSpan={TABLE_COLUMNS.length} className="px-3 py-3">
                           <div className="grid gap-3 text-[11px] font-semibold text-slate-700 lg:grid-cols-4">
-                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Passenger trip</p><p className="mt-1 truncate" title={`${row.tripPickupCity} → ${row.tripDropoffCity}`}>{row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p className="truncate text-slate-500" title={`${row.tripPickupAddress} → ${row.tripDropoffAddress}`}>{row.tripPickupAddress || 'Pickup missing'} → {row.tripDropoffAddress || 'Dropoff missing'}</p></div>
+                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Passenger trip</p><p className="mt-1 truncate text-slate-900" title={clientName(row)}>{clientName(row)}</p><p className="truncate" title={`${row.tripPickupCity} → ${row.tripDropoffCity}`}>{row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p className="truncate text-slate-500" title={`${row.tripPickupAddress} → ${row.tripDropoffAddress}`}>{row.tripPickupAddress || 'Pickup missing'} → {row.tripDropoffAddress || 'Dropoff missing'}</p></div>
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Unloaded leg</p><p className="mt-1">{row.legLabel}: {row.originCity || 'Missing'} → {row.destinationCity || 'Missing'}</p><p className="truncate text-slate-500" title={`${row.originAddress} → ${row.destinationAddress}`}>{row.originAddress || 'Origin missing'} → {row.destinationAddress || 'Destination missing'}</p></div>
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Mileage evidence</p><p className="mt-1">{row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${row.mileageSource} · raw ${decimal(row.rawUnloadedMiles)} mi`}</p><p className="text-slate-500">{decimal(row.unloadedMiles)} × {money(row.unloadedRate)} = {money(row.unloadedAmount)}</p></div>
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Waiting evidence</p><p className="mt-1">{row.originTimestamp ? `${dateTime(row.originTimestamp)} → ${dateTime(row.destinationTimestamp)}` : 'Not applicable to this home boundary leg'} · raw gap {decimal(row.rawGapHours)} hr</p><p className="text-slate-500">Billable {decimal(row.waitHours)} hr × {money(row.waitRate)} = {money(row.waitCost)}</p></div>
@@ -442,7 +453,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                 );
               })}
             </tbody>
-            {!!rows.length && <tfoot><tr className="bg-slate-100 font-bold"><td className="px-2 py-2" colSpan="6">SUBTOTALS</td><td /><td className="px-2 py-2 font-mono">{money(totals.unloaded)}</td><td /><td className="px-2 py-2 font-mono">{money(totals.waiting)}</td><td className="px-2 py-2 font-mono">{money(totals.original)}</td><td className="px-2 py-2 font-mono">{money(totals.total)}</td></tr></tfoot>}
+            {!!rows.length && <tfoot><tr className="bg-slate-100 font-bold"><td className="px-2 py-2" colSpan="7">SUBTOTALS</td><td /><td className="px-2 py-2 font-mono">{money(totals.unloaded)}</td><td /><td className="px-2 py-2 font-mono">{money(totals.waiting)}</td><td className="px-2 py-2 font-mono">{money(totals.original)}</td><td className="px-2 py-2 font-mono">{money(totals.total)}</td></tr></tfoot>}
           </table>
         </div>
         {!rows.length && <div className="flex h-44 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 text-center text-sm font-semibold text-slate-500">{candidateType === 'override' ? 'No trips qualify for a mileage or waiting override in this range.' : candidateType === 'review' ? 'No blocked gaps need data review in this range.' : 'No evaluated gaps match these filters.'}</div>}

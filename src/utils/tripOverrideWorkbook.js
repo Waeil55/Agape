@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 export const OVERRIDE_EXPORT_HEADERS = [
   'Trip Date',
   'Booking ID',
+  'Client Name',
   'Driver',
   'Leg',
   'From City',
@@ -26,8 +27,8 @@ export const OVERRIDE_EXPORT_HEADERS = [
   'Passenger Dropoff City',
 ];
 
-const currencyColumns = [6, 9, 10, 13, 14, 15];
-const numberColumns = [8, 11, 12];
+const currencyColumns = [7, 10, 11, 14, 15, 16];
+const numberColumns = [9, 12, 13];
 const excelServiceDate = (value) => {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return value || '';
@@ -36,6 +37,7 @@ const excelServiceDate = (value) => {
 const rowValues = (row, driverName) => [
   excelServiceDate(row.serviceDate),
   row.trip.bookingId || row.trip.id || '',
+  row.clientName || row.trip.patient || row.trip.patientName || row.trip.clientName || row.trip.memberName || row.trip.passengerName || row.trip.passenger || '',
   driverName || row.trip.completedDriverName || row.trip.driverName || '',
   row.legLabel,
   row.originCity,
@@ -68,22 +70,22 @@ export const buildTripOverrideWorkbook = (rows = [], driverById = new Map()) => 
   const subtotalRow = rows.length + 2;
   const subtotal = (column) => (rows.length ? { f: `SUM(${column}2:${column}${subtotalRow - 1})` } : { f: '0' });
   values.push([
-    'SUBTOTALS', '', '', '', '', '',
-    subtotal('G'), '',
-    subtotal('I'), '',
-    subtotal('K'), '',
-    subtotal('M'), '',
-    subtotal('O'),
-    subtotal('P'), '', '', '', '', '', '', '',
+    'SUBTOTALS', '', '', '', '', '', '',
+    subtotal('H'), '',
+    subtotal('J'), '',
+    subtotal('L'), '',
+    subtotal('N'), '',
+    subtotal('P'),
+    subtotal('Q'), '', '', '', '', '', '', '',
   ]);
 
   const sheet = XLSX.utils.aoa_to_sheet(values, { cellDates: true });
   sheet['!cols'] = [
-    { wch: 12 }, { wch: 15 }, { wch: 22 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
+    { wch: 12 }, { wch: 15 }, { wch: 24 }, { wch: 22 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
     { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 11 }, { wch: 16 }, { wch: 23 }, { wch: 18 }, { wch: 12 },
     { wch: 17 }, { wch: 19 }, { wch: 42 }, { wch: 42 }, { wch: 18 }, { wch: 18 }, { wch: 42 }, { wch: 22 }, { wch: 22 },
   ];
-  sheet['!autofilter'] = { ref: `A1:W${Math.max(1, subtotalRow - 1)}` };
+  sheet['!autofilter'] = { ref: `A1:X${Math.max(1, subtotalRow - 1)}` };
   sheet['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
 
   for (let row = 1; row < subtotalRow; row += 1) {

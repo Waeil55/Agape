@@ -57,10 +57,21 @@ describe('override policy UI integration contract', () => {
     expect(settings).toContain('<OverrideExclusionRulesEditor');
     expect(settings).not.toContain('Excluded directional city pairs');
     expect(report).toContain('aria-label="Edit override exclusion rules"');
+    expect(report.indexOf('aria-label="Edit override exclusion rules"')).toBeGreaterThan(report.indexOf('{advancedOpen &&'));
     expect(report).toContain('Save exclusion rules');
     expect(editor).toContain('Waiting time only');
     expect(editor).toContain('Unloaded mileage only');
     expect(editor).toContain('All override calculations');
     expect(editor).toContain('Any destination');
+  });
+
+  it('shows the recorded client name on every override row and keeps it in the export', () => {
+    const report = read('src/components/UnloadedTripsReport.jsx');
+    const workbook = read('src/utils/tripOverrideWorkbook.js');
+    expect(report).toContain("const clientName = (row) => row.clientName || 'Client name missing'");
+    expect(report).toContain("['Client', 'Client name'");
+    expect(report).toContain('title={clientName(row)}>{clientName(row)}');
+    expect(workbook).toContain("'Client Name'");
+    expect(workbook).toContain('row.clientName || row.trip.patient');
   });
 });
