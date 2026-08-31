@@ -66,6 +66,24 @@ without direct evidence. State any external or human verification that remains.
 - Accessibility, keyboard behavior, focus management, responsive layout,
   empty/error states, and usable touch targets are part of completion.
 
+## Protected mobile viewport baseline
+
+The mobile sizing and PWA presentation at commit `839030d` are an explicitly
+approved baseline. Preserve them unless the user explicitly requests a new
+mobile-shell design and approves it after rendered mobile verification.
+
+- Keep the global `html`, `body`, `#root`, `.app`, and `.App` shell on the
+  verified `100%` / `100vh` sizing contract. Do not add `100dvh`, global
+  `min-height: 0`, or a new app-wide overflow contract to these selectors.
+- Keep `public/manifest.webmanifest` in `standalone` mode with the current
+  `standalone`, `minimal-ui` display override. Do not force `fullscreen`.
+- Preserve the approved admin-shell and mobile-login height behavior recorded
+  in `MobileViewportBaselineContract.test.js`.
+- Run that contract test plus a production build for every viewport, PWA,
+  overlay, scrolling, keyboard, navigation-shell, or global CSS change.
+- Visually verify at least one narrow mobile viewport before deploying any such
+  change. A passing build alone is not evidence that the mobile fit is intact.
+
 ## WellTrans non-negotiable safety contract
 
 `automation/welltrans-worker/AGENT_POLICY.md` is authoritative and must be read
