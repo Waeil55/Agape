@@ -32,9 +32,9 @@ export const resolveTripKeyboardTop = ({
   return candidates.length ? Math.min(...candidates) : null;
 };
 
-export const calculateTripFooterLift = ({ footerBottom, keyboardTop, gap = 8 } = {}) => {
+export const calculateTripWindowLift = ({ windowBottom, keyboardTop, gap = 8 } = {}) => {
   if (!Number.isFinite(Number(keyboardTop))) return 0;
   return Math.max(0, Math.ceil(
-    finiteNonNegative(footerBottom) + finiteNonNegative(gap) - Number(keyboardTop)
+    finiteNonNegative(windowBottom) + finiteNonNegative(gap) - Number(keyboardTop)
   ));
 };

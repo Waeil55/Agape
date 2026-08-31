@@ -24,7 +24,7 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(read('src/App.jsx')).toContain('interactive-widget=overlays-content');
   });
 
-  it('uses keyboard bounds to expose only the covered action footer', () => {
+  it('uses keyboard bounds to keep the complete window together above the keyboard', () => {
     const driver = read('src/components/DriverPage.jsx');
     const css = read('src/index.css');
     expect(driver).toContain('virtualKeyboard.overlaysContent = true');
@@ -39,8 +39,10 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(driver).toContain('translate3d(0, ${viewportPan.toFixed(3)}px, 0)');
     expect(driver).toContain("visualViewport?.addEventListener('scroll', scheduleWindowLock)");
     expect(driver).toContain('resolveTripKeyboardTop({');
-    expect(driver).toContain('calculateTripFooterLift({ footerBottom, keyboardTop })');
-    expect(driver).toContain("root.style.setProperty('--trip-window-footer-lift', `${footerLift}px`)");
+    expect(driver).toContain('calculateTripWindowLift({ windowBottom, keyboardTop })');
+    expect(driver).toContain("root.style.setProperty('--trip-window-panel-lift', `${panelLift}px`)");
+    expect(driver).toContain("root.style.setProperty('--trip-window-keyboard-top', `${keyboardTop}px`)");
+    expect(driver).toContain('Math.abs(previousLift - panelLift) > 0.5');
     expect(driver).toContain("Keyboard.addListener('keyboardWillShow'");
     expect(driver).toContain("Keyboard.addListener('keyboardWillHide'");
     expect(driver).toContain('const resetTripKeyboardPresentation = () =>');
@@ -51,9 +53,9 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(css).toContain('background: #94979d !important');
     expect(driver).toContain("themeColorMeta.content = '#94979d'");
     expect(driver).toContain('trip-window-keyboard-visible');
-    expect(driver).toContain('--trip-window-footer-lift');
+    expect(driver).toContain('--trip-window-panel-lift');
     expect(css).toContain('trip-window-keyboard-visible');
-    expect(css).toContain('--trip-window-footer-lift');
+    expect(css).toContain('--trip-window-panel-lift');
     expect(driver).not.toContain('--trip-window-keyboard-inset');
     expect(css).not.toContain('--trip-window-keyboard-inset');
     expect(driver).not.toContain('trip-window-kb-open');
@@ -63,13 +65,17 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(css).not.toContain('html.trip-window-kb-open');
     expect(css).not.toContain('html.trip-window-kb-native');
     expect(css).not.toContain('html.trip-window-kb-bounds');
-    expect(driver).not.toContain('--trip-window-panel-shift');
-    expect(css).not.toContain('--trip-window-panel-shift');
+    expect(driver).not.toContain('--trip-window-footer-lift');
+    expect(css).not.toContain('--trip-window-footer-lift');
 
     const footerBase = css.match(/\.trip-window-footer\s*\{([^}]*)\}/)?.[1] || '';
     const footerKeyboard = css.match(/html\.trip-window-keyboard-visible \.trip-window-footer\s*\{([^}]*)\}/)?.[1] || '';
+    const panelKeyboard = css.match(/html\.trip-window-keyboard-visible \.trip-window-panel\s*\{([^}]*)\}/)?.[1] || '';
     expect(footerBase).not.toContain('transform:');
-    expect(footerKeyboard).toContain('transform: translate3d');
+    expect(footerKeyboard).not.toContain('transform:');
+    expect(footerKeyboard).not.toContain('box-shadow:');
+    expect(panelKeyboard).toContain('transform: translate3d');
+    expect(panelKeyboard).toContain('--trip-window-keyboard-top');
   });
 
   it('opens the native numeric keyboard through a fixed proxy instead of scrolling visible fields', () => {

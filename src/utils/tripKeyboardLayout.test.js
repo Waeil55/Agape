@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateTripFooterLift, resolveTripKeyboardTop } from './tripKeyboardLayout';
+import { calculateTripWindowLift, resolveTripKeyboardTop } from './tripKeyboardLayout';
 
 describe('trip keyboard layout', () => {
   it('finds the browser keyboard boundary without treating small viewport changes as a keyboard', () => {
@@ -16,7 +16,7 @@ describe('trip keyboard layout', () => {
   });
 
   it('lifts the footer only by the amount that overlaps the keyboard', () => {
-    expect(calculateTripFooterLift({ footerBottom: 590, keyboardTop: 510, gap: 8 })).toBe(88);
-    expect(calculateTripFooterLift({ footerBottom: 480, keyboardTop: 510, gap: 8 })).toBe(0);
+    expect(calculateTripWindowLift({ windowBottom: 590, keyboardTop: 510, gap: 8 })).toBe(88);
+    expect(calculateTripWindowLift({ windowBottom: 480, keyboardTop: 510, gap: 8 })).toBe(0);
   });
 });

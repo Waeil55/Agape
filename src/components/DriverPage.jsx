@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspens
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
 import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
-import { calculateTripFooterLift, resolveTripKeyboardTop } from '../utils/tripKeyboardLayout';
+import { calculateTripWindowLift, resolveTripKeyboardTop } from '../utils/tripKeyboardLayout';
 import { buildDriverTimeConflicts } from '../utils/tripConflicts';
 import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
@@ -1481,7 +1481,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
     const resetTripKeyboardPresentation = () => {
       root.classList.remove('trip-window-keyboard-visible');
-      root.style.setProperty('--trip-window-footer-lift', '0px');
+      root.style.setProperty('--trip-window-panel-lift', '0px');
+      root.style.removeProperty('--trip-window-keyboard-top');
       if (keyboardBody) {
         if (keyboardBody.isConnected) keyboardBody.scrollTop = keyboardBodyScrollTop;
         keyboardBody = null;
@@ -1568,13 +1569,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           visualOffsetTop: visualViewport?.offsetTop,
           nativeKeyboardHeight,
         });
-        const previousLift = Number.parseFloat(root.style.getPropertyValue('--trip-window-footer-lift')) || 0;
+        const previousLift = Number.parseFloat(root.style.getPropertyValue('--trip-window-panel-lift')) || 0;
+        const panelRect = panel?.getBoundingClientRect();
         const footerRect = footer?.getBoundingClientRect();
-        const footerBottom = footerRect ? footerRect.bottom + previousLift : 0;
-        const footerLift = footer ? calculateTripFooterLift({ footerBottom, keyboardTop }) : 0;
-        const keyboardVisible = keyboardTop !== null && footerLift > 0;
+        const windowBottom = panelRect ? panelRect.bottom + previousLift : 0;
+        const panelLift = panel ? calculateTripWindowLift({ windowBottom, keyboardTop }) : 0;
+        const keyboardVisible = keyboardTop !== null;
+        const keyboardVisibilityChanged = root.classList.contains('trip-window-keyboard-visible') !== keyboardVisible;
         root.classList.toggle('trip-window-keyboard-visible', keyboardVisible);
-        root.style.setProperty('--trip-window-footer-lift', `${footerLift}px`);
+        root.style.setProperty('--trip-window-panel-lift', `${panelLift}px`);
+        if (keyboardVisible) root.style.setProperty('--trip-window-keyboard-top', `${keyboardTop}px`);
+        else root.style.removeProperty('--trip-window-keyboard-top');
 
         const body = panel?.querySelector('.trip-window-body');
         if (keyboardVisible && body && footer) {
@@ -1584,14 +1589,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           }
           const visibleField = panel.querySelector('input[readonly][inputmode="none"], input:focus, select:focus, textarea:focus');
           const fieldRect = visibleField?.getBoundingClientRect();
-          const liftedFooterTop = (footerRect?.top || 0) + previousLift - footerLift;
-          if (fieldRect && fieldRect.bottom > liftedFooterTop - 12) {
-            body.scrollTop += fieldRect.bottom - liftedFooterTop + 12;
+          const footerTop = footerRect?.top || keyboardTop;
+          if (fieldRect && fieldRect.bottom > footerTop - 12) {
+            body.scrollTop += fieldRect.bottom - footerTop + 12;
           }
         } else if (keyboardBody) {
           keyboardBody.scrollTop = keyboardBodyScrollTop;
           keyboardBody = null;
           keyboardBodyScrollTop = 0;
+        }
+        if (keyboardVisibilityChanged || Math.abs(previousLift - panelLift) > 0.5) {
+          frame = requestAnimationFrame(applyWindowLock);
         }
       } else {
         resetTripKeyboardPresentation();
@@ -1679,7 +1687,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       unlockBackground();
       root.classList.remove('trip-window-open');
       resetTripKeyboardPresentation();
-      root.style.removeProperty('--trip-window-footer-lift');
+      root.style.removeProperty('--trip-window-panel-lift');
     };
   }, []);
 

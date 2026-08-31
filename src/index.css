@@ -2304,8 +2304,8 @@ textarea {
 
 /* ===== TRIP ACTION WINDOWS (odometer / signature / completion / password) =====
    Centered dialog on every size, height-bounded with internal scrolling.
-   The app viewport and window keep the same coordinates while the keyboard
-   overlays them; keyboard opening must not alter this layout. */
+   The background app stays fixed while the complete dialog (content and
+   actions together) clears the native keyboard as one connected panel. */
 
 .trip-window-overlay {
   position: fixed;
@@ -2332,6 +2332,7 @@ textarea {
   border-radius: 1.5rem;
   box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.35);
   pointer-events: auto;
+  overflow: hidden;
 }
 
 /* While a trip window is open, stop the background page from panning when
@@ -2449,10 +2450,12 @@ html.trip-window-open {
 }
 
 html.trip-window-keyboard-visible .trip-window-footer {
-  transform: translate3d(0, calc(-1 * var(--trip-window-footer-lift, 0px)), 0);
-  background: #ffffff;
-  border-radius: 1rem;
-  box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.45);
+  border-top: 1px solid #e2e8f0;
+}
+
+html.trip-window-keyboard-visible .trip-window-panel {
+  max-height: min(34rem, calc(var(--trip-window-keyboard-top, 100vh) - 1rem));
+  transform: translate3d(0, calc(-1 * var(--trip-window-panel-lift, 0px)), 0);
 }
 
 @supports not (height: 1dvh) {
