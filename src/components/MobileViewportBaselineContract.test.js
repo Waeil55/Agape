@@ -44,4 +44,12 @@ describe('protected mobile viewport baseline from 839030d', () => {
     expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
     expect(manifest.display_override).not.toContain('fullscreen');
   });
+
+  it('keeps the mobile navbar fixed to the approved bottom edge', () => {
+    const bottomNav = ruleBody('.bottom-nav');
+    expect(bottomNav).toContain('position: fixed');
+    expect(bottomNav).toContain('bottom: 8px');
+    expect(bottomNav).toContain('height: 56px');
+    expect(bottomNav).not.toContain('position: absolute');
+  });
 });

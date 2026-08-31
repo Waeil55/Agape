@@ -2361,7 +2361,9 @@ html.trip-window-open {
   overscroll-behavior: none;
 }
 
-/* Keep a visible, scoped caret in trip-progress odometer fields. */
+/* The visible odometer field delegates typing to a fixed native input so iOS
+   cannot pan the page. Mirror a caret at the end of the visible value while
+   that proxy owns the keyboard. */
 .trip-odometer-input {
   caret-color: #2a52ac;
   line-height: 1.25rem;
@@ -2369,6 +2371,37 @@ html.trip-window-open {
   text-align: center;
   box-sizing: border-box;
   cursor: pointer;
+}
+
+.trip-odometer-caret-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+.trip-odometer-caret-measure {
+  visibility: hidden;
+  white-space: pre;
+}
+
+.trip-odometer-visual-caret {
+  width: 2px;
+  height: 1.25rem;
+  margin-left: 1px;
+  border-radius: 999px;
+  background: #2a52ac;
+  animation: trip-odometer-caret-blink 1s steps(1, end) infinite;
+}
+
+@keyframes trip-odometer-caret-blink {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0; }
 }
 
 /* Safari scrolls the page to reveal the element that owns the native keyboard.
@@ -2411,6 +2444,15 @@ html.trip-window-open {
   display: flex;
   gap: 0.75rem;
   padding-top: 0.5rem;
+  position: relative;
+  z-index: 12;
+  transform: translate3d(0, calc(-1 * var(--trip-window-footer-lift, 0px)), 0);
+}
+
+html.trip-window-keyboard-visible .trip-window-footer {
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.45);
 }
 
 @supports not (height: 1dvh) {

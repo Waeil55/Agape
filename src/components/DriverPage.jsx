@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspens
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
 import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
+import { calculateTripFooterLift, resolveTripKeyboardTop } from '../utils/tripKeyboardLayout';
+import { buildDriverTimeConflicts } from '../utils/tripConflicts';
 import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress, verifyGeocodedAddress } from '../config/maps';
@@ -143,6 +145,13 @@ const OdometerBaselineLine = ({ vehicleName, miles }) => (
       : ' · No verified reading yet'}
   </p>
 );
+
+const OdometerEditingCaret = ({ active, value }) => active ? (
+  <span className="trip-odometer-caret-layer" aria-hidden="true">
+    <span className="trip-odometer-caret-measure">{value || ''}</span>
+    <span className="trip-odometer-visual-caret" />
+  </span>
+) : null;
 
 // Focus the primary trip-window field after an async React commit. Odometer
 // fields are read-only display targets that forward focus to one fixed native
@@ -968,9 +977,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [legsDetailPatient, setLegsDetailPatient] = useState(null);
   const [etas, setEtas] = useState({});
   const [, setBackgroundLocation] = useState(false);
-  const [conflicts, setConflicts] = useState([]);
-
-
   const [, setUndoableAction] = useState(null);
   const undoTimeoutRef = useRef(null);
   const [passwordPrompt, setPasswordPrompt] = useState(null);
@@ -1456,7 +1462,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     let savedBodyStyles = null;
     let savedThemeColor = null;
     let nativeKeyboard = null;
+    let nativeKeyboardHeight = 0;
+    let nativeKeyboardListeners = [];
     let baselineVisualPageTop = 0;
+    let keyboardBody = null;
+    let keyboardBodyScrollTop = 0;
 
     const getVisualPageTop = () => {
       const reportedPageTop = Number(visualViewport?.pageTop);
@@ -1524,6 +1534,49 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         // app pixel remains at its pre-keyboard screen coordinate.
         const viewportPan = Math.max(0, getVisualPageTop() - baselineVisualPageTop);
         document.body.style.transform = viewportPan > 0.01 ? `translate3d(0, ${viewportPan.toFixed(3)}px, 0)` : 'none';
+
+        const panel = document.querySelector('.trip-window-panel');
+        const footer = panel?.querySelector('.trip-window-footer');
+        const layoutHeight = Math.max(window.innerHeight || 0, root.clientHeight || 0);
+        const keyboardTop = resolveTripKeyboardTop({
+          layoutHeight,
+          visualHeight: visualViewport?.height,
+          visualOffsetTop: visualViewport?.offsetTop,
+          nativeKeyboardHeight,
+        });
+        const previousLift = Number.parseFloat(root.style.getPropertyValue('--trip-window-footer-lift')) || 0;
+        const footerRect = footer?.getBoundingClientRect();
+        const footerBottom = footerRect ? footerRect.bottom + previousLift : 0;
+        const footerLift = footer ? calculateTripFooterLift({ footerBottom, keyboardTop }) : 0;
+        const keyboardVisible = keyboardTop !== null && footerLift > 0;
+        root.classList.toggle('trip-window-keyboard-visible', keyboardVisible);
+        root.style.setProperty('--trip-window-footer-lift', `${footerLift}px`);
+
+        const body = panel?.querySelector('.trip-window-body');
+        if (keyboardVisible && body && footer) {
+          if (!keyboardBody) {
+            keyboardBody = body;
+            keyboardBodyScrollTop = body.scrollTop;
+          }
+          const visibleField = panel.querySelector('input[readonly][inputmode="none"], input:focus, select:focus, textarea:focus');
+          const fieldRect = visibleField?.getBoundingClientRect();
+          const liftedFooterTop = (footerRect?.top || 0) + previousLift - footerLift;
+          if (fieldRect && fieldRect.bottom > liftedFooterTop - 12) {
+            body.scrollTop += fieldRect.bottom - liftedFooterTop + 12;
+          }
+        } else if (keyboardBody) {
+          keyboardBody.scrollTop = keyboardBodyScrollTop;
+          keyboardBody = null;
+          keyboardBodyScrollTop = 0;
+        }
+      } else {
+        root.classList.remove('trip-window-keyboard-visible');
+        root.style.setProperty('--trip-window-footer-lift', '0px');
+        if (keyboardBody) {
+          keyboardBody.scrollTop = keyboardBodyScrollTop;
+          keyboardBody = null;
+          keyboardBodyScrollTop = 0;
+        }
       }
     };
 
@@ -1559,6 +1612,24 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         await Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {});
         if (cancelled) return;
         nativeKeyboard = Keyboard;
+        nativeKeyboardListeners = await Promise.all([
+          Keyboard.addListener('keyboardWillShow', (info) => {
+            nativeKeyboardHeight = Number(info?.keyboardHeight) || 0;
+            scheduleWindowLock();
+          }),
+          Keyboard.addListener('keyboardDidShow', (info) => {
+            nativeKeyboardHeight = Number(info?.keyboardHeight) || nativeKeyboardHeight;
+            scheduleWindowLock();
+          }),
+          Keyboard.addListener('keyboardWillHide', () => {
+            nativeKeyboardHeight = 0;
+            scheduleWindowLock();
+          }),
+          Keyboard.addListener('keyboardDidHide', () => {
+            nativeKeyboardHeight = 0;
+            scheduleWindowLock();
+          }),
+        ]).catch(() => []);
         if (panelOpen) await Keyboard.setScroll({ isDisabled: true }).catch(() => {});
       }).catch(() => {});
     }
@@ -1572,8 +1643,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       visualViewport?.removeEventListener('scroll', scheduleWindowLock);
       document.removeEventListener('touchmove', preventBackgroundTouch, true);
       if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: false }).catch(() => {});
+      nativeKeyboardListeners.forEach(listener => void listener?.remove?.());
       unlockBackground();
       root.classList.remove('trip-window-open');
+      root.classList.remove('trip-window-keyboard-visible');
+      root.style.removeProperty('--trip-window-footer-lift');
     };
   }, []);
 
@@ -1822,6 +1896,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const serviceDateBuckets = useMemo(() => buildDriverServiceDateBuckets(orderedTrips, todayKey), [orderedTrips, todayKey]);
   const todayTrips = serviceDateBuckets.todayTrips;
   const tomorrowTrips = serviceDateBuckets.tomorrowTrips;
+  const visibleManifestTripCount = todayTrips.length + tomorrowTrips.length;
+  const conflicts = useMemo(() => buildDriverTimeConflicts(todayTrips), [todayTrips]);
 
   // Notify urgent trips (once per trip)
   useEffect(() => {
@@ -2512,15 +2588,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return () => clearTimeout(timer);
   }, [activeTrips.length, driverId, isClockedIn, me?.name, me?.pendingClockOut, onDriverStatusUpdate]);
 
-  // Detect ride-sharing opportunities — deduplicated, max 3
+  // Detect ride-sharing opportunities only for the visible current service
+  // date. Hidden older/future trips must not create alerts on an empty screen.
   useEffect(() => {
-    if (activeTrips.length < 2) { setAiRideShare([]); return; }
+    if (todayTrips.length < 2) { setAiRideShare([]); return; }
     const seen = new Set();
     const nearby = [];
-    for (let i = 0; i < activeTrips.length && nearby.length < 3; i++) {
-      for (let j = i + 1; j < activeTrips.length && nearby.length < 3; j++) {
-        const a = activeTrips[i];
-        const b = activeTrips[j];
+    for (let i = 0; i < todayTrips.length && nearby.length < 3; i++) {
+      for (let j = i + 1; j < todayTrips.length && nearby.length < 3; j++) {
+        const a = todayTrips[i];
+        const b = todayTrips[j];
         if (a.patient === b.patient) continue;
         const key = [a.patient, b.patient].sort().join('|');
         if (seen.has(key)) continue;
@@ -2534,33 +2611,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       }
     }
     setAiRideShare(nearby);
-  }, [activeTrips]);
-
-  // Detect time conflicts — deduplicated summary, max 5
-  useEffect(() => {
-    const flagged = new Set();
-    const detected = [];
-    for (let i = 0; i < activeTrips.length; i++) {
-      for (let j = i + 1; j < activeTrips.length; j++) {
-        const a = activeTrips[i];
-        const b = activeTrips[j];
-        if (!a.time || !b.time || a.time === 'Will Call' || b.time === 'Will Call') continue;
-        const tA = timeToMinutes(a.time);
-        const tB = timeToMinutes(b.time);
-        if (tA === 1440 || tB === 1440) continue;
-        if (Math.abs(tA - tB) < 30) {
-          const key = [a.patient, b.patient].sort().join('|');
-          if (!flagged.has(key)) {
-            flagged.add(key);
-            detected.push({ aName: a.patient, bName: b.patient, timeA: a.time, timeB: b.time });
-            if (detected.length >= 5) break;
-          }
-        }
-      }
-      if (detected.length >= 5) break;
-    }
-    setConflicts(detected);
-  }, [activeTrips]);
+  }, [todayTrips]);
 
   // Calculate ETAs using Google Maps Distance Matrix
   const calculateEta = useCallback(async (trip, position) => {
@@ -4667,7 +4718,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <p className="text-xs font-semibold text-rose-800">{conflicts.length} time conflict{conflicts.length > 1 ? 's' : ''}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {conflicts.map((c, i) => (
-                      <span key={i} className="text-xs text-rose-700 bg-white/60 rounded-lg px-2 py-0.5">{c.aName} · {c.bName}</span>
+                      <span key={`${c.aId}-${c.bId}-${i}`} className="text-xs text-rose-700 bg-white/60 rounded-lg px-2 py-0.5">{c.aLabel} · {c.bLabel}</span>
                     ))}
                   </div>
                 </div>
@@ -4693,8 +4744,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           )}
 
           {/* Manifest Header */}
-          <div className="flex items-center justify-end px-1 pt-1">
-            <div className="flex items-center gap-1.5">
+          <div className="flex w-full items-center justify-between gap-2 px-1 pt-1">
+            <span className="shrink-0 text-xs font-semibold text-slate-500">{todayTrips.length} trip{todayTrips.length !== 1 ? 's' : ''}</span>
+            <div className="flex min-w-0 items-center justify-end gap-1.5">
               {onAddTrip && (
                 <button
                   onClick={() => setShowAddTripModal && setShowAddTripModal(true)}
@@ -4757,23 +4809,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </button>
                 </>
               )}
-              {activeTrips.length > 0 && (
-                <button onClick={exportDailyLog} className="h-7 w-[100px] text-xs text-white font-medium flex items-center justify-center gap-1.5 active:scale-95 bg-gradient-to-r from-slate-600 to-slate-700 rounded-lg shadow-sm">
-                  <Download size={16} /> Export
-                </button>
-              )}
-              <span className="text-xs text-white/70 font-medium ml-0.5">{todayTrips.length} trip{todayTrips.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
           {/* Trip Cards */}
-          {tripsLoading && orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
+          {tripsLoading && visibleManifestTripCount === 0 && assignedRoutePlanStops.length === 0 ? (
             <div className="space-y-2 mt-2 px-1">
               <SkeletonTripCard />
               <SkeletonTripCard />
               <SkeletonTripCard />
             </div>
-          ) : orderedTrips.length === 0 && assignedRoutePlanStops.length === 0 ? (
+          ) : visibleManifestTripCount === 0 && assignedRoutePlanStops.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-10 text-center mt-2">
               <div className="w-20 h-20 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-[2rem] flex items-center justify-center mx-auto mb-5 shadow-inner">
                 <CheckCircle2 size={36} className="text-emerald-400" />
@@ -5674,7 +5720,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                 </div>
                 <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Current Odometer (mi)</label>
-                <div className="text-center">
+                <div className="relative text-center">
                 <input
                   type="text"
                   inputMode="none"
@@ -5688,6 +5734,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   placeholder='Enter full odometer reading'
                   className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
+                <OdometerEditingCaret active={activeNativeOdometer === 'pickup'} value={odometerValue} />
                 </div>
                 <OdometerGuardFeedback compact evaluation={arrivalEvaluation} ack={odometerAck} onAckChange={setOdometerAck} />
                 {odometerError && (
@@ -5729,7 +5776,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                 </div>
                 <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival</label>
-                <div className="text-center">
+                <div className="relative text-center">
                 <input
                   type="text"
                   inputMode="none"
@@ -5743,6 +5790,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   placeholder="Enter odometer reading"
                   className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${odometerError ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                 />
+                <OdometerEditingCaret active={activeNativeOdometer === 'route'} value={routeStopOdometerValue} />
                 </div>
                 <OdometerGuardFeedback compact evaluation={stopEvaluation} ack={odometerAck} onAckChange={setOdometerAck} />
                 {odometerError && (
@@ -5812,13 +5860,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <div className="bg-slate-50 rounded-xl p-3 space-y-2">
                 <div>
                   <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival (mi)</label>
-                  <div className="text-center">
+                  <div className="relative text-center">
                   <input type="text" inputMode="none" readOnly value={arrivalOdometer}
                     onPointerDown={(event) => { event.preventDefault(); openNativeOdometerKeyboard('arrival'); }}
                     onFocus={() => openNativeOdometerKeyboard('arrival')} onClick={() => openNativeOdometerKeyboard('arrival')}
                     aria-label="Arrival odometer. Opens mobile numeric keyboard."
                     className="trip-odometer-input w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none"
                   />
+                  <OdometerEditingCaret active={activeNativeOdometer === 'arrival'} value={arrivalOdometer} />
                   </div>
                 </div>
                 {showArrivalConfirm.bookingId && (
@@ -5934,7 +5983,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-rose-600 mb-1">Final Odometer (mi)</label>
-                    <div className="text-center">
+                    <div className="relative text-center">
                     <input
                       type="text"
                       inputMode="none"
@@ -5948,6 +5997,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       placeholder="Final reading"
                       className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${completionBlocked && completeOdometer ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'}`}
                     />
+                    <OdometerEditingCaret active={activeNativeOdometer === 'complete'} value={completeOdometer} />
                     </div>
                   </div>
                 </div>
