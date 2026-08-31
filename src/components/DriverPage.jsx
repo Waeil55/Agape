@@ -1551,6 +1551,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const keyboardVisible = keyboardTop !== null && footerLift > 0;
         root.classList.toggle('trip-window-keyboard-visible', keyboardVisible);
         root.style.setProperty('--trip-window-footer-lift', `${footerLift}px`);
+        const panelShift = keyboardVisible ? Math.round(layoutHeight * 0.10) : 0;
+        root.style.setProperty('--trip-window-panel-shift', `${panelShift}px`);
 
         const body = panel?.querySelector('.trip-window-body');
         if (keyboardVisible && body && footer) {
@@ -1572,6 +1574,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       } else {
         root.classList.remove('trip-window-keyboard-visible');
         root.style.setProperty('--trip-window-footer-lift', '0px');
+        root.style.setProperty('--trip-window-panel-shift', '0px');
         if (keyboardBody) {
           keyboardBody.scrollTop = keyboardBodyScrollTop;
           keyboardBody = null;
@@ -1648,6 +1651,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       root.classList.remove('trip-window-open');
       root.classList.remove('trip-window-keyboard-visible');
       root.style.removeProperty('--trip-window-footer-lift');
+      root.style.removeProperty('--trip-window-panel-shift');
     };
   }, []);
 

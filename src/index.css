@@ -2332,6 +2332,7 @@ textarea {
   border-radius: 1.5rem;
   box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.35);
   pointer-events: auto;
+  transform: translate3d(0, calc(-1 * var(--trip-window-panel-shift, 0px)), 0);
 }
 
 /* While a trip window is open, stop the background page from panning when
