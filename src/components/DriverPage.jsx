@@ -844,6 +844,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [routeStopSignatureConfirmed, setRouteStopSignatureConfirmed] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [completeOdometer, setCompleteOdometer] = useState('');
+  const [completePickupOdometer, setCompletePickupOdometer] = useState('');
   const [activeNativeOdometer, setActiveNativeOdometer] = useState(null);
   const odometerKeyboardProxyRef = useRef(null);
   const [completeError, setCompleteError] = useState('');
@@ -860,6 +861,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       pickup: Boolean(showOdometerPrompt),
       route: Boolean(routeStopOdometerPrompt),
       arrival: Boolean(showArrivalConfirm),
+      completePickup: Boolean(showCompleteModal),
       complete: Boolean(showCompleteModal),
     }[activeNativeOdometer];
     if (!activeWindowExists) setActiveNativeOdometer(null);
@@ -870,6 +872,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const proxy = odometerKeyboardProxyRef.current;
     if (!proxy) return;
     try { proxy.focus({ preventScroll: true }); } catch { proxy.focus(); }
+    window.dispatchEvent(new Event('agape:trip-keyboard-open'));
   }, []);
 
   // Strict odometer gate shared by every trip window that records a reading.
@@ -1467,11 +1470,23 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     let baselineVisualPageTop = 0;
     let keyboardBody = null;
     let keyboardBodyScrollTop = 0;
+    let activePanel = null;
+    let keyboardSuppressed = true;
 
     const getVisualPageTop = () => {
       const reportedPageTop = Number(visualViewport?.pageTop);
       if (Number.isFinite(reportedPageTop)) return reportedPageTop;
       return (window.scrollY || root.scrollTop || 0) + (Number(visualViewport?.offsetTop) || 0);
+    };
+
+    const resetTripKeyboardPresentation = () => {
+      root.classList.remove('trip-window-keyboard-visible');
+      root.style.setProperty('--trip-window-footer-lift', '0px');
+      if (keyboardBody) {
+        if (keyboardBody.isConnected) keyboardBody.scrollTop = keyboardBodyScrollTop;
+        keyboardBody = null;
+        keyboardBodyScrollTop = 0;
+      }
     };
 
     const lockBackground = () => {
@@ -1517,12 +1532,21 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
     const applyWindowLock = () => {
       frame = 0;
-      const nextPanelOpen = !!document.querySelector('.trip-window-panel');
+      const nextPanel = document.querySelector('.trip-window-panel');
+      const nextPanelOpen = Boolean(nextPanel);
+      if (nextPanel !== activePanel) {
+        resetTripKeyboardPresentation();
+        document.body.style.transform = 'none';
+        nativeKeyboardHeight = 0;
+        keyboardSuppressed = true;
+        activePanel = nextPanel;
+      }
       if (nextPanelOpen && !panelOpen) {
         lockBackground();
         if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: true }).catch(() => {});
       }
       if (!nextPanelOpen && panelOpen) {
+        resetTripKeyboardPresentation();
         if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: false }).catch(() => {});
         unlockBackground();
       }
@@ -1535,10 +1559,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const viewportPan = Math.max(0, getVisualPageTop() - baselineVisualPageTop);
         document.body.style.transform = viewportPan > 0.01 ? `translate3d(0, ${viewportPan.toFixed(3)}px, 0)` : 'none';
 
-        const panel = document.querySelector('.trip-window-panel');
+        const panel = nextPanel;
         const footer = panel?.querySelector('.trip-window-footer');
         const layoutHeight = Math.max(window.innerHeight || 0, root.clientHeight || 0);
-        const keyboardTop = resolveTripKeyboardTop({
+        const keyboardTop = keyboardSuppressed ? null : resolveTripKeyboardTop({
           layoutHeight,
           visualHeight: visualViewport?.height,
           visualOffsetTop: visualViewport?.offsetTop,
@@ -1551,8 +1575,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const keyboardVisible = keyboardTop !== null && footerLift > 0;
         root.classList.toggle('trip-window-keyboard-visible', keyboardVisible);
         root.style.setProperty('--trip-window-footer-lift', `${footerLift}px`);
-        const panelShift = keyboardVisible ? Math.round(layoutHeight * 0.10) : 0;
-        root.style.setProperty('--trip-window-panel-shift', `${panelShift}px`);
 
         const body = panel?.querySelector('.trip-window-body');
         if (keyboardVisible && body && footer) {
@@ -1572,20 +1594,29 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           keyboardBodyScrollTop = 0;
         }
       } else {
-        root.classList.remove('trip-window-keyboard-visible');
-        root.style.setProperty('--trip-window-footer-lift', '0px');
-        root.style.setProperty('--trip-window-panel-shift', '0px');
-        if (keyboardBody) {
-          keyboardBody.scrollTop = keyboardBodyScrollTop;
-          keyboardBody = null;
-          keyboardBodyScrollTop = 0;
-        }
+        resetTripKeyboardPresentation();
       }
     };
 
     const scheduleWindowLock = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(applyWindowLock);
+    };
+    const handleKeyboardOpen = () => {
+      if (keyboardSuppressed) baselineVisualPageTop = getVisualPageTop();
+      keyboardSuppressed = false;
+      scheduleWindowLock();
+    };
+    const handleKeyboardHidden = () => {
+      keyboardSuppressed = true;
+      nativeKeyboardHeight = 0;
+      document.body.style.transform = 'none';
+      baselineVisualPageTop = getVisualPageTop();
+      resetTripKeyboardPresentation();
+      scheduleWindowLock();
+    };
+    const handleKeyboardProxyBlur = (event) => {
+      if (event.target?.matches?.('.trip-odometer-native-proxy')) handleKeyboardHidden();
     };
     const preventBackgroundTouch = (event) => {
       if (!panelOpen || event.target?.closest?.('.trip-window-panel')) return;
@@ -1604,6 +1635,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     mutationObserver.observe(document.body, { childList: true, subtree: true });
     visualViewport?.addEventListener('resize', scheduleWindowLock);
     visualViewport?.addEventListener('scroll', scheduleWindowLock);
+    window.addEventListener('agape:trip-keyboard-open', handleKeyboardOpen);
+    document.addEventListener('focusout', handleKeyboardProxyBlur, true);
     document.addEventListener('touchmove', preventBackgroundTouch, { capture: true, passive: false });
 
     if (virtualKeyboard) {
@@ -1618,20 +1651,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         nativeKeyboardListeners = await Promise.all([
           Keyboard.addListener('keyboardWillShow', (info) => {
             nativeKeyboardHeight = Number(info?.keyboardHeight) || 0;
-            scheduleWindowLock();
+            handleKeyboardOpen();
           }),
           Keyboard.addListener('keyboardDidShow', (info) => {
             nativeKeyboardHeight = Number(info?.keyboardHeight) || nativeKeyboardHeight;
-            scheduleWindowLock();
+            handleKeyboardOpen();
           }),
-          Keyboard.addListener('keyboardWillHide', () => {
-            nativeKeyboardHeight = 0;
-            scheduleWindowLock();
-          }),
-          Keyboard.addListener('keyboardDidHide', () => {
-            nativeKeyboardHeight = 0;
-            scheduleWindowLock();
-          }),
+          Keyboard.addListener('keyboardWillHide', handleKeyboardHidden),
+          Keyboard.addListener('keyboardDidHide', handleKeyboardHidden),
         ]).catch(() => []);
         if (panelOpen) await Keyboard.setScroll({ isDisabled: true }).catch(() => {});
       }).catch(() => {});
@@ -1644,14 +1671,15 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       mutationObserver.disconnect();
       visualViewport?.removeEventListener('resize', scheduleWindowLock);
       visualViewport?.removeEventListener('scroll', scheduleWindowLock);
+      window.removeEventListener('agape:trip-keyboard-open', handleKeyboardOpen);
+      document.removeEventListener('focusout', handleKeyboardProxyBlur, true);
       document.removeEventListener('touchmove', preventBackgroundTouch, true);
       if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: false }).catch(() => {});
       nativeKeyboardListeners.forEach(listener => void listener?.remove?.());
       unlockBackground();
       root.classList.remove('trip-window-open');
-      root.classList.remove('trip-window-keyboard-visible');
+      resetTripKeyboardPresentation();
       root.style.removeProperty('--trip-window-footer-lift');
-      root.style.removeProperty('--trip-window-panel-shift');
     };
   }, []);
 
@@ -1688,6 +1716,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       setRouteStopOdometerPrompt(null);
       setRouteStopSignaturePrompt(null);
       setShowCompleteModal(null);
+      setCompletePickupOdometer('');
+      setCompleteOdometer('');
+      setActiveNativeOdometer(null);
       setScheduleEditorTrip(null);
       setShowContactSelector(null);
       setQuickSmsMenuTrip(null);
@@ -3813,6 +3844,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         : (lastOdometer > 0 ? lastOdometer : trip.pickupOdometer))
       || '';
     setCompleteOdometer(odometerSeed ? String(odometerSeed) : '');
+    setCompletePickupOdometer(sanitizeOdometerInput(trip.pickupOdometer));
     setCompleteError('');
     setCompleteTimeNotice('');
     setCompleteAck(false);
@@ -3862,9 +3894,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const submitComplete = async () => {
     if (!showCompleteModal) return;
+    const pickupOdo = Number(completePickupOdometer);
+    if (!Number.isFinite(pickupOdo) || pickupOdo <= 0) {
+      setCompleteError('Enter the pickup odometer reading before completing this trip.');
+      return;
+    }
     const evaluation = runOdometerGuard({
       raw: completeOdometer,
-      pickupOdometer: showCompleteModal.pickupOdometer ?? null,
+      pickupOdometer: pickupOdo,
     });
     if (evaluation.status === 'empty') {
       setCompleteError('Enter the final odometer reading before completing this trip.');
@@ -3918,6 +3955,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       : null;
     setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     advanceWorkflow(showCompleteModal, 'Completed', {
+      pickupOdometer: pickupOdo,
       dropoffOdometer: odo,
       completedAt: now,
       departedPickupTime: departedPickupIso,
@@ -3941,6 +3979,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setLastOdometer(odo);
     setShowCompleteModal(null);
     setCompleteOdometer('');
+    setCompletePickupOdometer('');
     setCompleteError('');
     setCompleteTimeNotice('');
     setCompleteAck(false);
@@ -5942,9 +5981,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
       {/* ===== COMPLETE TRIP MODAL ===== */}
       {showCompleteModal && (() => {
+        const completePickupReading = Number(completePickupOdometer) || null;
         const completionEvaluation = runOdometerGuard({
           raw: completeOdometer,
-          pickupOdometer: showCompleteModal.pickupOdometer ?? null,
+          pickupOdometer: completePickupReading,
         });
         const completionBlocked = completionEvaluation.status === 'invalid' || completionEvaluation.status === 'blocked'
           || (completionEvaluation.status === 'confirm' && !completeAck);
@@ -5971,8 +6011,21 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Pickup Odometer</label>
-                    <input type="text" readOnly value={showCompleteModal.pickupOdometer ? `${showCompleteModal.pickupOdometer.toLocaleString()} mi` : '—'} title="Verified at pickup arrival"
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm text-center text-slate-600 cursor-default outline-none" />
+                    <div className="relative text-center">
+                      <input
+                        type="text"
+                        inputMode="none"
+                        readOnly
+                        value={completePickupOdometer}
+                        onPointerDown={(event) => { event.preventDefault(); openNativeOdometerKeyboard('completePickup'); }}
+                        onFocus={() => openNativeOdometerKeyboard('completePickup')}
+                        onClick={() => openNativeOdometerKeyboard('completePickup')}
+                        aria-label="Pickup odometer. Opens mobile numeric keyboard."
+                        placeholder="Pickup reading"
+                        className={`trip-odometer-input w-full p-2.5 bg-white border rounded-xl font-semibold text-sm outline-none ${!completePickupReading ? 'border-amber-300 focus:border-amber-500' : 'border-slate-200 focus:border-blue-500'}`}
+                      />
+                      <OdometerEditingCaret active={activeNativeOdometer === 'completePickup'} value={completePickupOdometer} />
+                    </div>
                   </div>
                 </div>
 
@@ -6019,8 +6072,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </div>
 
               <div className="trip-window-footer px-4 pb-4">
-                <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, () => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); })} onClick={() => { setShowCompleteModal(null); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-                <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, submitComplete)} onClick={submitComplete} disabled={!completeOdometer || completionBlocked} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
+                <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, () => { setShowCompleteModal(null); setCompletePickupOdometer(''); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); })} onClick={() => { setShowCompleteModal(null); setCompletePickupOdometer(''); setCompleteError(''); setCompleteTimeNotice(''); setCompleteAck(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
+                <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, submitComplete)} onClick={submitComplete} disabled={!completePickupOdometer || !completeOdometer || completionBlocked} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Complete Trip</button>
               </div>
             </div>
           </div>
@@ -7906,6 +7959,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           arrival: showArrivalConfirm ? {
             value: arrivalOdometer,
             setValue: setArrivalOdometer,
+          } : null,
+          completePickup: showCompleteModal ? {
+            value: completePickupOdometer,
+            setValue: (next) => { setCompletePickupOdometer(next); setCompleteError(''); setCompleteAck(false); },
           } : null,
           complete: showCompleteModal ? {
             value: completeOdometer,

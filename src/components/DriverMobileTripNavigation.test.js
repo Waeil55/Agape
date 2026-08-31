@@ -25,8 +25,8 @@ describe('driver mobile active-trip navigation regression', () => {
     expect(driverSource).not.toContain('aria-label={`Resume active trip for');
   });
 
-  it('suppresses only odometer carets affected by the transformed mobile dialog', () => {
-    expect(driverSource.match(/trip-odometer-input/g)).toHaveLength(4);
+  it('keeps the native-keyboard caret treatment on every trip odometer field', () => {
+    expect(driverSource.match(/trip-odometer-input/g)).toHaveLength(5);
     expect(appCss).toContain('.trip-odometer-input');
     expect(appCss).toContain('caret-color');
   });
