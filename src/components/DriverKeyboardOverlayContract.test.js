@@ -33,7 +33,7 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(driver).toContain('const mutationObserver = new MutationObserver((records) =>');
     expect(driver).toContain("node.matches?.('.trip-window-panel')");
     expect(driver).toContain('Keyboard.setScroll({ isDisabled: true })');
-    expect(driver).toContain('inputRect.bottom > bodyRect.bottom - edgePadding');
+    expect(driver).toContain('fieldRect.bottom > footerTop - 12');
     expect(driver).toContain('baselineVisualPageTop = getVisualPageTop()');
     expect(driver).toContain('const viewportPan = Math.max(0, getVisualPageTop() - baselineVisualPageTop)');
     expect(driver).toContain('translate3d(0, ${viewportPan.toFixed(3)}px, 0)');
@@ -49,7 +49,10 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(driver).toContain('if (nextPanel !== activePanel)');
     expect(driver).toContain("window.addEventListener('agape:trip-keyboard-open', handleKeyboardOpen)");
     expect(driver).toContain("document.addEventListener('focusout', handleKeyboardProxyBlur, true)");
-    expect(driver).toContain('.trip-window-panel [data-trip-initial-focus="true"]');
+    expect(driver).not.toContain('focusTripWindowInput');
+    expect(driver).toMatch(/setShowOdometerPrompt\(trip\);\s*openNativeOdometerKeyboard\('pickup'\);/);
+    expect(driver).toMatch(/setRouteStopOdometerPrompt\(stop\);\s*openNativeOdometerKeyboard\('route'\);/);
+    expect(driver).not.toMatch(/readOnly\s+autoFocus\s+value=\{(?:odometerValue|routeStopOdometerValue|completeOdometer)\}/);
     expect(css).toContain('html.trip-window-open {');
     expect(css).toContain('background: #94979d !important');
     expect(driver).toContain("themeColorMeta.content = '#94979d'");
@@ -85,19 +88,19 @@ describe('driver odometer keyboard overlay contract', () => {
   it('opens the native numeric keyboard through a fixed proxy instead of scrolling visible fields', () => {
     const driver = read('src/components/DriverPage.jsx');
     const css = read('src/index.css');
-    expect(driver.match(/inputMode="none"/g)).toHaveLength(5);
+    expect(driver.match(/inputMode="none"/g)).toHaveLength(4);
     expect(driver.match(/inputMode="numeric"/g)).toHaveLength(1);
     expect(driver).toContain('ref={odometerKeyboardProxyRef}');
     expect(driver).toContain('className="trip-odometer-native-proxy"');
     expect(driver).toContain("openNativeOdometerKeyboard('pickup')");
     expect(driver).toContain("openNativeOdometerKeyboard('route')");
-    expect(driver).toContain("openNativeOdometerKeyboard('arrival')");
+    expect(driver).not.toContain("openNativeOdometerKeyboard('arrival')");
     expect(driver).toContain("openNativeOdometerKeyboard('complete')");
     expect(driver).toContain('proxy.focus({ preventScroll: true })');
     expect(css).toContain('.trip-odometer-native-proxy {');
     expect(css).toContain('position: fixed;');
     expect(css).toContain('top: max(1px, env(safe-area-inset-top, 0px));');
-    expect(driver.match(/<OdometerEditingCaret active=/g)).toHaveLength(5);
+    expect(driver.match(/<OdometerEditingCaret active=/g)).toHaveLength(4);
     expect(css).toContain('.trip-odometer-visual-caret {');
     expect(driver).not.toContain('OdometerKeypad');
     expect(css).not.toContain('.trip-odometer-keypad');

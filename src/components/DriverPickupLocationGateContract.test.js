@@ -7,11 +7,15 @@ const timeTracking = readFileSync(new URL('../utils/timeTracking.js', import.met
 describe('driver pickup confirmation location contract', () => {
   it('never gates either pickup-confirmation path on GPS or geocoding', () => {
     expect(driver).toContain('getTripPickupLocation(showOdometerPrompt) || driverLocation');
-    expect(driver).toContain('getTripPickupLocation(showArrivalConfirm) || driverLocation');
+    expect(driver).not.toContain('showArrivalConfirm');
     expect(driver).not.toContain('resolveVerifiedPickupLocation');
     expect(driver).not.toContain('evaluateVerifiedTripWorkEvidence');
     expect(driver).not.toContain('verifiedWorkEvidence');
     expect(driver).not.toContain('pickupCoordinatesSource');
+    expect(driver).not.toContain('Near pickup:');
+    expect(driver).not.toContain('Near dropoff:');
+    expect(driver).not.toContain("action: 'arrive-pickup'");
+    expect(driver).not.toContain("action: 'arrive-dropoff'");
   });
 
   it('removes the obsolete pickup geofence and all of its blocking messages', () => {

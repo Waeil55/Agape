@@ -26,7 +26,7 @@ describe('driver mobile active-trip navigation regression', () => {
   });
 
   it('keeps the native-keyboard caret treatment on every trip odometer field', () => {
-    expect(driverSource.match(/trip-odometer-input/g)).toHaveLength(5);
+    expect(driverSource.match(/trip-odometer-input/g)).toHaveLength(4);
     expect(appCss).toContain('.trip-odometer-input');
     expect(appCss).toContain('caret-color');
   });

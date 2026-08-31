@@ -153,35 +153,6 @@ const OdometerEditingCaret = ({ active, value }) => active ? (
   </span>
 ) : null;
 
-// Focus the primary trip-window field after an async React commit. Odometer
-// fields are read-only display targets that forward focus to one fixed native
-// input; time fields keep their native picker for corrections.
-const focusTripWindowInput = () => {
-  setTimeout(() => {
-    // One explicit marker wins over DOM order so iOS cannot land on an earlier
-    // pickup field when the final/dropoff odometer is the current workflow step.
-    const el = document.querySelector('.trip-window-panel [data-trip-initial-focus="true"]')
-      || document.querySelector('.trip-window-panel input[autofocus]')
-      || document.querySelector('.trip-window-panel input[readonly][inputmode="none"]')
-      || document.querySelector('.trip-window-panel input[type="time"]');
-    if (!el) return;
-    try { el.focus({ preventScroll: true }); } catch { el.focus(); }
-    requestAnimationFrame(() => {
-      const body = el.closest('.trip-window-body') || document.querySelector('.trip-window-panel');
-      if (body) {
-        const bodyRect = body.getBoundingClientRect();
-        const inputRect = el.getBoundingClientRect();
-        const edgePadding = 12;
-        if (inputRect.bottom > bodyRect.bottom - edgePadding) {
-          body.scrollTop += inputRect.bottom - bodyRect.bottom + edgePadding;
-        } else if (inputRect.top < bodyRect.top + edgePadding) {
-          body.scrollTop -= bodyRect.top + edgePadding - inputRect.top;
-        }
-      }
-    });
-  }, 120);
-};
-
 const calculateBoundaryTravel = async (origin, destination) => {
   if (!origin || !destination) return { minutes: 0, source: 'NO_ROUTE_EVIDENCE', confidence: 'missing' };
   if (typeof navigator === 'undefined' || navigator.onLine !== false) {
@@ -835,8 +806,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       try { localStorage.setItem(`agape_drvOdo_${userKey}`, String(lastOdometer)); } catch (e) { console.warn('[odo persist]', e); }
     }
   }, [lastOdometer, userKey]);
-  const [showArrivalConfirm, setShowArrivalConfirm] = useState(null);
-  const [arrivalOdometer, setArrivalOdometer] = useState('');
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
   const [showSignatureConfirm, setShowSignatureConfirm] = useState(null);
   const [routeStopOdometerPrompt, setRouteStopOdometerPrompt] = useState(null);
@@ -861,12 +830,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const activeWindowExists = {
       pickup: Boolean(showOdometerPrompt),
       route: Boolean(routeStopOdometerPrompt),
-      arrival: Boolean(showArrivalConfirm),
       completePickup: Boolean(showCompleteModal),
       complete: Boolean(showCompleteModal),
     }[activeNativeOdometer];
     if (!activeWindowExists) setActiveNativeOdometer(null);
-  }, [activeNativeOdometer, routeStopOdometerPrompt, showArrivalConfirm, showCompleteModal, showOdometerPrompt]);
+  }, [activeNativeOdometer, routeStopOdometerPrompt, showCompleteModal, showOdometerPrompt]);
 
   const openNativeOdometerKeyboard = useCallback((field) => {
     setActiveNativeOdometer(field);
@@ -1213,12 +1181,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const positionRef = useRef(null);
   const activeTripsRef = useRef([]);
   const addressCoordsCache = useRef({});
-  const geofenceAlerted = useRef(new Set());
   const boundaryReconciliationRef = useRef(new Set());
   meRef.current = me;
   positionRef.current = driverPosition;
 
-  const geofenceProximityNotified = useRef(new Set());
 
   // Imported broker trips often contain valid street addresses without latitude/
   // longitude fields. Reconcile the day's home boundaries from those addresses
@@ -1692,7 +1658,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     };
   }, []);
 
-  // GPS is mandatory — always active on mount
+  // Live GPS supports navigation and route telemetry; it never gates trip actions.
   // Clean up undo timeout on unmount
   useEffect(() => {
     return () => { if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current); };
@@ -1704,7 +1670,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   // its own buttons pops the sentinel so back never needs a double press.
   const anyTripWindowOpen = Boolean(
     showOdometerPrompt
-    || showArrivalConfirm
     || showSignatureConfirm
     || routeStopOdometerPrompt
     || routeStopSignaturePrompt
@@ -1720,7 +1685,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   useEffect(() => {
     const closeAllTripWindows = () => {
       setShowOdometerPrompt(null);
-      setShowArrivalConfirm(null);
       setShowSignatureConfirm(null);
       setRouteStopOdometerPrompt(null);
       setRouteStopSignaturePrompt(null);
@@ -2648,44 +2612,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return () => clearInterval(timer);
   }, [activeNav, activeTrips.length, calculateEta]);
 
-  // Geofence proximity detection — check every 15s if near pickup/dropoff
-  useEffect(() => {
-    if (!['trips', 'active-trip'].includes(activeNav) || activeTrips.length === 0) return undefined;
-    const timer = setInterval(() => {
-      const pos = positionRef.current;
-      if (!pos?.lat || !pos?.lng) return;
-      activeTripsRef.current.forEach(trip => {
-        const tripKey = trip.id;
-        const alreadyNotified = geofenceAlerted.current.has(tripKey);
-        const pickupCoords = trip.pickup ? addressCoordsCache.current[trip.pickup] : null;
-        const dropoffCoords = trip.dropoff ? addressCoordsCache.current[trip.dropoff] : null;
-
-        if (pickupCoords && !alreadyNotified && (trip.status === 'Navigating Pickup' || trip.status === 'In Progress')) {
-          const dist = Math.sqrt(Math.pow(pos.lat - pickupCoords.lat, 2) + Math.pow(pos.lng - pickupCoords.lng, 2)) * 69;
-          if (dist <= 0.1 && !geofenceProximityNotified.current.has(`${tripKey}_pu`)) {
-            geofenceProximityNotified.current.add(`${tripKey}_pu`);
-            setTimeout(() => geofenceProximityNotified.current.delete(`${tripKey}_pu`), 30000);
-            setShowToast({ message: `Near pickup: ${trip.patient}. Tap to arrive.`, action: 'arrive-pickup', trip });
-            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-            toastTimeoutRef.current = setTimeout(() => setShowToast(null), 8000);
-          }
-        }
-
-        if (dropoffCoords && !alreadyNotified && (trip.status === 'Navigating Dropoff' || trip.status === 'In Transit')) {
-          const dist = Math.sqrt(Math.pow(pos.lat - dropoffCoords.lat, 2) + Math.pow(pos.lng - dropoffCoords.lng, 2)) * 69;
-          if (dist <= 0.1 && !geofenceProximityNotified.current.has(`${tripKey}_do`)) {
-            geofenceProximityNotified.current.add(`${tripKey}_do`);
-            setTimeout(() => geofenceProximityNotified.current.delete(`${tripKey}_do`), 30000);
-            setShowToast({ message: `Near dropoff: ${trip.patient}. Tap to arrive.`, action: 'arrive-dropoff', trip });
-            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-            toastTimeoutRef.current = setTimeout(() => setShowToast(null), 8000);
-          }
-        }
-      });
-    }, 15000);
-    return () => clearInterval(timer);
-  }, [activeNav, activeTrips.length]);
-
   const filteredHistory = useMemo(() => selectedHistoryDayTrips.filter(t => {
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
@@ -2854,8 +2780,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setRouteStopOdometerValue(currentVehicleOdometer > 0 ? String(currentVehicleOdometer) : '');
     resetOdometerPromptState();
     setRouteStopOdometerPrompt(stop);
-    focusTripWindowInput();
-  }, [currentVehicleOdometer, resetOdometerPromptState]);
+    openNativeOdometerKeyboard('route');
+  }, [currentVehicleOdometer, openNativeOdometerKeyboard, resetOdometerPromptState]);
 
   const submitRouteStopOdometer = useCallback(() => {
     if (!routeStopOdometerPrompt || !routeStopOdometerValue) return;
@@ -3199,7 +3125,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setOdometerValue(autoOdo);
     resetOdometerPromptState();
     setShowOdometerPrompt(trip);
-    focusTripWindowInput();
+    openNativeOdometerKeyboard('pickup');
   };
 
   const submitOdometer = async () => {
@@ -3319,103 +3245,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       handleArrivePickup(trip);
     } else if (trip.status === 'In Transit') {
       handleArriveDropoff(trip);
-    }
-  };
-
-  const confirmArrival = async () => {
-    if (!showArrivalConfirm) return;
-    if (tripActionInFlightRef.current) return;
-    const arrivalEvaluation = runOdometerGuard({ raw: arrivalOdometer });
-    if (arrivalEvaluation.status === 'empty' || arrivalEvaluation.status === 'invalid' || arrivalEvaluation.status === 'blocked') {
-      setShowToast({ type: 'warning', message: arrivalEvaluation.errors[0] || 'Enter the current odometer reading before confirming arrival.' });
-      return;
-    }
-    if (arrivalEvaluation.status === 'confirm' && !odometerAck) {
-      setShowToast({ type: 'warning', message: 'Review the odometer warning and confirm the reading first.' });
-      return;
-    }
-    tripActionInFlightRef.current = true;
-    try {
-    const odo = arrivalEvaluation.value;
-    setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
-    const nowIso = new Date().toISOString();
-    const driverLocation = getDriverClockLocation();
-    const pickupLocation = getTripPickupLocation(showArrivalConfirm) || driverLocation;
-    await resumeBreakFromPickup(showArrivalConfirm, pickupLocation, nowIso, driverLocation);
-    let autoStartedShift = false;
-    let homeTravel = null;
-    let homeLocation = null;
-    if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
-      homeLocation = Number.isFinite(Number(me?.homeLat)) && Number.isFinite(Number(me?.homeLng))
-        ? { lat: Number(me.homeLat), lng: Number(me.homeLng) }
-        : null;
-      const pickupDestination = pickupLocation || driverLocation || showArrivalConfirm.pickup;
-      homeTravel = timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && homeLocation
-        ? await calculateBoundaryTravel(homeLocation, pickupDestination)
-        : null;
-      const anchor = calculateAnchor({
-        policyMode: timeTrackingPolicyMode,
-        driver: me,
-        lastWorkLocation: ttLastTripEventRef.current?.location || null,
-        pickupLocation: pickupLocation || driverLocation,
-        pickupTime: new Date(nowIso),
-      });
-      const travelMin = Math.max(0, homeTravel?.minutes ?? anchor.travelMinutes ?? 0);
-      const autoClockInTime = homeTravel?.minutes > 0
-        ? new Date(new Date(nowIso).getTime() - travelMin * 60000).toISOString()
-        : (anchor.clockInTime ? anchor.clockInTime.toISOString() : nowIso);
-      const anchorType = homeTravel?.minutes > 0 ? 'HOME_ROUTE' : anchor.anchorType;
-      onDriverStatusUpdate?.(driverId, true, {
-        clockTimestamp: autoClockInTime,
-        clockEventType: 'auto_in',
-        clockEventSource: 'verified_trip_pickup',
-        timeTrackingState: TT.ON_SHIFT_ACTIVE,
-        timeTrackingPolicy: timeTrackingPolicyMode,
-        timeTrackingAnchor: anchorType,
-        timeTrackingTravelMinutes: travelMin,
-        timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
-        timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
-        ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
-      });
-      setTtState(TT.ON_SHIFT_ACTIVE);
-      ttStateRef.current = TT.ON_SHIFT_ACTIVE;
-      ttClockInTimeRef.current = autoClockInTime;
-      ttEventsLogRef.current = [{
-        type: 'AUTO_CLOCK_IN',
-        timestamp: autoClockInTime,
-        location: anchor.anchorLocation || driverLocation || pickupLocation,
-        anchorType,
-        travelMinutes: travelMin,
-        policyMode: timeTrackingPolicyMode,
-      }];
-      setTtBillableMin(0);
-      setTtBreakMin(0);
-      ttBreakStartRef.current = null;
-      autoStartedShift = true;
-      setShowToast({ type: 'success', message: `Auto clocked in - ${travelMin} min travel included.` });
-    }
-    advanceWorkflow(showArrivalConfirm, 'At Pickup', {
-      pickupOdometer: odo,
-      arrivalTime: nowIso,
-      startTime: nowIso,
-      ...(homeTravel?.minutes > 0 ? {
-        homeToPickupTravelMinutes: homeTravel.minutes,
-        homeToPickupCalculatedAt: nowIso,
-        homeToPickupCalculationSource: homeTravel.source,
-        homeToPickupConfidence: homeTravel.confidence,
-        homeToPickupDistanceMiles: homeTravel.distanceMiles ?? null,
-        homeLocationSnapshot: homeLocation,
-        pickupLocationSnapshot: pickupLocation || driverLocation || null,
-      } : {}),
-    });
-    if (autoStartedShift || ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
-      ttLogTripEvent('TRIP_ARRIVED_PICKUP', showArrivalConfirm.id, driverLocation || pickupLocation);
-    }
-    setLastOdometer(odo);
-    setShowArrivalConfirm(null);
-    setArrivalOdometer('');
-    } finally {
-      tripActionInFlightRef.current = false;
     }
   };
 
@@ -3822,7 +3651,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
     setDepartedTime(normalizedClocks.pickupDeparture);
     setArrivalDropoffTime(normalizedClocks.dropoffArrival);
-    focusTripWindowInput();
+    openNativeOdometerKeyboard('complete');
   };
 
   const updateCompletionDeparture = (value) => {
@@ -5726,7 +5555,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   type="text"
                   inputMode="none"
                   readOnly
-                  autoFocus
                   value={odometerValue}
                   onPointerDown={(event) => { event.preventDefault(); openNativeOdometerKeyboard('pickup'); }}
                   onFocus={() => openNativeOdometerKeyboard('pickup')}
@@ -5782,7 +5610,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   type="text"
                   inputMode="none"
                   readOnly
-                  autoFocus
                   value={routeStopOdometerValue}
                   onPointerDown={(event) => { event.preventDefault(); openNativeOdometerKeyboard('route'); }}
                   onFocus={() => openNativeOdometerKeyboard('route')}
@@ -5840,67 +5667,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             <div className="trip-window-footer px-4 pb-4">
               <button type="button" onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
               <button type="button" onClick={confirmRoutePlanStopSignature} disabled={!routeStopSignatureConfirmed} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all disabled:opacity-40 cursor-pointer">Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== ARRIVAL CONFIRM MODAL ===== */}
-      {showArrivalConfirm && (
-        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
-          <div className="trip-window-panel">
-            <div className="trip-window-body p-4">
-              <div className="text-center mb-3">
-                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
-                  <MapPin size={18} className="text-emerald-600" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Arrived at Pickup</h3>
-                <p className="text-sm text-slate-500 mt-0.5">{showArrivalConfirm.patient}</p>
-              </div>
-
-              <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-                <div>
-                  <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Odometer at Arrival (mi)</label>
-                  <div className="relative text-center">
-                  <input type="text" inputMode="none" readOnly value={arrivalOdometer}
-                    onPointerDown={(event) => { event.preventDefault(); openNativeOdometerKeyboard('arrival'); }}
-                    onFocus={() => openNativeOdometerKeyboard('arrival')} onClick={() => openNativeOdometerKeyboard('arrival')}
-                    aria-label="Arrival odometer. Opens mobile numeric keyboard."
-                    className="trip-odometer-input w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none"
-                  />
-                  <OdometerEditingCaret active={activeNativeOdometer === 'arrival'} value={arrivalOdometer} />
-                  </div>
-                </div>
-                {showArrivalConfirm.bookingId && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 font-semibold uppercase">Booking</span>
-                    <span className="text-sm font-semibold text-slate-900">{showArrivalConfirm.bookingId}</span>
-                  </div>
-                )}
-                {showArrivalConfirm.pickupPhone && (() => {
-                  const contact = getContactsForTrip(showArrivalConfirm).find(c => cleanPhone(c.phone) === cleanPhone(showArrivalConfirm.pickupPhone));
-                  const label = contact ? contact.label : 'Contact';
-                  return (
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500 font-semibold uppercase">{label}</span>
-                      <button type="button" onClick={() => handleCall(showArrivalConfirm.pickupPhone, `${label}: ${showArrivalConfirm.patient}`)} className="text-sm font-medium text-blue-600 flex items-center gap-1 hover:underline cursor-pointer">
-                        <Phone size={14} /> {formatPhoneDisplay(showArrivalConfirm.pickupPhone)}
-                      </button>
-                    </div>
-                  );
-                })()}
-                {showArrivalConfirm.notes && (
-                  <div className="pt-2 border-t border-slate-200">
-                    <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Notes</p>
-                    <p className="text-sm text-slate-700">{showArrivalConfirm.notes}</p>
-                  </div>
-                )}
-              </div>
-              <p className="mt-2 text-center text-xs font-semibold text-slate-500">Confirm arrival details before proceeding.</p>
-            </div>
-            <div className="trip-window-footer px-4 pb-4">
-              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, () => setShowArrivalConfirm(null))} onClick={() => setShowArrivalConfirm(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Back</button>
-              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, confirmArrival)} onClick={confirmArrival} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Confirm Arrival</button>
             </div>
           </div>
         </div>
@@ -6003,7 +5769,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       type="text"
                       inputMode="none"
                       readOnly
-                      data-trip-initial-focus="true"
                       value={completeOdometer}
                       onPointerDown={(event) => { event.preventDefault(); openNativeOdometerKeyboard('complete'); }}
                       onFocus={() => openNativeOdometerKeyboard('complete')}
@@ -7914,10 +7679,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             value: routeStopOdometerValue,
             setValue: (next) => { setRouteStopOdometerValue(next); setOdometerError(''); },
           } : null,
-          arrival: showArrivalConfirm ? {
-            value: arrivalOdometer,
-            setValue: setArrivalOdometer,
-          } : null,
           completePickup: showCompleteModal ? {
             value: completePickupOdometer,
             setValue: (next) => { setCompletePickupOdometer(next); setCompleteError(''); setCompleteAck(false); },
@@ -7949,7 +7710,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         );
       })()}
 
-      {/* ===== GEOFENCE TOAST ===== */}
+      {/* ===== DRIVER ACTION TOAST ===== */}
       {showToast && (
         <div className="fixed bottom-6 left-4 right-4 z-50 animate-slide-up" style={{bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))'}}>
           <div className="bg-white text-slate-900 rounded-xl p-4 shadow-2xl flex items-center gap-3 border border-slate-200">
@@ -7959,16 +7720,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">{showToast.message}</p>
             </div>
-            {showToast.action === 'arrive-pickup' && (
-              <button type="button" onClick={() => { setShowToast(null); if (showToast.trip) handleArrivePickup(showToast.trip); }} className="px-4 py-2 bg-blue-500 rounded-xl text-xs font-semibold hover:bg-blue-400 transition-all shrink-0 cursor-pointer">
-                Arrive
-              </button>
-            )}
-            {showToast.action === 'arrive-dropoff' && (
-              <button type="button" onClick={() => { setShowToast(null); if (showToast.trip) handleArriveDropoff(showToast.trip); }} className="px-4 py-2 bg-orange-500 rounded-xl text-xs font-semibold hover:bg-orange-400 transition-all shrink-0 cursor-pointer">
-                Arrive
-              </button>
-            )}
             {showToast.action === 'refresh-coordinates' && (
               <button type="button" onClick={() => setShowToast(null)} className="px-4 py-2 bg-emerald-500 rounded-xl text-xs font-semibold text-white hover:bg-emerald-400 transition-all shrink-0 cursor-pointer">
                 Refresh

@@ -27,13 +27,11 @@ describe('driver completion odometer contract', () => {
     expect(source).toContain('placeholder="Pickup reading"');
   });
 
-  it('makes the final/dropoff odometer the only explicit initial focus target', () => {
-    expect(source.match(/data-trip-initial-focus="true"/g)).toHaveLength(2);
+  it('opens the native keyboard directly on the final/dropoff odometer', () => {
     expect(source).toContain("openNativeOdometerKeyboard('complete')");
-    const completionMarkup = source.slice(source.indexOf('{/* ===== COMPLETE TRIP MODAL ===== */'), source.indexOf('{/* ===== TRIP RECEIPT ===== */'));
-    expect(completionMarkup.indexOf('data-trip-initial-focus="true"')).toBeGreaterThan(completionMarkup.indexOf('Final Odometer (mi)'));
-    expect(completionMarkup.indexOf('data-trip-initial-focus="true"')).toBeLessThan(completionMarkup.indexOf("openNativeOdometerKeyboard('complete')"));
-    expect(completionMarkup.slice(0, completionMarkup.indexOf('Final Odometer (mi)'))).not.toContain('data-trip-initial-focus="true"');
+    const body = functionBody('openCompleteModal', 'updateCompletionDeparture');
+    expect(body).toMatch(/setShowCompleteModal\(trip\);[\s\S]*openNativeOdometerKeyboard\('complete'\);/);
+    expect(source).not.toContain('data-trip-initial-focus');
   });
 
   it('requires and persists the entered pickup reading with the final reading', () => {

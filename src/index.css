@@ -2318,7 +2318,7 @@ textarea {
   padding: 0.5rem;
   overscroll-behavior: none;
   overflow: hidden;
-  animation: trip-window-scrim-in 160ms ease-out both;
+  animation: trip-window-scrim-in 100ms ease-out both;
 }
 
 .trip-window-panel {
@@ -2335,10 +2335,8 @@ textarea {
   pointer-events: auto;
   overflow: hidden;
   translate: 0 0;
-  scale: 1;
-  animation: trip-window-panel-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), max-height 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: transform;
+  animation: trip-window-panel-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: transform 120ms ease-out;
 }
 
 @keyframes trip-window-scrim-in {
@@ -2347,8 +2345,8 @@ textarea {
 }
 
 @keyframes trip-window-panel-in {
-  from { opacity: 0; translate: 0 0.75rem; scale: 0.975; }
-  to { opacity: 1; translate: 0 0; scale: 1; }
+  from { opacity: 0; translate: 0 0.25rem; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 /* While a trip window is open, stop the background page from panning when
@@ -2373,10 +2371,6 @@ html.trip-window-open {
 .trip-window-overlay label {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-}
-
-.trip-window-overlay button {
-  transition: transform 100ms ease-out, opacity 100ms ease-out, background-color 140ms ease-out, border-color 140ms ease-out;
 }
 
 .trip-window-overlay button:active:not(:disabled) {

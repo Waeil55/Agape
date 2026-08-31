@@ -11,8 +11,10 @@ describe('driver portal performance contract', () => {
     expect(source).toContain('Promise.all(');
     expect(source).toContain('mergeDriverEtaMeasurements(previous, measurements)');
     expect(source).toContain('const pos = positionRef.current');
-    expect(source).toContain('activeTripsRef.current.forEach');
+    expect(source).toContain('activeTripsRef.current.slice(0, 3).map');
     expect(source).toContain('setEtas(');
+    expect(source).not.toContain('geofenceProximityNotified');
+    expect(source).not.toContain("showToast.action === 'arrive-pickup'");
     expect(source).not.toContain('}, [driverPosition, activeTrips]);');
   });
 
