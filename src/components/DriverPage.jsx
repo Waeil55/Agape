@@ -6,7 +6,7 @@ import { calculateTripWindowLift, resolveTripKeyboardTop } from '../utils/tripKe
 import { buildDriverTimeConflicts } from '../utils/tripConflicts';
 import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
-import { getDistanceMiles, getTravelDuration, geocodeAddress, verifyGeocodedAddress } from '../config/maps';
+import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useChat } from '../hooks/useChat';
@@ -19,7 +19,7 @@ const TaskCard = lazy(() => import('./TaskCard'));
 import { Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Sun, Moon, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { tripMatchesSearch } from '../utils/search';
-import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, evaluateVerifiedTripWorkEvidence, classifyGap, buildTimeEvents } from '../utils/timeTracking';
+import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, classifyGap, buildTimeEvents } from '../utils/timeTracking';
 import { impact, selection } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 
@@ -2081,48 +2081,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
   }, []);
 
-  const resolveVerifiedPickupLocation = useCallback(async (trip, fallbackLocation) => {
-    const persisted = getTripPickupLocation(trip);
-    if (persisted) return persisted;
-
-    const pickupAddress = typeof trip?.pickup === 'object'
-      ? String(trip.pickup?.address || '').trim()
-      : String(trip?.pickup || '').trim();
-    if (!pickupAddress) return fallbackLocation || null;
-
-    const cached = addressCoordsCache.current[pickupAddress];
-    const geocoded = cached || await geocodeAddress(pickupAddress);
-    const location = verifyGeocodedAddress(pickupAddress, geocoded);
-    if (location) {
-      const { lat, lng } = location;
-      addressCoordsCache.current[pickupAddress] = { ...location, type: 'pickup' };
-      await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
-        pickupLat: lat,
-        pickupLng: lng,
-        pickupCoordinatesVerifiedAt: new Date().toISOString(),
-        pickupCoordinatesSource: cached ? 'verified_geocode_cache' : 'google_geocode',
-        ...(geocoded?.placeId ? { pickupPlaceId: geocoded.placeId } : {}),
-        ...(geocoded?.formattedAddress ? { pickupFormattedAddress: geocoded.formattedAddress } : {}),
-      }));
-      return location;
-    }
-
-    if (fallbackLocation) {
-      const { lat, lng } = fallbackLocation;
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        await Promise.resolve(onUpdateTrip?.(trip.id, trip.status, {
-          pickupLat: lat,
-          pickupLng: lng,
-          pickupCoordinatesVerifiedAt: new Date().toISOString(),
-          pickupCoordinatesSource: 'driver_gps_fallback',
-        }));
-        return fallbackLocation;
-      }
-    }
-
-    return null;
-  }, [getTripPickupLocation, onUpdateTrip]);
-
   const getDriverClockLocation = useCallback(() => (
     driverPosition?.lat && driverPosition?.lng
       ? { lat: driverPosition.lat, lng: driverPosition.lng }
@@ -3262,12 +3220,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     // Record pickup arrival + departure timestamps using canonical fields
     const nowIso = new Date().toISOString();
     const driverLocation = getDriverClockLocation();
-    const pickupLocation = await resolveVerifiedPickupLocation(showOdometerPrompt, driverLocation);
-    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showOdometerPrompt, driver: me, pickupLocation, driverLocation, odometer: odo });
-    if (!verifiedWorkEvidence.valid) {
-      setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
-      return;
-    }
+    const pickupLocation = getTripPickupLocation(showOdometerPrompt) || driverLocation;
 
     await resumeBreakFromPickup(showOdometerPrompt, pickupLocation, nowIso, driverLocation);
 
@@ -3304,7 +3257,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         timeTrackingTravelMinutes: travelMin,
         timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
         timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
-        verifiedWorkEvidence,
         ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
       });
       setTtState(TT.ON_SHIFT_ACTIVE);
@@ -3328,7 +3280,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
-      verifiedWorkEvidence,
       ...(homeTravel?.minutes > 0 ? {
         homeToPickupTravelMinutes: homeTravel.minutes,
         homeToPickupCalculatedAt: nowIso,
@@ -3388,12 +3339,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setUndoable(showArrivalConfirm, showArrivalConfirm.status, 'At Pickup');
     const nowIso = new Date().toISOString();
     const driverLocation = getDriverClockLocation();
-    const pickupLocation = await resolveVerifiedPickupLocation(showArrivalConfirm, driverLocation);
-    const verifiedWorkEvidence = evaluateVerifiedTripWorkEvidence({ trip: showArrivalConfirm, driver: me, pickupLocation, driverLocation, odometer: odo });
-    if (!verifiedWorkEvidence.valid) {
-      setShowToast({ type: 'warning', message: verifiedWorkEvidence.reason });
-      return;
-    }
+    const pickupLocation = getTripPickupLocation(showArrivalConfirm) || driverLocation;
     await resumeBreakFromPickup(showArrivalConfirm, pickupLocation, nowIso, driverLocation);
     let autoStartedShift = false;
     let homeTravel = null;
@@ -3428,7 +3374,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         timeTrackingTravelMinutes: travelMin,
         timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
         timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
-        verifiedWorkEvidence,
         ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
       });
       setTtState(TT.ON_SHIFT_ACTIVE);
@@ -3452,7 +3397,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       pickupOdometer: odo,
       arrivalTime: nowIso,
       startTime: nowIso,
-      verifiedWorkEvidence,
       ...(homeTravel?.minutes > 0 ? {
         homeToPickupTravelMinutes: homeTravel.minutes,
         homeToPickupCalculatedAt: nowIso,

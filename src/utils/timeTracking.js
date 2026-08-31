@@ -1,6 +1,6 @@
 /**
  * AUTOMATED TIME TRACKING ENGINE
- * Event-driven, GPS-verified, audit-logged, multi-session aware.
+ * Event-driven, location-aware, audit-logged, multi-session aware.
  *
  * States: OFF_SHIFT → ON_SHIFT_ACTIVE ↔ ON_BREAK → PENDING_RESUME → OFF_SHIFT
  * Payroll is based on EVENTS, not raw clock-in/out times.
@@ -65,9 +65,6 @@ export const PAYROLL_EFFECTS = {
   REVIEW: 'REVIEW',
 };
 
-export const ARRIVAL_RADIUS_FT = 200; // Default arrival radius in feet
-export const ARRIVAL_RADIUS_METERS = ARRIVAL_RADIUS_FT * 0.3048; // ~61 meters
-
 // Gap thresholds in minutes
 export const GAP_THRESHOLDS = {
   SHORT_MAX: 20,
@@ -80,14 +77,6 @@ export const ASSUMED_TRAVEL_SPEED_MPH = 30;
 // ─── HAVERSINE DISTANCE ──────────────────────────────────────────
 export const haversineDistanceMiles = (lat1, lng1, lat2, lng2) => {
   return haversineMiles(lat1, lng1, lat2, lng2);
-};
-
-export const haversineDistanceMeters = (lat1, lng1, lat2, lng2) => {
-  return haversineDistanceMiles(lat1, lng1, lat2, lng2) * 1609.344;
-};
-
-export const haversineDistanceFeet = (lat1, lng1, lat2, lng2) => {
-  return haversineDistanceMeters(lat1, lng1, lat2, lng2) * 3.28084;
 };
 
 // ─── TRAVEL TIME ESTIMATION ──────────────────────────────────────
@@ -140,66 +129,6 @@ export const calculateReturnToWorkFromPickup = ({
     travelMinutesRounded: Math.round(travelMinutes),
     source: hasRoutedDuration ? 'ROUTED_PICKUP_BACKCALCULATION' : (estimatedMinutes > 0 ? 'OFFLINE_ROUTE_ESTIMATE' : 'VERIFIED_PICKUP_ARRIVAL'),
     confidence: hasRoutedDuration ? 'route_verified' : (estimatedMinutes > 0 ? 'route_estimate' : 'trip_verified'),
-  };
-};
-
-// ─── GPS ARRIVAL VALIDATION ──────────────────────────────────────
-export const validateArrival = (driverLat, driverLng, targetLat, targetLng, radiusMeters = ARRIVAL_RADIUS_METERS) => {
-  if (driverLat == null || driverLng == null || targetLat == null || targetLng == null) {
-    return { valid: false, distanceFeet: Infinity, reason: 'Missing coordinates' };
-  }
-  const distanceMeters = haversineDistanceMeters(driverLat, driverLng, targetLat, targetLng);
-  const distanceFeet = haversineDistanceFeet(driverLat, driverLng, targetLat, targetLng);
-  const valid = distanceMeters <= radiusMeters;
-  return {
-    valid,
-    distanceFeet: Math.round(distanceFeet),
-    distanceMeters: Math.round(distanceMeters),
-    reason: valid ? 'Within arrival radius' : `Too far (${Math.round(distanceFeet)}ft > ${Math.round(radiusMeters * 3.28084)}ft)`,
-  };
-};
-
-export const evaluateVerifiedTripWorkEvidence = ({ trip, driver, pickupLocation, driverLocation, odometer, pickupLocationSource } = {}) => {
-  if (!trip?.id) return { valid: false, code: 'MISSING_TRIP', reason: 'A verified assigned trip is required.' };
-  const driverIds = [driver?.id, driver?.driverId, driver?.uid].filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  const driverEmails = [driver?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  const tripDriverIds = [trip.driverId, trip.assignedDriver, trip.assignedDriverId].filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  const tripDriverEmails = [trip.driverEmail, trip.assignedDriverEmail].filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  const assignedToDriver = tripDriverIds.some((value) => driverIds.includes(value))
-    || tripDriverEmails.some((value) => driverEmails.includes(value));
-  if (!assignedToDriver) return { valid: false, code: 'TRIP_NOT_ASSIGNED_TO_DRIVER', reason: 'This trip is not assigned to the signed-in driver.' };
-  const normalizedStatus = String(trip.status || '').trim().toLowerCase();
-  const workflowStarted = Boolean(trip.startedAt) || ['in progress', 'in mission', 'en route', 'navigating pickup'].includes(normalizedStatus);
-  if (!workflowStarted) return { valid: false, code: 'TRIP_NOT_STARTED', reason: 'Start the assigned trip before confirming work at pickup.' };
-  const reading = Number(String(odometer ?? '').replace(/,/g, ''));
-  if (!Number.isFinite(reading) || reading <= 0) return { valid: false, code: 'INVALID_ODOMETER', reason: 'A valid vehicle odometer reading is required.' };
-  const pickupLat = Number(pickupLocation?.lat ?? pickupLocation?.latitude);
-  const pickupLng = Number(pickupLocation?.lng ?? pickupLocation?.longitude);
-  if (!Number.isFinite(pickupLat) || !Number.isFinite(pickupLng)) return { valid: false, code: 'MISSING_PICKUP_LOCATION', reason: 'The pickup address could not be verified on the map and no driver GPS was available. Ask dispatch to correct the pickup address before continuing.' };
-  const driverLat = Number(driverLocation?.lat ?? driverLocation?.latitude);
-  const driverLng = Number(driverLocation?.lng ?? driverLocation?.longitude);
-  if (!Number.isFinite(driverLat) || !Number.isFinite(driverLng)) return { valid: false, code: 'MISSING_DRIVER_GPS', reason: 'Live GPS is required to verify work at pickup.' };
-  const capturedAtMs = Date.parse(driverLocation?.capturedAt || '');
-  if (Number.isFinite(capturedAtMs) && Date.now() - capturedAtMs > 60_000) {
-    return { valid: false, code: 'STALE_DRIVER_GPS', reason: 'Your GPS reading is stale. Keep Agape Care open and try again when live location updates.' };
-  }
-  const accuracyMeters = Number(driverLocation?.accuracy);
-  if (Number.isFinite(accuracyMeters) && accuracyMeters > 100) {
-    return { valid: false, code: 'INACCURATE_DRIVER_GPS', reason: `GPS accuracy is currently ${Math.round(accuracyMeters)}m. Move to an open area and try again.` };
-  }
-  const arrival = validateArrival(driverLat, driverLng, pickupLat, pickupLng);
-  if (!arrival.valid) return { valid: false, code: 'OUTSIDE_PICKUP_GEOFENCE', reason: `You are ${arrival.distanceFeet}ft from pickup. Move closer before confirming work.`, distanceFeet: arrival.distanceFeet };
-  const isGpsFallback = String(pickupLocationSource || '').trim().toLowerCase() === 'driver_gps_fallback';
-  return {
-    valid: true,
-    code: isGpsFallback ? 'GPS_ODOMETER_PICKUP_GPS_FALLBACK' : 'GPS_ODOMETER_PICKUP_VERIFIED',
-    verifiedAt: new Date().toISOString(),
-    tripId: trip.id,
-    odometer: reading,
-    distanceFeet: arrival.distanceFeet,
-    pickupLocationSource: isGpsFallback ? 'driver_gps_fallback' : 'verified_pickup',
-    driverLocation: { lat: driverLat, lng: driverLng },
-    pickupLocation: { lat: pickupLat, lng: pickupLng },
   };
 };
 
@@ -1271,14 +1200,9 @@ export default {
   POLICY_MODES,
   GAP_CLASSIFICATIONS,
   PAYROLL_EFFECTS,
-  ARRIVAL_RADIUS_FT,
-  ARRIVAL_RADIUS_METERS,
   GAP_THRESHOLDS,
   haversineDistanceMiles,
-  haversineDistanceMeters,
-  haversineDistanceFeet,
   estimateTravelTimeMinutes,
-  validateArrival,
   calculateAnchor,
   classifyGap,
   stitchSessions,
