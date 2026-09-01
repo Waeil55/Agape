@@ -1,28 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, X, ArrowUp } from 'lucide-react';
-import { getDB, readSyncQueue } from '../../utils/localDB';
-import { getUnsafeUpdateReasons } from './pwaUpdateSafety';
 
 const PWAUpdatePrompt = () => {
   const [showUpdate, setShowUpdate] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [blockedReasons, setBlockedReasons] = useState([]);
-
-  const checkUpdateSafety = useCallback(async () => {
-    try {
-      const queue = await readSyncQueue();
-      const db = await getDB();
-      const deadLetter = db.objectStoreNames.contains('deadLetterQueue')
-        ? await db.count('deadLetterQueue')
-        : 0;
-      return getUnsafeUpdateReasons({
-        queueStatus: { state: deadLetter > 0 ? 'attention_required' : 'idle', pending: queue.length, deadLetter },
-        storage: window.localStorage,
-      });
-    } catch {
-      return getUnsafeUpdateReasons({ queueStatus: null, storage: window.localStorage });
-    }
-  }, []);
 
   useEffect(() => {
     const handler = () => setShowUpdate(true);
@@ -57,12 +38,6 @@ const PWAUpdatePrompt = () => {
 
   const handleUpdate = useCallback(async () => {
     setIsUpdating(true);
-    const unsafeReasons = await checkUpdateSafety();
-    if (unsafeReasons.length > 0) {
-      setBlockedReasons(unsafeReasons);
-      setIsUpdating(false);
-      return;
-    }
     try {
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration();
@@ -71,18 +46,12 @@ const PWAUpdatePrompt = () => {
         }
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
-      const finalUnsafeReasons = await checkUpdateSafety();
-      if (finalUnsafeReasons.length > 0) {
-        setBlockedReasons(finalUnsafeReasons);
-        setIsUpdating(false);
-        return;
-      }
       window.location.reload();
     } catch (err) {
       console.error('[PWA] Update failed:', err);
       setIsUpdating(false);
     }
-  }, [checkUpdateSafety]);
+  }, []);
 
   const handleDismiss = useCallback(() => {
     setShowUpdate(false);
@@ -131,14 +100,6 @@ const PWAUpdatePrompt = () => {
             )}
           </button>
         </div>
-        {blockedReasons.length > 0 && (
-          <div className="mx-4 mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3" role="alert">
-            <p className="text-xs font-bold text-amber-900">Restart paused to protect current work</p>
-            <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs font-medium text-amber-800">
-              {blockedReasons.map((reason) => <li key={reason}>{reason}</li>)}
-            </ul>
-          </div>
-        )}
       </div>
     </div>
   );
