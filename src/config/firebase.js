@@ -1,5 +1,34 @@
 import { initializeApp, deleteApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, initializeFirestore, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, increment, writeBatch, setDoc, getDoc, getDocFromCache, getDocFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  memoryLocalCache,
+  collection,
+  getDocs,
+  getDocsFromServer,
+  doc,
+  updateDoc as firestoreUpdateDoc,
+  addDoc as firestoreAddDoc,
+  serverTimestamp,
+  increment,
+  writeBatch as firestoreWriteBatch,
+  setDoc as firestoreSetDoc,
+  getDoc,
+  getDocFromCache,
+  getDocFromServer,
+  deleteDoc,
+  deleteField,
+  arrayUnion,
+  arrayRemove,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  runTransaction as firestoreRunTransaction,
+  enableNetwork,
+  onSnapshot,
+} from 'firebase/firestore';
 import { initializeAuth, getAuth, browserSessionPersistence, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
@@ -10,8 +39,46 @@ import { buildOperationalTripRecord } from '../utils/tripLifecycle';
 import { buildLocationFraudSignals } from '../utils/locationFraud';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
 import { sanitizeFirestorePayload } from '../utils/firestorePayload';
+import {
+  sanitizeFirestoreUpdateArguments,
+  sanitizeFirestoreWriteData,
+  wrapFirestoreWriteContext,
+} from '../utils/firestoreWriteSafety';
 import * as firestoreEvents from '../services/firestoreEventEngine';
 const env = import.meta.env;
+
+/**
+ * Every application Firestore write crosses this boundary. The database-level
+ * ignoreUndefinedProperties setting remains a final SDK safeguard, but callers,
+ * batches, transactions, and queued replays no longer depend on that setting.
+ */
+const setDoc = (reference, data, options) => {
+  const safeData = sanitizeFirestoreWriteData(data);
+  return options === undefined
+    ? firestoreSetDoc(reference, safeData)
+    : firestoreSetDoc(reference, safeData, options);
+};
+
+const addDoc = (reference, data) => (
+  firestoreAddDoc(reference, sanitizeFirestoreWriteData(data))
+);
+
+const updateDoc = (reference, ...args) => (
+  firestoreUpdateDoc(reference, ...sanitizeFirestoreUpdateArguments(args))
+);
+
+const writeBatch = (firestore) => wrapFirestoreWriteContext(firestoreWriteBatch(firestore));
+
+const runTransaction = (firestore, updateFunction, options) => {
+  const execute = (transaction) => updateFunction(wrapFirestoreWriteContext(transaction));
+  return options === undefined
+    ? firestoreRunTransaction(firestore, execute)
+    : firestoreRunTransaction(
+        firestore,
+        execute,
+        options,
+      );
+};
 
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY || "",
