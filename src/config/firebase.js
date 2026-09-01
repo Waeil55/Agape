@@ -1,5 +1,5 @@
 import { initializeApp, deleteApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, increment, writeBatch, setDoc, getDoc, getDocFromCache, getDocFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, memoryLocalCache, collection, getDocs, getDocsFromServer, doc, updateDoc, addDoc, serverTimestamp, increment, writeBatch, setDoc, getDoc, getDocFromCache, getDocFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot } from 'firebase/firestore';
 import { initializeAuth, getAuth, browserSessionPersistence, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
@@ -9,6 +9,7 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-ch
 import { buildOperationalTripRecord } from '../utils/tripLifecycle';
 import { buildLocationFraudSignals } from '../utils/locationFraud';
 import { isCorruptedTripRecord } from '../utils/tripIntegrity';
+import { sanitizeFirestorePayload } from '../utils/firestorePayload';
 import * as firestoreEvents from '../services/firestoreEventEngine';
 const env = import.meta.env;
 
@@ -39,41 +40,22 @@ const appCheck = (() => {
   }
 })();
 let db;
-const usesWebKitIndexedDbRiskRuntime = typeof navigator !== 'undefined'
-  && /AppleWebKit/i.test(navigator.userAgent || '')
-  && /iPad|iPhone|iPod/i.test(navigator.userAgent || '');
 if (appWasInitialized) {
   // During development hot reloads the default Firebase app already owns a
   // configured Firestore instance. Reuse it so its cache and listeners remain
   // stable instead of attempting a conflicting second initialization.
   db = getFirestore(app);
-} else if (usesWebKitIndexedDbRiskRuntime) {
-  // Firestore's persistent IndexedDB cache can become internally inconsistent
-  // in iOS WebKit (including installed PWAs), producing target-ID collisions
-  // and transactionless range-delete failures across every live listener.
-  // The server remains authoritative; use the stable in-memory Firestore cache
-  // here while the app's own local snapshot layer provides fast startup data.
+} else {
+  // Firestore's persistent IndexedDB target database can become internally
+  // inconsistent across browser and installed-PWA lifecycle changes. That
+  // produces target-ID collisions and transactionless range-delete failures.
+  // Firestore remains the live server authority; Agape's separate tenant-
+  // scoped IndexedDB snapshot and durable outbox own offline persistence.
   db = initializeFirestore(app, {
     localCache: memoryLocalCache(),
     experimentalAutoDetectLongPolling: true,
+    ignoreUndefinedProperties: true,
   });
-} else try {
-  // Persistent local cache: the app opens instantly from on-device data and
-  // streams live changes in the background, so every device converges on the
-  // same global state fast — including offline starts. Multi-tab manager
-  // keeps the PWA, admin console, and any duplicate tabs consistent.
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-    experimentalAutoDetectLongPolling: true,
-  });
-} catch (err) {
-  console.warn('Persistent cache unavailable, using memory cache:', err.message);
-  try {
-    db = initializeFirestore(app, { localCache: memoryLocalCache() });
-  } catch (err2) {
-    console.warn('Memory cache failed, using default Firestore:', err2.message);
-    db = getFirestore(app);
-  }
 }
 
 let auth;
@@ -145,7 +127,7 @@ export async function updateTripStatus(tripId, updates) {
   const tripRef = doc(db, 'trips', tripId);
   const beforeSnap = await getDoc(tripRef).catch(() => null);
   const beforeTrip = beforeSnap?.exists() ? { id: beforeSnap.id, ...beforeSnap.data() } : null;
-  const nextTrip = buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...updates, id: tripId });
+  const nextTrip = sanitizeFirestorePayload(buildOperationalTripRecord({ ...(beforeTrip || { id: tripId }), ...updates, id: tripId }));
   if (isCorruptedTripRecord(nextTrip)) {
     console.warn('Blocked corrupted trip status update:', { tripId, updates });
     return false;
@@ -280,9 +262,7 @@ export async function saveOdometerReading(tripId, odometerValue) {
   }]);
 }
 
-const cleanFirestoreUpdates = (updates = {}) => Object.fromEntries(
-  Object.entries(updates).filter(([, value]) => value !== undefined)
-);
+const cleanFirestoreUpdates = (updates = {}) => sanitizeFirestorePayload(updates);
 
 export async function saveTripWorkflowUpdate(tripId, updates = {}) {
   if (!tripId) return false;

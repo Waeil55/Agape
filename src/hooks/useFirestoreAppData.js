@@ -24,6 +24,7 @@ import { readAppData, saveField as saveLocalField, saveFieldWithSyncOperations }
 import { createSerializedOperationQueue } from '../utils/serializedOperationQueue';
 import { buildAssignmentMutations } from '../utils/assignmentPersistence';
 import { isPermanentSyncFailure } from '../services/syncQueueProcessor';
+import { sanitizeFirestorePayload } from '../utils/firestorePayload';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -74,12 +75,7 @@ const DEFAULT_DATA = {
   phoneNumbers: { dispatcher: '', routing: '' },
 };
 
-function sanitizeForFirestore(obj) {
-  return JSON.parse(JSON.stringify(obj, (_key, value) => {
-    if (value === undefined) return null;
-    return value;
-  }));
-}
+const sanitizeForFirestore = sanitizeFirestorePayload;
 
 function normalizeTrip(trip) {
   if (!trip) return trip;
@@ -874,11 +870,12 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
   const upsertDriverTrip = useCallback((tripId, updates = {}) => enqueueFieldPersistence('trips', async () => {
     if (!tripId) return false;
     const now = new Date().toISOString();
-    const progressDoc = attachTenantScope({ ...updates, tripId, workflowUpdatedAt: now }, activeTenantId);
+    const safeUpdates = sanitizeForFirestore(updates);
+    const progressDoc = sanitizeForFirestore(attachTenantScope({ ...safeUpdates, tripId, workflowUpdatedAt: now }, activeTenantId));
 
     // Update local state optimistic UI
     const currentTrips = dataRef.current.trips || [];
-    const nextTrips = currentTrips.map(t => t.id === tripId ? { ...t, ...updates } : t);
+    const nextTrips = currentTrips.map(t => t.id === tripId ? { ...t, ...safeUpdates } : t);
     dataRef.current = { ...dataRef.current, trips: nextTrips };
     setState(prev => ({ ...prev, trips: nextTrips }));
 

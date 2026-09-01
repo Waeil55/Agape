@@ -2889,8 +2889,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const { workflow } = buildRoutePlanWorkflow(stop, {
       status,
       exceptionStatus: status,
-      exceptionReason: reason || undefined,
-      cancellationReason: reason || undefined,
+      exceptionReason: reason || null,
+      cancellationReason: reason || null,
       exceptionAt: completedAt,
       completedAt,
       completedBy: currentUser,
@@ -3618,7 +3618,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           setUndoable(leg, leg.status, newStatus);
           advanceWorkflow(leg, newStatus, {
             completedAt: new Date().toISOString(),
-            cancellationReason: reason || undefined,
+            cancellationReason: reason || null,
             cancelledBy: me?.email || '',
             cancelledAt: new Date().toISOString(),
           });

@@ -153,6 +153,25 @@ describe('localDB durable outbox contract', () => {
     });
   });
 
+  it('never stores unsupported undefined values in the durable outbox', async () => {
+    const id = await localDB.queueSyncOperation({
+      type: 'setDoc',
+      collection: 'driverTripProgress',
+      docId: 'trip-1',
+      data: {
+        status: 'Cancelled',
+        cancellationReason: undefined,
+        evidence: ['saved', undefined],
+      },
+      tenantId: 'agape-care',
+      userId: 'user-1',
+    });
+
+    const queued = database.stores.get('syncQueue').get(id);
+    expect(Object.prototype.hasOwnProperty.call(queued.data, 'cancellationReason')).toBe(false);
+    expect(queued.data.evidence).toEqual(['saved', null]);
+  });
+
   it('persists a field snapshot, granular records, and outbox in one transaction', async () => {
     const result = await localDB.saveFieldWithSyncOperations(
       'trips',

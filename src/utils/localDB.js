@@ -17,6 +17,7 @@
 import { openDB } from 'idb';
 import { localCalendarYmd } from './tripDate';
 import { DEFAULT_TENANT_ID, normalizeTenantId } from './tenantScope';
+import { sanitizeFirestorePayload } from './firestorePayload';
 
 const DB_NAME = 'agape_fleet_os';
 const DB_VERSION = 3;
@@ -380,9 +381,10 @@ export async function saveField(field, value, { previousValue, tenantId = DEFAUL
  */
 export async function queueSyncOperation(operation) {
   const ownership = normalizeSyncOwnership(operation);
+  const safeOperation = sanitizeFirestorePayload(operation);
   const db = await getDB();
   return db.add(STORES.SYNC_QUEUE, {
-      ...operation,
+      ...safeOperation,
       ...ownership,
       status: 'pending',
       attempts: 0,
@@ -529,15 +531,16 @@ export async function saveFieldWithSyncOperations(field, value, operations, owne
     await tx.objectStore(STORES.PHONE_NUMBERS).put(value, 'current');
   }
   for (const operation of operations || []) {
-    const operationOwnership = operation.tenantId || operation.userId
-      ? normalizeSyncOwnership(operation)
+    const safeOperation = sanitizeFirestorePayload(operation);
+    const operationOwnership = safeOperation.tenantId || safeOperation.userId
+      ? normalizeSyncOwnership(safeOperation)
       : normalizedOwnership;
     if (operationOwnership.tenantId !== normalizedOwnership.tenantId
       || operationOwnership.userId !== normalizedOwnership.userId) {
       throw new TypeError('Queued operation ownership does not match the active session');
     }
     const id = await queueStore.add({
-      ...operation,
+      ...safeOperation,
       ...normalizedOwnership,
       status: 'pending',
       attempts: 0,

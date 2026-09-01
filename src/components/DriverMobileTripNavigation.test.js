@@ -31,10 +31,22 @@ describe('driver mobile active-trip navigation regression', () => {
     expect(tripWindowCss).toContain('caret-color');
   });
 
-  it('avoids the corruptible persistent Firestore cache on iOS WebKit', () => {
-    expect(firebaseSource).toContain('usesWebKitIndexedDbRiskRuntime');
-    expect(firebaseSource).toMatch(/usesWebKitIndexedDbRiskRuntime[\s\S]*localCache: memoryLocalCache\(\)/);
+  it('avoids the corruptible persistent Firestore target cache on every client', () => {
+    expect(firebaseSource).toContain('localCache: memoryLocalCache()');
+    expect(firebaseSource).toContain('ignoreUndefinedProperties: true');
+    expect(firebaseSource).not.toContain('persistentLocalCache');
+    expect(firebaseSource).not.toContain('persistentMultipleTabManager');
     expect(appDataSource).toContain('Target ID already exists|delete range from database without an in-progress transaction');
     expect(appDataSource).toContain('The local Firestore cache became invalid. Close and reopen Agape Care');
+  });
+
+  it('normalizes every driver progress payload before live or offline persistence', () => {
+    expect(driverSource).not.toContain('cancellationReason: reason || undefined');
+    expect(driverSource).not.toContain('exceptionReason: reason || undefined');
+    expect(driverSource).toContain('cancellationReason: reason || null');
+    expect(appDataSource).toContain('const safeUpdates = sanitizeForFirestore(updates)');
+    expect(appDataSource).toContain('...safeUpdates, tripId, workflowUpdatedAt: now');
+    expect(appDataSource).toContain("data: progressDoc");
+    expect(firebaseSource).toContain('sanitizeFirestorePayload(updates)');
   });
 });

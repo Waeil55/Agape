@@ -8,6 +8,7 @@ import {
   normalizeSyncOwnership,
   syncOperationBelongsTo,
 } from '../utils/localDB';
+import { sanitizeFirestorePayload } from '../utils/firestorePayload';
 
 export const SYNC_QUEUE_PROCESS_INTERVAL_MS = 5000;
 export const SYNC_QUEUE_ONLINE_DELAY_MS = 250;
@@ -167,7 +168,7 @@ export class SyncQueueProcessor {
           throw new PermanentSyncError('setDoc requires collection, docId, and data');
         }
         {
-          const operationData = { ...operation.data };
+          const operationData = sanitizeFirestorePayload(operation.data);
           if (operation.collection === 'logs' && !operationData.timestamp) {
             operationData.timestamp = serverTimestamp();
           }

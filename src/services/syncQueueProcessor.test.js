@@ -125,6 +125,33 @@ describe('SyncQueueProcessor ownership and terminal failure handling', () => {
     expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(2);
   });
 
+  it('repairs undefined fields in an existing queued payload before replay', async () => {
+    const processor = authenticatedStartedProcessor();
+    localDBMock.getPendingSyncOperations.mockResolvedValue([
+      operation({
+        data: {
+          status: 'Cancelled',
+          cancellationReason: undefined,
+          evidence: ['saved', undefined],
+        },
+      }),
+    ]);
+
+    await processor.processNow();
+
+    expect(firebaseMock.setDoc).toHaveBeenCalledWith(
+      'trips/trip-1',
+      expect.objectContaining({
+        status: 'Cancelled',
+        evidence: ['saved', null],
+      }),
+      { merge: true },
+    );
+    const savedPayload = firebaseMock.setDoc.mock.calls[0][1];
+    expect(Object.prototype.hasOwnProperty.call(savedPayload, 'cancellationReason')).toBe(false);
+    expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(1);
+  });
+
   it('does not replay an outbox concurrently in another browser tab', async () => {
     const request = vi.fn(async (_name, _options, callback) => callback(null));
     vi.stubGlobal('navigator', { onLine: true, locks: { request } });
