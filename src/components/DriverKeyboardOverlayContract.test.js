@@ -26,7 +26,7 @@ describe('driver odometer keyboard overlay contract', () => {
 
   it('uses keyboard bounds to keep the complete window together above the keyboard', () => {
     const driver = read('src/components/DriverPage.jsx');
-    const css = read('src/index.css');
+    const css = read('src/styles/tripWindows.css');
     expect(driver).toContain('virtualKeyboard.overlaysContent = true');
     expect(driver).toContain('Keyboard.setResizeMode({ mode: KeyboardResize.None })');
     expect(driver).toContain('applyWindowLock');
@@ -87,7 +87,7 @@ describe('driver odometer keyboard overlay contract', () => {
 
   it('opens the native numeric keyboard through a fixed proxy instead of scrolling visible fields', () => {
     const driver = read('src/components/DriverPage.jsx');
-    const css = read('src/index.css');
+    const css = read('src/styles/tripWindows.css');
     expect(driver.match(/inputMode="none"/g)).toHaveLength(4);
     expect(driver.match(/inputMode="numeric"/g)).toHaveLength(1);
     expect(driver).toContain('ref={odometerKeyboardProxyRef}');
@@ -104,5 +104,16 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(css).toContain('.trip-odometer-visual-caret {');
     expect(driver).not.toContain('OdometerKeypad');
     expect(css).not.toContain('.trip-odometer-keypad');
+  });
+
+  it('loads one authoritative trip-window stylesheet after global application styles', () => {
+    const main = read('src/main.jsx');
+    const globalCss = read('src/index.css');
+    const tripCss = read('src/styles/tripWindows.css');
+    expect(main.indexOf("import './styles/tripWindows.css';")).toBeGreaterThan(main.indexOf("import './index.css';"));
+    expect(globalCss).not.toContain('.trip-window-overlay');
+    expect(tripCss).toContain('.trip-window-overlay {');
+    expect(tripCss).toContain('.trip-window-footer {');
+    expect(tripCss).toContain('background: #ffffff;');
   });
 });

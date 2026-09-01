@@ -6,6 +6,9 @@ import { ToastProvider } from './hooks/useToast';
 import { AccessibilityProvider } from './contexts/AccessibilityContext';
 import { installTableKeyboardNavigation } from './utils/tableKeyboardNavigation';
 import './index.css';
+// Keep the driver trip-window contract last so global page/table refinements
+// cannot restyle or reposition safety-critical trip actions.
+import './styles/tripWindows.css';
 
 // Runtime safety net: unhandled failures must never die silently. They are
 // logged with enough context to diagnose, without leaking user data.

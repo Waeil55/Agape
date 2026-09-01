@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const driverSource = fs.readFileSync(path.join(here, 'DriverPage.jsx'), 'utf8');
-const appCss = fs.readFileSync(path.join(here, '..', 'index.css'), 'utf8');
+const tripWindowCss = fs.readFileSync(path.join(here, '..', 'styles', 'tripWindows.css'), 'utf8');
 const firebaseSource = fs.readFileSync(path.join(here, '..', 'config', 'firebase.js'), 'utf8');
 const appDataSource = fs.readFileSync(path.join(here, '..', 'hooks', 'useFirestoreAppData.js'), 'utf8');
 
@@ -27,8 +27,8 @@ describe('driver mobile active-trip navigation regression', () => {
 
   it('keeps the native-keyboard caret treatment on every trip odometer field', () => {
     expect(driverSource.match(/trip-odometer-input/g)).toHaveLength(4);
-    expect(appCss).toContain('.trip-odometer-input');
-    expect(appCss).toContain('caret-color');
+    expect(tripWindowCss).toContain('.trip-odometer-input');
+    expect(tripWindowCss).toContain('caret-color');
   });
 
   it('avoids the corruptible persistent Firestore cache on iOS WebKit', () => {
