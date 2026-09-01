@@ -1591,7 +1591,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       scheduleWindowLock();
     };
     const handleKeyboardProxyBlur = (event) => {
-      if (event.target?.matches?.('.trip-odometer-native-proxy')) handleKeyboardHidden();
+      if (event.target?.matches?.('.trip-odometer-native-proxy')) {
+        handleKeyboardHidden();
+        return;
+      }
+      if (event.target?.closest?.('.trip-window-panel')) {
+        setTimeout(() => {
+          if (!document.activeElement || document.activeElement === document.body) {
+            handleKeyboardHidden();
+          }
+        }, 200);
+      }
     };
     const preventBackgroundTouch = (event) => {
       if (!panelOpen || event.target?.closest?.('.trip-window-panel')) return;
@@ -5729,8 +5739,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Departed Pickup Time</label>
                     <div className="text-center">
-                    <input type="time" value={departedTime} onChange={(e) => updateCompletionDeparture(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
+                    <input type="text" inputMode="numeric" pattern="[0-9:]*" maxLength={5}
+                      value={departedTime} placeholder="HH:MM"
+                      onChange={(e) => updateCompletionDeparture(e.target.value.replace(/[^0-9:]/g, '').slice(0, 5))}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none text-center" />
                     </div>
                   </div>
                   <div>
@@ -5758,8 +5770,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Arrival Dropoff Time</label>
                     <div className="text-center">
-                    <input type="time" value={arrivalDropoffTime} onChange={(e) => updateCompletionDropoffArrival(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none" />
+                    <input type="text" inputMode="numeric" pattern="[0-9:]*" maxLength={5}
+                      value={arrivalDropoffTime} placeholder="HH:MM"
+                      onChange={(e) => updateCompletionDropoffArrival(e.target.value.replace(/[^0-9:]/g, '').slice(0, 5))}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:border-blue-500 outline-none text-center" />
                     </div>
                   </div>
                   <div>
