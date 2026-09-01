@@ -39,7 +39,25 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(driver).toContain('translate3d(0, ${viewportPan.toFixed(3)}px, 0)');
     expect(driver).toContain("visualViewport?.addEventListener('scroll', scheduleWindowLock)");
     expect(driver).toContain('resolveTripKeyboardTop({');
-    expect(driver).toContain('calculateTripWindowLift({ windowBottom, keyboardTop })');
+    expect(driver).toContain("panel?.classList.contains('trip-window-panel-odometer')");
+    expect(driver).toContain('TRIP_ODOMETER_WINDOW_EXTRA_LIFT_RATIO');
+    expect(driver).toContain('extraLift: odometerWindowExtraLift');
+    expect(driver.match(/trip-window-panel trip-window-panel-odometer/g)).toHaveLength(2);
+    const pickupWindow = driver.slice(
+      driver.indexOf('/* ===== ODOMETER PROMPT MODAL ===== */'),
+      driver.indexOf('/* ===== ROUTE STOP ODOMETER PROMPT ===== */'),
+    );
+    const routeWindow = driver.slice(
+      driver.indexOf('/* ===== ROUTE STOP ODOMETER PROMPT ===== */'),
+      driver.indexOf('/* ===== ROUTE STOP SIGNATURE PROMPT ===== */'),
+    );
+    const completeWindow = driver.slice(
+      driver.indexOf('/* ===== COMPLETE TRIP MODAL ===== */'),
+      driver.indexOf('/* ===== TRIP RECEIPT ===== */'),
+    );
+    expect(pickupWindow).toContain('trip-window-panel-odometer');
+    expect(routeWindow).not.toContain('trip-window-panel-odometer');
+    expect(completeWindow).toContain('trip-window-panel-odometer');
     expect(driver).toContain("root.style.setProperty('--trip-window-panel-lift', `${panelLift}px`)");
     expect(driver).toContain("root.style.setProperty('--trip-window-keyboard-top', `${keyboardTop}px`)");
     expect(driver).toContain('Math.abs(previousLift - panelLift) > 0.5');

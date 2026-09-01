@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspens
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
 import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
-import { calculateTripWindowLift, resolveTripKeyboardTop } from '../utils/tripKeyboardLayout';
+import {
+  calculateTripWindowLift,
+  resolveTripKeyboardTop,
+  TRIP_ODOMETER_WINDOW_EXTRA_LIFT_RATIO,
+} from '../utils/tripKeyboardLayout';
 import { buildDriverTimeConflicts } from '../utils/tripConflicts';
 import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
@@ -1541,7 +1545,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const panelRect = panel?.getBoundingClientRect();
         const footerRect = footer?.getBoundingClientRect();
         const windowBottom = panelRect ? panelRect.bottom + previousLift : 0;
-        const panelLift = panel ? calculateTripWindowLift({ windowBottom, keyboardTop }) : 0;
+        const odometerWindowExtraLift = panel?.classList.contains('trip-window-panel-odometer')
+          ? (panelRect?.height || 0) * TRIP_ODOMETER_WINDOW_EXTRA_LIFT_RATIO
+          : 0;
+        const panelLift = panel ? calculateTripWindowLift({
+          windowBottom,
+          keyboardTop,
+          extraLift: odometerWindowExtraLift,
+        }) : 0;
         const keyboardVisible = keyboardTop !== null;
         const keyboardVisibilityChanged = root.classList.contains('trip-window-keyboard-visible') !== keyboardVisible;
         root.classList.toggle('trip-window-keyboard-visible', keyboardVisible);
@@ -5546,7 +5557,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const arrivalEvaluation = runOdometerGuard({ raw: odometerValue });
         return (
           <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
-            <div className="trip-window-panel">
+            <div className="trip-window-panel trip-window-panel-odometer">
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
                   <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
@@ -5723,7 +5734,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           || (completionEvaluation.status === 'confirm' && !completeAck);
         return (
           <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
-            <div className="trip-window-panel">
+            <div className="trip-window-panel trip-window-panel-odometer">
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
                   <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
