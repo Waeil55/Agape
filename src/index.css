@@ -5491,7 +5491,19 @@ textarea:focus,
   display: flex;
   flex-direction: column;
   justify-content: center;
+  position: fixed !important;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  transform: translate3d(0, var(--login-keyboard-counter-pan, 0px), 0);
+  transform-origin: top left;
   background: var(--brand-primary);
+}
+
+html.login-keyboard-open .agape-login {
+  transition: none !important;
+  overscroll-behavior: none;
 }
 
 .agape-login-backdrop {

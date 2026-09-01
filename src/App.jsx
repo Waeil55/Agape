@@ -30,6 +30,7 @@ import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useRealtimeReliability } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
 import { useDriverAssignments } from './hooks/useDriverAssignments';
+import useLoginKeyboardStability from './hooks/useLoginKeyboardStability';
 import useEnterpriseSessionSecurity, { beginSecuritySession, clearSecuritySession, isEmploymentAccessActive } from './hooks/useEnterpriseSessionSecurity';
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
@@ -39,7 +40,7 @@ import { DEFAULT_OVERRIDE_POLICY, isOverridePolicyDocumentValid, normalizeOverri
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v373';
+const APP_VERSION = 'v374';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -407,6 +408,7 @@ const App = () => {
   const [timeTrackingDeclarations, setTimeTrackingDeclarations] = useState([]);
   const driverTelemetryRef = useRef([]);
   const realtimeReliability = useRealtimeReliability({ enabled: isAuthenticated });
+  useLoginKeyboardStability(!isAuthenticated);
 
   // Platform initialization only. Firestore reliability is handled by useRealtimeReliability.
   useEffect(() => {
