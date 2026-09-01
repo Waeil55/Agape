@@ -7,7 +7,7 @@ import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
 
-export const MOBILE_REPORT_PAGE_SIZE = 40;
+const MOBILE_REPORT_PAGE_SIZE = 40;
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
   <div className="grid grid-cols-[112px_1fr] gap-3 py-1.5 items-start">

@@ -474,7 +474,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 let _aiSkipRequested = false;
 
-export function requestAiSkip() {
+function requestAiSkip() {
   _aiSkipRequested = true;
 }
 

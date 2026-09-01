@@ -14,7 +14,7 @@ const ReportsFallback = () => (
   </div>
 );
 
-export const normalizeReportsSection = (section) => {
+const normalizeReportsSection = (section) => {
   if (section === 'archives' || section === 'archived') return 'archive';
   if (section === 'welltrans' || section === 'portal-filler') return 'portal';
   return ['trips', 'unloaded', 'archive', 'portal'].includes(section) ? section : 'trips';

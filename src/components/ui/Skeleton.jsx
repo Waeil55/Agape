@@ -7,7 +7,7 @@ const SHAPES = {
   circle: 'rounded-full aspect-square w-10',
 };
 
-export default function Skeleton({ shape = 'text', className = '', style, ...props }) {
+function Skeleton({ shape = 'text', className = '', style, ...props }) {
   const shapeClass = SHAPES[shape] || SHAPES.text;
   return (
     <div

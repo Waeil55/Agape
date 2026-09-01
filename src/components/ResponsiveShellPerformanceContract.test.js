@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const readSource = (name) => readFileSync(new URL(name, import.meta.url), 'utf8');
 
 describe('responsive page shell performance contract', () => {
-  it.each(['./AdminPage.jsx', './ReportsPage.jsx'])(
+  it.each(['./ReportsPage.jsx'])(
     '%s uses the shared breakpoint store without a resize listener',
     (componentPath) => {
       const source = readSource(componentPath);
@@ -16,13 +16,14 @@ describe('responsive page shell performance contract', () => {
     },
   );
 
-  it('keeps desktop and mobile administration implementations behind dynamic imports', () => {
-    const source = readSource('./AdminPage.jsx');
+  it('loads the correct administration implementation directly from each responsive shell', () => {
+    const desktopSource = readSource('./DesktopEnterpriseDashboard.jsx');
+    const mobileSource = readSource('./MobileEnterpriseDashboard.jsx');
 
-    expect(source).toContain("lazy(() => import('./DesktopAdminPage'))");
-    expect(source).toContain("lazy(() => import('./MobileAdminPage'))");
-    expect(source).not.toContain("import DesktopAdminPage from './DesktopAdminPage'");
-    expect(source).not.toContain("import MobileAdminPage from './MobileAdminPage'");
+    expect(desktopSource).toContain("lazy(() => import('./DesktopAdminPage'))");
+    expect(desktopSource).not.toContain("lazy(() => import('./MobileAdminPage'))");
+    expect(mobileSource).toContain("lazy(() => import('./MobileAdminPage'))");
+    expect(mobileSource).not.toContain("lazy(() => import('./DesktopAdminPage'))");
   });
 
   it('keeps desktop, mobile, and unloaded reports behind dynamic imports', () => {

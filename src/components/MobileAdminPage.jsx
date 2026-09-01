@@ -12,7 +12,7 @@ import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import SystemControlCenter from './admin/SystemControlCenter';
 
-export const MOBILE_ADMIN_LIST_PAGE_SIZE = 40;
+const MOBILE_ADMIN_LIST_PAGE_SIZE = 40;
 
 const ACTIVE_TRIP_STATUSES = new Set([
   'Assigned', 'In Progress', 'In Mission', 'En Route', 'Navigating Pickup',

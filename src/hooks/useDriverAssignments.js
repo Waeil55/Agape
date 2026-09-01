@@ -179,5 +179,3 @@ export function useDriverAssignments({ enabled, driver, currentUser, resubscribe
     acceptAssignment,
   };
 }
-
-export default useDriverAssignments;

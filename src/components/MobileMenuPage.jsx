@@ -25,8 +25,8 @@ const SHARED_MENU_SECTIONS = [
   },
 ];
 
-export const DISPATCH_MENU_SECTIONS = Object.freeze(SHARED_MENU_SECTIONS);
-export const ADMIN_MENU_SECTIONS = Object.freeze([
+const DISPATCH_MENU_SECTIONS = Object.freeze(SHARED_MENU_SECTIONS);
+const ADMIN_MENU_SECTIONS = Object.freeze([
   {
     title: 'Organization',
     items: [

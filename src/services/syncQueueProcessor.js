@@ -189,4 +189,3 @@ export class SyncQueueProcessor {
 }
 
 export const syncQueueProcessor = new SyncQueueProcessor();
-export default syncQueueProcessor;

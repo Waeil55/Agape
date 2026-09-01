@@ -184,14 +184,6 @@ export const AdminCardHead = ({ icon: Icon, title, action }) => (
   </div>
 );
 
-export const AdminStat = ({ icon: Icon, value, label, accent }) => (
-  <div className="adm-stat" style={accent ? { '--adm-accent-soft': accent } : undefined}>
-    {Icon && <Icon size={20} className="adm-stat-ico" />}
-    <div className="adm-stat-value">{value}</div>
-    <div className="adm-stat-label">{label}</div>
-  </div>
-);
-
 const TONE = {
   online: 'adm-badge--online',
   success: 'adm-badge--success',
@@ -247,21 +239,6 @@ export const AdminSearch = ({ icon: Icon = SearchGlyph, value, onChange, placeho
   </div>
 );
 
-export const AdminPillTabs = ({ tabs, active, onChange }) => (
-  <div className="adm-pill-tabs">
-    {tabs.map((t) => (
-      <button
-        key={t.id}
-        type="button"
-        onClick={() => onChange?.(t.id)}
-        className={`adm-pill-tab ${active === t.id ? 'is-active' : ''}`}
-      >
-        {t.label}
-      </button>
-    ))}
-  </div>
-);
-
 export const AdminEmpty = ({ icon: Icon, title, hint }) => (
   <div className="adm-empty">
     {Icon && <Icon size={28} className="text-slate-300" />}
@@ -269,12 +246,3 @@ export const AdminEmpty = ({ icon: Icon, title, hint }) => (
     {hint && <p className="text-xs font-medium text-slate-400">{hint}</p>}
   </div>
 );
-
-export const AdminSectionTitle = ({ children }) => (
-  <div className="adm-section-title">{children}</div>
-);
-
-/* =====================================================================
-   Default export for convenience
-   ===================================================================== */
-export default AdminShell;

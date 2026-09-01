@@ -269,5 +269,3 @@ export function useDriverLocationStream({
     lastSent: lastSentRef.current,
   };
 }
-
-export default useDriverLocationStream;

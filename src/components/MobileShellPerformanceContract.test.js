@@ -16,7 +16,7 @@ describe('mobile shell interaction performance contract', () => {
     expect(adminSource).toContain('buildDriverIndex(drivers)');
     expect(lookupBlock).toContain('findDriverInIndex(driverIndex, trip)');
     expect(lookupBlock).not.toContain('drivers.find');
-    expect(adminSource).toContain('export const MOBILE_ADMIN_LIST_PAGE_SIZE = 40');
+    expect(adminSource).toContain('const MOBILE_ADMIN_LIST_PAGE_SIZE = 40');
     expect(adminSource).toContain('useDeferredValue(driverQuery)');
     expect(adminSource).toContain('visibleDrivers.map');
     expect(adminSource).toContain('visibleUsers.map');
@@ -25,7 +25,7 @@ describe('mobile shell interaction performance contract', () => {
 
   it('bounds report DOM size, defers search work, and caps bulk review concurrency', () => {
     expect(reportsSource).toContain('useDeferredValue(searchQuery)');
-    expect(reportsSource).toContain('export const MOBILE_REPORT_PAGE_SIZE = 40');
+    expect(reportsSource).toContain('const MOBILE_REPORT_PAGE_SIZE = 40');
     expect(reportsSource).toContain('visibleTrips.map');
     expect(reportsSource).toContain('forEachWithConcurrency(pendingTrips');
     expect(reportsSource).not.toContain('drivers.find');

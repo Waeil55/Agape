@@ -23,7 +23,6 @@ import {
 } from './utils/driverTelemetry';
 import { buildLocationFraudSignals } from './utils/locationFraud';
 import { buildLocationEvent, emitSystemEvent } from './services/firestoreEventEngine';
-import './utils/clientExport';
 import { registerServiceWorker, setupSWMessageHandler } from './utils/swManager';
 import { syncQueueProcessor } from './services/syncQueueProcessor';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
@@ -40,7 +39,7 @@ import { DEFAULT_OVERRIDE_POLICY, isOverridePolicyDocumentValid, normalizeOverri
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v375';
+const APP_VERSION = 'v376';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;

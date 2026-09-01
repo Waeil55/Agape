@@ -455,5 +455,3 @@ export function useDriverLivenessMonitor({ enabled, resubscribeKey = 0 }) {
     };
   }, [enabled, resubscribeKey]);
 }
-
-export default useDriverLiveState;

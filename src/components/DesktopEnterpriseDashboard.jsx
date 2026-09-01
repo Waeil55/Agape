@@ -10,7 +10,7 @@ import { buildGlobalSearchResults } from './GlobalEntitySearch';
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const OperationsCommandCenter = lazy(() => import('./OperationsCommandCenter'));
 const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
-const AdminPage = lazy(() => import('./AdminPage'));
+const DesktopAdminPage = lazy(() => import('./DesktopAdminPage'));
 const DriverPage = lazy(() => import('./DriverPage'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
 const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
@@ -1153,7 +1153,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
       );
       case 'admin': return (
         <ErrorBoundary><Suspense fallback={<LazyFallback />}>
-        <AdminPage
+        <DesktopAdminPage
           role={role} currentUser={currentUser}
           drivers={drivers} setDrivers={setDrivers} upsertDriverProfile={upsertDriverProfile} assignVehicleToDriver={assignVehicleToDriver}
           dispatchers={dispatchers} setDispatchers={setDispatchers}

@@ -19,7 +19,7 @@ class ErrorBoundary extends Component {
   }
 }
 
-const AdminPage = lazy(() => import('./AdminPage'));
+const MobileAdminPage = lazy(() => import('./MobileAdminPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
@@ -293,7 +293,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (subView === 'admin') {
       return (
         <SubViewWrapper title="User Management" renderTopBar={renderTopBar}>
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><AdminPage {...props} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileAdminPage {...props} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }

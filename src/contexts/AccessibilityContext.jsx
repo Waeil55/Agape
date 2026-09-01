@@ -1,8 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect } from 'react';
 
-export const AccessibilityContext = createContext();
-
-export const useAccessibility = () => useContext(AccessibilityContext);
+const AccessibilityContext = createContext();
 
 export const AccessibilityProvider = ({ children }) => {
   const [fontScale, setFontScale] = useState(() => localStorage.getItem('agape_fontScale') || 'md');

@@ -602,4 +602,3 @@ export const areTaskCardPropsEqual = (previous, next) => {
 };
 
 export default memo(TaskCard, areTaskCardPropsEqual);
-export { StatusBadge, getTimeUrgency, getSiteIcon };
