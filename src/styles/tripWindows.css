@@ -170,7 +170,7 @@ html.trip-window-keyboard-visible .trip-window-footer {
 
 html.trip-window-keyboard-visible .trip-window-panel {
   max-height: min(34rem, calc(var(--trip-window-keyboard-top, 100vh) - var(--trip-window-keyboard-gap)));
-  transform: translate3d(0, calc(-1 * var(--trip-window-panel-lift, 0px) - 10vh), 0);
+  transform: translate3d(0, calc(-1 * var(--trip-window-panel-lift, 0px)), 0);
 }
 
 @media (prefers-reduced-motion: reduce) {

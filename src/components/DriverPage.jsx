@@ -1535,7 +1535,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const panel = nextPanel;
         const footer = panel?.querySelector('.trip-window-footer');
         const layoutHeight = Math.max(window.innerHeight || 0, root.clientHeight || 0);
-        const keyboardTop = keyboardSuppressed ? null : resolveTripKeyboardTop({
+        const panelInputFocused = panel?.contains(document.activeElement)
+          && (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'SELECT');
+        const keyboardTop = (keyboardSuppressed && !panelInputFocused) ? null : resolveTripKeyboardTop({
           layoutHeight,
           visualHeight: visualViewport?.height,
           visualOffsetTop: visualViewport?.offsetTop,
