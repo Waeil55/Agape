@@ -27,8 +27,13 @@ describe('PWA update contract', () => {
 
   it('offers an explicit update without making background refresh noisy', () => {
     const prompt = readFileSync(new URL('../components/pwa/PWAUpdatePrompt.jsx', import.meta.url), 'utf8');
+    const manager = readFileSync(new URL('./swManager.js', import.meta.url), 'utf8');
     expect(prompt).toContain("window.addEventListener('swUpdateAvailable', handler)");
+    expect(prompt).toContain('reg.waiting && navigator.serviceWorker.controller');
     expect(prompt).toContain("reg.waiting.postMessage({ type: 'SKIP_WAITING' })");
+    expect(manager.indexOf("addEventListener('updatefound', updateFoundHandler)")).toBeLessThan(manager.indexOf('await checkForServiceWorkerUpdate()'));
+    expect(manager).toContain('void checkForServiceWorkerUpdate()');
+    expect(manager).not.toContain('setInterval(() => {\n      swRegistration.update();');
   });
 
   it('marks the agape5 application shell as no-store', () => {

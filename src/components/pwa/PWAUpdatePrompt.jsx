@@ -32,6 +32,9 @@ const PWAUpdatePrompt = () => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then((reg) => {
         if (reg) {
+          if (reg.waiting && navigator.serviceWorker.controller) {
+            setShowUpdate(true);
+          }
           reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             if (newWorker) {

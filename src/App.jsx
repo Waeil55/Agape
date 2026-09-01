@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
 import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromCache, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -35,11 +35,19 @@ import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './component
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
 import { hydrateTripDriverIdentity } from './utils/driverIdentity';
 import { DEFAULT_OVERRIDE_POLICY, isOverridePolicyDocumentValid, normalizeOverridePolicy } from './utils/tripCostOverrides';
+import {
+  AUTH_LOADING_RECOVERY_DELAY_MS,
+  AUTH_PROFILE_CACHE_TIMEOUT_MS,
+  AUTH_PROFILE_SERVER_TIMEOUT_MS,
+  AUTH_WATCHDOG_TIMEOUT_MS,
+  getAuthVerificationIssue,
+  isRecoverableAuthVerificationFailure,
+} from './utils/authStartup';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v376';
+const APP_VERSION = 'v377';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -258,8 +266,6 @@ function getBestDriverProfileForEmail(drivers = [], email = '', trips = []) {
   })[0];
 }
 
-const AUTH_WATCHDOG_TIMEOUT_MS = 30000;
-
 // --- Role cache: persist role to localStorage so boot is instant for returning users ---
 function readRoleCache(uid) {
   try {
@@ -375,12 +381,22 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [startupIssue, setStartupIssue] = useState('');
   const [showLoadingRecovery, setShowLoadingRecovery] = useState(false);
+  const [authBootAttempt, setAuthBootAttempt] = useState(0);
   const authBootResolvedRef = useRef(false);
   const loginPortalRoleRef = useRef(null);
   const loginInProgressRef = useRef(false);
   const loginAttemptRef = useRef(0);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
+
+  const retryStartupSession = useCallback(() => {
+    authBootResolvedRef.current = false;
+    loginInProgressRef.current = false;
+    setStartupIssue('');
+    setShowLoadingRecovery(false);
+    setIsLoading(true);
+    setAuthBootAttempt((attempt) => attempt + 1);
+  }, []);
 
   // Warm the driver/admin page chunks while the user is on the login screen
   // so the post-login transition is instant (native-app feel).
@@ -984,9 +1000,9 @@ const App = () => {
       const timer = setTimeout(() => setShowLoadingRecovery(false), 0);
       return () => clearTimeout(timer);
     }
-    const timer = setTimeout(() => setShowLoadingRecovery(true), 3000);
+    const timer = setTimeout(() => setShowLoadingRecovery(true), AUTH_LOADING_RECOVERY_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isLoading]);
+  }, [authBootAttempt, isLoading]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -1048,12 +1064,12 @@ const App = () => {
     let cancelled = false;
     authBootResolvedRef.current = false;
 
-    // Watchdog: if nothing resolves, unblock loading and show recovery.
+    // Watchdog: preserve the authenticated session and expose recovery actions.
     const bootWatchdog = setTimeout(() => {
       if (cancelled || authBootResolvedRef.current) return;
       authBootResolvedRef.current = true;
-      setIsLoading(false);
-      setStartupIssue('Startup took too long. Retry, repair browser files, or return to the Access Portal.');
+      setShowLoadingRecovery(true);
+      setStartupIssue('Session verification is still pending. Your sign-in is preserved; retry when the connection is stable.');
     }, AUTH_WATCHDOG_TIMEOUT_MS);
 
     // Helper: apply authenticated session state and clear loading immediately
@@ -1129,6 +1145,46 @@ const App = () => {
       setIsLoading(false);
     };
 
+    const verifyAppliedSessionInBackground = (capturedUser, cachedRole, cachedTenantId) => {
+      getDocFromServer(doc(db, 'users', capturedUser.uid)).then((freshDoc) => {
+        if (cancelled) return;
+        if (!freshDoc.exists() || !isEmploymentAccessActive(freshDoc.data())) {
+          handleSecurityTermination({ message: 'Your Agape Care access has been disabled.' });
+          return;
+        }
+        const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
+        const freshTenantId = tenantIdFromProfile(freshDoc.data());
+        if (!VALID_ROLES.has(freshRole)) {
+          handleSecurityTermination({ message: 'Your Agape Care account role is not configured. Contact an administrator.' });
+          return;
+        }
+        if (freshRole !== cachedRole) {
+          writeRoleCache(capturedUser.uid, freshRole, capturedUser.email || '', freshTenantId);
+          window.location.reload();
+          return;
+        }
+        if (freshTenantId !== tenantIdFromProfile({ tenantId: cachedTenantId })) {
+          writeRoleCache(capturedUser.uid, freshRole, capturedUser.email || '', freshTenantId);
+          setTenantId(freshTenantId);
+        }
+        const settings = freshDoc.data()?.settings || {};
+        if (Object.keys(settings).length > 0) {
+          setAppSettings((previous) => ({ ...previous, ...withoutLegacyTheme(settings) }));
+        }
+      }).catch(() => {
+        // A cached session remains usable while Firestore reconnects. Security
+        // rules still protect every data read and write on the server.
+      });
+    };
+
+    const pauseBootForRetry = (verificationResult) => {
+      loginInProgressRef.current = false;
+      authBootResolvedRef.current = true;
+      setStartupIssue(getAuthVerificationIssue(verificationResult));
+      setShowLoadingRecovery(true);
+      setIsLoading(true);
+    };
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
       // If a login is actively being processed and we got a null event,
@@ -1147,59 +1203,69 @@ const App = () => {
           // Apply session immediately — loading clears in milliseconds
           loginInProgressRef.current = false;
           applySession(cached.role, userEmail, null, user, cached.tenantId);
-
-          // Then verify role from Firestore in the background (non-blocking)
-          getDoc(doc(db, 'users', user.uid)).then((freshDoc) => {
-            if (cancelled) return;
-            if (!freshDoc.exists() || !isEmploymentAccessActive(freshDoc.data())) {
-              handleSecurityTermination({ message: 'Your Agape Care access has been disabled.' });
-              return;
-            }
-            const freshRole = String(freshDoc.data()?.role || '').toLowerCase();
-            const freshTenantId = tenantIdFromProfile(freshDoc.data());
-            if (freshRole && freshRole !== cached.role) {
-              writeRoleCache(user.uid, freshRole, userEmail, freshTenantId);
-              window.location.reload();
-              return;
-            }
-            if (freshTenantId !== tenantIdFromProfile({ tenantId: cached.tenantId })) {
-              writeRoleCache(user.uid, freshRole || cached.role, userEmail, freshTenantId);
-              setTenantId(freshTenantId);
-            }
-            // Load user settings from Firestore so preferences survive hard refresh.
-            // so they survive hard refresh even when the role cache is present.
-            const settings = freshDoc.data()?.settings || {};
-            if (Object.keys(settings).length > 0) {
-              setAppSettings(prev => ({ ...prev, ...withoutLegacyTheme(settings) }));
-            }
-          }).catch(() => { /* background check — ignore network errors */ });
+          verifyAppliedSessionInBackground(user, cached.role, cached.tenantId);
           return;
         }
 
-        // ── FIRST LOGIN or EXPLICIT ROLE CHECK: fetch from Firestore ─────────
+        const userProfileRef = doc(db, 'users', user.uid);
+        const cachedProfileResult = await withTimeout(
+          getDocFromCache(userProfileRef),
+          AUTH_PROFILE_CACHE_TIMEOUT_MS,
+          'cached user profile'
+        );
+        if (cancelled) return;
+
+        const cachedProfileDoc = cachedProfileResult.ok ? cachedProfileResult.value : null;
+        const cachedProfileRole = cachedProfileDoc?.exists?.()
+          && isEmploymentAccessActive(cachedProfileDoc.data())
+          ? String(cachedProfileDoc.data()?.role || '').toLowerCase()
+          : '';
+        if (
+          VALID_ROLES.has(cachedProfileRole)
+          && (!requestedPortalRole || requestedPortalRole === cachedProfileRole)
+        ) {
+          const cachedTenantId = tenantIdFromProfile(cachedProfileDoc.data());
+          loginInProgressRef.current = false;
+          applySession(cachedProfileRole, userEmail, cachedProfileDoc, user, cachedTenantId);
+          verifyAppliedSessionInBackground(user, cachedProfileRole, cachedTenantId);
+          return;
+        }
+
+        // ── FIRST LOGIN or EXPLICIT ROLE CHECK: verify from Firestore ────────
         const userDocResult = await withTimeout(
-          getDocFromServer(doc(db, 'users', user.uid)),
-          4000,
+          getDocFromServer(userProfileRef),
+          AUTH_PROFILE_SERVER_TIMEOUT_MS,
           'user profile'
         );
         if (cancelled) return;
 
-        let userDoc = userDocResult.ok ? userDocResult.value : null;
-        let userRole = userDoc?.exists?.() && isEmploymentAccessActive(userDoc.data()) ? String(userDoc.data()?.role || '').toLowerCase() : '';
-
-        // If Firestore timed out, try one more time quickly then proceed
-        if (!userDocResult.ok || (!userRole && userDoc)) {
-          const retryResult = await withTimeout(getDocFromServer(doc(db, 'users', user.uid)), 4000, 'user profile retry');
-          if (cancelled) return;
-          if (retryResult.ok && retryResult.value?.exists?.()) {
-            userDoc = retryResult.value;
-            userRole = isEmploymentAccessActive(userDoc.data()) ? String(userDoc.data()?.role || '').toLowerCase() : '';
+        if (!userDocResult.ok) {
+          if (isRecoverableAuthVerificationFailure(userDocResult)) {
+            pauseBootForRetry(userDocResult);
+          } else {
+            handleSecurityTermination({ message: getAuthVerificationIssue(userDocResult) });
           }
+          return;
+        }
+
+        let userDoc = userDocResult.value;
+        if (userDoc?.exists?.() && !isEmploymentAccessActive(userDoc.data())) {
+          handleSecurityTermination({ message: 'Your Agape Care access has been disabled.' });
+          return;
+        }
+        let userRole = userDoc?.exists?.() ? String(userDoc.data()?.role || '').toLowerCase() : '';
+        if (userDoc?.exists?.() && !VALID_ROLES.has(userRole)) {
+          handleSecurityTermination({ message: 'Your Agape Care account role is not configured. Contact an administrator.' });
+          return;
         }
 
         if (!userRole) {
           // Check if this could be the first-ever admin bootstrapping
-          const usersSnap = await withTimeout(getDocs(collection(db, 'users')), 4000, 'user directory');
+          const usersSnap = await withTimeout(
+            getDocs(collection(db, 'users')),
+            AUTH_PROFILE_SERVER_TIMEOUT_MS,
+            'user directory'
+          );
           const hasExistingUsers = usersSnap.ok ? !usersSnap.value.empty : true;
           const canBootstrapFirstAdmin = !hasExistingUsers && requestedPortalRole === 'admin';
 
@@ -1226,13 +1292,13 @@ const App = () => {
               { merge: true }
             );
             userRole = 'admin';
-            userDoc = await getDocFromServer(doc(db, 'users', user.uid)).catch(() => null);
+            userDoc = await getDocFromServer(userProfileRef).catch(() => null);
           } else if (!usersSnap.ok) {
-            // Firestore completely unreachable — show login so user can retry
-            loginInProgressRef.current = false;
-            authBootResolvedRef.current = true;
-            setIsLoading(false);
-            setStartupIssue('Could not reach the server. Check your connection and sign in again.');
+            if (isRecoverableAuthVerificationFailure(usersSnap)) {
+              pauseBootForRetry(usersSnap);
+            } else {
+              handleSecurityTermination({ message: getAuthVerificationIssue(usersSnap) });
+            }
             return;
           } else {
             loginInProgressRef.current = false;
@@ -1383,7 +1449,7 @@ const App = () => {
       if (unsubData) unsubData();
       if (typeof unsubFcm === 'function') unsubFcm();
     };
-  }, [handleSecurityTermination, resetSessionState, setDrivers, setDispatchers]);
+  }, [authBootAttempt, handleSecurityTermination, resetSessionState, setDrivers, setDispatchers]);
 
   useEffect(() => {
     const metaTags = [
@@ -3016,10 +3082,10 @@ const App = () => {
             )}
             {showLoadingRecovery && (
               <div className="w-full space-y-3">
-                <p className="text-xs font-semibold text-white/60 leading-relaxed">This is taking longer than expected.</p>
+                <p className="text-xs font-semibold text-white/60 leading-relaxed">Connection verification is still in progress. Your session and pending work are preserved.</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => window.location.reload()} className="h-11 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-sm backdrop-blur-sm border border-white/20 transition active:scale-95">Retry</button>
-                  <button onClick={async () => { skipNextSignedOutResetRef.current = true; await signOut(auth).catch(() => {}); resetSessionState({ loginErrorMessage: 'Session reset. Please sign in again.' }); }} className="h-11 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 font-bold text-sm backdrop-blur-sm border border-white/15 transition active:scale-95">Sign In Again</button>
+                  <button onClick={retryStartupSession} className="h-11 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-sm backdrop-blur-sm border border-white/20 transition active:scale-95">Retry Connection</button>
+                  <button onClick={async () => { skipNextSignedOutResetRef.current = true; await signOut(auth).catch(() => {}); resetSessionState({ loginErrorMessage: 'Signed out safely.' }); }} className="h-11 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 font-bold text-sm backdrop-blur-sm border border-white/15 transition active:scale-95">Sign Out</button>
                 </div>
                 <button onClick={async () => { await repairBrowserStatePreservingAuth().catch(() => {}); window.location.reload(); }} className="w-full h-11 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 font-bold text-sm backdrop-blur-sm border border-amber-400/25 transition active:scale-95">Repair & Reload</button>
               </div>

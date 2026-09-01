@@ -9,6 +9,36 @@ let updateCheckTimer = null;
 let controllerChangeHandler = null;
 let updateFoundHandler = null;
 let stateChangeHandler = null;
+let stateChangeWorker = null;
+let onlineUpdateHandler = null;
+let visibilityUpdateHandler = null;
+let updateInFlight = null;
+
+const checkForServiceWorkerUpdate = async () => {
+  if (!swRegistration) return null;
+  if (updateInFlight) return updateInFlight;
+
+  updateInFlight = swRegistration.update()
+    .catch(() => null)
+    .finally(() => {
+      updateInFlight = null;
+    });
+  return updateInFlight;
+};
+
+const monitorInstallingWorker = (worker) => {
+  if (!worker) return;
+  if (stateChangeWorker && stateChangeHandler) {
+    stateChangeWorker.removeEventListener('statechange', stateChangeHandler);
+  }
+  stateChangeWorker = worker;
+  stateChangeHandler = () => {
+    if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+      notifyUpdateAvailable();
+    }
+  };
+  worker.addEventListener('statechange', stateChangeHandler);
+};
 
 /**
  * Register the service worker and set up update listeners
@@ -31,32 +61,35 @@ export const registerServiceWorker = async () => {
       scope: '/',
       updateViaCache: 'none',
     });
-    await swRegistration.update().catch(() => {});
 
-    // Listen for updates
+    // Attach update listeners before checking so a fast installation cannot be
+    // missed between register() and update().
     updateFoundHandler = () => {
-      const newWorker = swRegistration.installing;
-      if (!newWorker) return;
-      
-      // Remove previous statechange handler if any
-      if (stateChangeHandler) {
-        newWorker.removeEventListener('statechange', stateChangeHandler);
-      }
-
-      stateChangeHandler = () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          notifyUpdateAvailable();
-        }
-      };
-      newWorker.addEventListener('statechange', stateChangeHandler);
+      monitorInstallingWorker(swRegistration?.installing);
     };
     swRegistration.addEventListener('updatefound', updateFoundHandler);
+    monitorInstallingWorker(swRegistration.installing);
+    if (swRegistration.waiting && navigator.serviceWorker.controller) {
+      notifyUpdateAvailable();
+    }
+    await checkForServiceWorkerUpdate();
 
-    // Check for updates periodically without forcing a page reload.
+    // Retry checks when connectivity or visibility returns. Every check is
+    // caught so a transient fetch failure never becomes an unhandled rejection.
     if (updateCheckTimer) clearInterval(updateCheckTimer);
     updateCheckTimer = setInterval(() => {
-      swRegistration.update();
+      void checkForServiceWorkerUpdate();
     }, 5 * 60 * 1000);
+
+    if (onlineUpdateHandler) window.removeEventListener('online', onlineUpdateHandler);
+    onlineUpdateHandler = () => { void checkForServiceWorkerUpdate(); };
+    window.addEventListener('online', onlineUpdateHandler);
+
+    if (visibilityUpdateHandler) document.removeEventListener('visibilitychange', visibilityUpdateHandler);
+    visibilityUpdateHandler = () => {
+      if (document.visibilityState === 'visible') void checkForServiceWorkerUpdate();
+    };
+    document.addEventListener('visibilitychange', visibilityUpdateHandler);
 
     if (controllerChangeHandler && 'serviceWorker' in navigator) {
       navigator.serviceWorker.removeEventListener('controllerchange', controllerChangeHandler);
@@ -139,7 +172,20 @@ export const cleanupServiceWorker = () => {
     swRegistration.removeEventListener('updatefound', updateFoundHandler);
     updateFoundHandler = null;
   }
+  if (stateChangeWorker && stateChangeHandler) {
+    stateChangeWorker.removeEventListener('statechange', stateChangeHandler);
+  }
+  stateChangeWorker = null;
   stateChangeHandler = null;
+  if (onlineUpdateHandler) {
+    window.removeEventListener('online', onlineUpdateHandler);
+    onlineUpdateHandler = null;
+  }
+  if (visibilityUpdateHandler) {
+    document.removeEventListener('visibilitychange', visibilityUpdateHandler);
+    visibilityUpdateHandler = null;
+  }
+  updateInFlight = null;
 };
 
 export default {
