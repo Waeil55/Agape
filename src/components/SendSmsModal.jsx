@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { X, Send, CheckCircle, AlertCircle, Loader2, MessageSquare } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 
 const DEFAULT_TEMPLATE = `Hi {patient}, this is Agape Care confirming your trip on {date} at {time}. Reply YES to confirm or NO to cancel. Call 317-777-7707 if you have questions.`;
 
@@ -21,18 +22,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
     }));
   }, [trips, template]);
 
-  const FACILITY_KW = ['center','centre','clinic','hospital','care','treatment','medical','health','therapy','academy','school','facility','llc','inc','llp','corp','ltd','pharmacy','pharm','dialysis','rehab','rehabilitation','mental health','behavioral','paediatric','pediatric','dental','lab','imaging','radiology','urgent care','er ','emergency','surgery','surgical','ortho','cardio','neuro'];
-  const isFac = (n) => { const l = (n||'').toLowerCase().trim(); return l ? FACILITY_KW.some(kw => l.includes(kw)) : false; };
-  const getClientPhone = (t) => {
-    if (t.patientPhone) return t.patientPhone;
-    const pu = t.pickupPhone || '', doPh = t.dropoffPhone || '';
-    if (!pu && !doPh) return '';
-    const puFac = isFac(t.pickupSiteName||'') || isFac(t.pickup||'');
-    const doFac = isFac(t.dropoffSiteName||'') || isFac(t.dropoff||'');
-    if (puFac && !doFac) return doPh;
-    if (doFac && !puFac) return pu;
-    return pu || doPh;
-  };
+  const getClientPhone = (trip) => resolveClientPhoneForTrip(trip, trips);
 
   const canSend = trips.every(t => getClientPhone(t));
 

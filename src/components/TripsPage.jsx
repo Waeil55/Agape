@@ -8,6 +8,7 @@ import { makeCall, sendSMS } from '../utils/nativeActions';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
 import TripActionCenter from './trips/TripActionCenter';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 
 
 
@@ -39,9 +40,10 @@ const toTimeInput = (value) => {
   return clock ? `${clock[1].padStart(2, '0')}:${clock[2]}` : '';
 };
 
-const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
+const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', patientPhone: '', clientPhone: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
 
 const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
+  const getClientPhone = (trip) => resolveClientPhoneForTrip(trip, trips);
   const today = useMemo(() => getTodayStr(), []);
   const [sortBy, setSortBy] = useState('time');
   const [selectedTrip, setSelectedTrip] = useState(null);
@@ -352,7 +354,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
               <option value="">Unassigned</option>
               {drivers.map(entry => <option key={entry.id} value={entry.id}>{entry.name} {entry.vehicle ? `(${entry.vehicle})` : ''}</option>)}
             </select>
-            <input value={editTrip.pickupPhone || ''} onChange={event => setEditTrip(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Patient phone" aria-label="Patient phone" />
+            <input value={editTrip.clientPhone || editTrip.patientPhone || ''} onChange={event => setEditTrip(current => ({ ...current, clientPhone: event.target.value, patientPhone: event.target.value }))} className={fieldClass} placeholder="Client main phone" aria-label="Client main phone" />
+            <input value={editTrip.pickupPhone || ''} onChange={event => setEditTrip(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Pickup location phone" aria-label="Pickup location phone" />
+            <input value={editTrip.dropoffPhone || ''} onChange={event => setEditTrip(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff location phone" aria-label="Dropoff location phone" />
             <div className="sm:col-span-2">
               <PlacesAutocompleteInput value={editTrip.pickup || ''} onChange={value => setEditTrip(current => ({ ...current, pickup: value }))} className={fieldClass} placeholder="Pickup address" required />
             </div>
@@ -423,12 +427,12 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             </div>
 
             {/* Contact Info - Compact */}
-            {(role === 'admin' || role === 'dispatcher') && (trip.pickupPhone || trip.notes) && (
+            {(role === 'admin' || role === 'dispatcher') && (getClientPhone(trip) || trip.notes) && (
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {trip.pickupPhone && (
+                {getClientPhone(trip) && (
                   <div className="flex items-center gap-1">
-                    <button onClick={() => makeCall(trip.pickupPhone, trip.patient)} className="text-blue-600 hover:underline font-bold">{trip.pickupPhone}</button>
-                    <button onClick={() => sendSMS(trip.pickupPhone, trip.patient)} className="text-blue-600 hover:text-blue-700" aria-label="SMS"><MessageSquare size={12} /></button>
+                    <button onClick={() => makeCall(getClientPhone(trip), trip.patient)} className="text-blue-600 hover:underline font-bold">{getClientPhone(trip)}</button>
+                    <button onClick={() => sendSMS(getClientPhone(trip), trip.patient)} className="text-blue-600 hover:text-blue-700" aria-label="SMS"><MessageSquare size={12} /></button>
                   </div>
                 )}
                 {trip.notes && (
@@ -482,8 +486,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           },
           onAssign: (trip) => { setSelectedTrip(trip); setAssignMode(trip.driverId ? 'reassign' : 'assign'); trip.driverId ? setShowReassignModal(true) : setShowAssign(true); },
           onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
-          onCall: (trip) => makeCall(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone, trip.patient),
-          onMessage: (trip) => sendSMS(trip.patientPhone || trip.pickupPhone || trip.dropoffPhone, trip.patient),
+          onCall: (trip) => makeCall(getClientPhone(trip), trip.patient),
+          onMessage: (trip) => sendSMS(getClientPhone(trip), trip.patient),
           onEdit: openEdit,
           onArchive: (trip) => onDeleteTrip?.(trip.id),
         }}
@@ -762,12 +766,16 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Patient Phone</label>
-                  <input type="text" value={newTrip.pickupPhone} onChange={(e) => setNewTrip({...newTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Client Main Phone</label>
+                  <input type="tel" value={newTrip.patientPhone} onChange={(e) => setNewTrip({...newTrip, patientPhone: e.target.value, clientPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Hospital Phone</label>
-                  <input type="text" value={newTrip.dropoffPhone} onChange={(e) => setNewTrip({...newTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Pickup Location Phone</label>
+                  <input type="tel" value={newTrip.pickupPhone} onChange={(e) => setNewTrip({...newTrip, pickupPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-1">Dropoff Location Phone</label>
+                  <input type="tel" value={newTrip.dropoffPhone} onChange={(e) => setNewTrip({...newTrip, dropoffPhone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-base focus:border-blue-500 outline-none" />
                 </div>
               </div>
               <div>

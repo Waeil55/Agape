@@ -117,6 +117,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
         pickupPhone: form.pickupPhone.trim(),
         dropoffPhone: form.dropoffPhone.trim(),
         patientPhone: form.patientPhone.trim(),
+        clientPhone: form.patientPhone.trim(),
         hospitalPhone: form.hospitalPhone.trim(),
         notes: form.notes.trim(),
         status: selectedDriver?.id ? 'Assigned' : 'Unassigned',

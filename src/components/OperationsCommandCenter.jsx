@@ -16,6 +16,7 @@ import { scopeOperationsTripsByDate } from '../utils/portalSelectors';
 import TripActionCenter from './trips/TripActionCenter';
 import { OPERATIONAL_VIEW_PRESETS, getOperationalViewPreset } from '../utils/operationalViews';
 import TableCheckbox from './ui/TableCheckbox';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -457,36 +458,10 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     }
   }, [editingTripId]);
 
-  const FACILITY_KEYWORDS_OPS = [
-    'center', 'centre', 'clinic', 'hospital', 'care', 'treatment',
-    'medical', 'health', 'therapy', 'academy', 'school', 'facility',
-    'llc', 'inc', 'llp', 'corp', 'ltd', 'pharmacy', 'pharm',
-    'dialysis', 'rehab', 'rehabilitation', 'mental health',
-    'behavioral', 'paediatric', 'pediatric', 'dental', 'lab',
-    'imaging', 'radiology', 'urgent care', 'er ', 'emergency',
-    'surgery', 'surgical', 'ortho', 'cardio', 'neuro',
-  ];
-  const isFacility = (name) => {
-    const lower = (name || '').toLowerCase().trim();
-    if (!lower) return false;
-    return FACILITY_KEYWORDS_OPS.some(kw => lower.includes(kw));
-  };
-  const getClientPhone = (trip) => {
-    if (trip.patientPhone) return trip.patientPhone;
-    const puPhone = trip.pickupPhone || '';
-    const doPhone = trip.dropoffPhone || '';
-    if (!puPhone && !doPhone) return '';
-    const hp = (trip.hospitalPhone || '').replace(/[^0-9]/g, '');
-    const puClean = puPhone.replace(/[^0-9]/g, '');
-    const doClean = doPhone.replace(/[^0-9]/g, '');
-    if (hp && puClean && puClean === hp && doPhone && doClean !== hp) return doPhone;
-    if (hp && doClean && doClean === hp && puPhone && puClean !== hp) return puPhone;
-    const puIsFacility = isFacility(trip.pickupSiteName || '') || isFacility(trip.pickup || '');
-    const doIsFacility = isFacility(trip.dropoffSiteName || '') || isFacility(trip.dropoff || '');
-    if (puIsFacility && !doIsFacility) return doPhone;
-    if (doIsFacility && !puIsFacility) return puPhone;
-    return puPhone || doPhone;
-  };
+  const getClientPhone = useCallback(
+    (trip) => resolveClientPhoneForTrip(trip, trips),
+    [trips],
+  );
 
   const [selectedDate, setSelectedDate] = useState(() => localCalendarYmd());
   const shiftDate = (days) => {

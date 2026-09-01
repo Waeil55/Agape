@@ -4,6 +4,7 @@ import { timeToMinutes } from '../utils/tripDate';
 import { tripMatchesRoutePlannerServiceDate } from '../utils/portalSelectors';
 import { optimizeRoute as geminiOptimizeRoute } from '../config/ai';
 import { tripMatchesSearch } from '../utils/search';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 
 const to12hr = (t) => {
   if (!t || t === 'Will Call' || t === 'WC') return t || 'WC';
@@ -117,19 +118,22 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
   // === ACTIONS ===
 
   const addTrip = useCallback((trip) => {
+    const clientPhone = resolveClientPhoneForTrip(trip, trips);
     setStops(prev => [...prev,
-      { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: trip.time, address: trip.pickup, phone: trip.pickupPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId },
-      { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: trip.time, address: trip.dropoff, phone: trip.dropoffPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId },
+      { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: trip.time, address: trip.pickup, phone: clientPhone, locationPhone: trip.pickupPhone || '', wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId },
+      { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: trip.time, address: trip.dropoff, phone: clientPhone, locationPhone: trip.dropoffPhone || '', wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId },
     ]);
-  }, []);
+  }, [trips]);
 
   const addPickupOnly = useCallback((trip) => {
-    setStops(prev => [...prev, { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: trip.time, address: trip.pickup, phone: trip.pickupPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId }]);
-  }, []);
+    const clientPhone = resolveClientPhoneForTrip(trip, trips);
+    setStops(prev => [...prev, { id: makeStopId(trip.id, 'pu'), tripId: trip.id, type: 'pickup', patient: trip.patient, time: trip.time, address: trip.pickup, phone: clientPhone, locationPhone: trip.pickupPhone || '', wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId }]);
+  }, [trips]);
 
   const addDropoffOnly = useCallback((trip) => {
-    setStops(prev => [...prev, { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: trip.time, address: trip.dropoff, phone: trip.dropoffPhone || trip.patientPhone, wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId }]);
-  }, []);
+    const clientPhone = resolveClientPhoneForTrip(trip, trips);
+    setStops(prev => [...prev, { id: makeStopId(trip.id, 'do'), tripId: trip.id, type: 'dropoff', patient: trip.patient, time: trip.time, address: trip.dropoff, phone: clientPhone, locationPhone: trip.dropoffPhone || '', wheelchair: trip.wheelchair, notes: trip.notes, bookingId: trip.bookingId }]);
+  }, [trips]);
 
   const removeStop = useCallback((stopId) => {
     setStops(prev => prev.filter(s => s.id !== stopId));
@@ -153,7 +157,14 @@ const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
       if (s.id !== stopId) return s;
       const newType = s.type === 'pickup' ? 'dropoff' : 'pickup';
       const trip = trips.find(t => t.id === s.tripId);
-      return { ...s, type: newType, address: newType === 'pickup' ? (trip?.pickup || s.address) : (trip?.dropoff || s.address), phone: newType === 'pickup' ? (trip?.pickupPhone || s.phone) : (trip?.dropoffPhone || s.phone) };
+      const clientPhone = trip ? resolveClientPhoneForTrip(trip, trips) : '';
+      return {
+        ...s,
+        type: newType,
+        address: newType === 'pickup' ? (trip?.pickup || s.address) : (trip?.dropoff || s.address),
+        phone: clientPhone,
+        locationPhone: newType === 'pickup' ? (trip?.pickupPhone || '') : (trip?.dropoffPhone || ''),
+      };
     }));
   };
 

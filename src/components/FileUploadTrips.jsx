@@ -9,7 +9,11 @@ import { normalizeDateValue } from '../utils/normalizeDate';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 import { isCompanyDriverPlaceholder } from '../utils/driverIdentity';
-import { analyzePhoneOwnershipForTrips } from '../utils/clientPhoneResolution';
+import {
+  analyzePhoneOwnershipForTrips,
+  isValidPhoneDigits,
+  normalizePhoneDigits,
+} from '../utils/clientPhoneResolution';
 
 
 
@@ -51,50 +55,10 @@ const COLUMN_ALIASES = {
   dropoffSiteName: ['dropoff site', 'dropoff site name', 'site name destination', 'destination site', 'dropoff location name', 'facility name (dropoff)', 'building (dropoff)'],
 };
 
-const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
-
-const isValidPhone = (cleaned) => {
-  if (!cleaned) return false;
-  if (cleaned.length === 10) return true;
-  if (cleaned.length === 11 && cleaned.startsWith('1')) return true;
-  return false;
+const validPhoneValue = (value) => {
+  const raw = String(value ?? '').trim();
+  return raw && isValidPhoneDigits(normalizePhoneDigits(raw)) ? raw : '';
 };
-
-const FACILITY_KEYWORDS = [
-  'center', 'centre', 'clinic', 'hospital', 'care', 'treatment',
-  'medical', 'health', 'therapy', 'academy', 'school', 'facility',
-  'llc', 'inc', 'llp', 'corp', 'ltd', 'pharmacy', 'pharm',
-  'dialysis', 'rehab', 'rehabilitation', 'mental health',
-  'behavioral', 'paediatric', 'pediatric', 'dental', 'lab',
-  'imaging', 'radiology', 'urgent care', 'er ', 'emergency',
-  'surgery', 'surgical', 'ortho', 'cardio', 'neuro',
-];
-
-function isFacilitySiteName(name) {
-  const lower = (name || '').toLowerCase().trim();
-  if (!lower) return false;
-  return FACILITY_KEYWORDS.some(kw => lower.includes(kw));
-}
-
-function isHomeSiteName(name) {
-  const lower = (name || '').toLowerCase().trim();
-  if (!lower) return false;
-  return ['home', 'house', 'residence', 'apartment', 'apt', 'mother', 'father',
-    'grandmother', 'grandfather', 'parent', 'mom', 'dad', 'guardian',
-    'foster', 'shelter', 'group home', 'group-home'].some(kw => lower.includes(kw));
-}
-
-function isLikelyResidentialAddress(address, siteName) {
-  const lower = (address || '').toLowerCase().trim();
-  const site = (siteName || '').toLowerCase().trim();
-  if (!lower && !site) return false;
-  if (isFacilitySiteName(siteName)) return false;
-  if (isHomeSiteName(siteName)) return true;
-  const streetPatterns = /\b\d+\s+\w+\s+(st|street|dr|drive|rd|road|ave|avenue|blvd|boulevard|ln|lane|way|ct|court|pl|place|cir|circle)\b/i;
-  if (streetPatterns.test(lower) || streetPatterns.test(site)) return true;
-  if (site === 'wrk' || site === 'work') return false;
-  return false;
-}
 
 const cleanOdometer = (value) => {
   if (value === undefined || value === null || value === '') return '';
@@ -358,6 +322,7 @@ function mapColumns(row) {
     completedVehicle: find(COLUMN_ALIASES.completedVehicle),
     paperSignatureConfirmed: find(COLUMN_ALIASES.paperSignatureConfirmed),
     patientPhone: find(COLUMN_ALIASES.patientPhone),
+    hospitalPhone: find(COLUMN_ALIASES.hospitalPhone),
     pickupSiteName: find(COLUMN_ALIASES.pickupSiteName),
     dropoffSiteName: find(COLUMN_ALIASES.dropoffSiteName),
   };
@@ -682,125 +647,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       };
       const today = getTodayStr();
 
-      // First pass: determine client phone per patient using site-name facility detection
-      // The client phone is the one at the HOME/residential location, NOT the facility
-      const patientClientPhone = {}; // patientKey -> resolved client phone (digits only)
-
-      const getSiteName = (row, m, side) => {
-        if (side === 'pickup') {
-          return m.pickupSiteName || row[colMap.pickupSite] || m.pickup || '';
-        }
-        return m.dropoffSiteName || row[colMap.dropoffSite] || m.dropoff || '';
-      };
-
-      const isLocationFacility = (row, m, side) => {
-        const siteName = getSiteName(row, m, side);
-        const address = side === 'pickup' ? m.pickup : m.dropoff;
-        if (isFacilitySiteName(siteName)) return true;
-        if (isFacilitySiteName(address)) return true;
-        return false;
-      };
-
-      const isLocationHome = (row, m, side) => {
-        const siteName = getSiteName(row, m, side);
-        const address = side === 'pickup' ? m.pickup : m.dropoff;
-        if (isHomeSiteName(siteName)) return true;
-        if (isLikelyResidentialAddress(address, siteName)) return true;
-        return false;
-      };
-
-      rows.forEach(row => {
-        const m = mapColumns(row);
-        const p = (m.patient || '').trim().toLowerCase();
-        if (!p || patientClientPhone[p]) return;
-
-        const puDigits = cleanPhone(m.pickupPhone);
-        const doDigits = cleanPhone(m.dropoffPhone);
-        if ((!puDigits || !isValidPhone(puDigits)) && (!doDigits || !isValidPhone(doDigits))) return;
-
-        const puIsFac = isLocationFacility(row, m, 'pickup');
-        const doIsFac = isLocationFacility(row, m, 'dropoff');
-        const puIsHomeLoc = isLocationHome(row, m, 'pickup');
-        const doIsHomeLoc = isLocationHome(row, m, 'dropoff');
-
-        const validPu = puDigits && isValidPhone(puDigits) ? puDigits : '';
-        const validDo = doDigits && isValidPhone(doDigits) ? doDigits : '';
-
-        if (puIsHomeLoc && !doIsHomeLoc && validPu) {
-          patientClientPhone[p] = validPu;
-        } else if (doIsHomeLoc && !puIsHomeLoc && validDo) {
-          patientClientPhone[p] = validDo;
-        } else if (puIsFac && !doIsFac && validDo) {
-          patientClientPhone[p] = validDo;
-        } else if (doIsFac && !puIsFac && validPu) {
-          patientClientPhone[p] = validPu;
-        }
-      });
-
-      // Second pass: for patients still unresolved, use phone frequency across all trips
-      // (the phone that appears most often at non-facility sites for this patient)
-      const unresolvedPatients = new Set();
-      rows.forEach(row => {
-        const m = mapColumns(row);
-        const p = (m.patient || '').trim().toLowerCase();
-        if (p && !patientClientPhone[p]) unresolvedPatients.add(p);
-      });
-
-      if (unresolvedPatients.size > 0) {
-        const phoneFreq = {};
-        rows.forEach(row => {
-          const m = mapColumns(row);
-          const p = (m.patient || '').trim().toLowerCase();
-          if (!p || !unresolvedPatients.has(p)) return;
-          const puDigits = cleanPhone(m.pickupPhone);
-          const doDigits = cleanPhone(m.dropoffPhone);
-          if (!phoneFreq[p]) phoneFreq[p] = {};
-          if (puDigits && isValidPhone(puDigits) && !isLocationFacility(row, m, 'pickup')) {
-            phoneFreq[p][puDigits] = (phoneFreq[p][puDigits] || 0) + 1;
-          }
-          if (doDigits && isValidPhone(doDigits) && !isLocationFacility(row, m, 'dropoff')) {
-            phoneFreq[p][doDigits] = (phoneFreq[p][doDigits] || 0) + 1;
-          }
-        });
-        Object.entries(phoneFreq).forEach(([p, freq]) => {
-          if (patientClientPhone[p]) return;
-          const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
-          if (sorted.length > 0) patientClientPhone[p] = sorted[0][0];
-        });
-      }
-
-      // Final fallback: for any still unresolved patients, pick the phone that is NOT
-      // shared across multiple patients (shared = facility)
-      const phoneToPatients = {};
-      rows.forEach(row => {
-        const m = mapColumns(row);
-        const p = (m.patient || '').trim().toLowerCase();
-        if (!p) return;
-        const puDigits = cleanPhone(m.pickupPhone);
-        const doDigits = cleanPhone(m.dropoffPhone);
-        if (puDigits && isValidPhone(puDigits)) {
-          if (!phoneToPatients[puDigits]) phoneToPatients[puDigits] = new Set();
-          phoneToPatients[puDigits].add(p);
-        }
-        if (doDigits && isValidPhone(doDigits)) {
-          if (!phoneToPatients[doDigits]) phoneToPatients[doDigits] = new Set();
-          phoneToPatients[doDigits].add(p);
-        }
-      });
-      rows.forEach(row => {
-        const m = mapColumns(row);
-        const p = (m.patient || '').trim().toLowerCase();
-        if (!p || patientClientPhone[p]) return;
-        const puDigits = cleanPhone(m.pickupPhone);
-        const doDigits = cleanPhone(m.dropoffPhone);
-        const puShared = puDigits && phoneToPatients[puDigits] && phoneToPatients[puDigits].size > 1;
-        const doShared = doDigits && phoneToPatients[doDigits] && phoneToPatients[doDigits].size > 1;
-        if (puDigits && isValidPhone(puDigits) && !puShared) patientClientPhone[p] = puDigits;
-        else if (doDigits && isValidPhone(doDigits) && !doShared) patientClientPhone[p] = doDigits;
-        else if (puDigits && isValidPhone(puDigits)) patientClientPhone[p] = puDigits;
-        else if (doDigits && isValidPhone(doDigits)) patientClientPhone[p] = doDigits;
-      });
-
       // Parse a distance string like "5.2mi" or "5.2 mi" or "5.2" into a number
       const parseDistance = (val) => {
         if (!val) return '';
@@ -811,36 +657,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       const mapped = rows.map((row, idx) => {
         const m = mapColumns(row);
-        const pKey = (m.patient || '').trim().toLowerCase();
-
-        const puDigits = cleanPhone(m.pickupPhone);
-        const doDigits = cleanPhone(m.dropoffPhone);
-        const validPu = puDigits && isValidPhone(puDigits) ? puDigits : '';
-        const validDo = doDigits && isValidPhone(doDigits) ? doDigits : '';
-
-        const puIsFac = isFacilitySiteName(m.pickupSiteName || '') || isFacilitySiteName(m.pickup || '');
-        const doIsFac = isFacilitySiteName(m.dropoffSiteName || '') || isFacilitySiteName(m.dropoff || '');
-
-        let hospitalPhone = '';
-        if (puIsFac && validPu) hospitalPhone = validPu;
-        else if (doIsFac && validDo) hospitalPhone = validDo;
-
-        let patientPhone = patientClientPhone[pKey] || m.pickupPhone || m.dropoffPhone || '';
-
-        // Smart phone detection: if pickup is a facility, client phone is likely dropoffPhone (home), and vice versa
-        if (!patientClientPhone[pKey] && validPu && validDo) {
-          if (puIsFac && !doIsFac) {
-            patientPhone = m.dropoffPhone;
-          } else if (doIsFac && !puIsFac) {
-            patientPhone = m.pickupPhone;
-          }
-        }
-        if (patientPhone && !patientClientPhone[pKey]) {
-          const digits = cleanPhone(patientPhone);
-          const isShared = phoneToPatients[digits] && phoneToPatients[digits].size > 1;
-          if (isShared || !isValidPhone(digits)) patientPhone = '';
-        }
-        if (patientPhone && !isValidPhone(cleanPhone(patientPhone))) patientPhone = '';
 
         const notes = [m.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
           .filter(Boolean)
@@ -954,7 +770,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           id: row['Trip ID'] || row['TripID'] || row['tripid'] || row['ID'] || row['id'] || m.bookingId || row['Booking Id'] || row['Booking ID'] || row['BookingId'] || row['Event Id'] || row['Event ID'] || `TRIP-${Date.now()}-${idx}`,
           bookingId: extract(m.bookingId, row['Booking Id'], row['Booking ID'], row['bookingId'], row['Booking'], row['Confirmation #']),
           patient: extract(m.patient, row['Client Name'], row['Client'], row['Patient'], row['patient'], 'Unknown'),
-          patientPhone: patientPhone || extract(m.patientPhone, row['Patient Phone'], row['patientPhone']),
+          patientPhone: validPhoneValue(extract(m.patientPhone, row['Patient Phone'], row['Client Phone'], row['patientPhone'], row['clientPhone'])),
 
           // --- DATES & TIMES ---
           date,
@@ -969,14 +785,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           originalTripCost: extract(m.originalTripCost, row['Original Trip Cost'], row['Original Cost'], row['Trip Cost'], row['Base Fare'], row['Cost']),
           pickupSiteName: extract(colMap.pickupSite ? row[colMap.pickupSite] : '', m.pickupSiteName, row['Pickup Site'], row['pickupSiteName'], row['Origin Site'], row['Pickup Location Name']),
           dropoffSiteName: extract(colMap.dropoffSite ? row[colMap.dropoffSite] : '', m.dropoffSiteName, row['Dropoff Site'], row['dropoffSiteName'], row['Destination Site']),
-          pickupPhone: (() => { const raw = extract(m.pickupPhone, row['Pickup Phone'], row['pickupPhone']); const c = cleanPhone(raw); return raw && isValidPhone(c) ? raw : ''; })(),
-          dropoffPhone: (() => { const raw = extract(m.dropoffPhone, row['Dropoff Phone'], row['dropoffPhone']); const c = cleanPhone(raw); return raw && isValidPhone(c) ? raw : ''; })(),
-          hospitalPhone: (() => {
-            if (hospitalPhone) return hospitalPhone;
-            const raw = extract(m.hospitalPhone, row['Hospital Phone'], row['hospitalPhone'], row['Facility Phone']);
-            const c = cleanPhone(raw);
-            return raw && isValidPhone(c) ? raw : '';
-          })(),
+          pickupPhone: validPhoneValue(extract(m.pickupPhone, row['Pickup Phone'], row['pickupPhone'])),
+          dropoffPhone: validPhoneValue(extract(m.dropoffPhone, row['Dropoff Phone'], row['dropoffPhone'])),
+          hospitalPhone: validPhoneValue(extract(m.hospitalPhone, row['Hospital Phone'], row['hospitalPhone'], row['Facility Phone'])),
 
           // --- TYPE & NOTES ---
           type: extract(m.type, row['Space Types'], row['Type'], row['Service Type'], row['Req'], row['req']),
@@ -1031,84 +842,9 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       const pairedMapped = annotateInOutPairs(mapped);
 
-      // Post-pairing: normalize phone fields across IN/OUT groups
-      // All legs in the same group MUST share the same patientPhone (home) and hospitalPhone (facility)
-      const inoutGroups = new Map();
-      pairedMapped.forEach(trip => {
-        if (trip.inOutGroupId) {
-          if (!inoutGroups.has(trip.inOutGroupId)) inoutGroups.set(trip.inOutGroupId, []);
-          inoutGroups.get(trip.inOutGroupId).push(trip);
-        }
-      });
-
-      inoutGroups.forEach((trips) => {
-        if (trips.length < 2) return;
-
-        // Find the best client phone: the phone that is NOT a hospital/facility phone
-        const facilityPhones = new Set();
-        trips.forEach(t => {
-          if (t.hospitalPhone) facilityPhones.add(cleanPhone(t.hospitalPhone));
-          const puD = cleanPhone(t.pickupPhone);
-          const doD = cleanPhone(t.dropoffPhone);
-          const puIsF = isFacilitySiteName(t.pickupSiteName || '') || isFacilitySiteName(t.pickup || '');
-          const doIsF = isFacilitySiteName(t.dropoffSiteName || '') || isFacilitySiteName(t.dropoff || '');
-          if (puIsF && puD) facilityPhones.add(puD);
-          if (doIsF && doD) facilityPhones.add(doD);
-        });
-
-        // Collect all patientPhone values, prefer non-facility ones
-        let bestClientPhone = '';
-        let bestHospitalPhone = '';
-        trips.forEach(t => {
-          const pp = cleanPhone(t.patientPhone);
-          if (pp && isValidPhone(pp) && !facilityPhones.has(pp) && !bestClientPhone) {
-            bestClientPhone = pp;
-          }
-          const hp = cleanPhone(t.hospitalPhone);
-          if (hp && isValidPhone(hp) && !bestHospitalPhone) {
-            bestHospitalPhone = hp;
-          }
-        });
-
-        // If still no client phone, pick any non-facility phone from pickup/dropoff
-        if (!bestClientPhone) {
-          trips.forEach(t => {
-            if (bestClientPhone) return;
-            const puD = cleanPhone(t.pickupPhone);
-            const doD = cleanPhone(t.dropoffPhone);
-            if (puD && isValidPhone(puD) && !facilityPhones.has(puD)) bestClientPhone = puD;
-            else if (doD && isValidPhone(doD) && !facilityPhones.has(doD)) bestClientPhone = doD;
-          });
-        }
-
-        // If still no hospital phone, find the one that IS at a facility
-        if (!bestHospitalPhone) {
-          trips.forEach(t => {
-            if (bestHospitalPhone) return;
-            const puD = cleanPhone(t.pickupPhone);
-            const doD = cleanPhone(t.dropoffPhone);
-            const puIsF = isFacilitySiteName(t.pickupSiteName || '') || isFacilitySiteName(t.pickup || '');
-            const doIsF = isFacilitySiteName(t.dropoffSiteName || '') || isFacilitySiteName(t.dropoff || '');
-            if (puIsF && puD && isValidPhone(puD)) bestHospitalPhone = puD;
-            else if (doIsF && doD && isValidPhone(doD)) bestHospitalPhone = doD;
-          });
-        }
-
-        // Apply normalized phones to ALL legs in this group
-        if (bestClientPhone || bestHospitalPhone) {
-          trips.forEach(t => {
-            if (bestClientPhone && isValidPhone(bestClientPhone)) {
-              t.patientPhone = bestClientPhone;
-            }
-            if (bestHospitalPhone && isValidPhone(bestHospitalPhone)) {
-              t.hospitalPhone = bestHospitalPhone;
-            }
-          });
-        }
-      });
-
-      // Global Phone Ownership & Identification Engine (37-section specification rules)
-      // Group all trips by patient and resolve phone ownership deterministically
+      // Resolve each client's primary number once across all of their A/B legs.
+      // Pickup/dropoff numbers remain unchanged as location contacts; they are never
+      // promoted to the primary client number by leg direction alone.
       const patientAnalysisMap = new Map();
       pairedMapped.forEach(t => {
         const pk = (t.patient || '').trim().toLowerCase();
@@ -1133,6 +869,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           t.phoneSource = analysis.phoneSource || '';
           t.phoneNeedsReview = analysis.phoneNeedsReview || false;
           t.phoneEvidenceMap = analysis.phoneEvidenceMap || {};
+          if (t.phoneNeedsReview) {
+            t._hasIssues = true;
+            t._issues = [
+              ...(Array.isArray(t._issues) ? t._issues : []),
+              'Client phone could not be distinguished from a clinic or facility number. Review the phone fields before import.',
+            ];
+          }
         }
 
         // Preserve raw source phone fields

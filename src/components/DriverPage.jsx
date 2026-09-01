@@ -23,7 +23,7 @@ import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToW
 import { impact, selection } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 
-import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, cleanPhone, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
+import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
 import { normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { SkeletonTripCard } from './ui/Skeleton';
@@ -39,6 +39,7 @@ import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
 import { queueSyncOperation } from '../utils/localDB';
 import { normalizeTenantId } from '../utils/tenantScope';
 import { sanitizeOdometerInput } from '../utils/odometerInput';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -1956,8 +1957,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [assignedSequence, driverScopedTrips]);
   const getRoutePlanStopPhone = useCallback((stop) => {
     if (!stop) return '';
-    const directPhone = stop.phone || stop.patientPhone || stop.pickupPhone || stop.dropoffPhone;
-    if (directPhone) return directPhone;
     const stopType = String(stop.type || '').toUpperCase() === 'DO' ? 'DO' : 'PU';
     const bookingId = String(stop.bookingId || '').trim().toLowerCase();
     const address = String(stop.address || '').trim().toLowerCase();
@@ -1971,10 +1970,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         || (name && tripName === name && ((stopType === 'PU' && pickup === address) || (stopType === 'DO' && dropoff === address)))
         || (address && (pickup === address || dropoff === address));
     });
-    if (!matchedTrip) return '';
-    return stopType === 'DO'
-      ? (matchedTrip.dropoffPhone || matchedTrip.patientPhone || matchedTrip.patientMobile || matchedTrip.pickupPhone || '')
-      : (matchedTrip.pickupPhone || matchedTrip.patientPhone || matchedTrip.patientMobile || matchedTrip.dropoffPhone || '');
+    if (matchedTrip) return resolveClientPhoneForTrip(matchedTrip, driverScopedTrips);
+    return resolveClientPhoneForTrip(stop);
   }, [driverScopedTrips]);
   const getRoutePlanStopKey = useCallback((stop) => (
     `${stop?.clientId || stop?.id || 'stop'}:${String(stop?.type || 'PU').toUpperCase()}:${stop?.stepNumber || stop?.sequenceIndex || 0}`
@@ -2746,14 +2743,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           stopType: String(stop?.type || 'PU').toUpperCase() === 'DO' ? 'DO' : 'PU',
           address: stop?.address || '',
           bookingId: stop?.bookingId || '',
-          phone: stop?.phone || stop?.patientPhone || stop?.pickupPhone || stop?.dropoffPhone || '',
+          phone: getRoutePlanStopPhone(stop),
           sequenceIndex: stop?.sequenceIndex || 0,
           ...updates,
           updatedAt: nowIso,
         },
       },
     };
-  }, [assignedSequence?.driverWorkflow, assignedSequence?.id, getRoutePlanStopKey]);
+  }, [assignedSequence?.driverWorkflow, assignedSequence?.id, getRoutePlanStopKey, getRoutePlanStopPhone]);
 
   const saveRoutePlanStopWorkflow = useCallback(async (stop, updates = {}, auditTitle = null, auditMessage = null) => {
     if (!stop || !assignedSequence?.id) return null;
@@ -4610,7 +4607,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           tripId: t.id,
                           bookingId: t.bookingId || t.tripNumber || '',
                           serviceType: t.serviceType || t.type || t.req || '',
-                          phone: t.pickupPhone || t.patientPhone || t.patientMobile || '',
+                          phone: resolveClientPhoneForTrip(t, driverScopedTrips),
+                          locationPhone: t.pickupPhone || '',
                           source: 'driver-trip',
                         },
                         {
@@ -4621,7 +4619,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           tripId: t.id,
                           bookingId: t.bookingId || t.tripNumber || '',
                           serviceType: t.serviceType || t.type || t.req || '',
-                          phone: t.dropoffPhone || t.patientPhone || t.patientMobile || '',
+                          phone: resolveClientPhoneForTrip(t, driverScopedTrips),
+                          locationPhone: t.dropoffPhone || '',
                           source: 'driver-trip',
                         },
                       ])
@@ -6098,7 +6097,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   time: s.time || '',
                   serviceType: s.serviceType || '',
                   bookingId: s.bookingId || '',
-                  phone: s.phone || s.patientPhone || s.pickupPhone || s.dropoffPhone || '',
+                  phone: (() => {
+                    const sourceTrip = driverScopedTrips.find((trip) => trip.id === s.tripId || trip.id === s.routePlanTripId);
+                    return sourceTrip
+                      ? resolveClientPhoneForTrip(sourceTrip, driverScopedTrips)
+                      : resolveClientPhoneForTrip(s);
+                  })(),
                   routePlanTripId: s.tripId || null,
                 };
               });
@@ -7584,14 +7588,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       </div>
                     </div>
                     {leg.notes && <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">{leg.notes}</p>}
-                    {leg.pickupPhone && (() => {
-                      const contact = getContactsForTrip(leg).find(c => cleanPhone(c.phone) === cleanPhone(leg.pickupPhone));
-                      const label = contact ? contact.label : 'Contact';
+                    {getPrimaryContactForTrip(leg) && (() => {
+                      const contact = getPrimaryContactForTrip(leg);
+                      const label = contact.label || 'Client';
                       return (
                         <div className="mt-1.5 flex items-center gap-2">
                           <span className="text-micro font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-                          <button type="button" onClick={() => handleCall(leg.pickupPhone, `${label}: ${leg.patient}`)} className="text-xs text-blue-600 font-medium flex items-center gap-1 hover:underline cursor-pointer">
-                            <Phone size={16} /> {formatPhoneDisplay(leg.pickupPhone)}
+                          <button type="button" onClick={() => handleCall(contact.phone, `${label}: ${leg.patient}`)} className="text-xs text-blue-600 font-medium flex items-center gap-1 hover:underline cursor-pointer">
+                            <Phone size={16} /> {formatPhoneDisplay(contact.phone)}
                           </button>
                         </div>
                       );

@@ -3,6 +3,7 @@ import { X, Send, Loader2, MessageSquare, ChevronDown, ChevronUp } from 'lucide-
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, collection, query, where, orderBy, getDocs } from '../config/firebase';
 import { limit } from 'firebase/firestore';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 
 const DEFAULT_TEMPLATE = `Hi {patient}, this is Agape Care confirming your trip on {date} at {time}. Reply YES to confirm or NO to cancel. Call 317-777-7707 if you have questions.`;
 
@@ -21,24 +22,7 @@ const SmsConversationModal = ({ trip, onClose }) => {
     if (digits.length === 10) return "+1" + digits;
     return "+" + digits;
   };
-  const FACILITY_KW = ['center','centre','clinic','hospital','care','treatment','medical','health','therapy','academy','school','facility','llc','inc','llp','corp','ltd','pharmacy','pharm','dialysis','rehab','rehabilitation','mental health','behavioral','paediatric','pediatric','dental','lab','imaging','radiology','urgent care','er ','emergency','surgery','surgical','ortho','cardio','neuro'];
-  const isFac = (n) => { const l = (n||'').toLowerCase().trim(); return l ? FACILITY_KW.some(kw => l.includes(kw)) : false; };
-  const getClientPhone = (t) => {
-    if (t.patientPhone) return t.patientPhone;
-    const pu = t.pickupPhone || '', doPh = t.dropoffPhone || '';
-    if (!pu && !doPh) return '';
-    const hp = (t.hospitalPhone || '').replace(/[^0-9]/g, '');
-    const puClean = pu.replace(/[^0-9]/g, '');
-    const doClean = doPh.replace(/[^0-9]/g, '');
-    if (hp && puClean && puClean === hp && doPh && doClean !== hp) return doPh;
-    if (hp && doClean && doClean === hp && pu && puClean !== hp) return pu;
-    const puFac = isFac(t.pickupSiteName||'') || isFac(t.pickup||'');
-    const doFac = isFac(t.dropoffSiteName||'') || isFac(t.dropoff||'');
-    if (puFac && !doFac) return doPh;
-    if (doFac && !puFac) return pu;
-    return pu || doPh;
-  };
-  const phone = normalizePhone(getClientPhone(trip));
+  const phone = normalizePhone(resolveClientPhoneForTrip(trip));
 
   const templatePreview = DEFAULT_TEMPLATE
     .replace(/\{patient\}/g, trip.patient || 'Client')

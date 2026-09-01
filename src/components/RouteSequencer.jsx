@@ -11,6 +11,7 @@ import {
   isTerminalTripStatus,
   normalizeRouteRecord,
 } from '../utils/routePlans';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 
 const getTripUrgency = (timeStr, status) => {
   if (!timeStr || ['Completed', 'Cancelled', 'No Show'].includes(status)) return 0;
@@ -73,7 +74,8 @@ export const tripsToClients = (trips, selectedDay) => {
       tripStatus: t.status || 'Unassigned',
       driverName: t.driverName || '',
       bookingId: t.bookingId || '',
-      patientPhone: t.patientPhone || '',
+      patientPhone: resolveClientPhoneForTrip(t, trips),
+      clientPhone: resolveClientPhoneForTrip(t, trips),
       pickupPhone: t.pickupPhone || '',
       dropoffPhone: t.dropoffPhone || '',
       notes: t.notes || '',
@@ -91,6 +93,7 @@ const TERMINAL_TRIP_LABELS = new Set(['Completed', 'Cancelled', 'No Show']);
 
 const buildImportedRouteClients = (initialStops, initialTripById, currentDay) => {
   if (!initialStops || initialStops.length === 0) return [];
+  const initialTrips = Array.from(initialTripById.values());
   return initialStops.map((s, i) => ({
     id: s.id,
     name: initialTripById.get(s.id)?.patient || s.name || `Stop ${String.fromCharCode(65 + i)}`,
@@ -107,7 +110,9 @@ const buildImportedRouteClients = (initialStops, initialTripById, currentDay) =>
     tripStatus: initialTripById.get(s.id)?.status || 'Unassigned',
     driverName: initialTripById.get(s.id)?.driverName || '',
     bookingId: initialTripById.get(s.id)?.bookingId || s.bookingId || '',
-    patientPhone: initialTripById.get(s.id)?.patientPhone || s.patientPhone || s.phone || '',
+    patientPhone: initialTripById.has(s.id)
+      ? resolveClientPhoneForTrip(initialTripById.get(s.id), initialTrips)
+      : (s.clientPhone || s.patientPhone || ''),
     pickupPhone: initialTripById.get(s.id)?.pickupPhone || s.pickupPhone || s.phone || '',
     dropoffPhone: initialTripById.get(s.id)?.dropoffPhone || s.dropoffPhone || s.phone || '',
     notes: initialTripById.get(s.id)?.notes || '',
@@ -723,7 +728,8 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
             address: stop.type === 'PU' ? (client?.pu || '') : (client?.do || ''),
             time: stop.type === 'PU' ? (client?.puTime || '') : (client?.doTime || ''),
             bookingId: client?.bookingId || '',
-            phone: client?.patientPhone || (stop.type === 'PU' ? client?.pickupPhone : client?.dropoffPhone) || client?.pickupPhone || client?.dropoffPhone || '',
+            phone: client?.clientPhone || client?.patientPhone || '',
+            locationPhone: stop.type === 'PU' ? (client?.pickupPhone || '') : (client?.dropoffPhone || ''),
             source: client?.isRoutePlanImport ? 'route-plan' : client?.isTemp ? 'temp' : 'trip',
           };
         }),
@@ -1059,14 +1065,19 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
                         )}
                         {(client.patientPhone || client.pickupPhone || client.dropoffPhone) && (
                           <div className="mt-1 flex flex-wrap gap-1">
-                            {(client.patientPhone || client.pickupPhone) && (
+                            {client.patientPhone && (
                                <span className="rounded-full border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
-                                Client {client.patientPhone || client.pickupPhone}
+                                Client {client.patientPhone}
                               </span>
                             )}
-                            {client.dropoffPhone && (
+                            {client.pickupPhone && client.pickupPhone !== client.patientPhone && (
+                               <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
+                                Pickup location {client.pickupPhone}
+                              </span>
+                            )}
+                            {client.dropoffPhone && client.dropoffPhone !== client.patientPhone && (
                                <span className="rounded-full border border-rose-100 bg-rose-50 px-1.5 py-0.5 text-xs font-semibold text-rose-700">
-                                Dropoff {client.dropoffPhone}
+                                Dropoff location {client.dropoffPhone}
                               </span>
                             )}
                           </div>

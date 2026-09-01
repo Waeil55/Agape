@@ -3,6 +3,7 @@ import { Search, Plus, Upload, Route, Users, Truck, MapPin, Phone, X, Edit2, Ban
 import { getDriverLiveStatus } from "../constants/statuses";
 import { tripCalendarDateKey, localCalendarYmd } from "../utils/tripDate";
 import { tripMatchesSearch } from "../utils/search";
+import { resolveClientPhoneForTrip } from "../utils/clientPhoneResolution";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 const timeToMinutes = (t) => {
@@ -59,7 +60,7 @@ const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str 
 const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
 /* ─── Admin Trip Card ─────────────────────────────────────────────── */
-const AdminTripCard = ({ trip, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role }) => {
+const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role }) => {
   const [showActions, setShowActions] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,6 +69,7 @@ const AdminTripCard = ({ trip, drivers, onOpenTripDetails, onOpenTripWorkflow, a
   const statusCfg = getStatusConfig(trip.status);
   const urgency = getUrgency(trip);
   const driver = drivers.find(d => d.id === trip.driverId || (trip.driverName && d.name === trip.driverName));
+  const clientPhone = resolveClientPhoneForTrip(trip, allTrips);
   const isTerminal = TERMINAL.includes(trip.status);
   const isActive = IN_PROGRESS.includes(trip.status);
   const pickup = getAddr(trip.pickup);
@@ -157,8 +159,9 @@ const AdminTripCard = ({ trip, drivers, onOpenTripDetails, onOpenTripWorkflow, a
           </select>
           <textarea value={draft.pickup || ''} onChange={event => setDraft(current => ({ ...current, pickup: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Pickup address" aria-label="Pickup address" />
           <textarea value={draft.dropoff || ''} onChange={event => setDraft(current => ({ ...current, dropoff: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Dropoff address" aria-label="Dropoff address" />
-          <input value={draft.pickupPhone || draft.patientPhone || ''} onChange={event => setDraft(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Patient phone" aria-label="Patient phone" />
-          <input value={draft.dropoffPhone || ''} onChange={event => setDraft(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff phone" aria-label="Dropoff phone" />
+          <input value={draft.clientPhone || draft.patientPhone || ''} onChange={event => setDraft(current => ({ ...current, clientPhone: event.target.value, patientPhone: event.target.value }))} className={fieldClass} placeholder="Client main phone" aria-label="Client main phone" />
+          <input value={draft.pickupPhone || ''} onChange={event => setDraft(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Pickup location phone" aria-label="Pickup location phone" />
+          <input value={draft.dropoffPhone || ''} onChange={event => setDraft(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff location phone" aria-label="Dropoff location phone" />
           <textarea value={draft.notes || ''} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Notes" aria-label="Notes" />
         </div>
         {editError && <p className="mt-2 rounded-lg bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700">{editError}</p>}
@@ -277,11 +280,11 @@ const AdminTripCard = ({ trip, drivers, onOpenTripDetails, onOpenTripWorkflow, a
                   {driver ? "Reassign" : "Assign"}
                 </button>
               )}
-              {trip.patientPhone && (
+              {clientPhone && (
                 <>
                   <button
                     type="button"
-                    onClick={() => makeCall?.(trip.patientPhone, trip.patient)}
+                    onClick={() => makeCall?.(clientPhone, trip.patient)}
                     className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center active:scale-95 transition-colors"
                     title="Call patient"
                   >
@@ -289,7 +292,7 @@ const AdminTripCard = ({ trip, drivers, onOpenTripDetails, onOpenTripWorkflow, a
                   </button>
                   <button
                     type="button"
-                    onClick={() => sendSMS?.(trip.patientPhone, trip.patient)}
+                    onClick={() => sendSMS?.(clientPhone, trip.patient)}
                     className="w-11 h-11 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center active:scale-95 transition-colors"
                     title="SMS patient"
                   >
@@ -401,20 +404,20 @@ const AdminTripCard = ({ trip, drivers, onOpenTripDetails, onOpenTripWorkflow, a
                 </div>
               )}
               {/* Call patient */}
-              {trip.patientPhone && (
+              {clientPhone && (
                 <button
                     type="button"
-                    onClick={() => { makeCall?.(trip.patientPhone, trip.patient); setShowActions(false); }}
+                    onClick={() => { makeCall?.(clientPhone, trip.patient); setShowActions(false); }}
                     className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold active:scale-95 transition-colors"
                   >
                     <Phone size={18} /> Call Patient
                   </button>
               )}
               {/* SMS patient */}
-              {trip.patientPhone && (
+              {clientPhone && (
                 <button
                   type="button"
-                  onClick={() => { sendSMS?.(trip.patientPhone, trip.patient); setShowActions(false); }}
+                  onClick={() => { sendSMS?.(clientPhone, trip.patient); setShowActions(false); }}
                   className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold active:scale-95 transition-colors"
                 >
                   <MessageSquare size={18} /> SMS Patient
@@ -671,6 +674,7 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
               <AdminTripCard
                 key={trip.id}
                 trip={trip}
+                allTrips={trips}
                 drivers={drivers}
                 onOpenTripDetails={onOpenTripDetails}
                 onOpenTripWorkflow={onOpenTripWorkflow}

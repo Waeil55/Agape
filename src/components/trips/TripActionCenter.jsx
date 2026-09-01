@@ -3,13 +3,14 @@ import {
   Archive, ClipboardList, Edit2, History, MapPin, MessageSquare,
   Navigation, Phone, RotateCcw, UserRoundCog, X,
 } from 'lucide-react';
+import { resolveClientPhoneForTrip } from '../../utils/clientPhoneResolution';
 
 const TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
 
 export const buildTripActionModel = ({ trip, role, driver, callbacks = {} }) => {
   if (!trip) return [];
   const canOperate = role === 'admin' || role === 'dispatcher' || role === 'fleet_manager';
-  const phone = trip.patientPhone || trip.pickupPhone || trip.dropoffPhone || '';
+  const phone = resolveClientPhoneForTrip(trip);
   const actions = [
     callbacks.onView && { id: 'view', label: 'Trip details', hint: 'Review the complete trip record', icon: ClipboardList, onSelect: callbacks.onView },
     callbacks.onDrive && canOperate && !TERMINAL_STATUSES.has(trip.status) && {

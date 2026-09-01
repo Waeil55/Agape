@@ -1,4 +1,9 @@
-const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute','senior','living','manor','village','skills','nursing','facility','campus','recreation','community','assisted','hospice','psychiatric','behavioral','outpatient','urgent care','emergency room','er','medicaid','medicare','health services','clinic','surgical center','doctors office','dr office','physician','specialty center','imaging','radiology','oncology','cardiology','orthopedic','pediatrics','obgyn','women','family practice'];
+import {
+  isFacilityLikeText,
+  isHomeLikeText,
+  normalizePhoneDigits,
+  resolveClientPhoneForTrip,
+} from './clientPhoneResolution';
 
 export const cleanPhone = (p) => (p || '').replace(/[^0-9]/g, '');
 
@@ -9,18 +14,9 @@ const isValidPhone = (cleaned) => {
   return false;
 };
 
-const isLikelyFacilityAddress = (address) => {
-  if (!address) return false;
-  const lower = address.toLowerCase();
-  return FACILITY_KEYWORDS.some(kw => lower.includes(kw));
-};
+const isLikelyFacilityAddress = (address) => isFacilityLikeText(address);
 
-const isLikelyHomeAddress = (address) => {
-  if (!address) return false;
-  const lower = address.toLowerCase();
-  const homeIndicators = ['apt','apartment','unit','suite','#','floor','st','street','ave','avenue','blvd','drive','lane','court','place','way','circle','terrace','road','lane','drive','avenue','boulevard'];
-  return homeIndicators.some(ind => lower.includes(ind)) && !isLikelyFacilityAddress(address);
-};
+const isLikelyHomeAddress = (address) => isHomeLikeText(address);
 
 const detectContactTypeForNumber = (phone, contextAddress, _patientName, allTrips) => {
   if (!phone || !cleanPhone(phone)) return null;
@@ -64,7 +60,7 @@ const detectRoleFromField = (fieldName) => {
   return roleMap[fieldName] || { role: 'patient', label: 'Contact', priority: 3, confidence: 'low' };
 };
 
-const buildContactList = (trip, allTrips, phoneNumbers = {}) => {
+const buildContactList = (trip, allTrips = [], phoneNumbers = {}) => {
   const contacts = [];
   const addedPhones = new Set();
 
@@ -86,9 +82,17 @@ const buildContactList = (trip, allTrips, phoneNumbers = {}) => {
     });
   };
 
+  const resolvedClientPhone = resolveClientPhoneForTrip(trip, allTrips);
+  if (resolvedClientPhone) {
+    const toTenDigits = (value) => normalizePhoneDigits(value).replace(/^1(?=\d{10}$)/, '');
+    const guardianMatch = toTenDigits(trip.guardianPhone) === resolvedClientPhone;
+    const escortMatch = toTenDigits(trip.escortPhone) === resolvedClientPhone;
+    const role = guardianMatch ? 'guardian' : escortMatch ? 'escort' : 'patient';
+    const label = guardianMatch ? 'Guardian' : escortMatch ? 'Escort' : 'Client';
+    tryAddContact(resolvedClientPhone, trip.patient, role, label, 1, 'high', { field: 'clientPhone' });
+  }
+
   const knownFieldRoles = [
-    { field: 'patientMobile', role: 'patient', label: 'Patient Mobile', priority: 1 },
-    { field: 'patientPhone', role: 'patient', label: 'Patient', priority: 1 },
     { field: 'guardianPhone', role: 'guardian', label: 'Guardian', priority: 2 },
     { field: 'escortPhone', role: 'escort', label: 'Escort', priority: 2 },
     { field: 'emergencyContact', role: 'emergency', label: 'Emergency Contact', priority: 3 },
@@ -101,11 +105,8 @@ const buildContactList = (trip, allTrips, phoneNumbers = {}) => {
     }
   }
 
-  const cleanedPatientMobile = cleanPhone(trip.patientMobile);
-  const cleanedPatientPhone = cleanPhone(trip.patientPhone);
   const knownPatientPhones = new Set();
-  if (cleanedPatientMobile) knownPatientPhones.add(cleanedPatientMobile);
-  if (cleanedPatientPhone) knownPatientPhones.add(cleanedPatientPhone);
+  if (resolvedClientPhone) knownPatientPhones.add(cleanPhone(resolvedClientPhone));
 
   const cleanedPickup = cleanPhone(trip.pickupPhone);
   const cleanedDropoff = cleanPhone(trip.dropoffPhone);
@@ -159,24 +160,18 @@ const buildContactList = (trip, allTrips, phoneNumbers = {}) => {
   return contacts;
 };
 
-const CONTACT_ROLES = new Set(['patient', 'guardian', 'escort', 'emergency', 'pickup', 'dropoff', 'facility']);
-
 const getPrimaryContact = (trip, allTrips, phoneNumbers = {}) => {
   const contacts = buildContactList(trip, allTrips, phoneNumbers);
   for (const role of ['patient', 'guardian', 'escort', 'emergency']) {
-    const found = contacts.find(c => c.role === role);
+    const found = contacts.find(c => c.role === role && c.confidence !== 'low');
     if (found) return found;
   }
-  const personal = contacts.find(c => CONTACT_ROLES.has(c.role));
-  if (personal) return personal;
   return null;
 };
 
 const getContactWarning = (trip, allTrips) => {
   const primary = getPrimaryContact(trip, allTrips);
   if (!primary) return { show: true, message: 'No contact number available for this trip.', severity: 'error' };
-  if (primary.role === 'facility') return { show: true, message: 'No patient mobile available. Calling facility.', severity: 'warning' };
-  if (primary.confidence === 'low') return { show: true, message: 'Patient number not confirmed. Verify before calling.', severity: 'info' };
   if (primary.role === 'guardian') return { show: true, message: `Contacting guardian: ${primary.name}`, severity: 'info' };
   if (primary.role === 'escort') return { show: true, message: `Contacting escort: ${primary.name}`, severity: 'info' };
   return { show: false, message: '', severity: 'none' };
@@ -221,7 +216,6 @@ const getContactRoleActions = (role) => {
 };
 
 export {
-  FACILITY_KEYWORDS,
   isLikelyFacilityAddress,
   isLikelyHomeAddress,
   detectContactTypeForNumber,

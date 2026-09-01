@@ -7,6 +7,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 import { toValidDate } from '../utils/safeDate';
 import { useChat } from '../hooks/useChat';
 import { buildGlobalSearchResults } from './GlobalEntitySearch';
+import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const OperationsCommandCenter = lazy(() => import('./OperationsCommandCenter'));
 const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
@@ -81,24 +82,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
-const isFacility = (name) => { const l = (name||'').toLowerCase().trim(); return l ? FACILITY_KEYWORDS.some(kw => l.includes(kw)) : false; };
-const cleanPhoneLocal = (p) => (p || '').replace(/[^0-9]/g, '');
-const getClientPhoneGlobal = (trip) => {
-  if (trip.patientPhone) return trip.patientPhone;
-  const pu = trip.pickupPhone || '', doPh = trip.dropoffPhone || '';
-  if (!pu && !doPh) return '';
-  const hp = cleanPhoneLocal(trip.hospitalPhone);
-  const puClean = cleanPhoneLocal(pu);
-  const doClean = cleanPhoneLocal(doPh);
-  if (hp && puClean && puClean === hp && doPh && doClean !== hp) return doPh;
-  if (hp && doClean && doClean === hp && pu && puClean !== hp) return pu;
-  const puFac = isFacility(trip.pickupSiteName||'') || isFacility(trip.pickup||'');
-  const doFac = isFacility(trip.dropoffSiteName||'') || isFacility(trip.dropoff||'');
-  if (puFac && !doFac) return doPh;
-  if (doFac && !puFac) return pu;
-  return pu || doPh;
-};
+const getClientPhoneGlobal = (trip) => resolveClientPhoneForTrip(trip);
 const SYNTHETIC_REFERENCE_PATTERNS = [/^BK-\d+-\d+$/i, /^TRP-\d+$/i, /^TRIP-\d{10,}-\d+$/i];
 
 const isSyntheticReference = (value) => {

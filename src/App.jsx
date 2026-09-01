@@ -5,7 +5,7 @@ import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
 import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd, isoToLocalDateKey } from './utils/tripDate';
-import { cleanPhone } from './utils/smartContacts';
+import { resolveClientPhoneForTrip } from './utils/clientPhoneResolution';
 import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playNotificationSound, initAudioContext } from './utils/notificationSound';
@@ -47,7 +47,7 @@ import {
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v377';
+const APP_VERSION = 'v378';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -1640,80 +1640,15 @@ const App = () => {
     const selectedTrips = trips.filter(t => selectedTasks.includes(t.id) && canControlTrip(t));
     if (selectedTrips.length === 0) return;
 
-    // Build map of patient → best client phone (detect home address as one that appears in both pickup and dropoff)
-    const patientPhoneMap = {};
-    const patientAddresses = {};
-    const FACILITY_KEYWORDS = ['hospital','center','clinic','academy','school','treatment','health','dental','pharmacy','office','suite','care','medical','therapy','rehab','wellness','surgery','diagnostic','lab','institute', 'skills', 'senior', 'living', 'manor', 'village'];
-    selectedTrips.forEach(t => {
-      const key = (t.patient || '').trim().toLowerCase();
-      if (!patientAddresses[key]) patientAddresses[key] = { pickups: [], dropoffs: [], trips: [] };
-      if (t.pickup) patientAddresses[key].pickups.push(t.pickup.trim().toLowerCase());
-      if (t.dropoff) patientAddresses[key].dropoffs.push(t.dropoff.trim().toLowerCase());
-      patientAddresses[key].trips.push(t);
-    });
-    Object.values(patientAddresses).forEach(({ pickups, dropoffs, trips: pTrips }) => {
-      // Find home address (appears in both pickups and dropoffs for same patient)
-      const homeAddr = pickups.find(p => dropoffs.includes(p)) || '';
-      let clientPhone = '';
-
-      const allPossiblePhones = pTrips.flatMap(t => [t.pickupPhone, t.dropoffPhone]).filter(Boolean);
-
-      // Heuristic: A phone is a facility if it's shared by other patients in the main trips list
-      const isShared = (p) => {
-        if (!p) return false;
-        const cleaned = cleanPhone(p);
-        if (cleaned.length < 7) return false;
-        return trips.some(t =>
-          (t.patient || '').toLowerCase() !== (pTrips[0].patient || '').toLowerCase() &&
-          (cleanPhone(t.pickupPhone) === cleaned || cleanPhone(t.dropoffPhone) === cleaned)
-        );
-      };
-
-      if (homeAddr) {
-        const homeTrip = pTrips.find(t => (t.pickup || '').trim().toLowerCase() === homeAddr);
-        if (homeTrip && !isShared(homeTrip.pickupPhone)) clientPhone = homeTrip.pickupPhone || '';
-        if (!clientPhone) {
-          const returnTrip = pTrips.find(t => (t.dropoff || '').trim().toLowerCase() === homeAddr);
-          if (returnTrip && !isShared(returnTrip.dropoffPhone)) clientPhone = returnTrip.dropoffPhone || '';
-        }
-      }
-
-      if (!clientPhone) {
-        // Find any phone for this patient that is NOT shared
-        clientPhone = allPossiblePhones.find(p => !isShared(p)) || '';
-      }
-
-      if (!clientPhone) {
-        // Final fallback to existing keyword detection
-        const trip = pTrips[0];
-        const isPickupFacility = FACILITY_KEYWORDS.some(k => (trip.pickup || '').toLowerCase().includes(k)) ||
-                                 FACILITY_KEYWORDS.some(k => (trip.pickupSiteName || '').toLowerCase().includes(k));
-        const isDropoffFacility = FACILITY_KEYWORDS.some(k => (trip.dropoff || '').toLowerCase().includes(k)) ||
-                                  FACILITY_KEYWORDS.some(k => (trip.dropoffSiteName || '').toLowerCase().includes(k));
-        if (isPickupFacility && !isDropoffFacility) {
-          clientPhone = trip.dropoffPhone || '';
-        } else if (!isPickupFacility && isDropoffFacility) {
-          clientPhone = trip.pickupPhone || '';
-        } else {
-          clientPhone = trip.patientPhone || trip.pickupPhone || trip.dropoffPhone || '';
-        }
-      }
-
-      pTrips.forEach(t => {
-        const key = (t.patient || '').trim().toLowerCase();
-        patientPhoneMap[key] = clientPhone;
-      });
-    });
-
     // Create legs: all pickups then all dropoffs (can be reordered later by driver)
     const legs = [];
     selectedTrips.forEach(t => {
-      const clientPhone = t.patientPhone || patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
-      legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.pickup, notes: t.notes, phone: clientPhone });
+      const clientPhone = resolveClientPhoneForTrip(t, trips);
+      legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'PICKUP', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.pickup, notes: t.notes, phone: clientPhone, locationPhone: t.pickupPhone || '' });
     });
     selectedTrips.forEach(t => {
-      const clientPhone = t.patientPhone || patientPhoneMap[(t.patient || '').trim().toLowerCase()] || t.pickupPhone;
-      legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: clientPhone });
+      const clientPhone = resolveClientPhoneForTrip(t, trips);
+      legs.push({ id: `L-${Math.random().toString(36).substr(2, 5)}`, type: 'DROPOFF', tripId: t.id, bookingId: t.bookingId, patient: t.patient, address: t.dropoff, notes: t.notes, phone: clientPhone, locationPhone: t.dropoffPhone || '' });
     });
 
     // Update trips status and assign to driver

@@ -23,7 +23,9 @@ const FACILITY_KEYWORDS = [
   'academy', 'school', 'facility', 'pharmacy', 'pharm',
   'dialysis', 'rehab', 'rehabilitation', 'mental health', 'behavioral', 'paediatric', 'pediatric',
   'dental', 'lab', 'imaging', 'radiology', 'urgent care', 'emergency', 'surgery', 'surgical',
-  'ortho', 'cardio', 'neuro', 'specialty', 'diagnostic', 'wellness',
+  'ortho', 'cardio', 'neuro', 'specialty', 'diagnostic', 'wellness', 'office', 'practice',
+  'institute', 'nursing', 'assisted living', 'senior living', 'hospice', 'outpatient',
+  'oncology', 'cardiology', 'orthopedic', 'autism', 'campus', 'llc', 'inc',
   'medical center', 'health services', 'primary care', 'physician', 'doctor', 'doctors office', 'provider',
 ];
 
@@ -126,7 +128,19 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
   // Count how many unique patients share each phone across ALL trips in the file
   const phonePatientCounts = new Map();
   allTrips.forEach((trip) => {
-    const values = [trip.patientPhone, trip.pickupPhone, trip.dropoffPhone, trip.hospitalPhone];
+    const values = [
+      trip.clientPhone,
+      trip.patientPhone,
+      trip.patientMobile,
+      trip.memberPhone,
+      trip.riderPhone,
+      trip.guardianPhone,
+      trip.escortPhone,
+      trip.pickupPhone,
+      trip.dropoffPhone,
+      trip.hospitalPhone,
+      trip.facilityPhone,
+    ];
     values.forEach((value) => {
       const digits = normalizePhoneDigits(value);
       if (!isValidPhoneDigits(digits)) return;
@@ -200,6 +214,26 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
     const pickupSite = trip.pickupSiteName || trip.pickupSite || '';
     const dropoffSite = trip.dropoffSiteName || trip.dropoffSite || '';
 
+    if (trip.clientPhone) {
+      registerCandidate(trip.clientPhone, {
+        locationText: '',
+        siteName: '',
+        side: 'clientPhone',
+        trip,
+        explicitLabel: 'Client Phone',
+      });
+    }
+
+    if (trip.patientMobile) {
+      registerCandidate(trip.patientMobile, {
+        locationText: '',
+        siteName: '',
+        side: 'patientMobile',
+        trip,
+        explicitLabel: 'Patient Mobile',
+      });
+    }
+
     if (trip.patientPhone) {
       registerCandidate(trip.patientPhone, {
         locationText: trip.pickup || '',
@@ -267,6 +301,8 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
     let guardianScore = 0;
     let facilityScore = 0;
 
+    if (rec.explicitLabels.has('Client Phone')) clientScore += 120;
+    if (rec.explicitLabels.has('Patient Mobile')) clientScore += 100;
     if (rec.explicitLabels.has('Patient Phone')) clientScore += 60;
     if (rec.residentialCount > 0) {
       clientScore += 80 + rec.residentialCount * 20;
@@ -339,7 +375,13 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
     }
 
     // Set Confidence
-    if (primaryPersonal.explicitLabels.has('Patient Phone') || primaryPersonal.residentialCount >= 1 || primaryPersonal.scores.client >= 80) {
+    if (
+      primaryPersonal.explicitLabels.has('Client Phone')
+      || primaryPersonal.explicitLabels.has('Patient Mobile')
+      || primaryPersonal.explicitLabels.has('Patient Phone')
+      || primaryPersonal.residentialCount >= 1
+      || primaryPersonal.scores.client >= 80
+    ) {
       phoneConfidence = 'HIGH';
     } else if (primaryPersonal.scores.client >= 30) {
       phoneConfidence = 'MEDIUM';
@@ -414,25 +456,35 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
   };
 };
 
+const analysisCache = new WeakMap();
+
+const getCachedPhoneAnalysis = (trips, patientName) => {
+  if (!Array.isArray(trips) || trips.length === 0) {
+    return analyzePhoneOwnershipForTrips([], patientName);
+  }
+  let byPatient = analysisCache.get(trips);
+  if (!byPatient) {
+    byPatient = new Map();
+    analysisCache.set(trips, byPatient);
+  }
+  const patientKey = normalizePatientName(patientName);
+  if (!byPatient.has(patientKey)) {
+    byPatient.set(patientKey, analyzePhoneOwnershipForTrips(trips, patientName));
+  }
+  return byPatient.get(patientKey);
+};
+
 export const resolveClientPhoneForTrips = (trips = [], patientName = '') => {
-  const analysis = analyzePhoneOwnershipForTrips(trips, patientName);
-  return analysis.clientPhone || '';
+  const analysis = getCachedPhoneAnalysis(trips, patientName);
+  return analysis.phoneNeedsReview ? '' : (analysis.clientPhone || '');
 };
 
 export const resolveClientPhoneForTrip = (trip, allTrips = []) => {
   if (!trip) return '';
-  const patientTrips = allTrips.length > 0 ? allTrips.filter(Boolean) : [trip];
   const patientName = trip.patient || trip.clientName || trip.memberName || '';
-  const analysis = analyzePhoneOwnershipForTrips(patientTrips, patientName);
-  if (analysis.clientPhone) return analysis.clientPhone;
-
-  const direct = [trip.patientPhone, trip.pickupPhone, trip.dropoffPhone]
-    .map(normalizePhoneDigits)
-    .find((digits) => isValidPhoneDigits(digits));
-
-  if (direct) {
-    const ten = direct.length === 11 && direct.startsWith('1') ? direct.slice(1) : direct;
-    return ten;
-  }
-  return '';
+  const patientTrips = allTrips.length > 0 && normalizePatientName(patientName) ? allTrips : [trip];
+  const analysis = patientTrips === allTrips
+    ? getCachedPhoneAnalysis(patientTrips, patientName)
+    : analyzePhoneOwnershipForTrips(patientTrips, patientName);
+  return analysis.phoneNeedsReview ? '' : (analysis.clientPhone || '');
 };
