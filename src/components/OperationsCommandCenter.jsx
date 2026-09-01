@@ -15,6 +15,7 @@ import { toValidDate } from '../utils/safeDate';
 import { scopeOperationsTripsByDate } from '../utils/portalSelectors';
 import TripActionCenter from './trips/TripActionCenter';
 import { OPERATIONAL_VIEW_PRESETS, getOperationalViewPreset } from '../utils/operationalViews';
+import TableCheckbox from './ui/TableCheckbox';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -382,6 +383,16 @@ const getManifestDensityProfile = (density) => {
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+const OPERATIONS_COMPACT_DEFAULTS_VERSION = '1';
+const readOperationsLayoutPreference = () => {
+  const migrated = localStorage.getItem('agape_opsCompactDefaultsVersion') === OPERATIONS_COMPACT_DEFAULTS_VERSION;
+  const storedView = localStorage.getItem('agape_opsManifestView');
+  return {
+    manifestView: migrated && ['table', 'card', 'board'].includes(storedView) ? storedView : 'table',
+    showIntelligence: migrated && localStorage.getItem('agape_opsShowIntelligence') === 'true',
+  };
+};
+
 
 
 const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatchers, selectedTasks, setSelectedTasks, searchQuery, setSearchQuery, operationsTab, setOperationsTab, setManualAssignTrip, addToast, addAuditLog, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, requestDeleteTrip, updateTrip, makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onOpenLiveMap, onDriveTrip, logs = [] }) => {
@@ -396,7 +407,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const [manifestLimit, setManifestLimit] = useState(() => Number(localStorage.getItem('agape_opsManifestLimit') || 150));
   const [fleetLimit, setFleetLimit] = useState(() => Number(localStorage.getItem('agape_opsFleetLimit') || 60));
   const [expandedDriver, setExpandedDriver] = useState(() => localStorage.getItem('agape_opsExpandedDriver') || null);
-  const [manifestView, setManifestView] = useState(() => localStorage.getItem('agape_opsManifestView') || 'board');
+  const [manifestView, setManifestView] = useState(() => readOperationsLayoutPreference().manifestView);
   const [manifestGroupBy] = useState(() => localStorage.getItem('agape_opsManifestGroupBy') || 'driver');
   const [manifestDensity] = useState(() => 'minimal');
   const [showSmsModal, setShowSmsModal] = useState(false);
@@ -404,7 +415,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const openSmsForTrip = (trip) => { setSelectedTasks([trip.id]); setShowSmsModal(true); };
   const [showOnlyAttention, setShowOnlyAttention] = useState(() => localStorage.getItem('agape_opsShowOnlyAttention') === 'true');
   const [routeTemplates, setRouteTemplates] = useState([]);
-  const [showIntelligence, setShowIntelligence] = useState(() => localStorage.getItem('agape_opsShowIntelligence') !== 'false');
+  const [showIntelligence, setShowIntelligence] = useState(() => readOperationsLayoutPreference().showIntelligence);
   const [expandedTripIds, setExpandedTripIds] = useState([]);
 
 
@@ -525,6 +536,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     localStorage.setItem('agape_opsManifestDensity', manifestDensity);
     localStorage.setItem('agape_opsShowOnlyAttention', String(showOnlyAttention));
     localStorage.setItem('agape_opsShowIntelligence', String(showIntelligence));
+    localStorage.setItem('agape_opsCompactDefaultsVersion', OPERATIONS_COMPACT_DEFAULTS_VERSION);
     if (expandedDriver) {
       localStorage.setItem('agape_opsExpandedDriver', expandedDriver);
     } else {
@@ -1232,6 +1244,8 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   }, [filteredTrips, showOnlyAttention]);
 
   const visibleTrips = useMemo(() => manifestFeedTrips.slice(0, manifestLimit), [manifestFeedTrips, manifestLimit]);
+  const visibleTripIds = useMemo(() => new Set(visibleTrips.map((trip) => trip.id)), [visibleTrips]);
+  const selectedVisibleCount = useMemo(() => selectedTasks.filter((id) => visibleTripIds.has(id)).length, [selectedTasks, visibleTripIds]);
   const intelligenceScore = useMemo(() => {
     const lateCount = visibleTrips.filter((trip) => getTripUrgencyLevel(trip) === 'late').length;
     const unassignedCount = visibleTrips.filter((trip) => trip.status === 'Unassigned').length;
@@ -1297,7 +1311,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   // ==================== CONTROL BAR (DEDUPED COMMAND STRIP) ====================
 
   const renderControlBar = () => (
-    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm overflow-x-auto">
+    <div className="app-filter-bar gap-1 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm">
       {/* Main Tabs */}
       <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg">
         {['manifest', 'willcall', 'fleet'].map(tab => (
@@ -1349,13 +1363,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
         <UploadCloud size={13} /> Upload
       </button>
-      <button onClick={() => onOpenSequencer?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
-        <Route size={13} /> Routes
-      </button>
-      <button onClick={() => onOpenLiveMap?.()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
-        <MapPin size={13} /> Map
-      </button>
-
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
       {/* Search */}
@@ -1367,32 +1374,19 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
       {/* Sort */}
-      {[
-        { id: 'time', label: 'Time' },
-        { id: 'assignment', label: 'Driver' },
-        { id: 'status', label: 'Status' },
-        { id: 'patient', label: 'Client' },
-        { id: 'urgency', label: 'Urgency' }
-      ].map(option => (
-        <button
-          key={option.id}
-          onClick={() => {
-            if (sortBy === option.id) {
-              setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-            } else {
-              handleSortSelect(option.id);
-            }
-          }}
-          className={`flex items-center gap-0.5 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 ${
-            sortBy === option.id
-              ? 'bg-blue-100 text-blue-700'
-              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-          }`}
-        >
-          {option.label}
-          {sortBy === option.id && (sortDirection === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+      <label className="inline-flex shrink-0 items-center gap-1">
+        <span className="sr-only">Sort trips by</span>
+        <select aria-label="Sort trips" value={sortBy} onChange={(event) => handleSortSelect(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="time">Sort: Time</option>
+          <option value="assignment">Sort: Driver</option>
+          <option value="status">Sort: Status</option>
+          <option value="patient">Sort: Client</option>
+          <option value="urgency">Sort: Urgency</option>
+        </select>
+        <button type="button" onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="flex min-h-[28px] min-w-[28px] items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-700" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
+          {sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
         </button>
-      ))}
+      </label>
 
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
@@ -1422,22 +1416,12 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
       {/* View + AI */}
-      <div className="flex items-center gap-0.5 shrink-0">
-        {MANIFEST_VIEW_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setManifestView(option.value)}
-            className={`rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors whitespace-nowrap ${
-              manifestView === option.value
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-            }`}
-          >
-            {option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}
-          </button>
-        ))}
-      </div>
+      <label className="shrink-0">
+        <span className="sr-only">Manifest layout</span>
+        <select aria-label="Manifest layout" value={manifestView} onChange={(event) => setManifestView(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+          {MANIFEST_VIEW_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}</option>)}
+        </select>
+      </label>
 
       <button
         onClick={() => setShowIntelligence(prev => !prev)}
@@ -1692,7 +1676,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const renderManifestBoard = () => (
     <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_360px] gap-4 px-3 pb-3 h-full overflow-hidden">
       {/* Board View (Left Column) */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y pr-1">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <div className="max-w-sm rounded-xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
@@ -1789,14 +1773,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== DISPATCH CARDS ====================
   const renderDispatchCards = () => {
-    const CARD_SORT_OPTIONS = [
-      { value: 'time', label: 'Time' },
-      { value: 'assignment', label: 'Driver' },
-      { value: 'vehicle', label: 'Car' },
-      { value: 'distance', label: 'Distance' },
-      { value: 'trips', label: 'Trips' },
-      { value: 'status', label: 'Availability' },
-    ];
     const getMinutesUntil = (tripTime) => {
       if (!tripTime || tripTime === 'Will Call') return null;
       const mins = timeToMinutes(tripTime);
@@ -1808,7 +1784,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       return Math.round(diffMs / 60000);
     };
     return (
-      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-3">
         {manifestFeedTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <div className="max-w-sm rounded-xl border border-slate-100/50 bg-white p-8 text-center shadow-sm">
@@ -1821,41 +1797,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           </div>
         ) : (
           <>
-            {/* Sort Toolbar */}
-            <div className="mb-3 rounded-xl border border-slate-100/50 bg-white px-3 py-2 shadow-sm">
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-slate-200">
-                  {CARD_SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        if (sortBy === opt.value) {
-                          setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-                        } else {
-                          setSortBy(opt.value);
-                          setSortDirection('asc');
-                        }
-                      }}
-                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs transition-all ${
-                        sortBy === opt.value
-                          ? 'bg-slate-900 text-white shadow-sm'
-                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  className="shrink-0 px-3 py-1.5 rounded-xl text-xs bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center gap-1"
-                >
-                  {sortDirection === 'asc' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  {sortDirection === 'asc' ? 'Asc' : 'Desc'}
-                </button>
-              </div>
-            </div>
-
             {/* Trip Cards */}
             <div className="space-y-3">
               {visibleTrips.map((trip) => {
@@ -2103,7 +2044,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== TRIP TABLE ====================
   const renderTripTable = () => (
-    <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+    <div data-scroll-region="operations-ledger" className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-3">
       {manifestFeedTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="bg-white border border-slate-100/50 rounded-xl p-8 text-center max-w-xs shadow-sm">
@@ -2130,7 +2071,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="app-table-frame">
             <table className="w-full table-fixed text-xs">
               <colgroup>
                 <col className="w-8" />
@@ -2147,19 +2088,15 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
               <thead className="sticky top-0 z-10 border-b border-blue-900/20 text-slate-100">
                 <tr>
                   <th className={`${densityProfile.tableHead} text-left align-middle`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedTasks.length === visibleTrips.length) {
-                          setSelectedTasks([]);
-                        } else {
-                          setSelectedTasks(visibleTrips.map((trip) => trip.id));
-                        }
-                      }}
-                      className={`rounded p-0.5 transition-all duration-150 ${selectedTasks.length === visibleTrips.length && visibleTrips.length > 0 ? 'text-blue-300' : 'text-slate-300 hover:text-white'}`}
-                    >
-                      {selectedTasks.length === visibleTrips.length && visibleTrips.length > 0 ? <CheckSquare size={15} /> : <Square size={15} />}
-                    </button>
+                    <TableCheckbox
+                      checked={selectedVisibleCount === visibleTrips.length && visibleTrips.length > 0}
+                      indeterminate={selectedVisibleCount > 0 && selectedVisibleCount < visibleTrips.length}
+                      disabled={!visibleTrips.length}
+                      label="Select all visible trips"
+                      onChange={() => setSelectedTasks((current) => selectedVisibleCount === visibleTrips.length
+                        ? current.filter((id) => !visibleTripIds.has(id))
+                        : [...new Set([...current, ...visibleTrips.map((trip) => trip.id)])])}
+                    />
                   </th>
                   {MANIFEST_TABLE_COLUMNS.map(({ label, sortKey }) => (
                     <th key={label} className={`${densityProfile.tableHead} text-left text-xs uppercase tracking-widest text-slate-200 align-middle`}>
@@ -2233,16 +2170,11 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                               <button type="button" onClick={(event) => { event.stopPropagation(); saveInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-emerald-100 p-1.5 text-emerald-700 disabled:opacity-50" title="Save row"><CheckCircle2 size={15} /></button>
                               <button type="button" onClick={(event) => { event.stopPropagation(); cancelInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-rose-50 p-1.5 text-rose-600 disabled:opacity-50" title="Cancel"><X size={15} /></button>
                             </div>
-                          ) : <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]);
-                            }}
-                            className={`rounded p-0.5 transition-all duration-150 ${isSelected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-600'}`}
-                          >
-                            {isSelected ? <CheckSquare size={15} /> : <Square size={15} />}
-                          </button>}
+                          ) : <TableCheckbox
+                            checked={isSelected}
+                            label={`Select trip ${trip.bookingId || trip.id}`}
+                            onChange={() => setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id])}
+                          />}
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
@@ -2607,7 +2539,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== Fleet Matrix ====================
   const renderFleetMatrix = () => (
-    <div className="flex-1 overflow-y-auto overscroll-contain p-3">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-3">
       <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-100/50 bg-white px-4 py-3 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-slate-500">Drivers</div>
@@ -2797,7 +2729,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== WILL CALL VIEW ====================
   const renderWillCall = () => (
-    <div className="flex-1 overflow-y-auto overscroll-contain p-3">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-3">
       {willCallTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="bg-white border border-slate-200 rounded-xl p-8 text-center max-w-xs shadow-sm">
@@ -2921,7 +2853,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   // ==================== MAIN RENDER ====================
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       {/* Unified Control Bar */}
       {renderControlBar()}
 

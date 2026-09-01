@@ -29,7 +29,6 @@ Identity and role profile. Document ID should be Firebase Auth UID.
   permissions: string[],
   phone: string,
   settings: {
-    theme: 'light' | 'dark' | 'system',
     fontScale: 'sm' | 'md' | 'lg' | 'xl',
     gpsApp: 'google_maps' | 'apple_maps' | 'waze',
     singleTripGpsApp: 'google_maps' | 'apple_maps' | 'waze'

@@ -129,7 +129,7 @@ export const AdminShell = ({
         </div>
       )}
 
-      <main className="adm-content">
+      <main data-scroll-region="admin-sections" className="adm-content">
         {children}
       </main>
     </div>

@@ -322,7 +322,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               );
             })}
           </div>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="app-table-frame hidden sm:block">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -436,7 +436,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             })
           )}
         </div>
-        <div className="hidden overflow-x-auto sm:block">
+        <div className="app-table-frame hidden sm:block">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
@@ -549,7 +549,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               ))
             )}
           </div>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="app-table-frame hidden sm:block">
           <table className="w-full relative">
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
               <tr>

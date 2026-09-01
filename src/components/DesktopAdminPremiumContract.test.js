@@ -42,4 +42,17 @@ describe('desktop administration visual contract', () => {
     expect(archives).toContain('aria-label="Archived trips"');
     expect(archives).toContain('Try clearing the search or changing the date range.');
   });
+
+  it('opens Add Vehicle in the real fleet section with a stable, independently scrolling dialog', () => {
+    const admin = readComponent('DesktopAdminPage.jsx');
+    const fleet = readComponent('DriversVehiclesPage.jsx');
+
+    expect(admin).toContain("setActiveSection('drivers')");
+    expect(admin).not.toContain("setActiveSection('vehicles')");
+    expect(fleet).toContain('vehicle-form-overlay fixed inset-0');
+    expect(fleet).toContain('data-scroll-region="vehicle-form"');
+    expect(fleet).toContain('max-h-[calc(100dvh-1.5rem)] min-h-0');
+    expect(fleet).toContain("setAssignmentError('Vehicle name is required.')");
+    expect(fleet).toContain("savingVehicle ? 'Saving…'");
+  });
 });

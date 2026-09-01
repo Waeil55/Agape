@@ -1,7 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Palette, Navigation, Type, Moon, Sun, Monitor, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw } from 'lucide-react';
+import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
+import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
+import OverrideHomeAddressEditor, { verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
+import OverrideExclusionRulesEditor from './OverrideExclusionRulesEditor';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -47,12 +50,6 @@ const FONT_SCALE_OPTIONS = [
   { value: 'lg', label: 'Large', desc: 'Larger text — easier to read', icon: Plus },
   { value: 'xl', label: 'Extra Large', desc: 'Maximum readability — reduced eye strain', icon: Maximize2 },
   { value: 'driver', label: 'Driver Mode', desc: 'Ultra-readable — optimized for in-vehicle use', icon: Smartphone },
-];
-
-const THEME_OPTIONS = [
-  { value: 'light', label: 'Light', desc: 'Clean, bright interface', icon: Sun },
-  { value: 'dark', label: 'Dark', desc: 'Easy on the eyes at night', icon: Moon },
-  { value: 'system', label: 'Auto', desc: 'Follows your device theme', icon: Monitor },
 ];
 
 const NAV_OPTIONS = [
@@ -103,6 +100,10 @@ const SettingsPage = ({
   appSettings,
   onUpdateAppSettings,
   updateAppSettings: updateAppSettingsAlias,
+  overridePolicy = DEFAULT_OVERRIDE_POLICY,
+  overridePolicyStatus = 'ready',
+  overridePolicyError = '',
+  updateOverridePolicy,
   driverProfile,
   phoneNumbers,
   onUpdatePhoneNumbers,
@@ -121,6 +122,7 @@ const SettingsPage = ({
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const personalSectionIds = ['profile', 'appearance', 'accessibility', 'navigation', 'notifications', 'security'];
+  if (role === 'admin' || role === 'dispatcher') personalSectionIds.push('overrides');
   if (role === 'dispatcher') personalSectionIds.unshift('activity');
   const resolvedInitialSection = personalSectionIds.includes(initialSection) ? initialSection : 'profile';
   const [activeSection, setActiveSection] = useState(() => {
@@ -146,6 +148,35 @@ const SettingsPage = ({
   const [deleteConfirmTrip, setDeleteConfirmTrip] = useState(null);
   const [chatRetention, setChatRetention] = useState({ enabled: false, legalHold: false, retentionDays: 365 });
   const [chatPolicyStatus, setChatPolicyStatus] = useState('');
+  const [overrideDraft, setOverrideDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
+  const [overrideStatus, setOverrideStatus] = useState('');
+  const [overrideSaving, setOverrideSaving] = useState(false);
+  const canSaveOverridePolicy = ['ready', 'error'].includes(overridePolicyStatus);
+
+  useEffect(() => setOverrideDraft(normalizeOverridePolicy(overridePolicy)), [overridePolicy]);
+
+  const saveOverridePolicy = async () => {
+    if (!canSaveOverridePolicy) {
+      setOverrideStatus(overridePolicyError || 'Wait until the shared override policy has been verified before saving changes.');
+      return;
+    }
+    if (!updateOverridePolicy) {
+      setOverrideStatus('Shared override settings are unavailable.');
+      return;
+    }
+    setOverrideSaving(true);
+    setOverrideStatus('Verifying the shared home address…');
+    try {
+      const verifiedPolicy = await verifyOverrideHomePolicy(overrideDraft);
+      await updateOverridePolicy(verifiedPolicy);
+      setOverrideDraft(normalizeOverridePolicy(verifiedPolicy));
+      setOverrideStatus(`Shared home verified and saved: ${verifiedPolicy.homeFormattedAddress}. Every driver's home-route mileage will recalculate from this address.`);
+    } catch (error) {
+      setOverrideStatus(error?.message || 'Override policy could not be saved.');
+    } finally {
+      setOverrideSaving(false);
+    }
+  };
 
   const saveSettings = async (updates, driverOnly = false) => {
     if (!_updateSettings) {
@@ -184,7 +215,6 @@ const SettingsPage = ({
 
   const personalNav = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'accessibility', label: 'Accessibility', icon: Accessibility },
     { id: 'navigation', label: 'Navigation', icon: Route },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -195,6 +225,9 @@ const SettingsPage = ({
   if (role === 'dispatcher' && !personalNav.find(p => p.id === 'activity')) {
     personalNav.unshift({ id: 'activity', label: 'System Activity', icon: Activity });
   }
+  if ((role === 'admin' || role === 'dispatcher') && !personalNav.find(p => p.id === 'overrides')) {
+    personalNav.push({ id: 'overrides', label: 'Override Pricing', icon: Gauge });
+  }
 
   const navItems = [
     { group: 'Account & preferences', items: personalNav },
@@ -203,6 +236,64 @@ const SettingsPage = ({
 
   const sectionContent = () => {
     switch (activeSection) {
+      case 'overrides': {
+        const updateNumber = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.value }));
+        const updateToggle = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.checked }));
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-heading font-semibold text-slate-900">Trip cost override policy</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Shared deterministic rules for unloaded mileage and waiting-time supplements.</p>
+            </div>
+            {overridePolicyStatus !== 'ready' && (
+              <div className={`rounded-xl border px-4 py-3 text-xs font-semibold ${overridePolicyStatus === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-blue-200 bg-blue-50 text-blue-800'}`} role={overridePolicyStatus === 'error' ? 'alert' : 'status'}>
+                {overridePolicyStatus === 'error'
+                  ? `${overridePolicyError || 'Shared override settings could not be verified.'} Review this draft and save it to repair the shared policy.`
+                  : 'Loading and verifying the shared override policy…'}
+              </div>
+            )}
+            <OverrideHomeAddressEditor policy={overrideDraft} onChange={setOverrideDraft} disabled={overrideSaving} />
+            <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ['unloadedThresholdMiles', 'Unloaded mile threshold', 'miles', '0.1'],
+                ['unloadedRate', 'Cost per unloaded mile', '$ / mile', '0.01'],
+                ['waitingThresholdHours', 'Waiting threshold', 'hours', '0.25'],
+                ['waitRate', 'Cost per wait hour', '$ / hour', '0.01'],
+                ['waitRoundingMinutes', 'Wait rounding increment', 'minutes', '1'],
+              ].map(([key, label, suffix, step]) => (
+                <label key={key} className="min-w-0 text-xs font-semibold text-slate-600">
+                  <span className="block truncate" title={label}>{label}</span>
+                  <span className="mt-1 flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
+                    <input type="number" min="0" step={step} value={overrideDraft[key]} onChange={updateNumber(key)} className="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-sm font-semibold text-slate-900" />
+                    <span className="ml-2 shrink-0 text-[10px] text-slate-500">{suffix}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="rounded-xl border border-slate-200 bg-white p-4">
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="checkbox" checked={overrideDraft.sameCityExemption} onChange={updateToggle('sameCityExemption')} /> Same-city exemption</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500">Set unloaded mileage to zero when both cities normalize to the same city. Waiting remains eligible unless a waiting rule excludes it.</span>
+              </label>
+              <label className="rounded-xl border border-slate-200 bg-white p-4">
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="checkbox" checked={overrideDraft.excludeOvernightGaps} onChange={updateToggle('excludeOvernightGaps')} /> Exclude overnight waiting</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500">Do not bill waiting when the gap crosses service dates.</span>
+              </label>
+            </div>
+            <div className="grid gap-3">
+              <label className="text-xs font-semibold text-slate-600">Same-city aliases
+                <textarea rows="4" value={overrideDraft.sameCityNames.join(', ')} onChange={(event) => setOverrideDraft((current) => ({ ...current, sameCityNames: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }))} className="mt-1 w-full resize-none p-3 text-sm" placeholder="Indianapolis, Indy, Indianapolis IN" />
+                <span className="mt-1 block text-[10px] text-slate-500">Comma-separated names treated as the same city.</span>
+              </label>
+            </div>
+            <OverrideExclusionRulesEditor policy={overrideDraft} onChange={setOverrideDraft} disabled={overrideSaving} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={saveOverridePolicy} disabled={!canSaveOverridePolicy || overrideSaving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><Save size={16} /> {overrideSaving ? 'Verifying and saving…' : overridePolicyStatus === 'error' ? 'Repair override policy' : 'Save override policy'}</button>
+              {overrideStatus && <p className="text-xs font-semibold text-slate-600" role="status">{overrideStatus}</p>}
+            </div>
+          </div>
+        );
+      }
       // ===== OVERVIEW =====
       case 'overview':
         return (
@@ -245,7 +336,7 @@ const SettingsPage = ({
               <p className="text-body text-slate-500">All registered drivers and dispatchers.</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
+              <div className="app-table-frame">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
@@ -316,7 +407,7 @@ const SettingsPage = ({
               <p className="text-body text-slate-500">Capability matrix for every role in the system.</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
-              <div className="overflow-x-auto">
+              <div className="app-table-frame">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
@@ -363,7 +454,7 @@ const SettingsPage = ({
               ) : (
                 <div>
                   <button onClick={() => setShowArchivedTrips(false)} className="mb-4 px-4 py-2 text-slate-600 hover:text-slate-900 font-semibold text-sm">← Hide</button>
-                  <div className="overflow-x-auto">
+                  <div className="app-table-frame">
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
@@ -549,32 +640,6 @@ const SettingsPage = ({
                   <button onClick={() => onLogout?.()} className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-base">
                     <LogOut size={20} /> Sign Out
                   </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      // ===== APPEARANCE =====
-      case 'appearance':
-        return (
-          <div className="space-y-6">
-            <div><h3 className="text-heading text-slate-900 mb-1">Appearance</h3><p className="text-body text-slate-500">Choose the theme and reading size that work best for you.</p></div>
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8 space-y-8">
-              <div>
-                <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold text-base"><Palette size={20} /> Theme</div>
-                <div className="grid grid-cols-3 gap-3 max-w-lg">
-                  {THEME_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    const active = appSettings?.theme === option.value;
-                    return (
-                      <button key={option.value} onClick={() => saveSettings({ theme: option.value })} className={`bg-white border border-slate-200 rounded-xl p-4 text-left transition-all ${active ? 'card-active bg-blue-50' : 'hover:bg-slate-50'}`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}><Icon size={20} /></div>
-                        <div className="font-semibold text-sm text-slate-900">{option.label}</div>
-                        <p className="text-xs text-slate-500 mt-0.5">{option.desc}</p>
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
             </div>
@@ -779,8 +844,8 @@ const SettingsPage = ({
       </nav>
 
       {/* Mobile nav */}
-      <div className="lg:hidden w-full overflow-x-auto no-scrollbar pb-2 -mx-1 px-1 touch-manipulation">
-        <div className="flex gap-1.5">
+      <div className="app-filter-bar -mx-1 w-full px-1 pb-2 touch-manipulation lg:hidden">
+        <div className="flex flex-wrap gap-1.5">
           {mobileNavItems.map(item => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;

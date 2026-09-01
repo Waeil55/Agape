@@ -128,9 +128,10 @@ const exportReviewCsv = (rows) => {
   URL.revokeObjectURL(url);
 };
 
-const CompactSelect = ({ value, onChange, children, className = '' }) => (
+const CompactSelect = ({ value, onChange, children, className = '', ariaLabel }) => (
   <label className={`relative inline-flex items-center ${className}`}>
     <select
+      aria-label={ariaLabel}
       value={value}
       onChange={onChange}
       className="appearance-none rounded-lg border border-slate-200 bg-slate-50 pl-2 pr-7 py-1 text-[11px] font-medium text-slate-600 outline-none transition hover:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
@@ -139,18 +140,6 @@ const CompactSelect = ({ value, onChange, children, className = '' }) => (
     </select>
     <ChevronDown size={12} className="pointer-events-none absolute right-1.5 text-slate-400" />
   </label>
-);
-
-const ViewButton = ({ active, children, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide transition whitespace-nowrap ${
-      active ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-    }`}
-  >
-    {children}
-  </button>
 );
 
 const DesktopReportsPage = ({
@@ -547,7 +536,7 @@ const DesktopReportsPage = ({
   const renderInvoiceTable = () => (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
     <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
-      <div className="overflow-x-auto">
+      <div className="app-table-frame">
       <table className="w-full table-fixed text-xs">
         <colgroup>
           <col className="w-[8%]" />
@@ -703,7 +692,7 @@ const DesktopReportsPage = ({
     return (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
     <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
-      <div className="overflow-x-auto">
+      <div className="app-table-frame">
       <table className="w-full table-fixed text-xs">
         {(() => {
           const allCols = [
@@ -728,9 +717,6 @@ const DesktopReportsPage = ({
           const cols = allCols.filter(c => !hiddenColumns.includes(c.key));
           return (
             <>
-              <colgroup>
-                {cols.map(c => <col key={c.key} className={c.w} />)}
-              </colgroup>
               <thead className="sticky top-0 z-10 bg-blue-600 text-white shadow-sm">
                 <tr>
                   {cols.map((c, i) => (
@@ -804,13 +790,13 @@ const DesktopReportsPage = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[var(--bg-app)] font-sans text-slate-900">
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
-        <div role="toolbar" aria-label="Trip report controls" className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-200 bg-white shrink-0 sticky top-0 z-20 shadow-sm overflow-x-auto">
+        <div role="toolbar" aria-label="Trip report controls" className="app-filter-bar gap-1 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm">
           {/* View Tabs */}
-          <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg">
-            <ViewButton active={viewMode === 'review'} onClick={() => setViewMode('review')}>Review</ViewButton>
-            <ViewButton active={viewMode === 'cards'} onClick={() => setViewMode('cards')}>Cards</ViewButton>
-            <ViewButton active={viewMode === 'invoice'} onClick={() => setViewMode('invoice')}>Invoice</ViewButton>
-          </div>
+          <CompactSelect ariaLabel="Report view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
+            <option value="review">Review view</option>
+            <option value="cards">Cards view</option>
+            <option value="invoice">Invoice view</option>
+          </CompactSelect>
 
           <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
@@ -851,7 +837,7 @@ const DesktopReportsPage = ({
           <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
           {/* Filters */}
-          <CompactSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <CompactSelect ariaLabel="Trip status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="all">All Status</option>
             <option value="Completed">Completed</option>
             <option value="No Show">No Show</option>
@@ -859,12 +845,12 @@ const DesktopReportsPage = ({
             <option value="Rerouted">Rerouted</option>
           </CompactSelect>
 
-          <CompactSelect value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)}>
+          <CompactSelect ariaLabel="Driver" value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)}>
             <option value="all">All Drivers</option>
             {driverOptions.map((driver) => <option key={driver.id} value={driver.id}>{driver.name || driver.email || driver.id}</option>)}
           </CompactSelect>
 
-          <CompactSelect value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value)}>
+          <CompactSelect ariaLabel="Review status" value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value)}>
             <option value="all">All Reviewed</option>
             <option value="reviewed">Reviewed</option>
             <option value="pending">Pending</option>

@@ -131,7 +131,7 @@ export default function AgapeCommandCenter({ trips = [], drivers = [], vehicles 
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200 bg-slate-50 p-1 shrink-0 gap-1 overflow-x-auto no-scrollbar">
+      <div className="app-filter-bar gap-1 border-b border-slate-200 bg-slate-50 p-1 shrink-0">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;

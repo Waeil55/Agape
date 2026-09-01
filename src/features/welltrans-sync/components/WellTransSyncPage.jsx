@@ -3,7 +3,7 @@ import {
   AlertTriangle, Bot, CheckCircle2, Code, Download, Eye,
   Loader2, Play, RefreshCw, RotateCcw, Save, Search,
   ShieldCheck, Sparkles, X, XCircle, ChevronLeft, ChevronRight, Image, Copy,
-  BarChart3, Zap, ListFilter, Activity, Edit2,
+  BarChart3, Activity, Edit2,
   KeyRound, Trash2, Lock,
 } from 'lucide-react';
 import {
@@ -13,7 +13,7 @@ import { useWellTransSync } from '../hooks/useWellTransSync';
 import { useWellTransAutoSync } from '../hooks/useWellTransAutoSync';
 import {
   confirmWellTransReviewBatchApplied,
-  explainWellTransFailure, explainWellTransFailureAI, exportWellTransLogsCSV,
+  explainWellTransFailure, explainWellTransFailureAI,
   isWellTransFailureRetryable, queueWellTransSync, saveWellTransSettings,
   clearLocalWellTransCredentials, getLocalWellTransCredentialStatus,
   saveLocalWellTransCredentials,
@@ -133,7 +133,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
   }, [vehicles]);
   const {
-    settings, logs, worker, workers, activeWorkers, standbyWorkers, operations, canary, coverage,
+    settings, logs, worker, activeWorkers, operations, canary, coverage,
     workerOnline, workerCalibrated, workerUpgradeRequired,
     requiredWorkerVersion, workerStandby, loading, allCompletedTrips, completedTrips, readyTrips,
     latestByTrip, healthScore, successfulCount,
@@ -155,7 +155,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   const [editingTrip, setEditingTrip] = useState(null);
   const [savingTripId, setSavingTripId] = useState('');
   const [recentlySavedTripId, setRecentlySavedTripId] = useState('');
-  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [queuePage, setQueuePage] = useState(0);
   const [logsPage, setLogsPage] = useState(0);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -171,7 +170,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   const [autoRetry, setAutoRetry] = useState(() => {
     try { return JSON.parse(localStorage.getItem('agape_wt_autoRetry') || '{}'); } catch { return {}; }
   });
-  const bulkMenuRef = useRef(null);
   const pageRef = useRef(null);
 
   const changeSyncDate = useCallback((nextDate) => {
@@ -187,7 +185,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     setEditingTrip(null);
     setSelectedFailure(null);
     setInspectPayloadTrip(null);
-    setBulkMenuOpen(false);
     setNotice('');
     setSyncProgress(null);
     setSyncDate(normalized);
@@ -605,7 +602,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
         setTripDrawer(null);
         setSelectedFailure(null);
         setInspectPayloadTrip(null);
-        setBulkMenuOpen(false);
       }
       if (e.key === 'r' && !e.ctrlKey && !e.metaKey) {
         if (workerDateMatches && retryableFailed.length && !busy) {
@@ -616,14 +612,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [filteredTrips, workerDateMatches, retryableFailed, busy, runQueue]);
-
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target)) setBulkMenuOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
 
   useEffect(() => {
     localStorage.setItem('agape_wt_autoRetry', JSON.stringify(autoRetry));
@@ -642,7 +630,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   }
 
   const handleBulkSelect = (type) => {
-    setBulkMenuOpen(false);
     if (type === 'failed') setSelectedIds(failedLogs.map(l => l.tripId).filter(id => enrichedTrips.some(t => t.id === id)));
     else if (type === 'invalid') setSelectedIds(enrichedTrips.filter(t => !t._valid).map(t => t.id));
     else if (type === 'retryable') setSelectedIds(retryableFailed.map(l => l.tripId).filter(id => enrichedTrips.some(t => t.id === id)));
@@ -709,8 +696,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     <div ref={pageRef} className="flex flex-col h-full min-h-0 overflow-hidden" tabIndex={-1}>
 
       {/* ═══ ROW 1 — Brand + Date Navigation + Live Stats + Agent Status ═══ */}
-      <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-white shadow-sm no-scrollbar">
-        <div className="flex min-w-max items-center gap-0 px-3 py-2">
+      <div className="shrink-0 border-b border-slate-200 bg-white shadow-sm">
+        <div className="app-filter-bar gap-y-2 px-3 py-2">
 
           {/* Brand pill */}
           <div className="flex shrink-0 h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-[11px] font-black text-white mr-3">
@@ -826,8 +813,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       </div>
 
       {/* ═══ ROW 2 — Action Bar ═══ */}
-      <div className="shrink-0 overflow-x-auto border-b border-slate-100 bg-slate-50/80">
-        <div className="flex min-w-max items-center gap-1.5 px-3 py-1.5 whitespace-nowrap">
+      <div className="shrink-0 border-b border-slate-100 bg-slate-50/80">
+        <div className="app-filter-bar gap-1.5 px-3 py-1.5">
 
           {/* Driver scope */}
           <select value={driverScopeId} disabled={stagedCount > 0 || Boolean(busy)} onChange={event => {
@@ -928,37 +915,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
         </div>
       </div>
 
-      {/* Header */}
-      <div className="hidden shrink-0 border-b border-slate-200 bg-white px-4 py-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles size={14} className="text-blue-500" />
-              <h1 className="text-base font-semibold text-slate-900">Portal Completion Center</h1>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Broker sync · field mapping · worker telemetry</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setShowInstallHelp(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
-            >
-              <Download size={13} /> Agent setup
-            </button>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${workerHealthy ? 'bg-emerald-400 opacity-75' : 'bg-amber-400 opacity-75'}`} />
-                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${workerHealthy ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              </span>
-              <span className="text-[11px] font-semibold text-slate-600">
-                {workerStatusLabel}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Sync progress bar */}
       {syncProgress && (
         <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-4 py-2">
@@ -973,80 +929,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
           </div>
         </div>
       )}
-
-      {/* Stats row */}
-      <div className="hidden shrink-0 border-b border-slate-100 bg-white px-4 py-2.5">
-        <div className="flex items-center gap-4 overflow-x-auto">
-          {[
-            { label: 'Completed trips', value: completedTrips.length, color: 'text-slate-900' },
-            { label: 'Ready for review', value: stagedCount, color: 'text-purple-600' },
-            { label: 'Applied & verified', value: successfulCount, color: 'text-emerald-600' },
-            { label: 'Needs correction', value: failedLogs.length, color: 'text-rose-600' },
-            { label: 'Coverage', value: `${healthScore}%`, color: coverage.coverageComplete ? 'text-emerald-600' : 'text-amber-600' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="flex items-center gap-1.5 shrink-0">
-              <span className={`text-sm font-bold ${color}`}>{value}</span>
-              <span className="text-[10px] font-medium text-slate-400">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Multi-agent operations strip */}
-      <div className="hidden shrink-0 border-b border-slate-100 bg-slate-50/80 px-4 py-2">
-        <div className="flex items-center gap-3 overflow-x-auto">
-          <div className="flex shrink-0 items-center gap-2 pr-2">
-            <Activity size={13} className="text-slate-500" />
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Current agents</span>
-            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
-              activeWorkers.length ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-            }`}>
-              {activeWorkers.length} online
-            </span>
-            {standbyWorkers.length > 0 && (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700">
-                {standbyWorkers.length} standby
-              </span>
-            )}
-            {activeWorkers.length > 1 && (
-              <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[9px] font-bold text-cyan-700">
-                Failover ready
-              </span>
-            )}
-            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
-              canaryHealthy ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
-            }`}>
-              Portal contract {canaryHealthy ? 'verified' : 'not verified'}
-            </span>
-          </div>
-          {workers.length ? workers.slice(0, 6).map(item => {
-            const ageLabel = Number.isFinite(item.ageMs)
-              ? item.ageMs < 60_000
-                ? `${Math.max(0, Math.round(item.ageMs / 1000))}s ago`
-                : `${Math.round(item.ageMs / 60_000)}m ago`
-              : 'never';
-            return (
-              <div key={item.id}
-                className={`flex shrink-0 items-center gap-2 rounded-lg border bg-white px-2.5 py-1 ${
-                  item.online ? 'border-emerald-200' : 'border-slate-200 opacity-60'
-                }`}>
-                <span className={`h-2 w-2 rounded-full ${item.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                <div className="leading-tight">
-                  <p className="max-w-[140px] truncate text-[10px] font-bold text-slate-700">
-                    {item.workerId || item.id}
-                  </p>
-                  <p className="text-[9px] text-slate-400">
-                    v{item.version || '?'} · {String(item.state || 'unknown').replaceAll('_', ' ')}
-                    {item.selectedDate ? ` · ${item.selectedDate}` : ''} · {ageLabel}
-                  </p>
-                </div>
-              </div>
-            );
-          }) : (
-            <span className="text-[10px] font-medium text-slate-400">No enrolled Agent heartbeat has been received.</span>
-          )}
-        </div>
-      </div>
 
       {/* Notifications */}
       {operationsNeedsAttention && ['critical', 'degraded'].includes(operations.state) && (
@@ -1077,98 +959,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
           <button onClick={() => setNotice('')} className="text-blue-500 hover:text-blue-700"><X size={14} /></button>
         </div>
       )}
-
-      {/* Control bar */}
-      <div className="hidden shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <button onClick={() => navigateDate(-1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronLeft size={16} /></button>
-            <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
-              <input type="date" value={syncDate} disabled={Boolean(busy)} onChange={event => changeSyncDate(event.target.value)}
-                className="bg-transparent text-[11px] font-semibold text-slate-900 outline-none w-[110px]" />
-            </label>
-            <button onClick={() => navigateDate(1)} className="p-1 rounded hover:bg-slate-100 text-slate-500"><ChevronRight size={16} /></button>
-          </div>
-          <button disabled={!settings.enabled || Boolean(busy)}
-            onClick={startAndFillDate}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition">
-            {busy === 'start-fill' ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
-            Reconcile & Fill Date ({completedTrips.length})
-          </button>
-          {stagedCount > 0 && (
-            <button disabled={!workerBatchReady || Boolean(busy)}
-              onClick={confirmReviewBatchApplied}
-              className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-40 transition">
-              <CheckCircle2 size={12} className="inline mr-1" />
-              Confirm Applied Batch ({stagedCount})
-            </button>
-          )}
-          {selectedIds.length > 0 && (
-            <button disabled={!settings.enabled || Boolean(busy)}
-              onClick={() => runQueue(selectedIds, 'selected')}
-              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition">
-              Process Selected ({selectedIds.length})
-            </button>
-          )}
-
-          {/* Bulk select dropdown */}
-          <div className="relative">
-            <button onClick={() => setBulkMenuOpen(o => !o)}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition flex items-center gap-1">
-              <ListFilter size={12} /> Bulk <span className="text-[9px]">▾</span>
-            </button>
-            {bulkMenuOpen && (
-              <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1">
-                <button onClick={() => handleBulkSelect('ready')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Select All Ready ({readyTrips.length})</button>
-                <button onClick={() => handleBulkSelect('failed')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-rose-600 hover:bg-rose-50">Select All Failed ({failedLogs.length})</button>
-                <button onClick={() => handleBulkSelect('retryable')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-amber-600 hover:bg-amber-50">Select All Retryable ({retryableFailed.length})</button>
-                <button onClick={() => handleBulkSelect('invalid')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-orange-600 hover:bg-orange-50">Select All Invalid</button>
-                <div className="border-t border-slate-100 my-1" />
-                <button onClick={() => handleBulkSelect('invert')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Invert Selection</button>
-                <button onClick={() => handleBulkSelect('none')} className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Clear Selection</button>
-              </div>
-            )}
-          </div>
-
-          <button disabled={!workerDateMatches || !retryableFailed.length || Boolean(busy)}
-            onClick={() => runQueue(retryableFailed.map(l => l.tripId), 'retry')}
-            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition">
-            <RefreshCw size={12} className="inline mr-1" /> Retry ({retryableFailed.length})
-          </button>
-          <button onClick={exportAllTripsCSV}
-            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition">
-            <Download size={12} className="inline mr-1" /> Export trips
-          </button>
-          <button onClick={() => exportWellTransLogsCSV(logs, syncDate)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition">
-            <Download size={12} className="inline mr-1" /> Export history
-          </button>
-          {Number(worker?.throughputPerMinute) > 0 && (
-            <div className="ml-auto flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] font-semibold text-cyan-800">
-              <Zap size={12} />
-              Turbo {worker.throughputPerMinute} trips/min
-              {worker.estimatedMinutesRemaining != null && (
-                <span className="text-cyan-600">ETA {worker.estimatedMinutesRemaining} min</span>
-              )}
-            </div>
-          )}
-          {worker?.verificationAgent
-            && (worker.verificationAgent.state !== 'idle'
-              || Number(worker.verificationAgent.checked || 0) > 0) && (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-800"
-              title="Independent deterministic read-back. AI cannot authorize transportation-record changes.">
-              <ShieldCheck size={12} />
-              Verifier {worker.verificationAgent.state || 'idle'}
-              <span className="text-emerald-600">
-                {Number(worker.verificationAgent.verified || 0)} verified
-                {Number(worker.verificationAgent.correctionsIssued || 0) > 0
-                  ? ` · ${worker.verificationAgent.correctionsIssued} correcting`
-                  : ''}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Worker warnings */}
       {(workerUpgradeRequired || workerReviewError || workerNeedsDate
@@ -1215,64 +1005,28 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
 
       {/* Tabs + content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div className="hidden shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-4 py-1.5">
-          {[
-            { id: 'queue', label: 'Completed trips', count: completedTrips.length },
-            { id: 'logs', label: 'Run history', count: currentLogs.length },
-            { id: 'settings', label: 'Settings' },
-          ].map(({ id, label, count, icon: Icon }) => (
-            <button key={id} onClick={() => {
-              if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
-              setTab(id);
-            }} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
-              tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-            }`}>
-              {Icon && <Icon size={12} />}
-              {label}{count !== undefined ? ` (${count})` : ''}
-            </button>
-          ))}
-          {tab === 'queue' && (
-            <div className="ml-auto flex items-center gap-2">
-              <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                  className="w-40 rounded-lg border border-slate-200 bg-white pl-7 pr-2 py-1.5 text-[11px] text-slate-900 placeholder-slate-400 outline-none focus:border-blue-400" />
-              </div>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-700 outline-none">
-                <option value="all">All completed trips</option>
-                <option value="ready">Not queued</option>
-                <option value="staged">Review</option>
-                <option value="synced">Applied &amp; verified</option>
-                <option value="failed">Needs correction</option>
-                <option value="invalid">Incomplete source data</option>
-              </select>
-            </div>
-          )}
-        </div>
-
         {loading ? (
           <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-500" /></div>
         ) : tab === 'queue' ? (
-          <div className="flex-1 overflow-auto">
-            <table className="w-full min-w-[1760px] table-fixed text-left text-[11px]">
+          <div className="app-table-frame flex-1 overflow-y-auto">
+            <table className="w-full table-fixed text-left text-[11px]">
               <colgroup>
-                <col className="w-[38px]" />
-                <col className="w-[88px]" />
-                <col className="w-[145px]" />
-                <col className="w-[115px]" />
-                <col className="w-[105px]" />
-                <col className="w-[74px]" />
-                <col className="w-[74px]" />
-                <col className="w-[82px]" />
-                <col className="w-[74px]" />
-                <col className="w-[74px]" />
-                <col className="w-[82px]" />
-                <col className="w-[72px]" />
-                <col className="w-[78px]" />
-                <col className="w-[245px]" />
-                <col className="w-[105px]" />
-                <col className="w-[90px]" />
+                <col className="w-[3%]" />
+                <col className="w-[8%]" />
+                <col className="w-[9%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[5%]" />
+                <col className="w-[5%]" />
+                <col className="w-[6%]" />
+                <col className="w-[5%]" />
+                <col className="w-[5%]" />
+                <col className="w-[6%]" />
+                <col className="w-[5%]" />
+                <col className="w-[5%]" />
+                <col className="w-[8%]" />
+                <col className="w-[7%]" />
+                <col className="w-[6%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-blue-700 bg-blue-600 text-white shadow-sm">
                 <tr>
@@ -1308,7 +1062,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                   const unmatched = latest?.status === 'failed' && !isWellTransFailureRetryable(latest);
                   const isEditing = editingTrip?.id === trip.id;
                   const draft = isEditing ? editingTrip : null;
-                  const inlineInputClass = 'w-full min-w-[70px] rounded-md border border-blue-400 bg-white px-1.5 py-1 font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-200';
+                  const inlineInputClass = 'w-full min-w-0 rounded-md border border-blue-400 bg-white px-1.5 py-1 font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-200';
                   const draftMiles = calculateWellTransDraftMileage(draft);
                   return (
                     <React.Fragment key={trip.id}>

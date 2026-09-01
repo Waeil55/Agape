@@ -16,7 +16,7 @@ const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
-import { Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Sun, Moon, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
+import { Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { tripMatchesSearch } from '../utils/search';
 import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, classifyGap, buildTimeEvents } from '../utils/timeTracking';
@@ -425,7 +425,7 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
     { label: 'SIGNATURE', value: trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No' },
   ];
   return (
-    <div className="overflow-hidden border-t border-slate-200 bg-white">
+    <div className="app-table-frame border-t border-slate-200 bg-white">
       <table className="driver-history-detail-table w-full table-fixed text-left">
         <tbody>
           {rows.map((row) => (
@@ -641,6 +641,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const currentVehicleOdometer = vehicleOdometerState.miles || 0;
 
   const [maintenanceResetting, setMaintenanceResetting] = useState('');
+  const [showToast, setShowToast] = useState(null);
 
   const resetVehicleMaintenanceCycle = useCallback((type) => {
     if (!assignedVehicleRecord?.id || !vehicleMaintenance || maintenanceResetting) return;
@@ -908,7 +909,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [showMoreOptions, setShowMoreOptions] = useState(null);
   const [quickSmsMenuTrip, setQuickSmsMenuTrip] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
-  const [showToast, setShowToast] = useState(null);
   const toastTimeoutRef = useRef(null);
   useEffect(() => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -6110,7 +6110,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {activeNav === 'history' && (
         <div className="agape-mobile-page agape-mobile-history flex-1 overflow-y-auto">
           <div className="agape-mobile-toolbar">
-            <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar whitespace-nowrap">
+            <div className="app-filter-bar gap-2">
 
               <button
                 type="button"
@@ -6880,24 +6880,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </div>
               </div>
               <div className="p-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: 'light', label: 'Light', icon: Sun },
-                    { value: 'dark', label: 'Dark', icon: Moon },
-                  ].map((option) => {
-                    const Icon = option.icon;
-                    const active = appSettings?.theme === option.value;
-                    return (
-                      <button key={option.value} type="button" aria-pressed={active}
-                        onClick={() => onUpdateAppSettings?.({ theme: option.value })}
-                        className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border text-xs font-semibold transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                      >
-                        <Icon size={15} /> {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Text size</p>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Text size</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: 'sm', label: 'Compact' },
@@ -7264,21 +7247,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         ];
         const closeQuickSms = () => setQuickSmsMenuTrip(null);
         return (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={closeQuickSms}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden" onClick={closeQuickSms}>
             <div className="absolute inset-0 bg-black/40" />
-            <div className="relative bg-white rounded-3xl rounded-b-none w-full max-w-lg pb-6 px-4 pt-2 animate-slide-up max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-center mb-3">
+            <div className="relative flex max-h-[85dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-3xl rounded-b-none bg-white pt-2 animate-slide-up" onClick={e => e.stopPropagation()}>
+              <div className="flex shrink-0 justify-center mb-3 px-4">
                 <span className="w-10 h-1 rounded-full bg-slate-300" />
               </div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex shrink-0 items-center justify-between mb-1 px-4">
                 <h3 className="text-base font-bold text-slate-900">SMS</h3>
                 <button type="button" onClick={closeQuickSms} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
-              <p className="text-xs font-semibold text-slate-500 mb-3">
+              <p className="shrink-0 px-4 text-xs font-semibold text-slate-500 mb-3">
                 To: {smsPrimary ? `${smsPrimary.label}: ${smsPrimary.name}` : 'No primary contact'}
               </p>
+              <div data-scroll-region="driver-quick-sms" className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
               {!smsPrimary ? (
                 <p className="text-sm font-medium text-rose-600 py-4 text-center">This trip has no contact number.</p>
               ) : (
@@ -7322,6 +7306,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <p className="text-[11px] font-medium text-slate-400 mt-3 text-center">Your message opens in the SMS app so you can review it before sending.</p>
                 </>
               )}
+              </div>
             </div>
           </div>
         );

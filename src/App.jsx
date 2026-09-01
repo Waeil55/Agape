@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
 import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -34,11 +34,12 @@ import useEnterpriseSessionSecurity, { beginSecuritySession, clearSecuritySessio
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
 import { hydrateTripDriverIdentity } from './utils/driverIdentity';
+import { DEFAULT_OVERRIDE_POLICY, isOverridePolicyDocumentValid, normalizeOverridePolicy } from './utils/tripCostOverrides';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v362';
+const APP_VERSION = 'v371';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -123,7 +124,6 @@ const isRecentDriverHistoryTrip = (trip) => (
 );
 
 const DEFAULT_APP_SETTINGS = {
-  theme: 'light',
   fontScale: 'md',
   readability: 'normal',
   navigationApp: 'google',
@@ -135,6 +135,11 @@ const DEFAULT_APP_SETTINGS = {
     filterChangeIntervalMonths: 12,
     filterDueSoonDays: 30,
   },
+};
+
+const withoutLegacyTheme = (settings = {}) => {
+  const { theme: _removedTheme, ...lightOnlySettings } = settings || {};
+  return lightOnlySettings;
 };
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
@@ -680,17 +685,71 @@ const App = () => {
   const [appSettings, setAppSettings] = useState(() => {
     try {
       const local = localStorage.getItem('agape_appSettings');
-      return local ? { ...DEFAULT_APP_SETTINGS, ...JSON.parse(local) } : { ...DEFAULT_APP_SETTINGS };
+      return local ? { ...DEFAULT_APP_SETTINGS, ...withoutLegacyTheme(JSON.parse(local)) } : { ...DEFAULT_APP_SETTINGS };
     } catch {
       return { ...DEFAULT_APP_SETTINGS };
     }
   });
+  const [overridePolicy, setOverridePolicy] = useState(() => normalizeOverridePolicy(DEFAULT_OVERRIDE_POLICY));
+  const [overridePolicyStatus, setOverridePolicyStatus] = useState('loading');
+  const [overridePolicyError, setOverridePolicyError] = useState('');
 
   const addToast = useCallback((title, message, type = 'info') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, title, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    let statusTimer;
+    if (!isAuthenticated || !['admin', 'dispatcher'].includes(role)) {
+      statusTimer = window.setTimeout(() => {
+        if (!active) return;
+        setOverridePolicyStatus('idle');
+        setOverridePolicyError('');
+      }, 0);
+      return () => {
+        active = false;
+        window.clearTimeout(statusTimer);
+      };
+    }
+    statusTimer = window.setTimeout(() => {
+      if (!active) return;
+      setOverridePolicyStatus('loading');
+      setOverridePolicyError('');
+    }, 0);
+    const unsubscribe = onSnapshot(
+      doc(db, 'systemConfig', 'overrideCostPolicy'),
+      (snapshot) => {
+        if (!active) return;
+        window.clearTimeout(statusTimer);
+        const storedPolicy = snapshot.exists() ? snapshot.data() : DEFAULT_OVERRIDE_POLICY;
+        if (!isOverridePolicyDocumentValid(storedPolicy)) {
+          setOverridePolicyStatus('error');
+          setOverridePolicyError('The saved override policy is incomplete or malformed. Cost calculations and export are blocked until it is corrected.');
+          addToast('Invalid override settings', 'The saved billing policy failed validation and was not used.', 'danger');
+          return;
+        }
+        setOverridePolicy(normalizeOverridePolicy(storedPolicy));
+        setOverridePolicyStatus('ready');
+        setOverridePolicyError('');
+      },
+      (error) => {
+        if (!active) return;
+        window.clearTimeout(statusTimer);
+        console.error('[OverridePolicy] Unable to read shared policy', error);
+        setOverridePolicyStatus('error');
+        setOverridePolicyError('Shared override settings could not be verified. Cost calculations and export are blocked.');
+        addToast('Override settings unavailable', 'Cost calculations and export are blocked until the shared settings can be verified.', 'danger');
+      },
+    );
+    return () => {
+      active = false;
+      window.clearTimeout(statusTimer);
+      unsubscribe();
+    };
+  }, [addToast, isAuthenticated, role]);
 
   // Show a non-blocking toast notification when the service worker updates,
   // prompting the user to reload instead of calling location.reload() automatically (which hangs/freezes WebKit PWAs)
@@ -726,9 +785,29 @@ const App = () => {
         addToast('Profile Updated', 'Your vehicle odometer has been synchronized.', 'success');
       }
     } else {
-      setAppSettings((prev) => ({ ...prev, ...updates }));
+      setAppSettings((prev) => ({ ...prev, ...withoutLegacyTheme(updates) }));
     }
   }, [role, currentUser, drivers, upsertDriverProfile, addToast]);
+
+  const updateOverridePolicy = useCallback(async (updates) => {
+    if (!['admin', 'dispatcher'].includes(role)) throw new Error('Only administrators and dispatchers can update override settings.');
+    const next = normalizeOverridePolicy({ ...overridePolicy, ...updates });
+    try {
+      await setDoc(doc(db, 'systemConfig', 'overrideCostPolicy'), {
+        ...next,
+        updatedAt: new Date().toISOString(),
+        updatedBy: auth.currentUser?.uid || '',
+      }, { merge: false });
+      setOverridePolicy(next);
+      setOverridePolicyStatus('ready');
+      setOverridePolicyError('');
+      return next;
+    } catch (error) {
+      setOverridePolicyStatus('error');
+      setOverridePolicyError('Shared override settings could not be saved or verified. Cost calculations and export are blocked.');
+      throw error;
+    }
+  }, [overridePolicy, role]);
 
   const requestAuthAction = useCallback((label, callback) => {
     setReAuthError('');
@@ -920,7 +999,7 @@ const App = () => {
       const uid = auth.currentUser.uid;
       await setDoc(
         doc(db, 'users', uid),
-        { settings: settingsToPersist },
+        { settings: { ...withoutLegacyTheme(settingsToPersist), theme: deleteField() } },
         { merge: true }
       );
     } catch (err) {
@@ -929,23 +1008,11 @@ const App = () => {
   };
 
   useEffect(() => {
-    const theme = appSettings.theme === 'dark' ? 'dark' : 'light';
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.dataset.fontScale = appSettings.fontScale || 'md';
     document.documentElement.dataset.readability = appSettings.readability || 'normal';
 
-    const themeColor = theme === 'dark' ? '#020617' : '#f8fafc';
-    let themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (!themeMeta) {
-      themeMeta = document.createElement('meta');
-      themeMeta.name = 'theme-color';
-      document.head.appendChild(themeMeta);
-    }
-    themeMeta.setAttribute('content', themeColor);
-
     try {
-      localStorage.setItem('agape_appSettings', JSON.stringify(appSettings));
+      localStorage.setItem('agape_appSettings', JSON.stringify(withoutLegacyTheme(appSettings)));
     } catch {}
 
     // Persist settings to Firestore for logged in user
@@ -1017,7 +1084,7 @@ const App = () => {
       setActiveTab(validTab);
 
       if (userSettings && Object.keys(userSettings).length > 0) {
-        setAppSettings(prev => ({ ...prev, ...userSettings }));
+        setAppSettings(prev => ({ ...prev, ...withoutLegacyTheme(userSettings) }));
       }
 
       requestNotificationPermission().then(token => {
@@ -1078,11 +1145,11 @@ const App = () => {
               writeRoleCache(user.uid, freshRole || cached.role, userEmail, freshTenantId);
               setTenantId(freshTenantId);
             }
-            // Load user settings from Firestore (theme, nav app, etc.)
+            // Load user settings from Firestore so preferences survive hard refresh.
             // so they survive hard refresh even when the role cache is present.
             const settings = freshDoc.data()?.settings || {};
             if (Object.keys(settings).length > 0) {
-              setAppSettings(prev => ({ ...prev, ...settings }));
+              setAppSettings(prev => ({ ...prev, ...withoutLegacyTheme(settings) }));
             }
           }).catch(() => { /* background check — ignore network errors */ });
           return;
@@ -3021,6 +3088,10 @@ const App = () => {
               setTrashedTrips={setTrashedTrips}
               appSettings={appSettings}
               updateAppSettings={updateAppSettings}
+              overridePolicy={overridePolicy}
+              overridePolicyStatus={overridePolicyStatus}
+              overridePolicyError={overridePolicyError}
+              updateOverridePolicy={updateOverridePolicy}
               selectedTasks={selectedTasks}
               setSelectedTasks={setSelectedTasks}
               searchQuery={searchQuery}

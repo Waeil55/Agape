@@ -320,22 +320,22 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) =>
               <div className="space-y-3 p-3 sm:hidden">
                 {dayTrips.map(renderMobileArchiveCard)}
               </div>
-              <div className="hidden w-full overflow-x-auto sm:block">
+              <div className="app-table-frame hidden w-full sm:block">
                 <table className="w-full table-fixed text-xs">
                   <colgroup>
-                    <col className="w-[7%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[6%]" />
                     <col className="w-[8%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[14%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
                     <col className="w-[7%]" />
                     <col className="w-[7%]" />
                     <col className="w-[7%]" />
                     <col className="w-[7%]" />
                     <col className="w-[7%]" />
-                    <col className="w-20" />
+                    <col className="w-[11%]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-slate-100 text-slate-700 shadow-sm">
                     <tr>

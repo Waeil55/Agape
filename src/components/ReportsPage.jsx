@@ -44,14 +44,14 @@ const ReportsPage = (props) => {
 
   const sections = useMemo(() => [
     { id: 'trips', label: 'All trips', description: 'Review, export, and reconcile trip records', icon: ClipboardList, count: props.trips?.length || 0 },
-    { id: 'unloaded', label: 'Unloaded mileage', description: 'Track non-passenger vehicle mileage', icon: Gauge },
+    { id: 'unloaded', label: 'Trip cost overrides', description: 'Calculate verified empty mileage and waiting supplements', icon: Gauge },
     { id: 'archive', label: 'Archived trips', description: 'Historical records, edits, and recovery', icon: Archive, count: props.trashedTrips?.length || 0 },
     ...(canUsePortalCompletion ? [{ id: 'portal', label: 'Portal Completion', description: 'Validate and fill completed trips into the broker portal', icon: PanelTopOpen }] : []),
   ], [canUsePortalCompletion, props.trashedTrips?.length, props.trips?.length]);
 
   const renderSection = () => {
     if (section === 'unloaded') {
-      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} onUpdateTrip={props.onUpdateTrip} />;
+      return <UnloadedTripsReport trips={props.trips} drivers={props.drivers} overridePolicy={props.overridePolicy} overridePolicyStatus={props.overridePolicyStatus} overridePolicyError={props.overridePolicyError} updateOverridePolicy={props.updateOverridePolicy} />;
     }
     if (section === 'archive') {
       return (
@@ -82,16 +82,16 @@ const ReportsPage = (props) => {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Reports workspace">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
-        <label className="relative flex min-h-[64px] items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 sm:hidden">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><ActiveIcon size={18} /></span>
+      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5 sm:px-4">
+        <label className="relative flex min-h-14 items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3 sm:hidden">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><ActiveIcon size={17} /></span>
           <span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-700">Reports workspace</span><span className="block truncate text-sm font-bold text-slate-950">{activeSection.label}</span><span className="block truncate text-[10px] font-semibold text-slate-600">{activeSection.description}</span></span>
           <ChevronDown size={17} className="text-blue-700" />
           <select aria-label="Reports section" value={section} onChange={(event) => setSection(event.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
             {sections.map((item) => <option key={item.id} value={item.id}>{item.label}{Number.isFinite(item.count) ? ` (${item.count})` : ''}</option>)}
           </select>
         </label>
-        <div className="hidden gap-2 overflow-x-auto no-scrollbar sm:flex" role="tablist" aria-label="Reports and records sections">
+        <div className="app-filter-bar hidden gap-2 sm:flex" role="tablist" aria-label="Reports and records sections">
           {sections.map((item) => {
             const Icon = item.icon;
             const active = section === item.id;
@@ -102,10 +102,10 @@ const ReportsPage = (props) => {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setSection(item.id)}
-                className={`group flex min-h-12 shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors sm:min-w-[180px] ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
+                className={`group flex h-11 min-w-0 flex-1 basis-[180px] items-center gap-2 rounded-xl border px-2.5 py-1 text-left transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-blue-700'}`}>
-                  <Icon size={16} aria-hidden="true" />
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-blue-700'}`}>
+                  <Icon size={15} aria-hidden="true" />
                 </span>
                 <span className="min-w-0">
                   <span className="flex items-center gap-1.5 text-xs font-bold">

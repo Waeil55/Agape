@@ -35,6 +35,14 @@ runtime state before changing or reporting anything.
 10. Do not call work complete from a build alone. Verify the actual affected
     workflow with proportionate automated tests and, for UI/runtime work,
     rendered or live behavioral inspection.
+11. When a replacement is verified, remove the superseded implementation,
+    unused imports/exports, obsolete compatibility styling, and tests that
+    exist only for unreachable code. Keep compatibility paths only when they
+    still protect real stored data or supported clients.
+12. Never place a second implementation beside an older implementation for the
+    same responsibility. Before completion, search every equivalent path and
+    remove the replaced component, state, styles, utilities, and tests; verify
+    that one authoritative implementation remains.
 
 ## Completion evidence
 
@@ -54,7 +62,7 @@ without direct evidence. State any external or human verification that remains.
 
 ## Agape UI conventions
 
-- Default to light mode unless the user explicitly selects dark mode.
+- The application is light-only. Do not add theme selection or dark-mode variants.
 - Use the existing admin/mobile component systems and Tailwind `slate`
   palette. Do not introduce `gray-*` utility classes or unexplained hardcoded
   colors.
