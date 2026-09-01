@@ -15,8 +15,9 @@ describe('trip keyboard layout', () => {
     })).toBe(500);
   });
 
-  it('lifts the footer only by the amount that overlaps the keyboard', () => {
-    expect(calculateTripWindowLift({ windowBottom: 590, keyboardTop: 510, gap: 8 })).toBe(88);
-    expect(calculateTripWindowLift({ windowBottom: 480, keyboardTop: 510, gap: 8 })).toBe(0);
+  it('keeps the whole connected window safely above the keyboard boundary', () => {
+    expect(calculateTripWindowLift({ windowBottom: 590, keyboardTop: 510 })).toBe(100);
+    expect(calculateTripWindowLift({ windowBottom: 495, keyboardTop: 510 })).toBe(5);
+    expect(calculateTripWindowLift({ windowBottom: 480, keyboardTop: 510 })).toBe(0);
   });
 });

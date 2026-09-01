@@ -1,4 +1,5 @@
 const DEFAULT_KEYBOARD_THRESHOLD = 120;
+export const TRIP_WINDOW_KEYBOARD_GAP = 20;
 
 const finiteNonNegative = (value) => {
   const number = Number(value);
@@ -32,7 +33,7 @@ export const resolveTripKeyboardTop = ({
   return candidates.length ? Math.min(...candidates) : null;
 };
 
-export const calculateTripWindowLift = ({ windowBottom, keyboardTop, gap = 8 } = {}) => {
+export const calculateTripWindowLift = ({ windowBottom, keyboardTop, gap = TRIP_WINDOW_KEYBOARD_GAP } = {}) => {
   if (!Number.isFinite(Number(keyboardTop))) return 0;
   return Math.max(0, Math.ceil(
     finiteNonNegative(windowBottom) + finiteNonNegative(gap) - Number(keyboardTop)

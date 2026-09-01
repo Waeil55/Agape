@@ -80,6 +80,8 @@ describe('driver odometer keyboard overlay contract', () => {
     expect(footerKeyboard).not.toContain('box-shadow:');
     expect(panelKeyboard).toContain('transform: translate3d');
     expect(panelKeyboard).toContain('--trip-window-keyboard-top');
+    expect(css).toContain('--trip-window-keyboard-gap: 20px');
+    expect(panelKeyboard).toContain('var(--trip-window-keyboard-gap)');
     expect(css).toContain('@keyframes trip-window-panel-in');
     expect(css).toContain('@keyframes trip-window-scrim-in');
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');

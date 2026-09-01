@@ -4,6 +4,7 @@
    form refinements cannot move or restyle the native-keyboard workflow. */
 
 .trip-window-overlay {
+  --trip-window-keyboard-gap: 20px;
   position: fixed;
   inset: 0;
   height: 100vh;
@@ -168,7 +169,7 @@ html.trip-window-keyboard-visible .trip-window-footer {
 }
 
 html.trip-window-keyboard-visible .trip-window-panel {
-  max-height: min(34rem, calc(var(--trip-window-keyboard-top, 100vh) - 1rem));
+  max-height: min(34rem, calc(var(--trip-window-keyboard-top, 100vh) - var(--trip-window-keyboard-gap)));
   transform: translate3d(0, calc(-1 * var(--trip-window-panel-lift, 0px)), 0);
 }
 
