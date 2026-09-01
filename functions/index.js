@@ -658,6 +658,58 @@ exports.sendSms = functions
   }
 });
 
+exports.sendDriverSms = functions
+  .runWith({ secrets: [runtimeConfigSecret] })
+  .https.onCall(async (data, context) => {
+  await requireRole(context, ["admin", "dispatcher", "driver"]);
+  const { to: rawTo, text, tripId } = data;
+  const to = normalizePhone(rawTo);
+  if (!to || !text) {
+    throw new functions.https.HttpsError("invalid-argument", "Both 'to' and 'text' are required.");
+  }
+  try {
+    const telnyx = getTelnyxConfig();
+    const apiKey = telnyx.api_key;
+    const fromNumber = telnyx.from || "+18552223330";
+    const messagingProfileId = telnyx.messaging_profile_id || null;
+    if (!apiKey) {
+      throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
+    }
+    const body = { from: fromNumber, to, text, type: "SMS" };
+    if (messagingProfileId) {
+      body.messaging_profile_id = messagingProfileId;
+    }
+    const res = await axios.post(
+      `${TELNYX_API_BASE}/messages`,
+      body,
+      { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } }
+    );
+    const telnyxData = res.data?.data || {};
+    const messageId = telnyxData.id;
+    const status = telnyxData.to?.[0]?.status || "queued";
+    functions.logger.info("Telnyx driver SMS:", { messageId, status, to, from: fromNumber, driverId: context.auth.uid });
+    if (tripId) {
+      await admin.firestore().collection("smsLogs").add({
+        tripId,
+        driverId: context.auth.uid,
+        direction: "outbound",
+        to,
+        from: fromNumber,
+        text,
+        status,
+        messageId,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    return { success: true, messageId, status };
+  } catch (err) {
+    const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
+    const errCode = err.response?.data?.errors?.[0]?.code || "";
+    functions.logger.error("Telnyx driver SMS error:", { detail: errDetail, code: errCode, response: err.response?.data });
+    throw new functions.https.HttpsError("internal", errDetail || "Failed to send SMS.");
+  }
+});
+
 exports.sendBulkSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
   .https.onCall(async (data, context) => {

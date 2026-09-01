@@ -913,6 +913,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   });
   const [showMoreOptions, setShowMoreOptions] = useState(null);
   const [quickSmsMenuTrip, setQuickSmsMenuTrip] = useState(null);
+  const [sendingSms, setSendingSms] = useState(false);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const toastTimeoutRef = useRef(null);
   useEffect(() => {
@@ -3941,6 +3942,23 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   };
   const markClientAsMessaged = (phone) => {
     try { window.localStorage.setItem(smsContactStorageKey(phone), new Date().toISOString()); } catch { /* storage unavailable */ }
+  };
+
+  const sendQuickSmsViaTelnyx = async (phone, text, tripId) => {
+    if (!phone || !text) return;
+    setSendingSms(true);
+    try {
+      const sendDriverSms = httpsCallable(functions, 'sendDriverSms');
+      await sendDriverSms({ to: phone, text, tripId });
+      setQuickSmsMenuTrip(null);
+      setShowToast({ message: 'Message sent' });
+    } catch (err) {
+      console.warn('[sendDriverSms]', err);
+      setShowToast({ message: 'Failed to send. Opening SMS app instead.' });
+      sendSMSWithBody(phone, text);
+    } finally {
+      setSendingSms(false);
+    }
   };
 
   const renderTripWorkPage = (trip) => {
@@ -7293,15 +7311,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <p className="shrink-0 px-4 text-xs font-semibold text-slate-500 mb-3">
                 To: {smsPrimary ? `${smsPrimary.label}: ${smsPrimary.name}` : 'No primary contact'}
               </p>
-              <div data-scroll-region="driver-quick-sms" className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+              <div data-scroll-region="driver-quick-sms" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]" style={{ WebkitOverflowScrolling: 'touch' }}>
               {!smsPrimary ? (
                 <p className="text-sm font-medium text-rose-600 py-4 text-center">This trip has no contact number.</p>
               ) : (
                 <>
-                  <button
+                   <button
                     type="button"
                     onClick={() => { closeQuickSms(); sendSMS(smsPrimary.phone, smsPrimary.name); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all text-sm font-semibold cursor-pointer mb-3"
+                    disabled={sendingSms}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all text-sm font-semibold cursor-pointer mb-3 disabled:opacity-50"
                   >
                     <PenLine size={16} /> Write Manually
                   </button>
@@ -7315,10 +7334,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           type="button"
                           onClick={() => {
                             markClientAsMessaged(smsPrimary.phone);
-                            closeQuickSms();
-                            sendSMSWithBody(smsPrimary.phone, preview);
+                            sendQuickSmsViaTelnyx(smsPrimary.phone, preview, smsTrip.id);
                           }}
-                          className="w-full flex items-start gap-3 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition-all text-left cursor-pointer"
+                          disabled={sendingSms}
+                          className="w-full flex items-start gap-3 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition-all text-left cursor-pointer disabled:opacity-50"
                         >
                           <MessageCircle size={16} className="text-blue-600 shrink-0 mt-0.5" />
                           <span className="min-w-0 flex-1">
@@ -7334,7 +7353,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       );
                     })}
                   </div>
-                  <p className="text-[11px] font-medium text-slate-400 mt-3 text-center">Your message opens in the SMS app so you can review it before sending.</p>
+                  {sendingSms && <p className="text-xs font-medium text-blue-600 mt-3 text-center">Sending...</p>}
+                  {!sendingSms && <p className="text-[11px] font-medium text-slate-400 mt-3 text-center">Messages are sent from the Agape Care business line.</p>}
                 </>
               )}
               </div>
