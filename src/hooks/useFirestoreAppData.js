@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { doc, setDoc, collection, addDoc, serverTimestamp, writeBatch, runTransaction, onSnapshot } from '../config/firebase';
+import { doc, setDoc, collection, serverTimestamp, writeBatch, runTransaction, onSnapshot, query, orderBy, limit } from '../config/firebase';
 import { db, auth, functions, httpsCallable } from '../config/firebase';
 import {
   buildDriverEvents,
@@ -7,17 +7,23 @@ import {
   emitSystemEvents,
 } from '../services/firestoreEventEngine';
 import { buildOperationalTripRecord, isOperationalTrip } from '../utils/tripLifecycle';
-import { ASSIGNMENT_STATUSES } from '../config/firestoreSchema';
 import { localCalendarYmd } from '../utils/tripDate';
 import {
   filterValidTripRecords,
   isCorruptedTripRecord,
 } from '../utils/tripIntegrity';
-import { findRemovedDocumentIds } from '../utils/firestorePersistence';
+import {
+  applyFirestoreDocumentChanges,
+  firestoreRecordFingerprint,
+  planCollectionMutations,
+  rollbackOptimisticValue,
+} from '../utils/firestorePersistence';
 import { attachTenantScope, normalizeTenantId, recordBelongsToTenant } from '../utils/tenantScope';
 import { hydrateTripDriverIdentities } from '../utils/driverIdentity';
 import { readAppData, saveField as saveLocalField, saveFieldWithSyncOperations } from '../utils/localDB';
 import { createSerializedOperationQueue } from '../utils/serializedOperationQueue';
+import { buildAssignmentMutations } from '../utils/assignmentPersistence';
+import { isPermanentSyncFailure } from '../services/syncQueueProcessor';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -140,15 +146,21 @@ function getCurrentEventActor() {
   return { userId: user?.uid || user?.email || 'system', email: user?.email || '', role: 'system' };
 }
 
-async function deleteDocsById(collectionName, ids = []) {
-  const cleanIds = [...new Set((ids || []).filter(Boolean).map(String))];
-  for (let i = 0; i < cleanIds.length; i += 450) {
+async function writeDocumentMutations(collectionName, upserts = [], removedIds = [], mapData = (item) => item) {
+  const mutations = [
+    ...(upserts || []).filter((item) => item?.id).map((item) => ({ type: 'set', id: String(item.id), data: mapData(item) })),
+    ...(removedIds || []).filter(Boolean).map((id) => ({ type: 'delete', id: String(id) })),
+  ];
+  for (let i = 0; i < mutations.length; i += 450) {
     const batch = writeBatch(db);
-    cleanIds.slice(i, i + 450).forEach((id) => {
-      batch.delete(doc(db, collectionName, id));
+    mutations.slice(i, i + 450).forEach((mutation) => {
+      const ref = doc(db, collectionName, mutation.id);
+      if (mutation.type === 'delete') batch.delete(ref);
+      else batch.set(ref, mutation.data, { merge: true });
     });
     await batch.commit();
   }
+  return mutations.length;
 }
 
 
@@ -213,40 +225,14 @@ async function writeTripsToCollection(trips = [], tenantId, { strictAtomic = fal
   return writtenCount;
 }
 
-async function writeDriversToCollection(drivers = [], tenantId) {
-  const now = new Date().toISOString();
-  const docs = (drivers || [])
-    .filter((d) => d?.id)
-    .map((d) => ({ id: String(d.id), data: sanitizeForFirestore(attachTenantScope({ ...d, updatedAtLocal: d.updatedAtLocal || now }, tenantId)) }));
-  for (let i = 0; i < docs.length; i += 450) {
-    const batch = writeBatch(db);
-    docs.slice(i, i + 450).forEach(({ id, data }) => {
-      batch.set(doc(db, DRIVER_PROFILE_COLLECTION, id), data, { merge: true });
-    });
-    await batch.commit();
-  }
-}
-
-const hasAssignedDriver = (trip = {}) => Boolean(trip.driverId || trip.driverEmail);
-const isTerminalTrip = (trip = {}) => ['completed', 'cancelled', 'canceled', 'no show', 'no_show'].includes(String(trip.status || trip.lifecycleStatus || '').trim().toLowerCase());
-const safeIdPart = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
-
 const createAssignmentsFn = httpsCallable(functions, 'createAssignments');
 
-async function writeAssignmentsToCollection(trips = [], tenantId) {
-  const assignments = cleanTripCollection(trips)
-    .filter((trip) => trip?.id && hasAssignedDriver(trip) && !isTerminalTrip(trip))
-    .map((trip) => ({
-      id: trip.assignmentId || `trip_${safeIdPart(trip.id)}_${safeIdPart(trip.driverId || trip.driverEmail)}`,
-      tripId: String(trip.id), driverId: trip.driverId || null,
-      driverEmail: String(trip.driverEmail || '').trim().toLowerCase() || null,
-      driverName: trip.driverName || null, dispatcherId: trip.dispatcherId || null,
-      status: trip.assignmentStatus || ASSIGNMENT_STATUSES.OFFERED,
-      priority: trip.priority || 'normal', deliveryState: trip.assignmentSeenAt ? 'seen' : 'queued',
-      offeredAtLocal: trip.assignedAt || trip.updatedAtLocal || new Date().toISOString(),
-      updatedAtLocal: new Date().toISOString(), tenantId: normalizeTenantId(tenantId),
-      tripSnapshot: { patient: trip.patient || trip.clientName || '', time: trip.time || '', pickup: trip.pickup || '', dropoff: trip.dropoff || '', status: trip.status || '' },
-    }));
+async function writeAssignmentsToCollection(trips = [], tenantId, previousTrips = []) {
+  const assignments = buildAssignmentMutations(
+    cleanTripCollection(trips),
+    cleanTripCollection(previousTrips),
+    tenantId,
+  );
   if (assignments.length === 0) return;
   const result = await createAssignmentsFn({ assignments });
   if (result.data.created !== assignments.length) {
@@ -271,6 +257,14 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
   const enqueueTripPersistenceRef = useRef(null);
   if (!enqueueTripPersistenceRef.current) enqueueTripPersistenceRef.current = createSerializedOperationQueue();
   const enqueueTripPersistence = enqueueTripPersistenceRef.current;
+  const fieldPersistenceQueuesRef = useRef(new Map());
+  const enqueueFieldPersistence = useCallback((field, operation) => {
+    if (field === 'trips' || field === 'trashedTrips') return enqueueTripPersistence(operation);
+    if (!fieldPersistenceQueuesRef.current.has(field)) {
+      fieldPersistenceQueuesRef.current.set(field, createSerializedOperationQueue());
+    }
+    return fieldPersistenceQueuesRef.current.get(field)(operation);
+  }, [enqueueTripPersistence]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -280,9 +274,17 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     let localSaveIdleCallback = null;
     const pendingLocalFields = new Map();
     const unsubscribers = [];
+    const collectionRecords = new Map();
+    let remoteTripRecords = [];
+    let remoteProgressRecords = [];
+    let tripsSnapshotInitialized = false;
 
     const persistLocalSnapshot = (field, value, previousValue) => {
-      pendingLocalFields.set(field, { value, previousValue });
+      const pending = pendingLocalFields.get(field);
+      pendingLocalFields.set(field, {
+        value,
+        previousValue: pending ? pending.previousValue : previousValue,
+      });
       clearTimeout(localSaveTimer);
       if (localSaveIdleCallback !== null && window.cancelIdleCallback) {
         window.cancelIdleCallback(localSaveIdleCallback);
@@ -333,11 +335,15 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     const applyCollectionData = (field, snap) => {
       if (cancelled) return;
       remoteSnapshotReceived = true;
-      const nextList = [];
-      snap.forEach((itemDoc) => {
-        const data = itemDoc.data();
-        if (recordBelongsToTenant(data, activeTenantId)) nextList.push({ ...data, id: itemDoc.id });
-      });
+      const nextList = applyFirestoreDocumentChanges(
+        collectionRecords.get(field) || [],
+        snap.docChanges({ includeMetadataChanges: false }),
+        (itemDoc) => {
+          const data = itemDoc.data();
+          return recordBelongsToTenant(data, activeTenantId) ? { ...data, id: itemDoc.id } : null;
+        },
+      );
+      collectionRecords.set(field, nextList);
       const previousValue = dataRef.current[field];
       const isFleetField = field === 'drivers' || field === 'vehicles';
       const driverIdentityChanged = isFleetField && (
@@ -370,16 +376,24 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     const applyTripsSnapshot = (snap) => {
       if (cancelled) return;
       const materialChanges = snap.docChanges({ includeMetadataChanges: false });
-      if (materialChanges.length === 0 && pendingTripImportsRef.current.size === 0) return;
+      const isInitialSnapshot = !tripsSnapshotInitialized;
+      tripsSnapshotInitialized = true;
+      if (!isInitialSnapshot && materialChanges.length === 0 && pendingTripImportsRef.current.size === 0) return;
       remoteSnapshotReceived = true;
+      materialChanges.forEach((change) => pendingTripImportsRef.current.delete(change.doc.id));
+      remoteTripRecords = applyFirestoreDocumentChanges(
+        remoteTripRecords,
+        materialChanges,
+        (tripDoc) => {
+          const trip = { ...tripDoc.data(), id: tripDoc.id };
+          return recordBelongsToTenant(trip, activeTenantId) ? trip : null;
+        },
+      );
       const liveTrips = [];
       const archivedTrips = [];
       const corruptedIds = [];
       const todayKey = localCalendarYmd();
-      snap.forEach((tripDoc) => {
-        const trip = { ...tripDoc.data(), id: tripDoc.id };
-        if (!recordBelongsToTenant(trip, activeTenantId)) return;
-        pendingTripImportsRef.current.delete(tripDoc.id);
+      remoteTripRecords.forEach((trip) => {
         if (trip.archiveState === 'archived') {
           archivedTrips.push(normalizeTrip(trip));
           return;
@@ -395,7 +409,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
           return;
         }
         if (isCorruptedTripRecord(trip)) {
-          corruptedIds.push(tripDoc.id);
+          corruptedIds.push(trip.id);
           return;
         }
         if (isOperationalTrip(trip)) liveTrips.push(normalizeTrip(trip));
@@ -406,11 +420,12 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       const baseData = normalizeData(dataRef.current);
       const previousTrips = baseData.trips;
       const previousTrashedTrips = baseData.trashedTrips;
-      const trashedIds = new Set((baseData.trashedTrips || []).map(t => t.id));
+      // The current Firestore snapshot is authoritative for archive state.
+      // Using the previous local archive list here suppresses a just-restored
+      // trip until some unrelated later snapshot happens to arrive.
+      const trashedIds = new Set(archivedTrips.map(t => t.id));
       liveTripsRef.current = liveTrips.filter((t) => !trashedIds.has(t.id));
-      const liveKeys = new Set(liveTripsRef.current.map((t) => t.id));
       const mergedTripsBase = cleanTripCollection([
-        ...(baseData.trips || []).filter((t) => !liveKeys.has(t.id) && !trashedIds.has(t.id)),
         ...liveTripsRef.current.map((liveTrip) => {
           const progress = tripProgressRef.current[liveTrip.id];
           if (!progress) return liveTrip;
@@ -438,18 +453,24 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     const applyTripProgressSnapshot = (snap) => {
       if (cancelled) return;
       remoteSnapshotReceived = true;
+      remoteProgressRecords = applyFirestoreDocumentChanges(
+        remoteProgressRecords,
+        snap.docChanges({ includeMetadataChanges: false }),
+        (progressDoc) => {
+          const data = progressDoc.data();
+          return recordBelongsToTenant(data, activeTenantId) ? { ...data, id: progressDoc.id } : null;
+        },
+      );
       const progressByTrip = {};
-      snap.forEach((progressDoc) => {
-        const data = progressDoc.data();
-        if (!recordBelongsToTenant(data, activeTenantId)) return;
-        progressByTrip[progressDoc.id] = { ...data, id: progressDoc.id };
-        delete progressByTrip[progressDoc.id].tripId;
+      remoteProgressRecords.forEach((progress) => {
+        progressByTrip[progress.id] = { ...progress };
+        delete progressByTrip[progress.id].tripId;
       });
       tripProgressRef.current = progressByTrip;
       const baseData = normalizeData(dataRef.current);
       const previousTrips = baseData.trips;
       const trashedIds = new Set((baseData.trashedTrips || []).map(t => t.id));
-      const progressSource = (liveTripsRef.current.length > 0 ? liveTripsRef.current : baseData.trips).filter((t) => !trashedIds.has(t.id));
+      const progressSource = (tripsSnapshotInitialized ? liveTripsRef.current : baseData.trips).filter((t) => !trashedIds.has(t.id));
       const sourceKeys = new Set(progressSource.map((t) => t.id));
       const mergedTripsBase = cleanTripCollection([
         ...(baseData.trips || []).filter((t) => !sourceKeys.has(t.id) && !trashedIds.has(t.id)),
@@ -521,7 +542,11 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     cleanupFns.push(setupListener(collection(db, DISPATCHER_PROFILE_COLLECTION), (snap) => applyCollectionData('dispatchers', snap), 'Dispatchers'));
     cleanupFns.push(setupListener(collection(db, VEHICLE_COLLECTION), (snap) => applyCollectionData('vehicles', snap), 'Vehicles'));
     cleanupFns.push(setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION), applyTripProgressSnapshot, 'TripProgress'));
-    cleanupFns.push(setupListener(collection(db, 'logs'), (snap) => applyCollectionData('logs', snap), 'Activity'));
+    cleanupFns.push(setupListener(
+      query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(250)),
+      (snap) => applyCollectionData('logs', snap),
+      'Activity',
+    ));
 
     const unsubPhones = onSnapshot(doc(db, PHONE_NUMBERS_DOC), (snap) => {
       if (cancelled) return;
@@ -559,194 +584,190 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
 
   const writeField = useCallback(async (field, value) => {
     const previousData = dataRef.current;
-    dataRef.current = { ...dataRef.current, [field]: value };
+    const previousValue = previousData[field];
+    if (previousValue === value) return true;
+
+    dataRef.current = { ...previousData, [field]: value };
     pendingWritesRef.current += 1;
     setState(prev => ({ ...prev, [field]: value, saving: true, error: null }));
     await yieldBeforePersistenceWork();
+
     const preparedValue = MIRRORED_TRIP_FIELDS.has(field)
-      ? hydrateTripDriverIdentities(cleanTripCollection(value), dataRef.current.drivers || [])
+      ? hydrateTripDriverIdentities(cleanTripCollection(value), previousData.drivers || [])
       : value;
     const sanitized = Array.isArray(preparedValue)
       ? preparedValue.map((item) => sanitizeForFirestore(item))
       : sanitizeForFirestore(preparedValue);
+    if (firestoreRecordFingerprint(previousValue) === firestoreRecordFingerprint(sanitized)) {
+      dataRef.current = { ...dataRef.current, [field]: sanitized };
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      setState(prev => ({ ...prev, [field]: sanitized, saving: pendingWritesRef.current > 0 }));
+      return true;
+    }
+
+    const allowDeletes = field === 'drivers' || field === 'dispatchers' || field === 'vehicles';
+    const mutationPlan = Array.isArray(sanitized)
+      ? planCollectionMutations(previousValue || [], sanitized, { allowDeletes })
+      : { upserts: [], removedIds: [], changed: true };
+    const now = new Date().toISOString();
+    const previousById = new Map((previousValue || []).filter((item) => item?.id).map((item) => [String(item.id), item]));
+    const priorChangedRecords = mutationPlan.upserts.map((item) => previousById.get(String(item.id))).filter(Boolean);
+    const assignmentMutations = field === 'trips'
+      ? buildAssignmentMutations(mutationPlan.upserts, priorChangedRecords, activeTenantId)
+      : [];
+    const vehiclePayload = (vehicle) => {
+      const payload = { ...vehicle, updatedAtLocal: vehicle.updatedAtLocal || now };
+      if (previousById.has(String(vehicle.id))) {
+        ['odometer', 'odometerUpdatedAt', 'odometerSourceTripId'].forEach((key) => { delete payload[key]; });
+      } else {
+        payload.odometer = Math.max(0, Number(vehicle.odometer || 0));
+        payload.odometerUpdatedAt = payload.odometerUpdatedAt || now;
+      }
+      return sanitizeForFirestore(attachTenantScope(payload, activeTenantId));
+    };
+    const scopedPayload = (item) => sanitizeForFirestore(attachTenantScope({
+      ...item,
+      updatedAtLocal: item.updatedAtLocal || now,
+    }, activeTenantId));
+    const archivedPayload = (item) => sanitizeForFirestore(attachTenantScope({
+      ...buildOperationalTripRecord(item),
+      archiveState: 'archived',
+      archivedAtLocal: item.archivedAtLocal || now,
+    }, activeTenantId));
+    const offlineOperations = [];
+    const targetByField = {
+      trips: TRIPS_COLLECTION,
+      trashedTrips: TRIPS_COLLECTION,
+      drivers: DRIVER_PROFILE_COLLECTION,
+      dispatchers: DISPATCHER_PROFILE_COLLECTION,
+      vehicles: VEHICLE_COLLECTION,
+    };
+    const targetCollection = targetByField[field];
+    if (targetCollection) {
+      mutationPlan.upserts.forEach((item) => {
+        const data = field === 'trashedTrips'
+          ? archivedPayload(item)
+          : field === 'vehicles'
+            ? vehiclePayload(item)
+            : field === 'trips'
+              ? sanitizeForFirestore(attachTenantScope(buildOperationalTripRecord(item), activeTenantId))
+              : scopedPayload(item);
+        offlineOperations.push({ type: 'setDoc', collection: targetCollection, docId: String(item.id), data });
+      });
+      mutationPlan.removedIds.forEach((id) => {
+        offlineOperations.push({ type: 'deleteDoc', collection: targetCollection, docId: String(id) });
+      });
+      if (field === 'trips') {
+        assignmentMutations.forEach((assignment) => {
+          offlineOperations.push({
+            type: 'setDoc',
+            collection: 'assignments',
+            docId: String(assignment.id),
+            data: assignment,
+          });
+        });
+      }
+    } else if (field === 'phoneNumbers') {
+      offlineOperations.push({
+        type: 'setDoc', collection: 'systemConfig', docId: 'phoneNumbers',
+        data: attachTenantScope(sanitized, activeTenantId),
+      });
+    }
+
     dataRef.current = { ...dataRef.current, [field]: sanitized };
 
     try {
       const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
       if (isOffline) {
-        const collectionByField = {
-          trips: TRIPS_COLLECTION,
-          drivers: DRIVER_PROFILE_COLLECTION,
-          dispatchers: DISPATCHER_PROFILE_COLLECTION,
-          vehicles: VEHICLE_COLLECTION,
-        };
-        const targetCollection = collectionByField[field];
-        const operations = [];
-        if (targetCollection && Array.isArray(sanitized)) {
-          const previousMap = new Map((previousData[field] || []).map((item) => [String(item.id), item]));
-          const changed = sanitized.filter((item) => item?.id && JSON.stringify(previousMap.get(String(item.id))) !== JSON.stringify(item));
-          operations.push(...changed.map((item) => ({
-            type: 'setDoc',
-            collection: targetCollection,
-            docId: String(item.id),
-            data: sanitizeForFirestore(attachTenantScope(item, activeTenantId)),
-          })));
-          if (field !== 'trips') {
-            const currentIds = new Set(sanitized.filter((item) => item?.id).map((item) => String(item.id)));
-            operations.push(...(previousData[field] || [])
-              .filter((item) => item?.id && !currentIds.has(String(item.id)))
-              .map((item) => ({ type: 'deleteDoc', collection: targetCollection, docId: String(item.id) })));
-          }
-        } else if (field === 'trashedTrips' && Array.isArray(sanitized)) {
-          const previousMap = new Map((previousData.trashedTrips || []).map((item) => [String(item.id), item]));
-          operations.push(...sanitized
-            .filter((item) => item?.id && JSON.stringify(previousMap.get(String(item.id))) !== JSON.stringify(item))
-            .map((item) => ({
-              type: 'setDoc',
-              collection: TRIPS_COLLECTION,
-              docId: String(item.id),
-              data: sanitizeForFirestore(attachTenantScope({
-                ...buildOperationalTripRecord(item),
-                archiveState: 'archived',
-                archivedAtLocal: item.archivedAtLocal || new Date().toISOString(),
-              }, activeTenantId)),
-            })));
-        } else if (field === 'phoneNumbers') {
-          operations.push({
-            type: 'setDoc',
-            collection: 'systemConfig',
-            docId: 'phoneNumbers',
-            data: attachTenantScope(sanitized, activeTenantId),
-          });
-        } else if (field === 'logs') {
-          operations.push({
-            type: 'setDoc',
-            collection: 'appData',
-            docId: 'logs',
-            data: { logs: sanitized, tenantId: activeTenantId },
-          });
-        }
-        await saveFieldWithSyncOperations(field, sanitized, operations, {
+        await saveFieldWithSyncOperations(field, sanitized, offlineOperations, {
           tenantId: activeTenantId,
           userId: auth.currentUser?.uid || '',
         });
-        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-        setState(prev => ({
-          ...prev,
-          saving: pendingWritesRef.current > 0,
-          lastSavedAt: new Date().toISOString(),
-          error: null,
-        }));
-        return true;
-      }
-      await saveLocalField(field, sanitized, { previousValue: previousData[field], tenantId: activeTenantId });
-      if (MIRRORED_TRIP_FIELDS.has(field)) {
-        const archivedTrips = cleanTripCollection(dataRef.current.trashedTrips || [])
-          .filter((trip) => trip?.id || trip?.bookingId)
-          .map((trip) => ({
-            id: String(trip.id || trip.bookingId || `archived_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
-            data: sanitizeForFirestore(attachTenantScope({ ...buildOperationalTripRecord(trip), archiveState: 'archived', archivedAtLocal: trip.archivedAtLocal || new Date().toISOString() }, activeTenantId)),
-          }));
-        for (let i = 0; i < archivedTrips.length; i += 450) {
-          const batch = writeBatch(db);
-          archivedTrips.slice(i, i + 450).forEach(({ id, data }) => {
-            batch.set(doc(db, TRIPS_COLLECTION, id), data, { merge: true });
-          });
-          await batch.commit();
-        }
-        const prevTrips = cleanTripCollection(previousData.trips || []);
-        const prevMap = new Map(prevTrips.map(t => [t.id, t]));
-        const currentTrips = dataRef.current.trips || [];
-        const changedTrips = currentTrips.filter(t => {
-          const prev = prevMap.get(t.id);
-          if (!prev) return true;
-          return JSON.stringify(prev) !== JSON.stringify(t);
-        });
-        changedTrips.forEach((trip) => pendingTripImportsRef.current.add(String(trip.id)));
-        try {
-          await writeTripsToCollection(changedTrips, activeTenantId);
-        } catch (tripsErr) {
-          changedTrips.forEach((trip) => pendingTripImportsRef.current.delete(String(trip.id)));
-          console.error('[writeField] writeTripsToCollection failed:', tripsErr.code, tripsErr.message, tripsErr.stack);
-          throw tripsErr;
-        }
-        await writeAssignmentsToCollection(dataRef.current.trips || [], activeTenantId).catch((err) => {
-          console.warn('[writeField] Assignment write non-fatal error:', err?.code, err?.message);
-        });
-      } else if (field === 'drivers') {
-        await writeDriversToCollection(dataRef.current.drivers || [], activeTenantId);
-        const removedIds = findRemovedDocumentIds(previousData.drivers, dataRef.current.drivers);
-        await deleteDocsById(DRIVER_PROFILE_COLLECTION, removedIds);
-      } else if (field === 'dispatchers') {
-        const now = new Date().toISOString();
-        const docs = (dataRef.current.dispatchers || []).filter((d) => d?.id).map((d) => ({
-          id: String(d.id), data: sanitizeForFirestore(attachTenantScope({ ...d, updatedAtLocal: d.updatedAtLocal || now }, activeTenantId)),
-        }));
-        for (let i = 0; i < docs.length; i += 450) {
-          const batch = writeBatch(db);
-          docs.slice(i, i + 450).forEach(({ id, data }) => {
-            batch.set(doc(db, DISPATCHER_PROFILE_COLLECTION, id), data, { merge: true });
-          });
-          await batch.commit();
-        }
-        const removedIds = findRemovedDocumentIds(previousData.dispatchers, dataRef.current.dispatchers);
-        await deleteDocsById(DISPATCHER_PROFILE_COLLECTION, removedIds);
-      } else if (field === 'vehicles') {
-        const now = new Date().toISOString();
-        // Odometer fields are owned by the dedicated monotonic writer
-        // (syncVehicleOdometerFromTrip). Stripping them from generic list
-        // saves prevents a stale device snapshot from erasing a newer
-        // reading written by another driver or device.
-        const ODOMETER_OWNED_FIELDS = ['odometer', 'odometerUpdatedAt', 'odometerSourceTripId'];
-        const docs = (dataRef.current.vehicles || []).filter((v) => v?.id).map((v) => {
-          const payload = { ...v, updatedAtLocal: v.updatedAtLocal || now };
-          const existedBeforeWrite = (previousData.vehicles || []).some((previousVehicle) => previousVehicle?.id === v.id);
-          if (existedBeforeWrite) {
-            ODOMETER_OWNED_FIELDS.forEach((key) => { delete payload[key]; });
-          } else {
-            payload.odometer = Math.max(0, Number(v.odometer || 0));
-            payload.odometerUpdatedAt = payload.odometerUpdatedAt || now;
+      } else {
+        if (field === 'trips') {
+          mutationPlan.upserts.forEach((trip) => pendingTripImportsRef.current.add(String(trip.id)));
+          try {
+            await writeTripsToCollection(mutationPlan.upserts, activeTenantId);
+          } catch (error) {
+            mutationPlan.upserts.forEach((trip) => pendingTripImportsRef.current.delete(String(trip.id)));
+            throw error;
           }
-          return { id: String(v.id), data: sanitizeForFirestore(attachTenantScope(payload, activeTenantId)) };
-        });
-        for (let i = 0; i < docs.length; i += 450) {
-          const batch = writeBatch(db);
-          docs.slice(i, i + 450).forEach(({ id, data }) => {
-            batch.set(doc(db, VEHICLE_COLLECTION, id), data, { merge: true });
+          await writeAssignmentsToCollection(mutationPlan.upserts, activeTenantId, priorChangedRecords).catch((error) => {
+            console.warn('[writeField] Assignment write non-fatal error:', error?.code, error?.message);
           });
-          await batch.commit();
+        } else if (field === 'trashedTrips') {
+          await writeDocumentMutations(TRIPS_COLLECTION, mutationPlan.upserts, [], archivedPayload);
+        } else if (field === 'drivers') {
+          await writeDocumentMutations(DRIVER_PROFILE_COLLECTION, mutationPlan.upserts, mutationPlan.removedIds, scopedPayload);
+        } else if (field === 'dispatchers') {
+          await writeDocumentMutations(DISPATCHER_PROFILE_COLLECTION, mutationPlan.upserts, mutationPlan.removedIds, scopedPayload);
+        } else if (field === 'vehicles') {
+          await writeDocumentMutations(VEHICLE_COLLECTION, mutationPlan.upserts, mutationPlan.removedIds, vehiclePayload);
+        } else if (field === 'phoneNumbers') {
+          await setDoc(doc(db, PHONE_NUMBERS_DOC), attachTenantScope(sanitized, activeTenantId), { merge: true });
         }
-        const removedIds = findRemovedDocumentIds(previousData.vehicles, dataRef.current.vehicles);
-        await deleteDocsById(VEHICLE_COLLECTION, removedIds);
-      } else if (field === 'phoneNumbers') {
-        await setDoc(doc(db, PHONE_NUMBERS_DOC), attachTenantScope(sanitized, activeTenantId), { merge: true });
-      } else if (field === 'logs') {
-        const logsDoc = doc(db, 'appData', 'logs');
-        await setDoc(logsDoc, { logs: sanitized, tenantId: activeTenantId, updatedAt: serverTimestamp() }, { merge: true });
+        await saveLocalField(field, sanitized, { previousValue, tenantId: activeTenantId });
       }
 
       const actor = getCurrentEventActor();
-      const events = field === 'trips' ? buildTripEvents(previousData.trips || [], sanitized || [], actor) :
-        field === 'drivers' ? buildDriverEvents(previousData.drivers || [], sanitized || [], actor) : [];
-      if (events.length > 0) emitSystemEvents(events).catch((err) => console.error('Event emit failed:', err));
+      const events = field === 'trips'
+        ? buildTripEvents(priorChangedRecords, mutationPlan.upserts, actor)
+        : field === 'drivers'
+          ? buildDriverEvents(priorChangedRecords, mutationPlan.upserts, actor)
+          : [];
+      if (events.length > 0) emitSystemEvents(events).catch((error) => console.error('Event emit failed:', error));
 
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
       setState(prev => ({ ...prev, saving: pendingWritesRef.current > 0, lastSavedAt: new Date().toISOString() }));
       return true;
-    } catch (err) {
-      dataRef.current = { ...dataRef.current, [field]: previousData[field] };
+    } catch (error) {
+      const canRetryInBackground = !isPermanentSyncFailure(error)
+        && offlineOperations.length > 0
+        && Boolean(auth.currentUser?.uid);
+      if (canRetryInBackground) {
+        try {
+          await saveFieldWithSyncOperations(field, sanitized, offlineOperations, {
+            tenantId: activeTenantId,
+            userId: auth.currentUser.uid,
+          });
+          pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+          setState(prev => ({
+            ...prev,
+            saving: pendingWritesRef.current > 0,
+            lastSavedAt: new Date().toISOString(),
+            error: null,
+          }));
+          return true;
+        } catch (queueError) {
+          console.error(`Failed to queue ${field} for synchronization:`, queueError);
+        }
+      }
+      const rollbackValue = rollbackOptimisticValue(
+        dataRef.current[field],
+        previousValue,
+        sanitized,
+        mutationPlan,
+      );
+      dataRef.current = { ...dataRef.current, [field]: rollbackValue };
       pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-      console.error(`Failed to save ${field}:`, err);
-      setState(prev => ({ ...prev, [field]: previousData[field] || [], saving: pendingWritesRef.current > 0, error: err.message || `Failed to save ${field}` }));
+      console.error(`Failed to save ${field}:`, error);
+      setState(prev => ({
+        ...prev,
+        [field]: rollbackValue ?? (Array.isArray(sanitized) ? [] : {}),
+        saving: pendingWritesRef.current > 0,
+        error: error.message || `Failed to save ${field}`,
+      }));
       return false;
     }
   }, [activeTenantId]);
 
   const setTrips = useCallback((updater) => {
-    const current = dataRef.current.trips || [];
-    const next = typeof updater === 'function' ? updater(current) : updater;
-    return writeField('trips', next);
-  }, [writeField]);
+    return enqueueFieldPersistence('trips', () => {
+      const current = dataRef.current.trips || [];
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      return writeField('trips', next);
+    });
+  }, [enqueueFieldPersistence, writeField]);
 
   const archiveTripsById = useCallback((tripIds = []) => {
     return enqueueTripPersistence(async () => {
@@ -844,13 +865,13 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     });
   }, [activeTenantId, enqueueTripPersistence]);
 
-  const setDrivers = useCallback((updater) => {
+  const setDrivers = useCallback((updater) => enqueueFieldPersistence('drivers', () => {
     const current = dataRef.current.drivers || [];
     const next = typeof updater === 'function' ? updater(current) : updater;
     return writeField('drivers', next);
-  }, [writeField]);
+  }), [enqueueFieldPersistence, writeField]);
 
-  const upsertDriverTrip = useCallback(async (tripId, updates = {}) => {
+  const upsertDriverTrip = useCallback((tripId, updates = {}) => enqueueFieldPersistence('trips', async () => {
     if (!tripId) return false;
     const now = new Date().toISOString();
     const progressDoc = attachTenantScope({ ...updates, tripId, workflowUpdatedAt: now }, activeTenantId);
@@ -862,23 +883,43 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     setState(prev => ({ ...prev, trips: nextTrips }));
 
     try {
+      const progressOperation = {
+        type: 'setDoc', collection: DRIVER_TRIP_PROGRESS_COLLECTION,
+        docId: String(tripId), data: progressDoc,
+      };
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await saveFieldWithSyncOperations('trips', nextTrips, [{
-          type: 'setDoc', collection: DRIVER_TRIP_PROGRESS_COLLECTION,
-          docId: String(tripId), data: progressDoc,
-        }], { tenantId: activeTenantId, userId: auth.currentUser?.uid || '' });
+        await saveFieldWithSyncOperations('trips', nextTrips, [progressOperation], { tenantId: activeTenantId, userId: auth.currentUser?.uid || '' });
         return true;
       }
       await saveLocalField('trips', nextTrips, { previousValue: currentTrips, tenantId: activeTenantId });
       await setDoc(doc(db, DRIVER_TRIP_PROGRESS_COLLECTION, tripId), progressDoc, { merge: true });
       return true;
     } catch (err) {
+      if (!isPermanentSyncFailure(err) && auth.currentUser?.uid) {
+        try {
+          await saveFieldWithSyncOperations('trips', nextTrips, [{
+            type: 'setDoc', collection: DRIVER_TRIP_PROGRESS_COLLECTION,
+            docId: String(tripId), data: progressDoc,
+          }], { tenantId: activeTenantId, userId: auth.currentUser.uid });
+          return true;
+        } catch (queueError) {
+          console.error('Failed to queue driver trip progress:', queueError);
+        }
+      }
+      const rollbackTrips = rollbackOptimisticValue(
+        dataRef.current.trips,
+        currentTrips,
+        nextTrips,
+        planCollectionMutations(currentTrips, nextTrips, { allowDeletes: false }),
+      );
+      dataRef.current = { ...dataRef.current, trips: rollbackTrips };
+      setState(prev => ({ ...prev, trips: rollbackTrips, error: err.message || 'Trip progress could not be saved' }));
       console.error('Failed to upsert driver trip progress:', err);
       return false;
     }
-  }, [activeTenantId]);
+  }), [activeTenantId, enqueueFieldPersistence]);
 
-  const upsertDriverProfile = useCallback(async (driverId, updates = {}) => {
+  const upsertDriverProfile = useCallback((driverId, updates = {}) => enqueueFieldPersistence('drivers', async () => {
     if (!driverId) return false;
     const currentDrivers = dataRef.current.drivers || [];
     const existing = currentDrivers.find((driver) => driver.id === driverId) || { id: driverId };
@@ -888,12 +929,13 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       : [...currentDrivers, nextDriver];
     dataRef.current = { ...normalizeData(dataRef.current), drivers: nextDrivers };
     setState(prev => ({ ...prev, drivers: nextDrivers, error: null }));
+    const profileOperation = {
+      type: 'setDoc', collection: DRIVER_PROFILE_COLLECTION,
+      docId: String(driverId), data: nextDriver,
+    };
     try {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await saveFieldWithSyncOperations('drivers', nextDrivers, [{
-          type: 'setDoc', collection: DRIVER_PROFILE_COLLECTION,
-          docId: String(driverId), data: nextDriver,
-        }], { tenantId: activeTenantId, userId: auth.currentUser?.uid || '' });
+        await saveFieldWithSyncOperations('drivers', nextDrivers, [profileOperation], { tenantId: activeTenantId, userId: auth.currentUser?.uid || '' });
         return true;
       }
       await saveLocalField('drivers', nextDrivers, { previousValue: currentDrivers, tenantId: activeTenantId });
@@ -910,16 +952,33 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       emitSystemEvents(buildDriverEvents([existing], [nextDriver], getCurrentEventActor())).catch((err) => console.error('Driver event failed:', err));
       return true;
     } catch (err) {
+      if (!isPermanentSyncFailure(err) && auth.currentUser?.uid) {
+        try {
+          await saveFieldWithSyncOperations('drivers', nextDrivers, [profileOperation], {
+            tenantId: activeTenantId,
+            userId: auth.currentUser.uid,
+          });
+          return true;
+        } catch (queueError) {
+          console.error('Failed to queue driver profile:', queueError);
+        }
+      }
       console.error('Failed to upsert driver profile:', err);
-      dataRef.current = { ...normalizeData(dataRef.current), drivers: currentDrivers };
+      const rollbackDrivers = rollbackOptimisticValue(
+        dataRef.current.drivers,
+        currentDrivers,
+        nextDrivers,
+        planCollectionMutations(currentDrivers, nextDrivers),
+      );
+      dataRef.current = { ...normalizeData(dataRef.current), drivers: rollbackDrivers };
       setState(prev => ({
         ...prev,
-        drivers: currentDrivers,
+        drivers: rollbackDrivers,
         error: err.message || 'Driver profile could not be saved',
       }));
       return false;
     }
-  }, [activeTenantId]);
+  }), [activeTenantId, enqueueFieldPersistence]);
 
   const assignVehicleToDriver = useCallback(async (driverId, vehicleName = '') => {
     if (!driverId) throw new Error('A driver is required for vehicle assignment.');
@@ -1012,15 +1071,61 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
   }, [activeTenantId]);
 
 
-  const setDispatchers = useCallback((updater) => { const current = dataRef.current.dispatchers || []; return writeField('dispatchers', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
-  const setVehicles = useCallback((updater) => { const current = dataRef.current.vehicles || []; return writeField('vehicles', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
-  const setTrashedTrips = useCallback((updater) => { const current = dataRef.current.trashedTrips || []; return writeField('trashedTrips', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
-  const setLogs = useCallback((updater) => { const current = dataRef.current.logs || []; return writeField('logs', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
-  const setPhoneNumbers = useCallback((updater) => { const current = dataRef.current.phoneNumbers || DEFAULT_DATA.phoneNumbers; return writeField('phoneNumbers', typeof updater === 'function' ? updater(current) : updater); }, [writeField]);
+  const setDispatchers = useCallback((updater) => enqueueFieldPersistence('dispatchers', () => { const current = dataRef.current.dispatchers || []; return writeField('dispatchers', typeof updater === 'function' ? updater(current) : updater); }), [enqueueFieldPersistence, writeField]);
+  const setVehicles = useCallback((updater) => enqueueFieldPersistence('vehicles', () => { const current = dataRef.current.vehicles || []; return writeField('vehicles', typeof updater === 'function' ? updater(current) : updater); }), [enqueueFieldPersistence, writeField]);
+  const setTrashedTrips = useCallback((updater) => enqueueFieldPersistence('trashedTrips', () => { const current = dataRef.current.trashedTrips || []; return writeField('trashedTrips', typeof updater === 'function' ? updater(current) : updater); }), [enqueueFieldPersistence, writeField]);
+  const setPhoneNumbers = useCallback((updater) => enqueueFieldPersistence('phoneNumbers', () => { const current = dataRef.current.phoneNumbers || DEFAULT_DATA.phoneNumbers; return writeField('phoneNumbers', typeof updater === 'function' ? updater(current) : updater); }), [enqueueFieldPersistence, writeField]);
 
-  const addLog = useCallback(async (log) => {
-    try { await addDoc(collection(db, 'logs'), { ...log, tenantId: activeTenantId, timestamp: serverTimestamp() }); } catch (err) { console.error('Log failed:', err); }
-  }, [activeTenantId]);
+  const addLog = useCallback((log) => enqueueFieldPersistence('logs', async () => {
+    const logRef = doc(collection(db, 'logs'));
+    const timestampLocal = new Date().toISOString();
+    const localLog = sanitizeForFirestore({
+      ...log,
+      id: logRef.id,
+      tenantId: activeTenantId,
+      timestampLocal,
+    });
+    const previousLogs = dataRef.current.logs || [];
+    const nextLogs = [localLog, ...previousLogs.filter((item) => item.id !== logRef.id)].slice(0, 250);
+    const operation = {
+      type: 'setDoc',
+      collection: 'logs',
+      docId: logRef.id,
+      data: localLog,
+    };
+    dataRef.current = { ...dataRef.current, logs: nextLogs };
+    setState(prev => ({ ...prev, logs: nextLogs, error: null }));
+    try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await saveFieldWithSyncOperations('logs', nextLogs, [operation], {
+          tenantId: activeTenantId,
+          userId: auth.currentUser?.uid || '',
+        });
+        return true;
+      }
+      await setDoc(logRef, { ...localLog, timestamp: serverTimestamp() });
+      await saveLocalField('logs', nextLogs, { previousValue: previousLogs, tenantId: activeTenantId });
+      return true;
+    } catch (error) {
+      if (!isPermanentSyncFailure(error) && auth.currentUser?.uid) {
+        try {
+          await saveFieldWithSyncOperations('logs', nextLogs, [operation], {
+            tenantId: activeTenantId,
+            userId: auth.currentUser.uid,
+          });
+          return true;
+        } catch (queueError) {
+          console.error('Failed to queue activity log:', queueError);
+        }
+      }
+      const currentLogs = dataRef.current.logs || [];
+      const rollbackLogs = currentLogs.filter((item) => item.id !== logRef.id);
+      dataRef.current = { ...dataRef.current, logs: rollbackLogs };
+      setState(prev => ({ ...prev, logs: rollbackLogs, error: error.message || 'Activity log could not be synchronized' }));
+      console.error('Log failed:', error);
+      return false;
+    }
+  }), [activeTenantId, enqueueFieldPersistence]);
 
   const initializeAppData = useCallback(async () => {
     return true;
@@ -1031,7 +1136,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     trashedTrips: state.trashedTrips, logs: state.logs, phoneNumbers: state.phoneNumbers,
     loading: state.loading, saving: state.saving, error: state.error,
     initialized: state.initialized, docExists: state.docExists, lastSavedAt: state.lastSavedAt,
-    setTrips, archiveTripsById, persistUploadedTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles, setTrashedTrips, setLogs, setPhoneNumbers, addLog, initializeAppData,
+    setTrips, archiveTripsById, persistUploadedTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles, setTrashedTrips, setPhoneNumbers, addLog, initializeAppData,
   };
 }
 

@@ -9,8 +9,8 @@ import {
   syncOperationBelongsTo,
 } from '../utils/localDB';
 
-const PROCESS_INTERVAL_MS = 30000;
-const RETRY_DELAY_MS = 5000;
+export const SYNC_QUEUE_PROCESS_INTERVAL_MS = 5000;
+export const SYNC_QUEUE_ONLINE_DELAY_MS = 250;
 const PERMANENT_FIREBASE_CODES = new Set([
   'already-exists', 'failed-precondition', 'invalid-argument', 'not-found',
   'out-of-range', 'permission-denied', 'unauthenticated', 'unimplemented',
@@ -51,10 +51,10 @@ export class SyncQueueProcessor {
     void this.processNow();
     this._timer = setInterval(() => {
       if (this._started && navigator.onLine && !this._processing) void this.processNow();
-    }, PROCESS_INTERVAL_MS);
+    }, SYNC_QUEUE_PROCESS_INTERVAL_MS);
     this._handleOnline = () => {
       if (this._started && !this._processing) {
-        this._onlineTimer = setTimeout(() => void this.processNow(), RETRY_DELAY_MS);
+        this._onlineTimer = setTimeout(() => void this.processNow(), SYNC_QUEUE_ONLINE_DELAY_MS);
       }
     };
     window.addEventListener('online', this._handleOnline);
@@ -166,12 +166,18 @@ export class SyncQueueProcessor {
         if (!operation.collection || !operation.docId || !operation.data || typeof operation.data !== 'object') {
           throw new PermanentSyncError('setDoc requires collection, docId, and data');
         }
-        await setDoc(doc(db, operation.collection, operation.docId), {
-          ...operation.data,
-          syncedAt: serverTimestamp(),
-          syncedAtLocal: new Date().toISOString(),
-        }, { merge: true });
-        return;
+        {
+          const operationData = { ...operation.data };
+          if (operation.collection === 'logs' && !operationData.timestamp) {
+            operationData.timestamp = serverTimestamp();
+          }
+          await setDoc(doc(db, operation.collection, operation.docId), {
+            ...operationData,
+            syncedAt: serverTimestamp(),
+            syncedAtLocal: new Date().toISOString(),
+          }, { merge: true });
+          return;
+        }
       case 'deleteDoc':
         if (!operation.collection || !operation.docId) throw new PermanentSyncError('deleteDoc requires collection and docId');
         await deleteDoc(doc(db, operation.collection, operation.docId));

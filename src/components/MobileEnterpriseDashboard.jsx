@@ -317,7 +317,6 @@ const MobileEnterpriseDashboard = (props) => {
                   props.setTrips?.([]);
                   props.setTrashedTrips?.([]);
                   props.setDrivers?.([]);
-                  props.setLogs?.([{ t: 'System Reset', d: 'Administrator wiped all operational data.', c: 'rose', type: 'system' }]);
                   props.addAuditLog?.('System Reset', 'Master data wipe performed by Admin.', 'rose');
                 }}
               />

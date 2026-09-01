@@ -40,6 +40,8 @@ vi.mock('../utils/localDB', () => localDBMock);
 import {
   isPermanentSyncFailure,
   PermanentSyncError,
+  SYNC_QUEUE_ONLINE_DELAY_MS,
+  SYNC_QUEUE_PROCESS_INTERVAL_MS,
   SyncQueueProcessor,
 } from './syncQueueProcessor';
 
@@ -86,6 +88,11 @@ beforeEach(() => {
 });
 
 describe('SyncQueueProcessor ownership and terminal failure handling', () => {
+  it('retries queued global writes promptly after connectivity returns', () => {
+    expect(SYNC_QUEUE_PROCESS_INTERVAL_MS).toBeLessThanOrEqual(5000);
+    expect(SYNC_QUEUE_ONLINE_DELAY_MS).toBeLessThanOrEqual(250);
+  });
+
   it('does not read or execute the queue without verified auth context', async () => {
     const processor = startedProcessor();
 

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle, Edit2, BrainCircuit, Activity, UserCheck, UserX } from 'lucide-react';
-import { db, collection, getDocs, functions, httpsCallable } from '../config/firebase';
+import { db, collection, getDocs, functions, httpsCallable, onSnapshot } from '../config/firebase';
 import { analyzeActivityLogs } from '../config/ai';
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
@@ -27,6 +27,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const [editName, setEditName] = useState('');
   const [editHourlyRate, setEditHourlyRate] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
+  const usersByIdRef = useRef(new Map());
 
   // AI Insights State
   const [aiInsights, setAiInsights] = useState(null);
@@ -42,8 +43,10 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
 
   useEffect(() => {
     if (!activityFeedOnly && role === 'admin' && !aiInsights && !analyzingLogs) {
-      fetchInsights();
+      const timer = window.setTimeout(() => void fetchInsights(), 0);
+      return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [role, logs, aiInsights, analyzingLogs, fetchInsights, activityFeedOnly]);
 
   const loadUsers = useCallback(async () => {
@@ -52,6 +55,7 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
       const snap = await getDocs(collection(db, 'users'));
       const list = [];
       snap.forEach(d => list.push({ uid: d.id, ...d.data() }));
+      usersByIdRef.current = new Map(list.map((user) => [user.uid, user]));
       setUsers(list);
     } catch (err) {
       console.error('Failed to load users:', err);
@@ -61,8 +65,23 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   }, []);
 
   useEffect(() => {
-    if (!activityFeedOnly) loadUsers();
-  }, [loadUsers, activityFeedOnly]);
+    if (activityFeedOnly) return undefined;
+    return onSnapshot(collection(db, 'users'), (snapshot) => {
+      const nextUsers = new Map(usersByIdRef.current);
+      snapshot.docChanges({ includeMetadataChanges: false }).forEach((change) => {
+        if (change.type === 'removed') nextUsers.delete(change.doc.id);
+        else nextUsers.set(change.doc.id, { uid: change.doc.id, ...change.doc.data() });
+      });
+      usersByIdRef.current = nextUsers;
+      setUsers([...nextUsers.values()]);
+      setLoading(false);
+      setFormError((current) => current === 'Could not load users. Check your Firestore permissions.' ? '' : current);
+    }, (error) => {
+      console.error('Live user directory failed:', error);
+      setFormError('Could not load users. Check your Firestore permissions.');
+      setLoading(false);
+    });
+  }, [activityFeedOnly]);
 
   const createUser = async () => {
     setFormError('');
@@ -767,7 +786,6 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
               {(() => {
                 const links = [];
                 const text = selectedLog.d || '';
-                const title = selectedLog.t || '';
 
                 // 1. Check for Trip ID patterns like TRP-XXX or BK-XXX
                 const tripIdMatches = text.match(/(?:TRP|BK)-\d+/gi);

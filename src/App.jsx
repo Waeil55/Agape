@@ -40,7 +40,7 @@ import { DEFAULT_OVERRIDE_POLICY, isOverridePolicyDocumentValid, normalizeOverri
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v374';
+const APP_VERSION = 'v375';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -512,7 +512,7 @@ const App = () => {
     trips, drivers, dispatchers, vehicles, trashedTrips, logs, phoneNumbers,
     loading: dataLoading, error: dataError,
     setTrips, archiveTripsById, persistUploadedTrips, setDrivers, upsertDriverProfile, assignVehicleToDriver, upsertDriverTrip, setDispatchers, setVehicles,
-    setTrashedTrips, setLogs, setPhoneNumbers,
+    setTrashedTrips, setPhoneNumbers,
     addLog, initializeAppData,
   } = useFirestoreAppData({ tenantId, resubscribeKey: realtimeReliability.resubscribeKey, enabled: isAuthenticated });
 
@@ -692,6 +692,7 @@ const App = () => {
       return { ...DEFAULT_APP_SETTINGS };
     }
   });
+  const remoteSettingsApplyRef = useRef(false);
   const [overridePolicy, setOverridePolicy] = useState(() => normalizeOverridePolicy(DEFAULT_OVERRIDE_POLICY));
   const [overridePolicyStatus, setOverridePolicyStatus] = useState('loading');
   const [overridePolicyError, setOverridePolicyError] = useState('');
@@ -1017,11 +1018,30 @@ const App = () => {
       localStorage.setItem('agape_appSettings', JSON.stringify(withoutLegacyTheme(appSettings)));
     } catch {}
 
-    // Persist settings to Firestore for logged in user
-    if (isAuthenticated && auth.currentUser) {
+    // A remote settings snapshot is already authoritative; do not echo it
+    // back to Firestore and create a cross-device update loop.
+    if (remoteSettingsApplyRef.current) {
+      remoteSettingsApplyRef.current = false;
+    } else if (isAuthenticated && auth.currentUser) {
       persistUserSettings(appSettings);
     }
   }, [appSettings, isAuthenticated]);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!isAuthenticated || !uid) return undefined;
+    return onSnapshot(doc(db, 'users', uid), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const remoteSettings = withoutLegacyTheme(snapshot.data()?.settings || {});
+      if (Object.keys(remoteSettings).length === 0) return;
+      setAppSettings((previous) => {
+        const next = { ...previous, ...remoteSettings };
+        if (JSON.stringify(previous) === JSON.stringify(next)) return previous;
+        remoteSettingsApplyRef.current = true;
+        return next;
+      });
+    }, (error) => console.error('User settings live sync failed:', error));
+  }, [isAuthenticated]);
 
   useEffect(() => {
     let unsubData = null;
@@ -1398,7 +1418,6 @@ const App = () => {
 
   const addAuditLog = useCallback((title, desc, color, meta = null) => {
     const now = Date.now();
-    const timeStr = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const actorEmail = currentUser || 'system';
     let actorRole = 'admin';
     try {
@@ -1407,9 +1426,8 @@ const App = () => {
       else if (dispatchers && dispatchers.some(d => norm(d.email) === norm(actorEmail))) actorRole = 'dispatcher';
       else if (!currentUser) actorRole = 'system';
     } catch (e) { /* ignore */ }
-    setLogs(prev => [{ t: title, d: desc, c: color, type: 'audit', timestamp: timeStr, time: now, actor: actorEmail, actorRole, meta }, ...prev].slice(0, 100));
     addLog({ t: title, d: desc, c: color, type: 'audit', time: now, actor: actorEmail, actorRole, meta });
-  }, [currentUser, drivers, dispatchers, addLog, setLogs]);
+  }, [currentUser, drivers, dispatchers, addLog]);
 
 
   const handleCreateAccount = async () => {
@@ -2093,50 +2111,55 @@ const App = () => {
   };
 
   const restoreTrip = (tripId) => {
-    requestAuthAction('restore_trip', () => {
+    requestAuthAction('restore_trip', async () => {
       let tripToRestore = null;
-      setTrashedTrips(currentTrashed => {
+      const archiveSaved = await setTrashedTrips(currentTrashed => {
         tripToRestore = currentTrashed.find(t => t.id === tripId);
         if (!tripToRestore) return currentTrashed;
         return currentTrashed.filter(t => t.id !== tripId);
       });
-
-      setTimeout(() => {
-        if (tripToRestore) {
-          setTrips(currentTrips => {
-            const restoreKey = getTripKey(tripToRestore);
-            const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
-            if (alreadyExists) return currentTrips;
-
-            return dedupTrips([...currentTrips, tripToRestore]);
-          });
-
-          setDoc(doc(db, 'trips', tripId), { archiveState: null }, { merge: true }).catch(err => {
-            console.error('Failed to clear archiveState in Firestore:', err);
-          });
-
-          addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${tripToRestore.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
-        }
-      }, 0);
+      if (archiveSaved === false || !tripToRestore) return;
+      const restoredTrip = { ...tripToRestore, archiveState: null, archivedAtLocal: null };
+      const tripSaved = await setTrips(currentTrips => {
+        const restoreKey = getTripKey(restoredTrip);
+        const alreadyExists = currentTrips.some(et => getTripKey(et) === restoreKey);
+        return alreadyExists ? currentTrips : dedupTrips([...currentTrips, restoredTrip]);
+      });
+      if (tripSaved === false) {
+        await setTrashedTrips(currentTrashed => (
+          currentTrashed.some(t => t.id === tripId)
+            ? currentTrashed
+            : [tripToRestore, ...currentTrashed]
+        ));
+        throw new Error('The restored trip could not be synchronized. The archive entry was preserved.');
+      }
+      addAuditLog('Trip Restored', `${currentUser || 'Admin'} restored trip ${tripId} (${restoredTrip.patient}) from Archive.`, 'emerald', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'active' }] });
     });
   };
 
   const deleteTrashedTrip = (tripId) => {
-    requestAuthAction('delete_trip', () => {
+    requestAuthAction('delete_trip', async () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        throw new Error('Permanent deletion requires a verified connection. Reconnect and retry; no trip was removed.');
+      }
       let deletedTrip = null;
-      setTrashedTrips(currentTrashed => {
+      const localSaved = await setTrashedTrips(currentTrashed => {
         deletedTrip = currentTrashed.find(t => t.id === tripId);
         if (!deletedTrip) return currentTrashed;
         return currentTrashed.filter(t => t.id !== tripId);
       });
-      setTimeout(() => {
-        if (deletedTrip) {
-          deleteDoc(doc(db, 'trips', tripId)).catch(err => {
-            console.error('Failed to delete trip from Firestore:', err);
-          });
-          addAuditLog('Trip Permanently Deleted', `${currentUser || 'Admin'} permanently deleted trip ${tripId} (${deletedTrip.patient}) from Archive.`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'deleted' }] });
-        }
-      }, 0);
+      if (localSaved === false || !deletedTrip) return;
+      try {
+        await deleteDoc(doc(db, 'trips', tripId));
+      } catch (error) {
+        await setTrashedTrips(currentTrashed => (
+          currentTrashed.some(t => t.id === tripId)
+            ? currentTrashed
+            : [deletedTrip, ...currentTrashed]
+        ));
+        throw error;
+      }
+      addAuditLog('Trip Permanently Deleted', `${currentUser || 'Admin'} permanently deleted trip ${tripId} (${deletedTrip.patient}) from Archive.`, 'rose', { entity: 'trip', id: tripId, diffs: [{ field: 'status', before: 'archived', after: 'deleted' }] });
     });
   };
 
@@ -3084,7 +3107,6 @@ const App = () => {
               restoreTrip={restoreTrip}
               deleteTrashedTrip={deleteTrashedTrip}
               logs={logs}
-              setLogs={setLogs}
               phoneNumbers={phoneNumbers}
               setPhoneNumbers={setPhoneNumbers}
               setTrashedTrips={setTrashedTrips}
