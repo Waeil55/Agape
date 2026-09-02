@@ -22,7 +22,7 @@ import { emitSystemEvent } from '../services/firestoreEventEngine';
 
 const HEARTBEAT_INTERVAL_MS = 5000;
 const HEARTBEAT_OFFLINE_MS = 15000;
-const HEARTBEAT_FORCE_LOGOUT_MS = 30000;
+const HEARTBEAT_FORCE_LOGOUT_MS = 300000;
 const DEVICE_ID_KEY = 'agape_device_id';
 
 const ACTIVE_TRIP_STATUSES = new Set([

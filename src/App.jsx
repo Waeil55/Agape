@@ -1399,21 +1399,17 @@ const App = () => {
         // If user was already authenticated in this session, this could be a transient
         // token refresh or an IndexedDB corruption issue. Wait for session restoration.
         if (authBootResolvedRef.current) {
-          console.warn('[Auth] Session went null after boot — waiting 3s for token refresh');
-          await new Promise(r => setTimeout(r, 3000));
+          console.warn('[Auth] Session went null after boot — waiting 5s for token refresh');
+          await new Promise(r => setTimeout(r, 5000));
           if (cancelled) return;
           if (auth.currentUser) {
             loginAttemptRef.current = 0;
             return;
           }
-          // Session truly lost — show login immediately
-          // But increment attempt counter: if we've been through this loop too many
-          // times, skip the signOut to prevent an infinite reload cycle.
           loginAttemptRef.current += 1;
-          if (loginAttemptRef.current > 3) {
+          if (loginAttemptRef.current > 5) {
             console.warn('[Auth] Multiple rapid null-state cycles detected — clearing all local state');
             clearRoleCache();
-            // Attempt to clear Firebase Auth IndexedDB state by signing out forcefully
             skipNextSignedOutResetRef.current = true;
             signOut(auth).catch(() => {});
             resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
@@ -1575,12 +1571,22 @@ const App = () => {
       // Privileged portals end when the browser session closes. Drivers retain
       // local persistence so navigation/reloads do not interrupt active field work;
       // their live employment and device session are still continuously verified.
-      const requestedPersistence = requestedRole === 'driver'
-        ? browserLocalPersistence
-        : browserSessionPersistence;
-      await setPersistence(auth, requestedPersistence).catch(() =>
-        setPersistence(auth, browserSessionPersistence).catch(() => {})
-      );
+      if (requestedRole === 'driver') {
+        try {
+          await setPersistence(auth, browserLocalPersistence);
+        } catch {
+          // Retry once — transient IndexedDB errors are common on cold boot
+          try {
+            await setPersistence(auth, browserLocalPersistence);
+          } catch {
+            // Last resort: session persistence keeps the driver logged in
+            // for the current browser session but will not survive a close.
+            await setPersistence(auth, browserSessionPersistence).catch(() => {});
+          }
+        }
+      } else {
+        await setPersistence(auth, browserSessionPersistence).catch(() => {});
+      }
       const { authEmail, username } = resolveAuthIdentifier(email);
       if (!authEmail || !username) {
         setIsLoading(false);

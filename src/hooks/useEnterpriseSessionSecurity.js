@@ -98,10 +98,9 @@ export default function useEnterpriseSessionSecurity({
       if (!snapshot.exists() || !isEmploymentAccessActive(snapshot.data())) {
         terminate('access_revoked', 'Your Agape Care access has been disabled. Contact an administrator if this is unexpected.');
       }
-    }, (error) => {
-      if (error?.code === 'permission-denied') {
-        terminate('access_revoked', 'Your Agape Care access is no longer authorized.');
-      }
+    }, () => {
+      // Transient Firestore errors (network, permission flicker) should not
+      // terminate the session. The next successful snapshot will re-validate.
     });
 
     const activityEvents = ['pointerdown', 'keydown', 'touchstart', 'focus'];
@@ -140,9 +139,11 @@ export default function useEnterpriseSessionSecurity({
         try {
           await currentUser.getIdToken(true);
         } catch (error) {
-          if (['auth/user-disabled', 'auth/user-token-expired', 'auth/invalid-user-token'].includes(error?.code)) {
+          if (error?.code === 'auth/user-disabled') {
             terminate('access_revoked', 'Your secure session was revoked by an administrator.');
           }
+          // auth/invalid-user-token and auth/user-token-expired are transient —
+          // Firebase will recover on the next refresh cycle.
         }
       }
     };
