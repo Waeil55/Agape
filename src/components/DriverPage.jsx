@@ -3659,32 +3659,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const nowLocal = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const defaultTime = `${pad(nowLocal.getHours())}:${pad(nowLocal.getMinutes())}`;
-    const pickupArrivalClock = formatTimeInput(getCompletionPickupBoundary(trip));
     const storedDepartureClock = formatTimeInput(trip.departedPickupTime);
-    const normalizedClocks = normalizeCompletionClocks({
-      pickupArrival: pickupArrivalClock,
-      pickupDeparture: storedDepartureClock,
-      dropoffArrival: formatTimeInput(trip.arrivalDropoffTime),
-      now: defaultTime,
-    });
-    if (storedDepartureClock && normalizedClocks.pickupDeparture !== storedDepartureClock) {
-      setCompleteTimeNotice(`Pickup departure was aligned to the recorded pickup arrival (${to12hrFromTimeInput(pickupArrivalClock)}).`);
-    }
-    setDepartedTime(normalizedClocks.pickupDeparture);
-    setArrivalDropoffTime(normalizedClocks.dropoffArrival);
+    const storedDropoffClock = formatTimeInput(trip.arrivalDropoffTime);
+    setDepartedTime(storedDepartureClock || defaultTime);
+    setArrivalDropoffTime(storedDropoffClock || defaultTime);
     openNativeOdometerKeyboard('complete');
   };
 
   const updateCompletionDeparture = (value) => {
-    const pickupArrivalClock = formatTimeInput(getCompletionPickupBoundary(showCompleteModal));
-    // Keep the driver's selected value intact while the native time picker is
-    // open. Normalizing on every change immediately replaced the selection
-    // (and made iOS appear read-only). Chronology is still enforced on submit.
     setDepartedTime(value);
     setCompleteError('');
-    if (value && pickupArrivalClock && timeToMinutes(value) < timeToMinutes(pickupArrivalClock)) {
-      setCompleteTimeNotice(`Pickup departure cannot be before pickup arrival (${to12hrFromTimeInput(pickupArrivalClock)}). Choose another time.`);
-    } else if (value && arrivalDropoffTime && timeToMinutes(arrivalDropoffTime) < timeToMinutes(value)) {
+    if (value && arrivalDropoffTime && timeToMinutes(arrivalDropoffTime) < timeToMinutes(value)) {
       setCompleteTimeNotice('Dropoff arrival is now before pickup departure. Update the dropoff time before completing.');
     } else {
       setCompleteTimeNotice('');
@@ -3738,10 +3723,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const pickupArrivalMs = pickupArrivalIso ? minuteEpoch(pickupArrivalIso) : NaN;
     const pickupDepartureMs = minuteEpoch(departedPickupIso);
     const dropoffArrivalMs = minuteEpoch(dropoffArrivalIso);
-    if (Number.isFinite(pickupArrivalMs) && pickupDepartureMs < pickupArrivalMs) {
-      setCompleteError(`Pickup departure cannot be before pickup arrival (${formatTimeInput(pickupArrivalIso)}).`);
-      return;
-    }
     if (dropoffArrivalMs < pickupDepartureMs) {
       setCompleteError(`Dropoff arrival cannot be before pickup departure (${formatTimeInput(departedPickupIso)}).`);
       return;
