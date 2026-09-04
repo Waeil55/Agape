@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { X, Plus, MapPin, Clock, User, Phone, FileText, Calendar, Repeat, Hash, Truck, Navigation } from 'lucide-react';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { getClientProfile, prefillFromProfile } from '../utils/clientProfileUtils';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const WEEKDAY_SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
@@ -71,6 +72,19 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
     setForm(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
   };
+
+  const profileTimerRef = useRef(null);
+  const handlePatientChange = useCallback((value) => {
+    update('patient', value);
+    clearTimeout(profileTimerRef.current);
+    if (!value || value.length < 2) return;
+    profileTimerRef.current = setTimeout(async () => {
+      const profile = await getClientProfile(value);
+      if (profile) {
+        setForm(prev => prefillFromProfile(profile, prev));
+      }
+    }, 500);
+  }, []);
 
   const toggleWeekday = (day) => {
     setForm(prev => ({
@@ -206,7 +220,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
                   <input
                     type="text"
                     value={form.patient}
-                    onChange={e => update('patient', e.target.value)}
+                    onChange={e => handlePatientChange(e.target.value)}
                     placeholder="Full name"
                     className={inputClass('patient')}
                     autoFocus

@@ -4,6 +4,7 @@ import { getManifestUrgency } from '../utils/portalSelectors';
 import { AlertCircle, Users, UserCheck, X, Plus, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal } from 'lucide-react';
 
 import { makeCall, sendSMS } from '../utils/nativeActions';
+import { saveClientProfile } from '../utils/clientProfileUtils';
 
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
@@ -61,6 +62,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const [savingCreate, setSavingCreate] = useState(false);
   const [createError, setCreateError] = useState('');
   const [editTrip, setEditTrip] = useState(null);
+  const [saveAsProfile, setSaveAsProfile] = useState(false);
   const [manifestDate, setManifestDate] = useState(today);
   const [showAllDates, setShowAllDates] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -241,8 +243,12 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     try {
       const saved = await Promise.resolve(onUpdateTrip(editTrip));
       if (saved === false) throw new Error('The trip update was rejected.');
+      if (saveAsProfile && editTrip.patient) {
+        await saveClientProfile(editTrip.patient, editTrip, currentUser).catch(() => {});
+      }
       setAssignmentFeedback(`✓ Trip ${editTrip.bookingId || editTrip.id} saved`);
       setEditTrip(null);
+      setSaveAsProfile(false);
       clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = setTimeout(() => setAssignmentFeedback(''), 3000);
     } catch (error) {
@@ -306,6 +312,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
   const openEdit = (trip) => {
     setEditTrip({ ...trip, time: toTimeInput(trip.time) });
+    setSaveAsProfile(false);
   };
 
   const renderManifestTripCard = (trip) => {
@@ -364,6 +371,10 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
               <PlacesAutocompleteInput value={editTrip.dropoff || ''} onChange={value => setEditTrip(current => ({ ...current, dropoff: value }))} className={fieldClass} placeholder="Dropoff address" required />
             </div>
             <textarea value={editTrip.notes || ''} onChange={event => setEditTrip(current => ({ ...current, notes: event.target.value }))} className={`${fieldClass} sm:col-span-2 xl:col-span-4`} rows="2" placeholder="Notes" aria-label="Notes" />
+            <label className={`sm:col-span-2 xl:col-span-4 flex items-center gap-2 cursor-pointer rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600`}>
+              <input type="checkbox" checked={saveAsProfile} onChange={e => setSaveAsProfile(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+              Save as client default for future trips
+            </label>
           </div>
         </form>
       );

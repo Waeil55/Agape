@@ -4,6 +4,7 @@ import { getDriverLiveStatus } from "../constants/statuses";
 import { tripCalendarDateKey, localCalendarYmd } from "../utils/tripDate";
 import { tripMatchesSearch } from "../utils/search";
 import { resolveClientPhoneForTrip } from "../utils/clientPhoneResolution";
+import { saveClientProfile } from "../utils/clientProfileUtils";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 const timeToMinutes = (t) => {
@@ -65,6 +66,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [saveAsProfile, setSaveAsProfile] = useState(false);
   const [draft, setDraft] = useState(() => ({ ...trip, pickup: getAddr(trip.pickup), dropoff: getAddr(trip.dropoff) }));
   const statusCfg = getStatusConfig(trip.status);
   const urgency = getUrgency(trip);
@@ -124,7 +126,11 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
     try {
       const saved = await Promise.resolve(updateTrip(trip.id, draft));
       if (saved === false) throw new Error('The trip update was rejected.');
+      if (saveAsProfile && draft.patient) {
+        await saveClientProfile(draft.patient, draft, currentUser).catch(() => {});
+      }
       setEditing(false);
+      setSaveAsProfile(false);
       setShowActions(false);
       addToast?.('Trip Updated', `${draft.patient || trip.id} saved.`, 'success');
     } catch (error) {
@@ -163,6 +169,10 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
           <input value={draft.pickupPhone || ''} onChange={event => setDraft(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Pickup location phone" aria-label="Pickup location phone" />
           <input value={draft.dropoffPhone || ''} onChange={event => setDraft(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff location phone" aria-label="Dropoff location phone" />
           <textarea value={draft.notes || ''} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Notes" aria-label="Notes" />
+          <label className={`${fieldClass} col-span-2 flex items-center gap-2 cursor-pointer rounded-lg border border-slate-100 bg-slate-50`}>
+            <input type="checkbox" checked={saveAsProfile} onChange={e => setSaveAsProfile(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            Save as client default for future trips
+          </label>
         </div>
         {editError && <p className="mt-2 rounded-lg bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700">{editError}</p>}
       </form>

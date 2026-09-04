@@ -100,6 +100,12 @@ service cloud.firestore {
       allow update: if signedIn();
       allow delete: if signedIn() && isAdmin();
     }
+    match /clientProfiles/{profileId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if signedIn() && isAdmin();
+    }
     match /assignments/{assignmentId} {
       allow read: if signedIn() && (
         isDispatcher()

@@ -8,6 +8,7 @@ export const FIRESTORE_COLLECTIONS = Object.freeze({
   DRIVER_LOCATIONS: 'driver_locations',
   SYSTEM_EVENTS: 'system_events',
   AUDIT_LOGS: 'audit_logs',
+  CLIENT_PROFILES: 'clientProfiles',
 });
 
 export const TRIP_STATUSES = Object.freeze({

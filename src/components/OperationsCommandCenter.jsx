@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { FileText, Users, AlertCircle, Clock, CheckCircle2, XCircle, Truck, Activity, BrainCircuit, Phone, MessageSquare, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTriangle, MapPin, Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown, Archive, UploadCloud, Plus, Edit2, Route, Search, RotateCcw, User, Car, Map as MapIcon, Navigation, UserPlus, Flag, MoreVertical } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
 import { localCalendarYmd } from '../utils/tripDate';
+import { saveClientProfile } from '../utils/clientProfileUtils';
 import SendSmsModal from './SendSmsModal';
 import SmsConversationModal from './SmsConversationModal';
 import { getOperationalRoutes } from '../utils/routePlans';
@@ -425,6 +426,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [inlineEditSaving, setInlineEditSaving] = useState(false);
+  const [saveAsProfile, setSaveAsProfile] = useState(false);
   const [inlineEditError, setInlineEditError] = useState('');
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
   const [activeTripRow, setActiveTripRow] = useState(null);
@@ -878,6 +880,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const startInlineEdit = useCallback((trip) => {
     const original = trips.find(t => t.id === trip.id) || trip;
     setEditingTripId(original.id);
+    setSaveAsProfile(false);
     setEditingTripData({
       patient: original.patient || '',
       bookingId: original.bookingId || '',
@@ -945,8 +948,12 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     try {
       const saved = await Promise.resolve(updateTrip?.(editingTripId, payload));
       if (saved === false) throw new Error('The trip update was rejected.');
+      if (saveAsProfile && d.patient) {
+        await saveClientProfile(d.patient, payload, currentUser).catch(() => {});
+      }
       setEditingTripId(null);
       setEditingTripData(null);
+      setSaveAsProfile(false);
       setSortKeyOverrides(prev => ({ ...prev, [editingTripId]: d.time || prev[editingTripId] || '' }));
       addToast?.('Trip Updated', `${d.patient || editingTripId} saved.`, 'success');
     } catch (error) {
@@ -1442,6 +1449,10 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           <input value={draft.pickupPhone} onChange={event => setEditingTripData(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Pickup phone" aria-label="Pickup phone" />
           <input value={draft.dropoffPhone} onChange={event => setEditingTripData(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff phone" aria-label="Dropoff phone" />
           <textarea value={draft.notes} onChange={event => setEditingTripData(current => ({ ...current, notes: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Notes" aria-label="Notes" />
+          <label className={`${fieldClass} col-span-2 flex items-center gap-2 cursor-pointer rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600`}>
+            <input type="checkbox" checked={saveAsProfile} onChange={e => setSaveAsProfile(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            Save as client default for future trips
+          </label>
         </div>
         {inlineEditError && <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{inlineEditError}</p>}
       </div>
@@ -2192,6 +2203,10 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                             <input value={ie.pickupPhone} onChange={event => setEditingTripData(current => ({ ...current, pickupPhone: event.target.value }))} className={inlineCellClass} aria-label="Pickup phone" placeholder="Pickup phone" />
                             <input value={ie.dropoffPhone} onChange={event => setEditingTripData(current => ({ ...current, dropoffPhone: event.target.value }))} className={inlineCellClass} aria-label="Dropoff phone" placeholder="Dropoff phone" />
                             <textarea value={ie.notes} onChange={event => setEditingTripData(current => ({ ...current, notes: event.target.value }))} className={inlineCellClass} rows="2" aria-label="Notes" placeholder="Notes" />
+                            <label className="flex items-center gap-2 cursor-pointer rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold text-slate-600">
+                              <input type="checkbox" checked={saveAsProfile} onChange={e => setSaveAsProfile(e.target.checked)} className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                              Save as client default
+                            </label>
                           </div>
                         ) : (
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center gap-0.5`}>

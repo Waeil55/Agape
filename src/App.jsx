@@ -2836,7 +2836,7 @@ const App = () => {
             </div>
           </aside>
 
-          <div className="agape-login-panel w-full max-w-lg justify-self-center overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
+          <div className="agape-login-panel w-full max-w-lg justify-self-center overflow-clip rounded-xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
           <div className="agape-login-brand flex flex-col items-center mb-6 text-center">
             <div className="agape-login-logo w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
               <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
