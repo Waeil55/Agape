@@ -435,8 +435,8 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
         <tbody>
           {rows.map((row) => (
             <tr key={row.label} className="align-top border-b border-slate-150 last:border-b-0">
-              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">{row.label}</td>
-              <td className={`px-3 py-1.5 text-xs font-semibold break-words ${
+              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-slate-600">{row.label}</td>
+              <td className={`px-3 py-1.5 text-sm font-semibold break-words ${
                 row.tone === 'green' ? 'text-emerald-600' : row.tone === 'red' ? 'text-rose-600' : row.tone === 'blue' ? 'text-blue-600' : 'text-slate-950'
               }`}>{row.value}</td>
             </tr>
