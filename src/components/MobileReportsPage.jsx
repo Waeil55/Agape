@@ -11,10 +11,10 @@ const MOBILE_REPORT_PAGE_SIZE = 40;
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
   <div className="grid grid-cols-[112px_1fr] gap-3 py-1.5 items-start">
-    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em] mt-0.5">
+    <span className="text-xs font-semibold text-slate-500 uppercase tracking-[0.14em] mt-0.5">
       {label}
     </span>
-    <span className={`text-[12px] font-semibold leading-5 ${valueColor}`}>
+    <span className={`text-sm font-semibold leading-5 ${valueColor}`}>
       {value || '-'}
     </span>
   </div>
