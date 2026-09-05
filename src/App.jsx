@@ -2898,7 +2898,7 @@ const App = () => {
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
-                  <input type="text" required autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)}
+                  <input type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)}
                     className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>
@@ -2906,7 +2906,7 @@ const App = () => {
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
-                  <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
+                  <input type="password" required autoComplete="current-password" enterKeyHint="go" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
                     className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
                 </div>
               </div>

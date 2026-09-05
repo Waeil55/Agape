@@ -2,8 +2,6 @@ import { useEffect } from 'react';
 import { isNativeShell } from '../utils/platform';
 import { calculateLoginKeyboardCounterPan } from '../utils/loginKeyboardLayout';
 
-const LOGIN_KEYBOARD_SETTLE_MS = 800;
-
 export default function useLoginKeyboardStability(enabled) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return undefined;
@@ -12,9 +10,6 @@ export default function useLoginKeyboardStability(enabled) {
     const root = document.documentElement;
     let activeLogin = null;
     let baselinePageTop = 0;
-    let baselineWindowScrollY = 0;
-    let baselineLoginScrollTop = 0;
-    let settleUntil = 0;
     let frame = 0;
     let nativeKeyboardCancelled = false;
 
@@ -47,18 +42,6 @@ export default function useLoginKeyboardStability(enabled) {
         currentPageTop: getVisualPageTop(),
       });
       activeLogin.style.setProperty('--login-keyboard-counter-pan', `${counterPan.toFixed(3)}px`);
-
-      // Safari can also auto-scroll the login element while revealing a field.
-      // Undo that automatic movement only during the keyboard-opening animation;
-      // intentional user scrolling remains available once the keyboard settles.
-      if (performance.now() <= settleUntil) {
-        if (Math.abs(activeLogin.scrollTop - baselineLoginScrollTop) > 0.5) {
-          activeLogin.scrollTop = baselineLoginScrollTop;
-        }
-        if (Math.abs((window.scrollY || 0) - baselineWindowScrollY) > 0.5) {
-          window.scrollTo(0, baselineWindowScrollY);
-        }
-      }
     };
 
     const scheduleLock = () => {
@@ -72,12 +55,9 @@ export default function useLoginKeyboardStability(enabled) {
       if (!activeLogin) {
         activeLogin = login;
         baselinePageTop = getVisualPageTop();
-        baselineWindowScrollY = window.scrollY || root.scrollTop || 0;
-        baselineLoginScrollTop = login.scrollTop;
         login.style.willChange = 'transform';
         root.classList.add('login-keyboard-open');
       }
-      settleUntil = performance.now() + LOGIN_KEYBOARD_SETTLE_MS;
       scheduleLock();
     };
 
@@ -88,13 +68,8 @@ export default function useLoginKeyboardStability(enabled) {
       });
     };
 
-    const handleLoginScroll = (event) => {
-      if (activeLogin && event.target === activeLogin && performance.now() <= settleUntil) scheduleLock();
-    };
-
     document.addEventListener('focusin', handleFocusIn, true);
     document.addEventListener('focusout', handleFocusOut, true);
-    document.addEventListener('scroll', handleLoginScroll, true);
     window.addEventListener('scroll', scheduleLock, { passive: true });
     visualViewport?.addEventListener('resize', scheduleLock);
     visualViewport?.addEventListener('scroll', scheduleLock);
@@ -110,7 +85,6 @@ export default function useLoginKeyboardStability(enabled) {
       nativeKeyboardCancelled = true;
       document.removeEventListener('focusin', handleFocusIn, true);
       document.removeEventListener('focusout', handleFocusOut, true);
-      document.removeEventListener('scroll', handleLoginScroll, true);
       window.removeEventListener('scroll', scheduleLock);
       visualViewport?.removeEventListener('resize', scheduleLock);
       visualViewport?.removeEventListener('scroll', scheduleLock);

@@ -21,7 +21,6 @@ describe('login keyboard stability contract', () => {
     expect(hook).toContain("event.target?.closest?.('.agape-login')");
     expect(hook).toContain("document.addEventListener('focusin', handleFocusIn, true)");
     expect(hook).toContain("visualViewport?.addEventListener('scroll', scheduleLock)");
-    expect(hook).toContain('LOGIN_KEYBOARD_SETTLE_MS = 800');
     expect(hook).toContain('Keyboard.setResizeMode({ mode: KeyboardResize.None })');
     expect(css).toContain('position: fixed !important');
     expect(css).toContain('height: 100vh');
