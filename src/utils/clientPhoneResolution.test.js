@@ -176,4 +176,122 @@ describe('Complete Trip File Extraction & Client Phone Identification Engine', (
 
     expect(resolveClientPhoneForTrip(trip)).toBe('3175550150');
   });
+
+  it('round-trip A-leg/B-leg: facility phone shared across patients is never selected as clientPhone', () => {
+    // Scenario matching the real CSV: Christina Brumley has A-leg and B-leg trips.
+    // The facility phone (317) 475-9066 appears on both legs but is also used by
+    // other patients (Elizabeth McCandless, Kristen Neice). It must be classified
+    // as FACILITY_PHONE and never used as clientPhone.
+    const trips = [
+      // Christina Brumley A-leg
+      {
+        patient: 'CHRISTINA BRUMLEY',
+        pickup: '3232 N Mitthoeffer Rd',
+        dropoff: 'Indianapolis Comprehensive Treatment Center',
+        pickupPhone: '(317) 250-9789',
+        dropoffPhone: '(317) 475-9066',
+        pickupSiteName: 'Home',
+        dropoffSiteName: 'Indianapolis Comprehensive Treatment Center',
+      },
+      // Christina Brumley B-leg
+      {
+        patient: 'CHRISTINA BRUMLEY',
+        pickup: 'Indianapolis Comprehensive Treatment Center',
+        dropoff: '3232 N Mitthoeffer Rd',
+        pickupPhone: '(317) 475-9066',
+        dropoffPhone: '(317) 223-8306',
+        pickupSiteName: 'Indianapolis Comprehensive Treatment Center',
+        dropoffSiteName: 'Home',
+      },
+      // Elizabeth McCandless A-leg (uses same facility phone)
+      {
+        patient: 'ELIZABETH MCCANDLESS',
+        pickup: '7460 E 30th St',
+        dropoff: 'Indianapolis Comprehensive Treatment Center',
+        pickupPhone: '(317) 475-9066',
+        dropoffPhone: '(317) 440-2697',
+        pickupSiteName: 'Home',
+        dropoffSiteName: 'Indianapolis Comprehensive Treatment Center',
+      },
+      // Elizabeth McCandless B-leg
+      {
+        patient: 'ELIZABETH MCCANDLESS',
+        pickup: 'Indianapolis Comprehensive Treatment Center',
+        dropoff: '7460 E 30th St',
+        pickupPhone: '(317) 475-9066',
+        dropoffPhone: '(317) 475-9066',
+        pickupSiteName: 'Indianapolis Comprehensive Treatment Center',
+        dropoffSiteName: 'Home',
+      },
+      // Kristen Neice A-leg (uses same facility phone)
+      {
+        patient: 'KRISTEN NEICE',
+        pickup: '1234 Main St',
+        dropoff: 'Indianapolis Comprehensive Treatment Center',
+        pickupPhone: '(317) 812-7589',
+        dropoffPhone: '(317) 475-9066',
+        pickupSiteName: 'Home',
+        dropoffSiteName: 'Indianapolis Comprehensive Treatment Center',
+      },
+      // Kristen Neice B-leg
+      {
+        patient: 'KRISTEN NEICE',
+        pickup: 'Indianapolis Comprehensive Treatment Center',
+        dropoff: '1234 Main St',
+        pickupPhone: '(317) 475-9066',
+        dropoffPhone: '(317) 812-7589',
+        pickupSiteName: 'Indianapolis Comprehensive Treatment Center',
+        dropoffSiteName: 'Home',
+      },
+    ];
+
+    // Christina Brumley: clientPhone must be her home phone, NOT the facility phone
+    const christinaAnalysis = analyzePhoneOwnershipForTrips(trips, 'CHRISTINA BRUMLEY');
+    expect(christinaAnalysis.clientPhone).toBe('3172509789');
+    expect(christinaAnalysis.facilityPhones).toContain('3174759066');
+    expect(christinaAnalysis.clientPhone).not.toBe('3174759066');
+
+    // Both legs must resolve to the same phone
+    expect(resolveClientPhoneForTrip(trips[0], trips)).toBe('3172509789');
+    expect(resolveClientPhoneForTrip(trips[1], trips)).toBe('3172509789');
+
+    // Elizabeth McCandless: clientPhone must be her home phone or escort, NOT the facility phone
+    const elizabethAnalysis = analyzePhoneOwnershipForTrips(trips, 'ELIZABETH MCCANDLESS');
+    expect(elizabethAnalysis.facilityPhones).toContain('3174759066');
+    expect(elizabethAnalysis.clientPhone).not.toBe('3174759066');
+
+    // Kristen Neice: clientPhone must be her home phone, NOT the facility phone
+    const kristenAnalysis = analyzePhoneOwnershipForTrips(trips, 'KRISTEN NEICE');
+    expect(kristenAnalysis.clientPhone).toBe('3178127589');
+    expect(kristenAnalysis.facilityPhones).toContain('3174759066');
+    expect(kristenAnalysis.clientPhone).not.toBe('3174759066');
+  });
+
+  it('tie-breaking: when two residential phones have equal score, prefers the one at a HOME site', () => {
+    const trips = [
+      {
+        patient: 'Tie Breaker',
+        pickup: '123 Home St',
+        dropoff: '456 Other Ave',
+        pickupPhone: '(317) 555-0201',
+        dropoffPhone: '(317) 555-0202',
+        pickupSiteName: 'HOME',
+        dropoffSiteName: "Mother's Address",
+      },
+      {
+        patient: 'Tie Breaker',
+        pickup: '456 Other Ave',
+        dropoff: '123 Home St',
+        pickupPhone: '(317) 555-0202',
+        dropoffPhone: '(317) 555-0201',
+        pickupSiteName: "Mother's Address",
+        dropoffSiteName: 'HOME',
+      },
+    ];
+
+    const analysis = analyzePhoneOwnershipForTrips(trips, 'Tie Breaker');
+    // Both phones have residentialCount=1, but (317) 555-0201 is registered first
+    // at a site explicitly named "HOME", so it should win the tie-break
+    expect(analysis.clientPhone).toBe('3175550201');
+  });
 });

@@ -100,7 +100,40 @@ export const parseGuardianMetadataFromComments = (comments = '', passengerTypes 
 
 /**
  * Detailed Phone Ownership Analysis Engine
+ *
  * Analyzes all trips for a given patient and categorizes every phone number.
+ *
+ * CRITICAL INVARIANT: The returned clientPhone MUST be the same for all trips
+ * belonging to the same patient, including both A-leg (going TO treatment) and
+ * B-leg (returning FROM treatment). This is enforced downstream in
+ * FileUploadTrips.jsx by applying the analysis result uniformly.
+ *
+ * PHONE SCORING HIERARCHY (descending priority):
+ *   1. Explicit "Client Phone" field — highest trust, +120
+ *   2. "Patient Mobile" field — high trust, +100
+ *   3. "Patient Phone" field — moderate trust, +60
+ *   4. Residential location association — each appearance at a HOME location, +80 base + 20/occurrence
+ *   5. Work location association — moderate signal, +40
+ *
+ * PENALTY SIGNALS (push phone AWAY from being clientPhone):
+ *   - Facility keyword match at the phone's location — facilityScore += 100 + 20/occurrence, clientScore -= 120
+ *   - Explicit "Facility Phone" label — facilityScore += 150, clientScore -= 150
+ *   - Phone shared across multiple patients — facilityScore += 90, clientScore -= 100
+ *
+ * TIE-BREAKING RULE (IMPORTANT):
+ *   When two phones have the same clientScore, we prefer the one that:
+ *   - Was found on the A-leg pickup side (home phone), OR
+ *   - Was found earlier in the trip list (stable sort preserves insertion order)
+ *
+ * KNOWN FACILITY PHONE PATTERN:
+ *   For round trips (A-leg going TO treatment, B-leg returning FROM treatment):
+ *   - A-leg dropoffPhone = facility phone (same as B-leg pickupPhone)
+ *   - B-leg pickupPhone = facility phone (same as A-leg dropoffPhone)
+ *   Both are classified as FACILITY_PHONE and excluded from clientPhone selection.
+ *
+ * WARNING: Future changes to phone scoring MUST preserve the invariant that
+ * facility phones at treatment centers never win over residential/home phones.
+ * Run the test suite (clientPhoneResolution.test.js) after any changes.
  */
 export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
   const allTrips = Array.isArray(trips) ? trips.filter(Boolean) : [];
@@ -244,6 +277,21 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
       });
     }
 
+    // IMPORTANT: For round trips (A-leg → treatment center → B-leg home):
+    //   A-leg pickupPhone = CLIENT'S HOME PHONE (this is the correct client phone)
+    //   A-leg dropoffPhone = FACILITY PHONE at treatment center
+    //   B-leg pickupPhone = FACILITY PHONE (same number, different leg)
+    //   B-leg dropoffPhone = ESCORT/DRIVER phone or client phone depending on context
+    //
+    // The scoring engine correctly classifies facility phones via:
+    //   - isFacilityLikeText() on site names like "treatment center", "hospital", etc.
+    //   - isSharedAcrossPatients flag (same phone used by multiple patients)
+    //   - Explicit "Facility Phone" label on hospitalPhone fields
+    //
+    // NEVER change the phone analysis to promote facility phones to clientPhone.
+    // If the facility phone is incorrectly being selected as clientPhone, the issue
+    // is likely in the site name detection or the isSharedAcrossPatients flag.
+
     if (trip.pickupPhone) {
       registerCandidate(trip.pickupPhone, {
         locationText: trip.pickup || '',
@@ -344,7 +392,15 @@ export const analyzePhoneOwnershipForTrips = (trips = [], patientName = '') => {
   personalCandidates.sort((a, b) => {
     const scoreA = Math.max(a.scores.client, a.scores.guardian);
     const scoreB = Math.max(b.scores.client, b.scores.guardian);
-    return scoreB - scoreA;
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    // TIE-BREAK: prefer the phone found at a residential/home location first
+    const aHome = a.locations.some(l => l.isHome);
+    const bHome = b.locations.some(l => l.isHome);
+    if (aHome !== bHome) return aHome ? -1 : 1;
+    // Second tie-break: prefer the phone with more residential appearances
+    if (b.residentialCount !== a.residentialCount) return b.residentialCount - a.residentialCount;
+    // Final tie-break: prefer the phone registered earlier (stable insertion order from A-leg pickup)
+    return 0;
   });
 
   facilityCandidates.sort((a, b) => b.scores.facility - a.scores.facility);

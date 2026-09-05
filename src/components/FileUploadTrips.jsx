@@ -18,6 +18,19 @@ import {
 
 
 
+// =============================================================================
+// COLUMN_ALIASES — CSV header matching rules for trip import
+//
+// WARNING: The 'phone' alias in pickupPhone is intentionally generic but can
+// cause false matches in CSVs where "Phone Dropoff" appears before "Phone Pickup".
+// The findColumn function uses substring matching (header.includes(alias)), so
+// 'phone' will match BOTH "Phone Pickup" and "Phone Dropoff". The first match
+// wins. Always verify column mapping visually when adding new CSV formats.
+//
+// The phone OWNERSHIP ANALYSIS downstream (clientPhoneResolution.js) is the
+// safety net — it classifies facility phones vs client phones using scoring.
+// Never rely solely on column mapping to determine phone ownership.
+// =============================================================================
 const COLUMN_ALIASES = {
   bookingId: ['booking id', 'bookingid', 'reservation id', 'trip id', 'booking number', 'confirmation id', 'tripid', 'trip_id', 'trip number', 'order id', 'order number', 'booking', 'confirmation #', 'confirmation', 'reservation'],
   patient: ['client', 'client name', 'passenger', 'passenger name', 'rider', 'customer', 'patient name', 'name', 'rider name', 'guest', 'user', 'person', 'member', 'member name', 'full name', 'contact name'],
@@ -70,20 +83,41 @@ const cleanOdometer = (value) => {
   return (!isNaN(num) && num >= 0) ? String(num) : '';
 };
 
+// =============================================================================
+// findColumn — Resolve a CSV header index from a list of alias strings.
+//
+// Matching priority:
+//   1. Exact match (normalized header === normalized alias)
+//   2. Header-contains-alias substring match (the header text includes the alias)
+//   3. Fallback: first alias substring match against headers
+//
+// IMPORTANT: We intentionally do NOT check alias.includes(header) because a long
+// alias like "pickupphonenumber" could falsely match a short header like "phone".
+// Only header.includes(alias) is used for substring matching — this ensures a
+// specific alias like "phone" only matches if the header actually contains it,
+// and never the reverse.
+//
+// WARNING: The generic alias 'phone' in pickupPhone can still match "Phone Dropoff"
+// if "Phone Pickup" is absent. Always verify column mapping visually when adding
+// new CSV formats. The phone ownership analysis downstream is the safety net.
+// =============================================================================
 function findColumn(headers, aliases) {
   const lower = headers.map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
+  // Pass 1: exact normalized match — strongest signal
   for (const alias of aliases) {
     const a = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
     const idx = lower.indexOf(a);
     if (idx !== -1) return idx;
   }
+  // Pass 2: header.includes(alias) only — avoids false positives from long aliases
   for (const alias of aliases) {
     const a = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const idx = lower.findIndex(h => h.includes(a) || a.includes(h));
+    const idx = lower.findIndex(h => h.includes(a));
     if (idx !== -1) return idx;
   }
+  // Pass 3: fallback — first alias substring match
   const a = aliases[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-  return lower.findIndex(h => h.includes(a) || a.includes(h));
+  return lower.findIndex(h => h.includes(a));
 }
 
 function detectDelimiter(firstLine) {
@@ -842,9 +876,25 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       const pairedMapped = annotateInOutPairs(mapped);
 
-      // Resolve each client's primary number once across all of their A/B legs.
-      // Pickup/dropoff numbers remain unchanged as location contacts; they are never
-      // promoted to the primary client number by leg direction alone.
+      // =========================================================================
+      // CLIENT PHONE RESOLUTION — A-LEG / B-LEG CONSISTENCY GUARANTEE
+      //
+      // CRITICAL RULE: For round trips (A-leg going TO treatment, B-leg returning
+      // FROM treatment), the clientPhone MUST be identical on both legs.
+      //
+      // The phone analysis runs on ALL trips for the same patient, considering:
+      //   - A-leg pickupPhone (home phone → highest residential score)
+      //   - A-leg dropoffPhone (facility phone → classified as FACILITY_PHONE)
+      //   - B-leg pickupPhone (facility phone → classified as FACILITY_PHONE)
+      //   - B-leg dropoffPhone (escort/driver phone or home phone)
+      //
+      // The analysis result is then applied UNIFORMLY to all trips for that patient.
+      // This guarantees A-leg and B-leg share the same clientPhone.
+      //
+      // WARNING: Never change this to apply per-trip phone analysis. The
+      // patientAnalysisMap pattern is the safety net against facility phones
+      // being used as client phones.
+      // =========================================================================
       const patientAnalysisMap = new Map();
       pairedMapped.forEach(t => {
         const pk = (t.patient || '').trim().toLowerCase();
@@ -859,11 +909,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         const analysis = patientAnalysisMap.get(pk);
 
         if (analysis) {
+          // Apply the SAME clientPhone to ALL legs (A-leg and B-leg)
           t.patientPhone = analysis.clientPhone || '';
           t.clientPhone = analysis.clientPhone || '';
           t.guardianPhone = analysis.guardianPhone || '';
           t.parentPhone = analysis.parentPhone || '';
           t.escortPhone = analysis.escortPhone || '';
+          // Facility phone: take the first one from analysis, or keep existing
           t.hospitalPhone = (analysis.facilityPhones && analysis.facilityPhones[0]) || t.hospitalPhone || '';
           t.phoneConfidence = analysis.phoneConfidence || 'UNKNOWN';
           t.phoneSource = analysis.phoneSource || '';
@@ -878,7 +930,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           }
         }
 
-        // Preserve raw source phone fields
+        // Preserve raw source phone fields for audit trail
         t.sourcePickupPhone = t._originalRow?.['Phone Pickup'] || t._originalRow?.['pickupPhone'] || t.pickupPhone || '';
         t.sourceDropoffPhone = t._originalRow?.['Phone Dropoff'] || t._originalRow?.['dropoffPhone'] || t.dropoffPhone || '';
         t.sourcePickupLocation = t._originalRow?.['Site Name(orig)'] || t.pickupSiteName || t.pickup || '';
