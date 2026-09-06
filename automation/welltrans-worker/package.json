@@ -1,6 +1,6 @@
 {
   "name": "agape-welltrans-worker",
-  "version": "5.0.2",
+  "version": "5.0.6",
   "private": true,
   "type": "module",
   "scripts": {

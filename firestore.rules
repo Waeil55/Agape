@@ -184,7 +184,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /welltrans_settings/{document} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow create, update: if signedIn() && isAdmin()
         && !request.resource.data.keys().hasAny([
           'portalUsername',
@@ -198,59 +198,63 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /welltrans_sync_logs/{logId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_sync_events/{eventId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_verification_runs/{runId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_correction_commands/{commandId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_sync_manifests/{serviceDate} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_driver_sync_status/{driverRunId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_sync_shards/{shardId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_sync_outbox/{outboxId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_sync_leases/{serviceDate} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_worker_status/{workerId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_workers/{workerInstanceId} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_operations/{document} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_canary/{document} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /welltrans_canary_history/{document} {
-      allow read: if signedIn() && isAdmin();
+      allow read: if signedIn() && isDispatcher();
+      allow write: if false;
+    }
+    match /welltrans_review_confirmations/{confirmationId} {
+      allow read: if signedIn() && isDispatcher();
       allow write: if false;
     }
     match /drivers/{driverId} {

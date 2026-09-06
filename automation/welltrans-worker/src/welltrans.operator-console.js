@@ -1,8 +1,9 @@
 const CONSOLE_ID = 'agape-welltrans-operator-console';
 const COMMAND_BINDING = '__agapeWellTransCommand';
-const POSITION_KEY = 'agape-welltrans-toolbar-position-v2';
+const POSITION_KEY = 'agape-welltrans-toolbar-position-v3';
+const BOTTOM_ACTION_CLEARANCE = 96;
 
-const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
+const consoleBootstrap = ({ consoleId, commandBinding, positionKey, bottomActionClearance }) => {
   if (window.top !== window || document.getElementById(consoleId)) return;
 
   const host = document.createElement('div');
@@ -24,60 +25,65 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
     <style>
       *{box-sizing:border-box}
       .bar{display:flex;align-items:center;gap:6px;width:100%;height:42px;max-width:100%;pointer-events:none;
-        padding:5px 7px;color:#eaf1ff;background:rgba(7,15,30,.97);border:1px solid #30476e;
-        border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.38);white-space:nowrap;overflow-x:auto;
+        padding:5px 7px;color:#0f172a;background:rgba(255,255,255,.98);border:1px solid #cbd5e1;
+        border-radius:12px;box-shadow:0 10px 28px rgba(15,23,42,.2);white-space:nowrap;overflow-x:auto;
         overflow-y:hidden;scrollbar-width:thin;backdrop-filter:blur(12px)}
       button,input,select{height:30px;flex:0 0 auto;border-radius:8px;font:700 10px Inter,Segoe UI,Arial,sans-serif;pointer-events:auto}
-      button{border:1px solid #31496f;padding:0 9px;color:#eaf1ff;background:#172944;cursor:pointer}
-      button:hover{background:#213b61;border-color:#4b6f9f}
+      button{border:1px solid #cbd5e1;padding:0 9px;color:#334155;background:#fff;cursor:pointer}
+      button:hover{background:#f1f5f9;border-color:#94a3b8}
       button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}
       button:disabled{cursor:wait;opacity:.5}
-      .drag{width:27px;padding:0;cursor:grab;color:#91a4c8;font-size:15px;touch-action:none;user-select:none}
+      .drag{width:27px;padding:0;cursor:grab;color:#64748b;font-size:15px;touch-action:none;user-select:none}
+      .collapse{width:30px;padding:0;font-size:15px}
       .drag:active{cursor:grabbing}
       .brand{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:900;letter-spacing:.06em}
       .mark{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#2563eb;color:white}
-      .version{color:#7f94b8;font-size:8px;font-weight:800}
+      .version{color:#64748b;font-size:8px;font-weight:800}
       .state{width:125px;flex:0 0 125px;overflow:hidden;text-overflow:ellipsis;padding:4px 7px;border-radius:999px;
-        background:#123c2c;color:#6ee7b7;font-size:9px;font-weight:900}
-      input{width:118px;border:1px solid #38517e;background:#0d1930;color:#fff;padding:0 7px;color-scheme:dark}
-      select{width:164px;max-width:210px;border:1px solid #38517e;background:#0d1930;color:#fff;padding:0 7px}
+        background:#d1fae5;color:#047857;font-size:9px;font-weight:900}
+      input{width:118px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;padding:0 7px;color-scheme:light}
+      select{width:164px;max-width:210px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;padding:0 7px}
       select:disabled{cursor:not-allowed;opacity:.55}
       .primary{background:#2563eb;border-color:#3b82f6;color:#fff}
       .primary:hover{background:#1d4ed8}
-      .verify{background:#14532d;border-color:#23834a}
-      .restart{background:#5b2230;border-color:#8f3d52}
+      .verify{background:#047857;border-color:#059669;color:#fff}
+      .restart{background:#fff1f2;border-color:#fda4af;color:#be123c}
       .restart[hidden]{display:none}
-      .metric{display:flex;align-items:baseline;gap:3px;padding:3px 6px;border-radius:7px;background:#101f37;
-        color:#91a4c8;font-size:8px;text-transform:uppercase}
-      .metric b{color:#fff;font-size:11px}
-      .verifier[data-state="verified"]{background:#123c2c;color:#6ee7b7}
-      .verifier[data-state="running"],.verifier[data-state="repairing"]{background:#3b2f0c;color:#fde68a}
-      .verifier[data-state="blocked"]{background:#4c1d1d;color:#fecaca}
-      .message{min-width:130px;flex:1 1 280px;overflow:hidden;text-overflow:ellipsis;color:#a9b8d2;
+      .metric{display:flex;align-items:baseline;gap:3px;padding:3px 6px;border-radius:7px;background:#f1f5f9;
+        color:#64748b;font-size:8px;text-transform:uppercase}
+      .metric b{color:#0f172a;font-size:11px}
+      .verifier[data-state="verified"]{background:#d1fae5;color:#047857}
+      .verifier[data-state="running"],.verifier[data-state="repairing"]{background:#fef3c7;color:#92400e}
+      .verifier[data-state="blocked"]{background:#ffe4e6;color:#be123c}
+      .message{min-width:130px;flex:1 1 280px;overflow:hidden;text-overflow:ellipsis;color:#475569;
         font-size:9px;font-weight:600}
-      .manual{padding:4px 7px;border-radius:7px;background:#3a1c1c;border:1px solid #713232;
-        color:#fecaca;font-size:8px;font-weight:900}
+      .manual{padding:4px 7px;border-radius:7px;background:#fff1f2;border:1px solid #fda4af;
+        color:#be123c;font-size:8px;font-weight:900}
+      :host([data-collapsed="true"]){width:auto!important;max-width:calc(100vw - 16px)!important}
+      :host([data-collapsed="true"]) .bar{overflow:hidden}
+      :host([data-collapsed="true"]) .optional{display:none}
       @media(max-width:900px){.message{min-width:140px;flex-basis:140px}.brandText{display:none}}
     </style>
     <section class="bar" role="toolbar" aria-label="Agape WellTrans controls">
       <button class="drag" data-role="drag" title="Drag toolbar" aria-label="Drag toolbar">&#8942;&#8942;</button>
+      <button class="collapse" data-role="collapse" title="Minimize toolbar" aria-label="Minimize toolbar">&#8722;</button>
       <span class="brand"><span class="mark">A</span><span class="brandText">WELLTRANS</span><span class="version" data-role="version"></span></span>
       <span class="state" data-role="state">CONNECTING</span>
-      <input data-role="date" type="date" aria-label="Go to WellTrans service date" title="Choose a date; the Agent will navigate WellTrans and verify the exact schedule automatically">
-      <select data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
+      <input class="optional" data-role="date" type="date" aria-label="Go to WellTrans service date" title="Choose a date; the Agent will navigate WellTrans and verify the exact schedule automatically">
+      <select class="optional" data-role="driver" aria-label="Driver scope" title="Fill all drivers or one authoritative driver">
         <option value="all">All drivers</option>
       </select>
-      <button class="primary" data-action="fill-date" title="Reconcile and fill the selected date; the Agent verifies the opened WellTrans date before writing">Fill Date</button>
-      <button data-action="detect-date" title="Cancel a pending date switch and use the date currently open in WellTrans">Use Open Date</button>
-      <button class="verify" data-action="verify" title="Read every staged field back without clicking Apply">Review &amp; Verify</button>
-      <button data-action="pause">Pause</button>
-      <button class="restart" data-action="restart" title="Discard an unsafe unsaved session and start clean" hidden>Reset Session</button>
+      <button class="primary optional" data-action="fill-date" title="Reconcile and fill the selected date; the Agent verifies the opened WellTrans date before writing">Fill Date</button>
+      <button class="optional" data-action="detect-date" title="Cancel a pending date switch and use the date currently open in WellTrans">Use Open Date</button>
+      <button class="verify optional" data-action="verify" title="Independently read every staged field back without clicking Apply" disabled>Verify Review</button>
+      <button class="optional" data-action="pause">Pause</button>
+      <button class="restart optional" data-action="restart" title="Discard an unsafe unsaved session and start clean" hidden>Reset Session</button>
       <span class="metric"><b data-role="staged">0</b> filled</span>
       <span class="metric"><b data-role="pending">0</b> pending</span>
       <span class="metric"><b data-role="failed">0</b> blocked</span>
       <span class="metric verifier" data-role="verifier" data-state="idle" title="Independent deterministic reviewer integrated into this installed Agent"><b data-role="verified">0/0</b> reviewed</span>
-      <span class="message" data-role="message" title="Waiting for the itinerary workspace">Waiting for the itinerary workspace</span>
-      <span class="manual" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
+      <span class="message optional" data-role="message" title="Waiting for the itinerary workspace">Waiting for the itinerary workspace</span>
+      <span class="manual optional" title="The Agent never clicks Apply or Close">HUMAN APPLY ONLY</span>
     </section>`;
   document.documentElement.appendChild(host);
   const hostGuard = new MutationObserver(() => {
@@ -89,6 +95,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   const state = {
     busy: false, paused: false, commandSequence: 0, selectedDate: '', requestedDate: '',
     selectedDriverId: 'all', scopeLocked: false, dateSwitchPending: false,
+    canVerifyReview: false,
     // Tracks whether the user currently has the date input focused.
     // When true, heartbeat updates must NOT overwrite the input value — that
     // would silently discard a date the user is typing or selecting.
@@ -99,11 +106,19 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
   try {
     const stored = JSON.parse(localStorage.getItem(positionKey) || 'null');
     if (Number.isFinite(stored?.top)) {
-      host.style.top = `${clamp(stored.top, 0, Math.max(0, innerHeight - 42))}px`;
+      host.style.top = `${clamp(stored.top, 0, Math.max(0, innerHeight - bottomActionClearance - 42))}px`;
     }
   } catch {}
 
   const drag = $('[data-role="drag"]');
+  const collapse = $('[data-role="collapse"]');
+  collapse.addEventListener('click', () => {
+    const collapsed = host.dataset.collapsed !== 'true';
+    host.dataset.collapsed = String(collapsed);
+    collapse.innerHTML = collapsed ? '&#43;' : '&#8722;';
+    collapse.title = collapsed ? 'Expand toolbar' : 'Minimize toolbar';
+    collapse.setAttribute('aria-label', collapse.title);
+  });
   drag.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
     const rect = host.getBoundingClientRect();
@@ -118,7 +133,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
         dragging = true;
         host.style.top = `${rect.top}px`;
       }
-      const top = clamp(start.top + moveEvent.clientY - start.y, 0, Math.max(0, innerHeight - 42));
+      const top = clamp(start.top + moveEvent.clientY - start.y, 0, Math.max(0, innerHeight - bottomActionClearance - 42));
       host.style.top = `${top}px`;
     };
     const end = endEvent => {
@@ -150,6 +165,8 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       fill.disabled = busy;
       if (!busy && state.dateSwitchPending) fill.textContent = 'Retry Date';
     }
+    const verify = $('[data-action="verify"]');
+    if (verify) verify.disabled = busy || !state.canVerifyReview;
     if (message) {
       $('[data-role="message"]').textContent = message;
       $('[data-role="message"]').title = message;
@@ -313,6 +330,17 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey }) => {
       set('failed', blockedTotal);
       const coverageComplete = expected > 0 && reviewed === expected && blockedTotal === 0
         && Number(next.pending || 0) === 0;
+      state.canVerifyReview = Number(next.staged || 0) > 0
+        && blockedTotal === 0
+        && Number(next.processing || 0) === 0
+        && Number(next.staged || 0) + Number(next.completed || 0) + Number(next.pending || 0) === expected;
+      const verify = $('[data-action="verify"]');
+      if (verify) {
+        verify.disabled = state.busy || !state.canVerifyReview;
+        verify.title = state.canVerifyReview
+          ? 'Independently read every staged field back without clicking Apply'
+          : 'Verification is available only when a clean staged review batch is open';
+      }
       const verifierState = blockedTotal > 0
         ? 'blocked'
         : String(coverageComplete ? (next.verifierState || 'verified') : (next.verifierState || 'idle')).toLowerCase();
@@ -346,6 +374,7 @@ export async function installWellTransOperatorConsole(page, onCommand) {
     consoleId: CONSOLE_ID,
     commandBinding: COMMAND_BINDING,
     positionKey: POSITION_KEY,
+    bottomActionClearance: BOTTOM_ACTION_CLEARANCE,
   };
   if (!context.__agapeOperatorInitInstalled) {
     await context.addInitScript(consoleBootstrap, options);

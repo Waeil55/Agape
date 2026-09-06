@@ -46,6 +46,7 @@ try {
     }
     publishedAt = [DateTime]::UtcNow.ToString('o')
   } | ConvertTo-Json
+  $manifestJson = $manifestJson -replace "`r`n", "`n"
   $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
   [IO.File]::WriteAllText(
     (Join-Path $outputRoot 'version.json'),

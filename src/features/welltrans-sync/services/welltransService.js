@@ -6,7 +6,7 @@ import { DEFAULT_WELLTRANS_FIELD_MAPPING } from '../utils/welltransMapping';
 
 export const DEFAULT_SETTINGS = {
   enabled: false, portalUrl: 'https://tripspark.welltransnemt.com/', automationMethod: 'playwright', lastSync: null,
-  autoStart: false, autoQueue: false, autoRetryEnabled: false,
+  autoQueue: false, autoRetryEnabled: false,
   autoRetryDelayMs: 30000, maxConcurrent: 1,
   fieldMapping: DEFAULT_WELLTRANS_FIELD_MAPPING,
 };
@@ -120,13 +120,11 @@ export const queueWellTransSync = (tripIds, mode, serviceDate, scope = { type: '
 export const explainWellTransFailureAI = logId =>
   httpsCallable(functions, 'explainWellTransFailureAI')({ logId });
 
-export const confirmWellTransDateApplied = serviceDate =>
-  httpsCallable(functions, 'confirmWellTransDateApplied')({ serviceDate });
-
-export const confirmWellTransReviewBatchApplied = (serviceDate, reviewSessionId) =>
+export const confirmWellTransReviewBatchApplied = (serviceDate, reviewSessionId, workerInstanceId) =>
   httpsCallable(functions, 'confirmWellTransReviewBatchApplied')({
     serviceDate,
     reviewSessionId,
+    workerInstanceId,
   });
 
 export const isWellTransFailureRetryable = log => {

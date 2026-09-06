@@ -216,9 +216,9 @@ export const validateTripForWellTrans = (trip = {}) => {
   return { valid: errors.length === 0, errors, payload };
 };
 
-export const calculateSyncHealthScore = (completedTripsCount = 0, successfulCount = 0, failedCount = 0) => {
+export const calculateSyncHealthScore = (_completedTripsCount = 0, successfulCount = 0, failedCount = 0) => {
   const totalAttempted = successfulCount + failedCount;
-  if (totalAttempted === 0) return completedTripsCount > 0 ? 100 : 100;
+  if (totalAttempted === 0) return 0;
   return Math.round((successfulCount / totalAttempted) * 100);
 };
 
@@ -245,7 +245,11 @@ export const buildWellTransCoverage = (completedTrips = [], latestByTrip = new M
   const blocked = trips.filter(item => !item.valid || item.status === 'failed');
   const missing = trips.filter(item =>
     item.valid && !COVERED_SYNC_STATUSES.has(item.status));
-  const verified = count('awaiting_review') + count('completed');
+  const verifiedCompleted = trips.filter(item => item.status === 'completed'
+    && item.log?.portalVerification?.verified === true).length;
+  const unverifiedCompleted = trips.filter(item => item.status === 'completed'
+    && item.log?.portalVerification?.verified !== true).length;
+  const verified = count('awaiting_review') + verifiedCompleted;
   const expected = trips.length;
   const pending = count('pending');
   const processing = count('processing');
@@ -266,11 +270,13 @@ export const buildWellTransCoverage = (completedTrips = [], latestByTrip = new M
     processing,
     staged,
     completed,
+    verifiedCompleted,
+    unverifiedCompleted,
     failed,
     verified,
     missingCount: missing.length,
     blockedCount: blocked.length,
-    coveragePercent: expected ? Math.round((verified / expected) * 100) : 100,
+    coveragePercent: expected ? Math.round((verified / expected) * 100) : 0,
     coverageComplete,
     reviewReady: coverageComplete && staged > 0,
     missing,

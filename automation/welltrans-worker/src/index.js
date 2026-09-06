@@ -55,7 +55,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '5.0.2';
+const workerVersion = '5.0.6';
 const capabilityKernel = createCapabilityKernel(workerInstanceId);
 const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
 const supervisor = createAgentSupervisor([
@@ -101,8 +101,8 @@ const firestorePageSize = Math.min(
   Math.max(100, Number(process.env.WELLTRANS_FIRESTORE_PAGE_SIZE) || 500),
 );
 const reviewBatchSize = Math.min(
-  500,
-  Math.max(25, Number(process.env.WELLTRANS_REVIEW_BATCH_SIZE) || 250),
+  200,
+  Math.max(25, Number(process.env.WELLTRANS_REVIEW_BATCH_SIZE) || 200),
 );
 const safeAutomaticRetryLimit = Math.min(
   10,
@@ -154,6 +154,16 @@ const stateForReviewSummary = summary => (
       : summary.processing
         ? 'staging'
         : 'calibrated'
+);
+const reviewBatchIsAccountedFor = summary => Boolean(
+  summary
+  && summary.total > 0
+  && summary.staged > 0
+  && summary.processing === 0
+  && summary.failed === 0
+  && summary.blocked === 0
+  && summary.missing === 0
+  && summary.staged + summary.completed + summary.pending === summary.total
 );
 let lastConsoleStatusKey = '';
 const writeConsoleStatusOnce = (key, message) => {
@@ -287,6 +297,9 @@ async function handleOperatorCommand(action, payload = {}) {
       operatorControl.message = 'Reconciliation and complete-date fill queued.';
     }
   } else if (action === 'verify') {
+    if (!reviewBatchIsAccountedFor(latestReviewSummary)) {
+      throw new Error('Verification is locked until the staged batch and every remaining trip are explicitly accounted for.');
+    }
     operatorControl.forceVerify = true;
     operatorControl.message = 'Exhaustive field verification queued.';
   } else if (action === 'reindex') {
@@ -630,6 +643,7 @@ async function publishDateReviewSummary(serviceDate) {
     if (!current || updatedAt > current.updatedAt) {
       latestByTrip.set(key, {
         status: data.status,
+        bookingId: data.bookingId || data.tripId || key,
         reviewSessionId: data.reviewSessionId || '',
         portalReviewSessionId: data.portalVerification?.reviewSessionId || '',
         portalVerified: data.portalVerification?.verified === true,
@@ -672,6 +686,12 @@ async function publishDateReviewSummary(serviceDate) {
       summary.unverifiedCompleted += 1;
     } else if (Object.hasOwn(summary, item.status)) summary[item.status] += 1;
   }
+  summary.blockedBookingIds = [...new Set([
+    ...(manifest.blockedTrips || []).map(item => item.bookingId || item.tripId),
+    ...expectedTripIds
+      .filter(tripId => latestByTrip.get(tripId)?.status === 'failed')
+      .map(tripId => latestByTrip.get(tripId)?.bookingId || tripId),
+  ].map(value => String(value || '').trim()).filter(Boolean))].slice(0, 20);
   const verified = summary.staged + summary.completed;
   const coverageComplete = summary.total > 0
     && verified === summary.total
@@ -680,13 +700,15 @@ async function publishDateReviewSummary(serviceDate) {
     && summary.processing === 0
     && summary.missing === 0
     && summary.blocked === 0;
+  summary.verified = verified;
+  summary.coverageComplete = coverageComplete;
   const state = coverageComplete
     ? (summary.staged > 0 ? 'review_ready' : 'completed')
     : (summary.failed || summary.blocked || summary.missing ? 'reconciliation_blocked' : 'calibrated');
   const update = {
     state,
     selectedDate: serviceDate,
-    reviewSummary: { ...summary, verified, coverageComplete },
+    reviewSummary: summary,
     reviewSummaryAt: FieldValue.serverTimestamp(),
     indexedBookings: portalGridIndex?.bookingCount || 0,
     indexedRows: portalGridIndex?.rowCount || 0,
@@ -1061,6 +1083,7 @@ async function reconcileAuthoritativeCompletedTrips(serviceDate) {
       await latest.ref.update({
         status: 'pending',
         stage: 'requeued_by_authoritative_worker_reconciliation',
+        previousErrorMessage: String(latest.data.errorMessage || '').slice(0, 2000),
         errorMessage: '',
         completedAt: FieldValue.delete(),
         leaseExpiresAt: FieldValue.delete(),
@@ -1637,6 +1660,9 @@ async function processJob(job, existingSession = null) {
       status: 'failed',
       stage: safeToContinue ? 'failed_no_partial_changes' : 'failed_review_close_required',
       sourceFingerprint: job.queuedSourceFingerprint,
+      errorMessage: String(error?.message || error).slice(0, 2000),
+      mutationStarted: error?.welltransMutationStarted === true,
+      rollbackVerified,
     });
     // Dismiss only a transient cell/dropdown editor so one failed row cannot
     // poison the next job. Keep the itinerary itself open and never Apply.
@@ -2027,11 +2053,24 @@ async function main() {
             message: operatorControl.message,
           });
           const forcedAudit = await auditStagedReviewBatch(session.page, selectedDate);
-          finalReviewAuditValid = forcedAudit.requeued === 0 && forcedAudit.failed === 0;
           summary = await publishDateReviewSummary(selectedDate);
-          operatorControl.message = `${forcedAudit.verified}/${forcedAudit.checked} trips and ${forcedAudit.verifiedFields} fields verified before Apply.`;
+          finalReviewAuditValid = forcedAudit.requeued === 0
+            && forcedAudit.failed === 0
+            && reviewBatchIsAccountedFor(summary);
+          const blockerCount = Math.max(summary.failed, summary.blocked)
+            + summary.missing + summary.processing;
+          const blockerBookings = summary.blockedBookingIds.length
+            ? ` Booking ${summary.blockedBookingIds.join(', ')} requires source correction.`
+            : '';
+          operatorControl.message = blockerCount
+            ? `${forcedAudit.verified}/${forcedAudit.checked} staged trips verified, but ${blockerCount} expected trip(s) remain blocked or missing.${blockerBookings} Do not Apply.`
+            : `${forcedAudit.verified}/${forcedAudit.checked} trips and ${forcedAudit.verifiedFields} fields verified before Apply.`;
           await updateOperatorConsole(session.page, summary, {
-            state: finalReviewAuditValid ? 'verified' : 'repairing_mismatches',
+            state: finalReviewAuditValid
+              ? 'verified'
+              : blockerCount
+                ? 'reconciliation_blocked_do_not_apply'
+                : 'repairing_mismatches',
             message: operatorControl.message,
           });
         }
@@ -2065,7 +2104,9 @@ async function main() {
           });
           const audit = await auditStagedReviewBatch(session.page, selectedDate);
           summary = await publishDateReviewSummary(selectedDate);
-          finalReviewAuditValid = audit.requeued === 0 && audit.failed === 0;
+          finalReviewAuditValid = audit.requeued === 0
+            && audit.failed === 0
+            && reviewBatchIsAccountedFor(summary);
           if (!finalReviewAuditValid) {
             operatorControl.message = `${audit.requeued + audit.failed} trip(s) failed the pre-Apply audit and were queued for automatic repair.`;
             await updateOperatorConsole(session.page, summary, {
@@ -2078,7 +2119,9 @@ async function main() {
         }
         const hasCoverageBlockers = summary.failed > 0
           || summary.blocked > 0
-          || summary.missing > 0;
+          || summary.missing > 0
+          || summary.processing > 0
+          || !finalReviewAuditValid;
         const state = !operatorControl.autoRun
           ? 'paused_review_ready'
           : hasCoverageBlockers
@@ -2089,15 +2132,24 @@ async function main() {
           : hasCoverageBlockers
           ? `${summary.failed + summary.blocked + summary.missing} completed trip(s) remain blocked or missing. Do not Apply yet; correct them and run Reconcile & Fill Date.`
           : operatorControl.message;
-        await db.doc('welltrans_worker_status/primary').set({
+        const verifiedReviewStatus = {
           state,
           selectedDate,
           reviewSessionId,
           reviewBatchSize,
           reviewBatchStaged: summary.staged,
           reviewBatchRemaining: summary.pending,
+          reviewSummary: summary,
+          reviewSummaryAt: FieldValue.serverTimestamp(),
           lastSeenAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        };
+        await Promise.all([
+          db.doc('welltrans_worker_status/primary').set(verifiedReviewStatus, { merge: true }),
+          db.doc(`welltrans_workers/${workerInstanceId}`).set({
+            ...heartbeatPayload(state),
+            ...verifiedReviewStatus,
+          }, { merge: true }),
+        ]);
         const blockerCount = Math.max(summary.failed, summary.blocked) + summary.missing;
         writeConsoleStatusOnce(
           `${state}|${selectedDate}|${summary.staged}|${summary.pending}|${blockerCount}`,

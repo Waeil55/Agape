@@ -9,6 +9,10 @@ const { getStorage } = require("firebase-admin/storage");
 const { getFunctions } = require("firebase-admin/functions");
 const axios = require("axios");
 const crypto = require("crypto");
+const {
+  evaluateWellTransReviewBatch,
+  hasVerifiedEvidence: hasVerifiedWellTransReviewEvidence,
+} = require("./welltransReviewGuard");
 
 function resolveRuntimeProjectId() {
   if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
@@ -187,6 +191,10 @@ async function invalidateUserSessions(uid, reason, actorUid) {
 
 async function requireAdmin(context) {
   return requireRole(context, ["admin"]);
+}
+
+async function requireWellTransOperator(context) {
+  return requireRole(context, ["admin", "dispatcher"]);
 }
 
 function requireRecentAuthentication(context, maxAgeSeconds = 300) {
@@ -1469,7 +1477,7 @@ exports.wellTransReconcileShard = onTaskDispatched({
 exports.queueWellTransSync = functions
   .runWith({ timeoutSeconds: 540, memory: "512MB" })
   .https.onCall(async (data, context) => {
-  await requireAdmin(context);
+  await requireWellTransOperator(context);
   const settingsSnap = await admin.firestore().doc("welltrans_settings/primary").get();
   const settings = settingsSnap.exists ? settingsSnap.data() : {};
   if (!settings.enabled) throw new functions.https.HttpsError("failed-precondition", "WellTrans automation is disabled.");
@@ -1850,50 +1858,114 @@ exports.queueWellTransSync = functions
 exports.confirmWellTransReviewBatchApplied = functions
   .runWith({ timeoutSeconds: 120, memory: "256MB" })
   .https.onCall(async (data, context) => {
-    await requireAdmin(context);
+    await requireWellTransOperator(context);
     const serviceDate = String(data?.serviceDate || "").trim();
     const reviewSessionId = String(data?.reviewSessionId || "").trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate) || !reviewSessionId) {
+    const workerInstanceId = String(data?.workerInstanceId || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)
+      || !reviewSessionId
+      || !/^[A-Za-z0-9._-]{8,200}$/.test(workerInstanceId)) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "A valid service date and live review-session ID are required.",
+        "A valid service date, live review-session ID, and Agent instance ID are required.",
       );
     }
 
-    const workerSnapshot = await admin.firestore().doc("welltrans_worker_status/primary").get();
+    const confirmationId = crypto.createHash("sha256")
+      .update(`welltrans-review:${serviceDate}:${reviewSessionId}:${workerInstanceId}`)
+      .digest("hex");
+    const confirmationRef = admin.firestore().doc(`welltrans_review_confirmations/${confirmationId}`);
+    const workerRef = admin.firestore().doc(`welltrans_workers/${workerInstanceId}`);
+    const primaryWorkerRef = admin.firestore().doc("welltrans_worker_status/primary");
+    const manifestRef = admin.firestore().doc(`welltrans_sync_manifests/${serviceDate}`);
+    const [confirmationSnapshot, workerSnapshot, manifestSnapshot, logsSnapshot] = await Promise.all([
+      confirmationRef.get(),
+      workerRef.get(),
+      manifestRef.get(),
+      admin.firestore().collection("welltrans_sync_logs")
+        .where("serviceDate", "==", serviceDate)
+        .get(),
+    ]);
+    if (confirmationSnapshot.exists && confirmationSnapshot.data()?.state === "completed") {
+      return {
+        confirmed: Number(confirmationSnapshot.data()?.confirmed || 0),
+        serviceDate,
+        reviewSessionId,
+        verificationPending: true,
+        idempotent: true,
+      };
+    }
     const worker = workerSnapshot.exists ? workerSnapshot.data() || {} : {};
-    if (worker.selectedDate !== serviceDate
-      || worker.reviewSessionId !== reviewSessionId
-      || !["review_batch_ready", "review_ready"].includes(worker.state)) {
+    if (worker.workerInstanceId !== workerInstanceId) {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        "The worker is not holding a review-ready batch for this date and browser session.",
+        "The selected Agent instance is no longer available.",
+      );
+    }
+    const manifest = manifestSnapshot.exists ? manifestSnapshot.data() || {} : {};
+    const logs = logsSnapshot.docs.map((document) => ({ id: document.id, ...document.data() }));
+    const reviewGuard = evaluateWellTransReviewBatch({
+      serviceDate,
+      reviewSessionId,
+      worker,
+      manifest,
+      logs,
+      nowMs: Date.now(),
+      minimumWorkerVersion: "5.0.6",
+    });
+    if (!reviewGuard.ready) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `Apply verification is locked: ${reviewGuard.blockers.slice(0, 3).join(" ")}`,
       );
     }
 
-    const snapshot = await admin.firestore().collection("welltrans_sync_logs")
-      .where("serviceDate", "==", serviceDate)
-      .where("status", "==", "awaiting_review")
-      .get();
-    const reviewDocuments = snapshot.docs.filter((document) =>
-      document.data().reviewSessionId === reviewSessionId);
-    if (!reviewDocuments.length) {
+    if (reviewGuard.stagedLogs.length > 200) {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        "No staged trips belong to the current live review batch.",
-      );
-    }
-    if (reviewDocuments.length > 500) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "The live review batch exceeds the 500-trip safety boundary.",
+        "The verified review batch exceeds the 200-trip atomic audit boundary.",
       );
     }
 
-    for (let offset = 0; offset < reviewDocuments.length; offset += 400) {
-      const batch = admin.firestore().batch();
-      for (const document of reviewDocuments.slice(offset, offset + 400)) {
-        batch.update(document.ref, {
+    const documentById = new Map(logsSnapshot.docs.map((document) => [document.id, document]));
+    const reviewDocuments = reviewGuard.stagedLogs.map((log) => documentById.get(log.id));
+    if (reviewDocuments.some((document) => !document)) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "A verified review document disappeared before confirmation.",
+      );
+    }
+    const auditRef = admin.firestore().collection("audit_logs").doc();
+    const transactionResult = await admin.firestore().runTransaction(async (transaction) => {
+      const snapshots = await transaction.getAll(
+        confirmationRef,
+        ...reviewDocuments.map((document) => document.ref),
+      );
+      const previousConfirmation = snapshots[0];
+      if (previousConfirmation.exists && previousConfirmation.data()?.state === "completed") {
+        return {
+          confirmed: Number(previousConfirmation.data()?.confirmed || 0),
+          idempotent: true,
+        };
+      }
+      const currentReviewDocuments = snapshots.slice(1);
+      for (const document of currentReviewDocuments) {
+        const current = document.exists ? document.data() || {} : {};
+        if (!document.exists
+          || current.status !== "awaiting_review"
+          || current.serviceDate !== serviceDate
+          || current.reviewSessionId !== reviewSessionId
+          || !hasVerifiedWellTransReviewEvidence(current, serviceDate, reviewSessionId)) {
+          throw new functions.https.HttpsError(
+            "aborted",
+            "The live review changed during confirmation. Nothing was marked Applied; verify the batch again.",
+          );
+        }
+      }
+      for (let index = 0; index < currentReviewDocuments.length; index++) {
+        const document = currentReviewDocuments[index];
+        const reviewedLog = reviewGuard.stagedLogs[index];
+        transaction.update(document.ref, {
           status: "completed",
           stage: "manual_batch_apply_pending_live_verification",
           appliedBy: context.auth.uid,
@@ -1903,116 +1975,71 @@ exports.confirmWellTransReviewBatchApplied = functions
           portalVerifiedAt: admin.firestore.FieldValue.delete(),
           portalVerification: admin.firestore.FieldValue.delete(),
         });
+        transaction.set(admin.firestore().collection("welltrans_sync_events").doc(), {
+          provider: "welltrans",
+          logId: document.id,
+          tripId: reviewedLog.tripId,
+          bookingId: reviewedLog.bookingId || reviewedLog.tripId,
+          serviceDate,
+          type: "manual_batch_apply_confirmed",
+          status: "completed",
+          stage: "manual_batch_apply_pending_live_verification",
+          sourceFingerprint: reviewedLog.stagedSourceFingerprint,
+          portalVerified: false,
+          reviewSessionId,
+          workerInstanceId,
+          actorId: context.auth.uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
       }
-      await batch.commit();
-    }
-
-    await admin.firestore().doc("welltrans_worker_status/primary").set({
-      state: "batch_apply_confirmed",
-      selectedDate: serviceDate,
-      reviewSessionId,
-      lastAppliedBatchCount: reviewDocuments.length,
-      lastAppliedBatchConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-    await admin.firestore().collection("audit_logs").add({
-      action: "welltrans.review_batch.applied",
-      entityType: "broker_sync_batch",
-      actorId: context.auth.uid,
-      serviceDate,
-      reviewSessionId,
-      confirmed: reviewDocuments.length,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      transaction.set(workerRef, {
+        state: "batch_apply_confirmed",
+        selectedDate: serviceDate,
+        reviewSessionId,
+        lastAppliedBatchCount: currentReviewDocuments.length,
+        lastAppliedBatchConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      transaction.set(primaryWorkerRef, {
+        state: "batch_apply_confirmed",
+        selectedDate: serviceDate,
+        reviewSessionId,
+        workerInstanceId,
+        lastAppliedBatchCount: currentReviewDocuments.length,
+        lastAppliedBatchConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      transaction.set(confirmationRef, {
+        provider: "welltrans",
+        state: "completed",
+        serviceDate,
+        reviewSessionId,
+        workerInstanceId,
+        orchestrationId: manifest.orchestrationId,
+        confirmed: currentReviewDocuments.length,
+        confirmedTripIds: reviewGuard.stagedLogs.map((log) => String(log.tripId)),
+        confirmedBy: context.auth.uid,
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(auditRef, {
+        action: "welltrans.review_batch.applied",
+        entityType: "broker_sync_batch",
+        actorId: context.auth.uid,
+        serviceDate,
+        reviewSessionId,
+        workerInstanceId,
+        orchestrationId: manifest.orchestrationId,
+        confirmed: currentReviewDocuments.length,
+        independentEvidenceRequired: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { confirmed: currentReviewDocuments.length, idempotent: false };
     });
     return {
-      confirmed: reviewDocuments.length,
+      confirmed: transactionResult.confirmed,
       serviceDate,
       reviewSessionId,
       verificationPending: true,
+      idempotent: transactionResult.idempotent,
     };
-  });
-
-exports.confirmWellTransDateApplied = functions
-  .runWith({ timeoutSeconds: 120, memory: "256MB" })
-  .https.onCall(async (data, context) => {
-    await requireAdmin(context);
-    const serviceDate = String(data?.serviceDate || "").trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
-      throw new functions.https.HttpsError("invalid-argument", "A valid service date is required.");
-    }
-    const manifestRef = admin.firestore().doc(`welltrans_sync_manifests/${serviceDate}`);
-    const [manifestSnapshot, logsSnapshot] = await Promise.all([
-      manifestRef.get(),
-      admin.firestore().collection("welltrans_sync_logs")
-        .where("serviceDate", "==", serviceDate).get(),
-    ]);
-    if (!manifestSnapshot.exists) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Run Reconcile & Fill Date before confirming Apply.",
-      );
-    }
-    const manifest = manifestSnapshot.data() || {};
-    const expectedTripIds = [...new Set((manifest.expectedTripIds || []).map(String))];
-    if (!expectedTripIds.length) {
-      throw new functions.https.HttpsError("failed-precondition", "The date manifest contains no completed trips.");
-    }
-    const latestByTrip = new Map();
-    for (const document of logsSnapshot.docs) {
-      const log = { id: document.id, ref: document.ref, ...document.data() };
-      const current = latestByTrip.get(String(log.tripId));
-      const updated = log.updatedAt?.toMillis?.() || log.createdAt?.toMillis?.() || 0;
-      const currentUpdated = current?.updatedAt?.toMillis?.() || current?.createdAt?.toMillis?.() || 0;
-      if (!current || updated > currentUpdated) latestByTrip.set(String(log.tripId), log);
-    }
-    const incomplete = expectedTripIds.filter((tripId) =>
-      !["awaiting_review", "completed"].includes(latestByTrip.get(tripId)?.status));
-    if (incomplete.length || Number(manifest.blockedCount || 0) > 0) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        `Apply confirmation is locked: ${incomplete.length} trips are not verified and ${manifest.blockedCount || 0} are blocked.`,
-      );
-    }
-    const awaiting = expectedTripIds
-      .map((tripId) => latestByTrip.get(tripId))
-      .filter((log) => log?.status === "awaiting_review");
-    for (let offset = 0; offset < awaiting.length; offset += 400) {
-      const batch = admin.firestore().batch();
-      for (const log of awaiting.slice(offset, offset + 400)) {
-        batch.update(log.ref, {
-          status: "completed",
-          stage: "completed_after_manual_apply",
-          appliedBy: context.auth.uid,
-          completedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-      await batch.commit();
-    }
-    await Promise.all([
-      manifestRef.set({
-        state: "completed",
-        confirmedCount: expectedTripIds.length,
-        stagedCount: 0,
-        completedCount: expectedTripIds.length,
-        missingCount: 0,
-        failedCount: 0,
-        confirmedBy: context.auth.uid,
-        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true }),
-      admin.firestore().doc("welltrans_settings/primary").set({
-        lastSync: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true }),
-      admin.firestore().collection("audit_logs").add({
-        action: "welltrans.sync.date_manually_applied",
-        entityType: "broker_sync_manifest",
-        entityId: serviceDate,
-        actorId: context.auth.uid,
-        confirmed: expectedTripIds.length,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      }),
-    ]);
-    return { confirmed: expectedTripIds.length };
   });
 
 exports.auditWellTransSettings = functions.firestore
@@ -2321,7 +2348,7 @@ function classifyWellTransFailure(message) {
 exports.explainWellTransFailureAI = functions
   .runWith({ secrets: [runtimeConfigSecret], timeoutSeconds: 30, memory: "256MB" })
   .https.onCall(async (data, context) => {
-    await requireAdmin(context);
+    await requireWellTransOperator(context);
     const logId = String(data?.logId || "").trim();
     if (!/^[A-Za-z0-9_-]{1,160}$/.test(logId)) {
       throw new functions.https.HttpsError("invalid-argument", "A valid synchronization log ID is required.");

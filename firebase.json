@@ -11,6 +11,7 @@
     "ignore": [
       "node_modules",
       ".git",
+      "**/*.node-test.js",
       "firebase-debug.log",
       "firebase-debug.*.log"
     ]

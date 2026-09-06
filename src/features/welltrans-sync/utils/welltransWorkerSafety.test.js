@@ -87,7 +87,7 @@ describe('WellTrans staging safety contract', () => {
     const page = readFileSync(syncPagePath, 'utf8');
     expect(page).toContain('reauthenticateWithCredential');
     expect(page).toContain('EmailAuthProvider.credential');
-    expect(page).toContain("const CREDENTIAL_ADMIN_ROLES = ['admin', 'superadmin', 'owner']");
+    expect(page).toContain("const CREDENTIAL_ADMIN_ROLES = ['admin']");
     expect(page).toContain('Unlocks credential management for five minutes.');
     expect(page).toContain('The saved WellTrans password is never displayed.');
   });
@@ -304,11 +304,14 @@ describe('WellTrans staging safety contract', () => {
     expect(page).toContain("? 'Verifying Apply'");
   });
 
-  it('requires complete date reconciliation before manual Apply confirmation', () => {
+  it('uses only the independently verified session-bound Apply confirmation path', () => {
     const source = readFileSync(functionsSourcePath, 'utf8');
-    expect(source).toContain('exports.confirmWellTransDateApplied');
-    expect(source).toContain('Apply confirmation is locked');
-    expect(source).toContain('["awaiting_review", "completed"]');
+    expect(source).not.toContain('exports.confirmWellTransDateApplied');
+    expect(source).toContain('exports.confirmWellTransReviewBatchApplied');
+    expect(source).toContain('evaluateWellTransReviewBatch');
+    expect(source).toContain('hasVerifiedWellTransReviewEvidence');
+    expect(source).toContain('Apply verification is locked');
+    expect(source).toContain('welltrans_review_confirmations');
   });
 
   it('never trusts staged rows from a closed browser review session', () => {
@@ -401,7 +404,7 @@ describe('WellTrans staging safety contract', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');
     const operatorConsole = readFileSync(operatorConsolePath, 'utf8');
     expect(operatorConsole).toContain('Fill Date');
-    expect(operatorConsole).toContain('Review &amp; Verify');
+    expect(operatorConsole).toContain('Verify Review');
     expect(operatorConsole).toContain('data-role="verifier"');
     expect(operatorConsole).toContain('Independent deterministic reviewer integrated into this installed Agent');
     expect(operatorConsole).toContain('Agent command acknowledgement timed out.');
@@ -414,13 +417,24 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).not.toContain('data-action="reindex"');
     expect(operatorConsole).toContain('data-action="detect-date"');
     expect(operatorConsole).toContain('Use Open Date');
-    expect(operatorConsole).not.toContain('data-action="collapse"');
+    expect(operatorConsole).toContain('data-role="collapse"');
     expect(worker).toContain('await installWellTransOperatorConsole(session.page, handleOperatorCommand)');
     expect(worker).toContain('operatorControl.dateOverride');
     expect(worker).toContain("action === 'restart'");
     expect(worker).toContain('operatorControl.fatalReviewError');
     expect(worker).toContain("operatorControl.message = 'The previous review is unsafe. Starting a clean session, then filling the opened date.'");
     expect(worker).toContain('return currentDate;');
+  });
+
+  it('gives dispatchers the same read and operation path shown by the portal UI', () => {
+    const backend = readFileSync(functionsSourcePath, 'utf8');
+    const rules = readFileSync(firestoreRulesPath, 'utf8');
+    expect(backend).toContain('function requireWellTransOperator(context)');
+    expect(backend).toContain('return requireRole(context, ["admin", "dispatcher"])');
+    expect(backend).toContain('await requireWellTransOperator(context)');
+    expect(rules).toContain('match /welltrans_sync_logs/{logId}');
+    expect(rules).toContain('allow read: if signedIn() && isDispatcher();');
+    expect(rules).toContain('match /welltrans_review_confirmations/{confirmationId}');
   });
 
   it('runs an exhaustive pre-Apply audit and automatically repairs mismatched trips', () => {

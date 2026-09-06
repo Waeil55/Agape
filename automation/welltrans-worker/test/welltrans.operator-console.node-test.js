@@ -77,7 +77,7 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.ok(layout.top <= 8);
     assert.equal(layout.rows, 1);
     assert.deepEqual(layout.labels, [
-      'Fill Date', 'Use Open Date', 'Review & Verify', 'Pause',
+      'Fill Date', 'Use Open Date', 'Verify Review', 'Pause',
     ]);
   });
 
@@ -94,8 +94,9 @@ describe('WellTrans one-line operator toolbar', () => {
     const result = await page.locator('#agape-welltrans-operator-console').evaluate(host => ({
       state: host.shadowRoot.querySelector('[data-role="verifier"]').dataset.state,
       count: host.shadowRoot.querySelector('[data-role="verified"]').textContent,
+      verifyDisabled: host.shadowRoot.querySelector('[data-action="verify"]').disabled,
     }));
-    assert.deepEqual(result, { state: 'blocked', count: '4/8' });
+    assert.deepEqual(result, { state: 'blocked', count: '4/8', verifyDisabled: true });
   });
 
   it('reports date coverage without double-counting manifest blockers', async () => {
@@ -144,6 +145,16 @@ describe('WellTrans one-line operator toolbar', () => {
     await updateWellTransOperatorConsole(page, {
       selectedDate: '2026-07-28',
       requestedDate: '2026-07-28',
+      expected: 4,
+      reviewed: 4,
+      staged: 4,
+      completed: 0,
+      pending: 0,
+      processing: 0,
+      failed: 0,
+      blocked: 0,
+      missing: 0,
+      scopeLocked: false,
     });
     await host.locator('[data-action="detect-date"]').click();
     await host.locator('[data-action="verify"]').click();
@@ -173,5 +184,17 @@ describe('WellTrans one-line operator toolbar', () => {
     const afterMove = await host.boundingBox();
     assert.equal(Math.round(afterMove.x), Math.round(before.x));
     assert.ok(afterMove.y > before.y + 30);
+  });
+
+  it('can collapse without covering the portal workspace', async () => {
+    const host = page.locator('#agape-welltrans-operator-console');
+    await host.locator('[data-role="collapse"]').click();
+    const result = await host.evaluate(element => ({
+      collapsed: element.dataset.collapsed,
+      optionalVisible: [...element.shadowRoot.querySelectorAll('.optional')]
+        .some(item => getComputedStyle(item).display !== 'none'),
+      label: element.shadowRoot.querySelector('[data-role="collapse"]').getAttribute('aria-label'),
+    }));
+    assert.deepEqual(result, { collapsed: 'true', optionalVisible: false, label: 'Expand toolbar' });
   });
 });

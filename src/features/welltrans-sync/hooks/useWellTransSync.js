@@ -14,7 +14,7 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '5.0.2';
+const REQUIRED_WORKER_VERSION = '5.0.6';
 const isTripRecord = trip => Boolean(trip && typeof trip === 'object' && !Array.isArray(trip));
 const safely = (operation, fallback) => {
   try { return operation(); } catch { return fallback; }
@@ -101,9 +101,19 @@ export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '
     || (primaryWorker?.lastSeenAt ? new Date(primaryWorker.lastSeenAt).getTime() : 0)
     || 0;
   const freshestDeviceWorker = visibleWorkers[0] || null;
-  const worker = freshestDeviceWorker && freshestDeviceWorker.lastSeenMs >= primaryLastSeenMs
-    ? freshestDeviceWorker
-    : primaryWorker;
+  const scopeMatches = candidate => candidate?.selectedDate === serviceDate
+    && (driverScopeId
+      ? candidate?.scopeType === 'driver' && String(candidate?.scopeDriverId || '') === String(driverScopeId)
+      : candidate?.scopeType !== 'driver');
+  const matchingDeviceWorker = visibleWorkers.find(scopeMatches) || null;
+  const primaryMatches = scopeMatches(primaryWorker);
+  // Prefer a live worker that owns the selected date and driver scope. A
+  // newer heartbeat from another computer/date must never control this page.
+  const worker = matchingDeviceWorker
+    || (primaryMatches ? primaryWorker : null)
+    || (freshestDeviceWorker && freshestDeviceWorker.lastSeenMs >= primaryLastSeenMs
+      ? freshestDeviceWorker
+      : primaryWorker);
   const heartbeatMs = worker?.lastSeenAt?.toMillis?.()
     || worker?.lastSeenAt?.toDate?.()?.getTime?.()
     || (worker?.lastSeenAt ? new Date(worker.lastSeenAt).getTime() : 0)

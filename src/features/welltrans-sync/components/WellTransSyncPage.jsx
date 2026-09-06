@@ -25,6 +25,7 @@ import {
 } from '../utils/welltransMapping';
 import { pageWellTransRows, WELLTRANS_TABLE_PAGE_SIZE } from '../utils/welltransScale';
 import { isValidWellTransServiceDate } from '../utils/welltransDate';
+import { buildWellTransReviewState } from '../utils/welltransReviewState';
 import { tripMatchesSearch } from '../../../utils/search';
 
 const statusStyle = {
@@ -35,8 +36,8 @@ const statusStyle = {
   failed: 'bg-rose-50 text-rose-700 border border-rose-200',
 };
 
-const AUTHORIZED_ROLES = ['admin', 'superadmin', 'dispatcher', 'manager', 'biller', 'owner'];
-const CREDENTIAL_ADMIN_ROLES = ['admin', 'superadmin', 'owner'];
+const AUTHORIZED_ROLES = ['admin', 'dispatcher'];
+const CREDENTIAL_ADMIN_ROLES = ['admin'];
 const TABLE_PAGE_SIZE = WELLTRANS_TABLE_PAGE_SIZE;
 const statusLabel = {
   pending: 'Queued',
@@ -133,7 +134,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
   }, [vehicles]);
   const {
-    settings, logs, worker, activeWorkers, operations, canary, coverage,
+    settings, logs, worker, activeWorkers, operations, canary, manifest, coverage,
     workerOnline, workerCalibrated, workerUpgradeRequired,
     requiredWorkerVersion, workerStandby, loading, allCompletedTrips, completedTrips, readyTrips,
     latestByTrip, healthScore, successfulCount,
@@ -321,42 +322,10 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     'reconciliation_blocked',
     'reconciliation_blocked_do_not_apply',
   ].includes(worker?.state);
-  const workerBatchReady = [
-    'review_batch_ready',
-    'review_ready',
-    'review_batch_verified',
-    'review_ready_verified',
-  ].includes(worker?.state);
-  const workerStatusLabel = !settings.enabled
-    ? 'Disabled'
-    : workerReviewError
-      ? 'Safety stop — discard review'
-    : workerReconciliationBlocked
-      ? 'Incomplete date — action required'
-    : workerBatchReady
-      ? `${worker?.reviewBatchStaged || 0} ready for Apply`
-    : worker?.state === 'indexing_schedule'
-      ? 'Indexing schedule for turbo fill'
-    : worker?.state === 'running_portal_canary'
-      ? 'Verifying portal contract'
-    : worker?.state === 'verifying_applied_records'
-      ? 'Verifying applied records'
-    : worker?.state === 'staging'
-      ? 'Filling WellTrans'
-    : workerNeedsLogin
-      ? 'Sign-in required'
-      : workerNeedsDate
-        ? `Select ${worker?.requestedDate || syncDate} in WellTrans`
-      : workerConnecting
-        ? 'Starting agent'
-        : workerOnline
-          ? 'Online'
-          : workerStandby
-            ? 'Standby'
-            : 'Offline';
   const workerHealthy = settings.enabled && workerOnline
     && !workerNeedsLogin && !workerNeedsDate && !workerConnecting
-    && !workerReviewError && !workerReconciliationBlocked;
+    && !workerReviewError && !workerReconciliationBlocked
+    && (!workerCalibrated || workerDateMatches);
   const canaryHealthy = canary?.passed === true
     && (!canary?.serviceDate || canary.serviceDate === syncDate);
   const liveActiveAgentCount = Math.max(activeWorkers.length, workerOnline ? 1 : 0);
@@ -372,9 +341,47 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   const currentLogs = useMemo(() => [...latestByTrip.values()]
     .filter(log => scopedCompletedTripIds.has(String(log.tripId))),
   [latestByTrip, scopedCompletedTripIds]);
-  const stagedCount = currentLogs.filter(l =>
-    l.status === 'awaiting_review'
-    && (!worker?.reviewSessionId || l.reviewSessionId === worker.reviewSessionId)).length;
+  const reviewState = useMemo(() => buildWellTransReviewState({
+    serviceDate: syncDate,
+    worker,
+    manifest,
+    workerOnline: workerOnline && !workerUpgradeRequired,
+    completedTripIds: completedTrips.map(trip => trip.id),
+    currentLogs: [...latestByTrip.values()],
+  }), [completedTrips, latestByTrip, manifest, syncDate, worker, workerOnline, workerUpgradeRequired]);
+  const workerBatchReady = reviewState.ready;
+  const stagedCount = reviewState.stagedCount;
+  const workerStatusLabel = !settings.enabled
+    ? 'Disabled'
+    : workerReviewError
+      ? 'Safety stop — discard review'
+    : workerReconciliationBlocked
+      ? 'Incomplete date — action required'
+    : workerOnline && worker?.selectedDate && worker.selectedDate !== syncDate
+      ? `Agent on ${worker.selectedDate}`
+    : workerBatchReady
+      ? `${stagedCount} independently verified for Apply`
+    : worker?.state === 'indexing_schedule'
+      ? 'Indexing schedule'
+    : worker?.state === 'running_portal_canary'
+      ? 'Verifying portal contract'
+    : worker?.state === 'verifying_applied_records'
+      ? 'Verifying applied records'
+    : worker?.state === 'verifying_staged_records'
+      ? 'Verifying staged records'
+    : worker?.state === 'staging'
+      ? 'Filling WellTrans'
+    : workerNeedsLogin
+      ? 'Sign-in required'
+      : workerNeedsDate
+        ? `Select ${worker?.requestedDate || syncDate} in WellTrans`
+      : workerConnecting
+        ? 'Starting Agent'
+        : workerOnline
+          ? 'Online'
+          : workerStandby
+            ? 'Standby'
+            : 'Offline';
   const failedLogs = currentLogs.filter(l => l.status === 'failed');
   const retryableFailed = failedLogs.filter(isWellTransFailureRetryable);
   const driverScopes = useMemo(() => {
@@ -519,16 +526,27 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     protocol.searchParams.set('date', syncDate);
     protocol.searchParams.set('scope', activeScope.type);
     if (activeScope.type === 'driver') protocol.searchParams.set('driverId', activeScope.driverId);
-    window.location.href = protocol.toString();
+    // A real anchor click preserves the user's activation for the registered
+    // Windows protocol handler. Assigning window.location from later async
+    // work is commonly blocked by Chromium and left the portal unopened.
+    const launchLink = document.createElement('a');
+    launchLink.href = protocol.toString();
+    launchLink.setAttribute('aria-hidden', 'true');
+    launchLink.style.display = 'none';
+    document.body.appendChild(launchLink);
+    launchLink.click();
+    launchLink.remove();
   }, [activeScope, syncDate]);
 
   const startAndFillDate = useCallback(async () => {
     if (!settings.enabled || busy) return;
+    // Keep launch inside the synchronous click path. The backend work follows
+    // without stealing the browser user gesture required by custom protocols.
+    openLocalAgent();
     setBusy('start-fill');
     setNotice('');
-    openLocalAgent();
     if (!completedTrips.length) {
-      setNotice(`Agent start requested for ${syncDate}. Agape has no completed trips for this date.`);
+      setNotice(`WellTrans was opened for ${syncDate}. Agape has no completed trips to fill for this date.`);
       setBusy('');
       return;
     }
@@ -566,8 +584,10 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   }, [activeScope, busy, completedTrips, openLocalAgent, selectedDriverScope, settings.enabled, syncDate]);
 
   const confirmReviewBatchApplied = useCallback(async () => {
-    if (!workerBatchReady || !worker?.reviewSessionId || !stagedCount) {
-      setNotice('No live WellTrans review batch is ready for Apply confirmation.');
+    if (!workerBatchReady || !worker?.reviewSessionId || !worker?.workerInstanceId || !stagedCount) {
+      setNotice(reviewState.reasons[0]
+        ? `Apply verification is locked: ${reviewState.reasons[0]}`
+        : 'No live WellTrans review batch is ready for Apply confirmation.');
       return;
     }
     if (!window.confirm(
@@ -579,6 +599,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       const result = await confirmWellTransReviewBatchApplied(
         syncDate,
         worker.reviewSessionId,
+        worker.workerInstanceId,
       );
       setNotice(
         `${result.data.confirmed} trips marked Applied. Live WellTrans verification is running before the next batch.`,
@@ -588,7 +609,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     } finally {
       setBusy('');
     }
-  }, [stagedCount, syncDate, worker, workerBatchReady]);
+  }, [reviewState.reasons, stagedCount, syncDate, worker, workerBatchReady]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -628,15 +649,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       </div>
     );
   }
-
-  const handleBulkSelect = (type) => {
-    if (type === 'failed') setSelectedIds(failedLogs.map(l => l.tripId).filter(id => enrichedTrips.some(t => t.id === id)));
-    else if (type === 'invalid') setSelectedIds(enrichedTrips.filter(t => !t._valid).map(t => t.id));
-    else if (type === 'retryable') setSelectedIds(retryableFailed.map(l => l.tripId).filter(id => enrichedTrips.some(t => t.id === id)));
-    else if (type === 'ready') setSelectedIds(readyTrips.map(t => t.id));
-    else if (type === 'invert') setSelectedIds(ids => filteredTrips.filter(t => t._valid).map(t => t.id).filter(id => !ids.includes(id)));
-    else if (type === 'none') setSelectedIds([]);
-  };
 
   const navigateDate = (offset) => {
     const baseDate = isValidWellTransServiceDate(syncDate)
@@ -799,16 +811,17 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
           </select>
 
           <button disabled={!settings.enabled || Boolean(busy)} onClick={startAndFillDate}
-            title={selectedDriverScope ? `Fill ${selectedDriverScope.name}` : 'Fill all drivers'}
+            title={selectedDriverScope ? `Open WellTrans and fill ${selectedDriverScope.name}` : 'Open WellTrans and reconcile every completed trip'}
             className="flex h-8 shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-2.5 text-[9px] font-bold text-white transition hover:bg-blue-700 disabled:opacity-40">
             {busy === 'start-fill' ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
-            Fill {selectedDriverScope ? 'Driver' : 'All'} ({completedTrips.length})
+            Open &amp; Fill ({completedTrips.length})
           </button>
 
           {stagedCount > 0 && (
             <button disabled={!workerBatchReady || Boolean(busy)} onClick={confirmReviewBatchApplied}
+              title={workerBatchReady ? 'Confirm your manual Apply, then run live portal verification' : reviewState.reasons.join(' ')}
               className="flex h-8 shrink-0 items-center gap-1 rounded-xl border border-purple-300 bg-purple-600 px-2 text-[9px] font-bold text-white transition hover:bg-purple-700 disabled:opacity-40">
-              <CheckCircle2 size={10} /> Confirm Applied ({stagedCount})
+              <CheckCircle2 size={10} /> Applied — Verify ({stagedCount})
             </button>
           )}
 
@@ -818,15 +831,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
               Sync ({selectedIds.length})
             </button>
           )}
-
-          <select aria-label="Select trips" defaultValue="" onChange={event => { if (event.target.value) handleBulkSelect(event.target.value); event.target.value = ''; }}
-            className="h-8 w-[76px] shrink-0 rounded-xl border border-slate-200 bg-white px-1.5 text-[9px] font-semibold text-slate-600 outline-none">
-            <option value="" disabled>Select…</option>
-            <option value="ready">All ready ({readyTrips.length})</option>
-            <option value="failed">All failed ({failedLogs.length})</option>
-            <option value="invalid">All invalid</option>
-            <option value="none">Clear selection</option>
-          </select>
 
           {retryableFailed.length > 0 && (
             <button disabled={!workerDateMatches || Boolean(busy)} onClick={() => runQueue(retryableFailed.map(log => log.tripId), 'retry')}
@@ -848,7 +852,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             {[
               ['queue', 'Trips'],
               ['logs', 'History'],
-              ['settings', 'Settings'],
+              ...(canManageWellTransCredentials ? [['settings', 'Settings']] : []),
             ].map(([id, label]) => (
               <button key={id} onClick={() => {
                 if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
@@ -929,7 +933,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       {/* Worker warnings */}
       {(workerUpgradeRequired || workerReviewError || workerNeedsDate
         || (workerCalibrated && !workerDateMatches)
-        || coverage.missingCount > 0 || coverage.invalid > 0) && (
+        || coverage.missingCount > 0 || coverage.invalid > 0 || coverage.unverifiedCompleted > 0) && (
         <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2 space-y-1.5">
           {workerReviewError && (
             <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-300 px-3 py-2 text-[11px] font-semibold text-rose-800">
@@ -957,12 +961,17 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
               In the open WellTrans schedule chooser, select {worker?.requestedDate || syncDate}. The agent is paused and will never write to {worker?.selectedDate || 'the currently open date'}.
             </div>
           )}
-          {(coverage.missingCount > 0 || coverage.invalid > 0) && (
+          {(coverage.missingCount > 0 || coverage.invalid > 0 || coverage.unverifiedCompleted > 0) && (
             <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-700">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
               <span>
-                {coverage.missingCount + coverage.invalid} completed trip(s) need attention before this date is ready.
-                Reconcile &amp; Fill checks every completed trip automatically.
+                {coverage.unverifiedCompleted > 0
+                  ? `${coverage.unverifiedCompleted} Applied trip(s) are still awaiting live portal verification. `
+                  : ''}
+                {coverage.missingCount + coverage.invalid > 0
+                  ? `${coverage.missingCount + coverage.invalid} completed trip(s) need correction or reconciliation. `
+                  : ''}
+                The date remains locked until every completed trip is independently verified.
               </span>
             </div>
           )}
@@ -1491,7 +1500,6 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                 Automated staging with mandatory operator review before Apply.
               </p>
               {[
-                { key: 'autoStart', label: 'Auto-Start Worker', desc: 'Automatically launch worker when offline' },
                 { key: 'autoQueue', label: 'Auto-Queue Trips', desc: 'Queue ready trips when worker comes online' },
                 { key: 'autoRetryEnabled', label: 'Auto-Retry Failures', desc: 'Retry failed trips based on auto-retry rules' },
               ].map(({ key, label, desc }) => (

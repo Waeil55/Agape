@@ -128,6 +128,14 @@ describe('WellTrans mapping', () => {
     expect(coverage.reviewReady).toBe(false);
   });
 
+  it('does not report false 100% coverage for an empty date', () => {
+    const coverage = buildWellTransCoverage([], new Map());
+    expect(coverage.expected).toBe(0);
+    expect(coverage.coveragePercent).toBe(0);
+    expect(coverage.coverageComplete).toBe(false);
+    expect(coverage.reviewReady).toBe(false);
+  });
+
   it('keeps coverage available when a legacy completed trip cannot be interpreted', () => {
     const corruptTrip = {
       id: 'legacy-1',
@@ -150,13 +158,30 @@ describe('WellTrans mapping', () => {
     const coverage = buildWellTransCoverage(
       [completeTrip('100'), completeTrip('101')],
       new Map([
-        ['100', { tripId: '100', status: 'completed' }],
+        ['100', { tripId: '100', status: 'completed', portalVerification: { verified: true } }],
         ['101', { tripId: '101', status: 'awaiting_review' }],
       ]),
     );
     expect(coverage.coveragePercent).toBe(100);
     expect(coverage.coverageComplete).toBe(true);
     expect(coverage.reviewReady).toBe(true);
+  });
+
+  it('does not count an Applied row as verified until live portal read-back passes', () => {
+    const trip = {
+      id: '100', bookingId: '100', dateKey: '2026-07-27', status: 'Completed',
+      driverName: 'Mikhaeil Waeil', pickupArrival: '10:00', pickupDeparture: '10:01',
+      dropoffArrival: '10:20', pickupOdometer: 100, dropoffOdometer: 110,
+      signatureCaptured: true,
+    };
+    const coverage = buildWellTransCoverage(
+      [trip],
+      new Map([['100', { tripId: '100', status: 'completed' }]]),
+    );
+    expect(coverage.unverifiedCompleted).toBe(1);
+    expect(coverage.verified).toBe(0);
+    expect(coverage.coveragePercent).toBe(0);
+    expect(coverage.coverageComplete).toBe(false);
   });
 
   it('never substitutes scheduled time or inferred mileage for missing actual evidence', () => {
