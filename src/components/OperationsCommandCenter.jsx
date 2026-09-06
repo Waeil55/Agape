@@ -1299,7 +1299,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       data-testid="operations-toolbar"
       className="app-filter-bar !flex-nowrap gap-1.5 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm"
     >
-      <label className="inline-flex w-[84px] shrink-0 items-center">
+      <label className="inline-flex w-[78px] shrink-0 items-center">
         <span className="sr-only">Trip workspace</span>
         <select aria-label="Trip workspace" value={operationsTab} onChange={(event) => setOperationsTab(event.target.value)} className="h-8 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-950 px-2 text-[10px] font-bold text-white outline-none focus:ring-2 focus:ring-blue-500">
           <option value="manifest">Manifest</option>
@@ -1308,7 +1308,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         </select>
       </label>
 
-      <label className="inline-flex w-[96px] shrink-0 items-center">
+      <label className="inline-flex w-[90px] shrink-0 items-center">
         <span className="sr-only">Saved operational view</span>
         <select aria-label="Saved operational view" value={activeSavedView} onChange={(event) => applySavedView(event.target.value)} className="h-8 w-full min-w-0 rounded-xl border border-blue-200 bg-blue-50 px-2 text-[10px] font-bold text-blue-800 outline-none focus:ring-2 focus:ring-blue-500">
           {OPERATIONAL_VIEW_PRESETS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
@@ -1320,7 +1320,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         <button onClick={() => shiftDate(-1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Previous service date">
           <ChevronLeft size={14} />
         </button>
-        <button onClick={() => setSelectedDate(localCalendarYmd())} className={`h-7 max-w-[76px] truncate rounded-lg px-1.5 text-[10px] font-bold transition-colors ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`} title={isToday ? 'Today' : 'Return to today'}>
+        <button onClick={() => setSelectedDate(localCalendarYmd())} className={`h-7 max-w-[60px] truncate rounded-lg px-1 text-[10px] font-bold transition-colors ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`} title={isToday ? 'Today' : 'Return to today'}>
           {formatDateLabel(selectedDate)}
         </button>
         <button onClick={() => shiftDate(1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Next service date">
@@ -1329,8 +1329,8 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       </div>
 
       {/* Quick Actions */}
-      <button onClick={() => setShowAddTripModal(true)} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-2 text-[10px] font-bold text-white transition-colors hover:bg-blue-700 whitespace-nowrap">
-        <Plus size={13} /> Trip
+      <button onClick={() => setShowAddTripModal(true)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700" aria-label="Add trip" title="Add trip">
+        <Plus size={13} />
       </button>
       <button onClick={() => setShowUploadModal(true)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50" aria-label="Upload trips" title="Upload trips">
         <UploadCloud size={13} />
@@ -1345,7 +1345,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       {/* Sort */}
       <label className="inline-flex shrink-0 items-center gap-1">
         <span className="sr-only">Sort trips by</span>
-        <select aria-label="Sort trips" value={sortBy} onChange={(event) => handleSortSelect(event.target.value)} className="h-8 w-[76px] min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500">
+        <select aria-label="Sort trips" value={sortBy} onChange={(event) => handleSortSelect(event.target.value)} className="h-8 w-[88px] min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500">
           <option value="time">Sort: Time</option>
           <option value="assignment">Sort: Driver</option>
           <option value="status">Sort: Status</option>
@@ -1358,7 +1358,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       </label>
 
       {/* Filters */}
-      <select aria-label="Trip status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="h-8 w-[74px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
+      <select aria-label="Trip status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="h-8 w-[84px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Status</option>
         <option value="Unassigned">Unassigned</option>
         <option value="Assigned">Assigned</option>
@@ -1366,13 +1366,13 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         <option value="Completed">Completed</option>
       </select>
 
-      <select aria-label="Trip direction" value={filterInOut} onChange={(e) => { setFilterInOut(e.target.value); localStorage.setItem('agape_opsFilterInOut', e.target.value); }} className="h-8 w-[76px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
+      <select aria-label="Trip direction" value={filterInOut} onChange={(e) => { setFilterInOut(e.target.value); localStorage.setItem('agape_opsFilterInOut', e.target.value); }} className="h-8 w-[82px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Trips</option>
         <option value="inout">IN/OUT Only</option>
         <option value="not-inout">Non IN/OUT</option>
       </select>
 
-      <select aria-label="Driver" value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="h-8 w-[84px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
+      <select aria-label="Driver" value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="h-8 w-[86px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Drivers</option>
         <option value="unassigned">Unassigned</option>
         {driverOptions.map((driver) => (
@@ -1381,7 +1381,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       </select>
 
       {/* View + AI */}
-      <label className="w-[60px] shrink-0">
+      <label className="w-[56px] shrink-0">
         <span className="sr-only">Manifest layout</span>
         <select aria-label="Manifest layout" value={manifestView} onChange={(event) => setManifestView(event.target.value)} className="h-8 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-1.5 text-[10px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
           {MANIFEST_VIEW_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}</option>)}

@@ -1695,6 +1695,12 @@ textarea::placeholder {
   .app-filter-bar {
     flex-wrap: nowrap;
   }
+
+  .app-filter-bar select {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .app-table-frame {
