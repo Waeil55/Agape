@@ -432,8 +432,16 @@ const DesktopReportsPage = ({
         return { trip, driver, travelMinutes };
       })
       .sort((a, b) => {
-        const aKey = sortKeyOverrides[a.trip.id] ?? (a.trip.arrivalDropoffTime || a.trip.completedAt || a.trip.time || '');
-        const bKey = sortKeyOverrides[b.trip.id] ?? (b.trip.arrivalDropoffTime || b.trip.completedAt || b.trip.time || '');
+        // Always sort by scheduled time first so completed trips don't jump
+        // out of order when their arrivalDropoffTime/completedAt ISO timestamp
+        // replaces the simple time string in the sort key.
+        const timeA = a.trip.time || '';
+        const timeB = b.trip.time || '';
+        const timeCmp = String(timeA).localeCompare(String(timeB));
+        if (timeCmp !== 0) return timeCmp;
+        // Tiebreaker: use completion timestamps for trips at the same scheduled time
+        const aKey = sortKeyOverrides[a.trip.id] ?? (a.trip.arrivalDropoffTime || a.trip.completedAt || '');
+        const bKey = sortKeyOverrides[b.trip.id] ?? (b.trip.arrivalDropoffTime || b.trip.completedAt || '');
         return String(aKey).localeCompare(String(bKey));
       });
   }, [trips, drivers, dateStr, allDates, searchQuery, statusFilter, driverFilter, reviewFilter, sortKeyOverrides]);
