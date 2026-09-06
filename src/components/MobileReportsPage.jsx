@@ -97,7 +97,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [savingTripId, setSavingTripId] = useState(null);
   const [editMessage, setEditMessage] = useState('');
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('completed');
   const [driverFilter, setDriverFilter] = useState('All Drivers');
   const [renderLimit, setRenderLimit] = useState(MOBILE_REPORT_PAGE_SIZE);
   const deferredSearchQuery = useDeferredValue(searchQuery);

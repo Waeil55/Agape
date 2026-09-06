@@ -154,7 +154,7 @@ const DesktopReportsPage = ({
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [allDates, setAllDates] = useState(false);
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('agape_reportsDesktopView') || 'review');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('Completed');
   const [driverFilter, setDriverFilter] = useState('all');
   const [reviewFilter, setReviewFilter] = useState('all');
   const [hiddenColumns, setHiddenColumns] = useState(['travelTime', 'distance']);
