@@ -356,45 +356,12 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg"><Navigation className="w-5 h-5 text-blue-600" /></div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Trips in range</p>
-                <p className="text-xl font-semibold text-slate-900">{summaryStats.totalTrips}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-50 rounded-lg"><Clock className="w-5 h-5 text-yellow-600" /></div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Verified hours</p>
-                <p className="text-xl font-semibold text-slate-900">{(summaryStats.billableMinutes / 60).toFixed(2)}h</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-50 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-600" /></div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Needs correction</p>
-                <p className="text-xl font-semibold text-slate-900">{summaryStats.unresolved}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-50 rounded-lg"><DollarSign className="w-5 h-5 text-green-600" /></div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Recorded breaks</p>
-                <p className="text-xl font-semibold text-slate-900">{formatMinutes(summaryStats.breakMinutes)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="col-span-2 lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3"><div className="p-2 bg-emerald-50 rounded-lg"><Activity className="w-5 h-5 text-emerald-600" /></div><div><p className="text-xs font-semibold text-slate-500">Active shifts</p><p className="text-xl font-semibold text-slate-900">{summaryStats.active}</p></div></div>
+        <div className="app-summary-strip mb-5" aria-label="Time tracking summary" data-testid="time-tracking-summary">
+          <div className="app-summary-metrics">
+            <span className="app-summary-item"><Navigation size={14} className="text-blue-600" /><strong>{summaryStats.totalTrips}</strong> trips</span>
+            <span className="app-summary-item"><Clock size={14} className="text-amber-600" /><strong>{(summaryStats.billableMinutes / 60).toFixed(2)}h</strong> verified</span>
+            <span className="app-summary-item"><DollarSign size={14} className="text-emerald-600" /><strong>{formatMinutes(summaryStats.breakMinutes)}</strong> breaks</span>
+            <span className="app-summary-item"><Activity size={14} className="text-emerald-600" /><strong>{summaryStats.active}</strong> active shifts</span>
           </div>
         </div>
 

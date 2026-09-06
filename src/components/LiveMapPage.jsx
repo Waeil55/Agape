@@ -650,11 +650,13 @@ const LiveMapPage = ({ role = 'dispatcher', currentUser = '', drivers = [], trip
           <span className="text-[12px] font-semibold text-slate-900 tracking-wide">Agape Care</span>
         </div>
         <div className="hidden h-4 w-px bg-slate-200 sm:block" />
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" /><span className="text-slate-600">{fleetStats.live}/{drivers.length} live</span></span>
-        <span className="hidden items-center gap-1.5 text-[11px] font-semibold sm:flex"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm" /><span className="text-blue-700">{fleetStats.moving} moving</span></span>
-        <span className="hidden items-center gap-1.5 text-[11px] font-semibold sm:flex"><span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" /><span className="text-amber-700">{fleetStats.stopped} stopped</span></span>
-        <span className="text-emerald-600 text-[11px] font-black flex items-center gap-0.5"><span className="text-emerald-500">✓</span> {fleetStats.complete}</span>
-        <span className="text-slate-400 text-[11px] font-semibold">| {fleetStats.remaining} remaining</span>
+        <div className="app-summary-metrics flex-none" aria-label="Live fleet summary" data-testid="live-fleet-summary">
+          <span className="app-summary-item"><span className="h-2 w-2 rounded-full bg-emerald-500 shadow-sm" /><strong>{fleetStats.live}/{drivers.length}</strong> live</span>
+          <span className="app-summary-item hidden sm:inline-flex"><span className="h-2 w-2 rounded-full bg-blue-500 shadow-sm" /><strong>{fleetStats.moving}</strong> moving</span>
+          <span className="app-summary-item hidden sm:inline-flex"><span className="h-2 w-2 rounded-full bg-amber-400 shadow-sm" /><strong>{fleetStats.stopped}</strong> stopped</span>
+          <span className="app-summary-item app-summary-item--accent"><strong>{fleetStats.complete}</strong> complete</span>
+          <span className="app-summary-item hidden md:inline-flex"><strong>{fleetStats.remaining}</strong> remaining</span>
+        </div>
         <div className="hidden flex-1 sm:block" />
         <div className="relative flex items-center flex-1 max-w-[150px] sm:flex-initial sm:w-auto">
           <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />

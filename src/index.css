@@ -1689,6 +1689,110 @@ textarea::placeholder {
   max-width: 100%;
 }
 
+/* Compact operational summaries use one visual sentence instead of a grid of
+   repeated cards. Values stay tabular and readable while zero-value exception
+   badges can be omitted by the owning view. */
+.app-summary-strip {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.4rem 0.75rem;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-summary-strip--flush {
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.app-summary-metrics {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.app-summary-item {
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  color: #475569;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.app-summary-item + .app-summary-item::before {
+  content: '\2022';
+  margin-right: 0.15rem;
+  color: #cbd5e1;
+}
+
+.app-summary-item strong {
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.app-summary-item--accent,
+.app-summary-item--accent strong {
+  color: #1d4ed8;
+}
+
+.app-summary-item--warning,
+.app-summary-item--warning strong {
+  color: #b45309;
+}
+
+.app-summary-item--danger,
+.app-summary-item--danger strong {
+  color: #be123c;
+}
+
+.app-summary-action {
+  display: inline-flex;
+  min-height: 1.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.75rem;
+  background: #eff6ff;
+  padding: 0.25rem 0.65rem;
+  color: #1d4ed8;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.app-summary-action:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.app-summary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 /* Desktop command strips stay on one compact row. Mobile keeps the existing
    wrapping behavior so touch controls are never clipped or pushed off-screen. */
 @media (min-width: 768px) {
@@ -1700,6 +1804,22 @@ textarea::placeholder {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-summary-strip,
+  .app-summary-metrics {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .app-summary-strip {
+    gap: 0.5rem;
+  }
+
+  .app-summary-action {
+    margin-left: auto;
   }
 }
 

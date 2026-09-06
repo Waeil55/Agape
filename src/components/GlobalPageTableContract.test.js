@@ -69,6 +69,32 @@ describe('global page and table layout contract', () => {
     expect(payroll).toContain('data-testid="payroll-toolbar"');
   });
 
+  it('uses one compact sentence-style summary across operational workspaces', () => {
+    const css = read('src/index.css');
+    const tripReports = read('src/components/DesktopReportsPage.jsx');
+    const overrides = read('src/components/UnloadedTripsReport.jsx');
+    const payroll = read('src/components/PayrollReportPage.jsx');
+    const timeTracking = read('src/components/TimeTrackingAdmin.jsx');
+    const manifest = read('src/components/TripsPage.jsx');
+    const route = read('src/components/RouteSequencer.jsx');
+    const fleet = read('src/components/FleetUtilizationReport.jsx');
+    const liveMap = read('src/components/LiveMapPage.jsx');
+
+    expect(css).toMatch(/\.app-summary-strip\s*\{[\s\S]*?display:\s*flex;[\s\S]*?overflow:\s*hidden;/);
+    expect(css).toMatch(/\.app-summary-item \+ \.app-summary-item::before\s*\{[\s\S]*?content:\s*'\\2022';/);
+    expect(css).toMatch(/@media \(max-width:\s*767px\)[\s\S]*?\.app-summary-strip,[\s\S]*?flex-wrap:\s*wrap;/);
+    expect(tripReports).toContain('data-testid="trip-report-summary"');
+    expect(tripReports).toContain("? 'Reset review' : 'Mark reviewed'");
+    expect(tripReports).not.toContain('Mark visible done');
+    expect(overrides).toContain('data-testid="override-cost-summary"');
+    expect(payroll).toContain('data-testid="payroll-summary"');
+    expect(timeTracking).toContain('data-testid="time-tracking-summary"');
+    expect(manifest).toContain('data-testid="trip-manifest-summary"');
+    expect(route).toContain('data-testid="route-summary"');
+    expect(fleet).toContain('data-testid="fleet-utilization-summary"');
+    expect(liveMap).toContain('data-testid="live-fleet-summary"');
+  });
+
   it('keeps every real table inside the page without horizontal table scrolling', () => {
     const files = collectSourceFiles(join(root, 'src'));
     const tableFiles = files.filter((path) => readFileSync(path, 'utf8').includes('<table'));

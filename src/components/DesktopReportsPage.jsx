@@ -450,7 +450,6 @@ const DesktopReportsPage = ({
 
   const summary = useMemo(() => {
     const reviewed = reportRows.filter(({ trip }) => trip.reviewed).length;
-    const done = reportRows.filter(({ trip }) => String(trip.status || '').toLowerCase() === 'completed').length;
     const noShow = reportRows.filter(({ trip }) => String(trip.status || '').toLowerCase() === 'no show').length;
     const cancelled = reportRows.filter(({ trip }) => String(trip.status || '').toLowerCase() === 'cancelled' || String(trip.status || '').toLowerCase() === 'canceled').length;
     const distance = reportRows.reduce((sum, row) => {
@@ -459,7 +458,7 @@ const DesktopReportsPage = ({
     }, 0);
     const moving = reportRows.reduce((sum, row) => sum + (Number.isFinite(row.travelMinutes) ? row.travelMinutes : 0), 0);
     const stopped = Math.max(reportRows.length * 25, 0);
-    return { reviewed, done, noShow, cancelled, distance, moving, stopped };
+    return { reviewed, noShow, cancelled, distance, moving, stopped };
   }, [reportRows]);
 
 
@@ -882,20 +881,24 @@ const DesktopReportsPage = ({
           </div>
         </div>
 
-        <div className="flex h-9 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-100 bg-slate-50/80 px-3" aria-label="Visible trip report summary">
-          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden text-[10px] font-semibold text-slate-600">
-            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{reportRows.length} trips</span>
-            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{summary.reviewed}/{reportRows.length} reviewed</span>
-            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{formatMinutes(summary.moving)} moving</span>
-            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{formatMinutes(summary.stopped)} stopped</span>
-            <span className="shrink-0 text-rose-700">NS {summary.noShow}</span>
-            <span className="shrink-0 text-amber-700">Cancelled {summary.cancelled}</span>
-            <span className="shrink-0">{Math.round(summary.distance)} mi</span>
+        <div className="app-summary-strip app-summary-strip--flush shrink-0 bg-slate-50/80" aria-label="Visible trip report summary" data-testid="trip-report-summary">
+          <div className="app-summary-metrics">
+            <span className="app-summary-item"><strong>{reportRows.length}</strong> trips</span>
+            <span className="app-summary-item"><strong>{summary.reviewed}/{reportRows.length}</strong> reviewed</span>
+            <span className="app-summary-item"><strong>{formatMinutes(summary.moving)}</strong> moving</span>
+            <span className="app-summary-item"><strong>{formatMinutes(summary.stopped)}</strong> stopped</span>
+            <span className="app-summary-item"><strong>{Math.round(summary.distance)}</strong> mi</span>
+            {summary.noShow > 0 && <span className="app-summary-item app-summary-item--danger"><strong>{summary.noShow}</strong> no-show</span>}
+            {summary.cancelled > 0 && <span className="app-summary-item app-summary-item--warning"><strong>{summary.cancelled}</strong> cancelled</span>}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button type="button" onClick={() => markRowsReviewed(true)} className="h-7 rounded-xl bg-emerald-100 px-2 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200">Mark visible done</button>
-            <button type="button" onClick={() => markRowsReviewed(false)} className="h-7 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600 hover:bg-slate-100">Reset review</button>
-          </div>
+          <button
+            type="button"
+            onClick={() => markRowsReviewed(!(reportRows.length > 0 && summary.reviewed === reportRows.length))}
+            disabled={reportRows.length === 0}
+            className="app-summary-action"
+          >
+            {reportRows.length > 0 && summary.reviewed === reportRows.length ? 'Reset review' : 'Mark reviewed'}
+          </button>
         </div>
 
         {viewMode === 'invoice' ? renderInvoiceTable() : viewMode === 'review' ? renderReviewTable() : renderCards()}

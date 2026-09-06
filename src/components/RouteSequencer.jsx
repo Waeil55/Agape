@@ -893,33 +893,28 @@ export default function RouteSequencerApp({ trips = [], drivers = [], currentUse
       </div>
 
       {/* ===== METRICS BAR ===== */}
-      <div className="app-filter-bar flex-shrink-0 gap-3 border border-slate-200 bg-white px-3 py-2 lg:px-5">
-        <div className="flex flex-wrap gap-2 sm:gap-5">
-          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+      <div className="app-summary-strip flex-shrink-0 lg:px-5" aria-label="Route summary" data-testid="route-summary">
+        <div className="app-summary-metrics">
+          <div className="app-summary-item">
             <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
-            <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Stops:</span>
-            <span className="text-xs sm:text-sm font-semibold">{routeMetrics.stops}</span>
+            <strong>{routeMetrics.stops}</strong><span>stops</span>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+          <div className="app-summary-item">
             <Route className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
-            <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Miles:</span>
-            <span className="text-xs sm:text-sm font-semibold">{routeMetrics.miles}</span>
+            <strong>{routeMetrics.miles}</strong><span>miles</span>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+          <div className="app-summary-item">
             <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
-            <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Est:</span>
-            <span className="text-xs sm:text-sm font-semibold">{routeMetrics.estTime}</span>
+            <strong>{routeMetrics.estTime}</strong><span>estimated</span>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 sm:bg-transparent sm:px-0 sm:py-0">
+          <div className="app-summary-item">
             <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-500" />
-            <span className="hidden sm:inline text-xs uppercase font-semibold tracking-wider text-slate-500">Pool:</span>
-            <span className="text-xs sm:text-sm font-semibold">{availableToday.length}</span>
+            <strong>{availableToday.length}</strong><span>in pool</span>
           </div>
         </div>
-        <div className="hidden lg:flex items-center gap-1.5">
+        <div className="app-summary-item hidden lg:inline-flex">
           <CarFront className="w-3.5 h-3.5 text-slate-500" />
-          <span className="text-xs uppercase font-semibold tracking-wider text-slate-500">Capacity:</span>
-          <span className="text-sm font-semibold text-blue-600">{VEHICLE_CAPACITY} seats</span>
+          <strong>{VEHICLE_CAPACITY}</strong><span>seats</span>
         </div>
       </div>
 

@@ -354,13 +354,15 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
         )}
       </div>
 
-      <div className="grid shrink-0 grid-cols-2 gap-2 px-3 py-2 sm:grid-cols-4">
-        {[
-          ['Original', money(totals.original)],
-          ['Mileage override', money(totals.unloaded)],
-          ['Waiting override', money(totals.waiting)],
-          ['Total', money(totals.total)],
-        ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white px-3 py-2"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="truncate text-base font-bold text-slate-900" title={value}>{value}</p></div>)}
+      <div className="shrink-0 px-3 py-2">
+        <div className="app-summary-strip" aria-label="Override cost summary" data-testid="override-cost-summary">
+          <div className="app-summary-metrics">
+            <span className="app-summary-item"><strong>{money(totals.original)}</strong> original</span>
+            <span className="app-summary-item"><strong>{money(totals.unloaded)}</strong> mileage</span>
+            <span className="app-summary-item"><strong>{money(totals.waiting)}</strong> waiting</span>
+            <span className="app-summary-item app-summary-item--accent"><strong>{money(totals.total)}</strong> total</span>
+          </div>
+        </div>
       </div>
 
       {policyReady && (

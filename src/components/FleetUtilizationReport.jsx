@@ -49,21 +49,6 @@ function Badge({ children, className }) {
   return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${className}`}>{children}</span>;
 }
 
-function StatCard({ icon: Icon, label, value, sub }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-3">
-      <div className="p-2 bg-blue-50 rounded-lg">
-        <Icon size={20} className="text-blue-600" />
-      </div>
-      <div>
-        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">{label}</p>
-        <p className="text-xl font-semibold text-slate-900">{value}</p>
-        {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
-      </div>
-    </div>
-  );
-}
-
 function TableRow({ children, className = '' }) {
   return <tr className={`border-b border-slate-100 last:border-0 ${className}`}>{children}</tr>;
 }
@@ -190,11 +175,13 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={MapPin} label="Total Fleet Miles" value={summary.totalMiles} />
-        <StatCard icon={Truck} label="Avg Utilization" value={`${summary.utilization}%`} />
-        <StatCard icon={Clock} label="Hours in Use" value={summary.totalHours} />
-        <StatCard icon={TrendingUp} label="Underutilized" value={summary.underutilized} sub="vehicles < 2 hrs" />
+      <div className="app-summary-strip" aria-label="Fleet utilization summary" data-testid="fleet-utilization-summary">
+        <div className="app-summary-metrics">
+          <span className="app-summary-item"><MapPin size={14} className="text-blue-600" /><strong>{summary.totalMiles}</strong> fleet miles</span>
+          <span className="app-summary-item"><Truck size={14} className="text-blue-600" /><strong>{summary.utilization}%</strong> utilization</span>
+          <span className="app-summary-item"><Clock size={14} className="text-blue-600" /><strong>{summary.totalHours}</strong> hours in use</span>
+          {summary.underutilized > 0 && <span className="app-summary-item app-summary-item--warning"><TrendingUp size={14} /><strong>{summary.underutilized}</strong> underutilized</span>}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

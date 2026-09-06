@@ -657,19 +657,20 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <div className="app-summary-strip" aria-label="Trip manifest summary" data-testid="trip-manifest-summary">
+        <div className="app-summary-metrics">
         {[
-          { label: 'Trips', value: manifestSummary.total, tone: 'text-slate-900 bg-white border-slate-200' },
-          { label: 'Late', value: manifestSummary.late, tone: manifestSummary.late > 0 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-50 border-slate-200' },
-          { label: 'Soon', value: manifestSummary.soon, tone: 'text-amber-700 bg-amber-50 border-amber-200' },
-          { label: 'Open', value: manifestSummary.unassigned, tone: manifestSummary.unassigned > 0 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-50 border-slate-200' },
-          { label: 'Assigned', value: manifestSummary.assigned, tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-        ].map((metric) => (
-          <div key={metric.label} className={`rounded-xl border px-4 py-3 shadow-sm ${metric.label === 'Trips' ? 'col-span-2 xl:col-span-1' : ''} ${metric.tone}`}>
-            <p className="text-[10px] font-semibold uppercase tracking-widest">{metric.label}</p>
-            <p className="mt-1 text-2xl font-black">{metric.value}</p>
-          </div>
+          { label: 'Trips', value: manifestSummary.total },
+          { label: 'Late', value: manifestSummary.late },
+          { label: 'Soon', value: manifestSummary.soon },
+          { label: 'Open', value: manifestSummary.unassigned },
+          { label: 'Assigned', value: manifestSummary.assigned },
+        ].filter((metric) => metric.label === 'Trips' || metric.value > 0).map((metric) => (
+          <span key={metric.label} className={`app-summary-item ${metric.label === 'Late' || metric.label === 'Open' ? 'app-summary-item--danger' : metric.label === 'Soon' ? 'app-summary-item--warning' : ''}`}>
+            <strong>{metric.value}</strong> {metric.label.toLowerCase()}
+          </span>
         ))}
+        </div>
       </div>
 
       {/* TABLE / LIST */}

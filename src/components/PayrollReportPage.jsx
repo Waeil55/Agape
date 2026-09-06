@@ -136,20 +136,22 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="px-3 sm:px-4 pb-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="px-3 py-2 sm:px-4">
+        <div className="app-summary-strip" aria-label="Payroll summary" data-testid="payroll-summary">
+          <div className="app-summary-metrics">
         {[
           { label: 'Billable', value: fmt(totals.billableMin), icon: <Clock size={14} />, color: 'text-indigo-700' },
           { label: 'Total Pay', value: fmtCurrency(totals.totalPay), icon: <DollarSign size={14} />, color: 'text-emerald-700' },
           { label: 'Trips', value: totals.trips, icon: <Navigation size={14} />, color: 'text-blue-700' },
           { label: 'Gap Events', value: totals.gaps, icon: <TrendingUp size={14} />, color: 'text-amber-700' },
           { label: 'Abuse Flags', value: totals.abuse, icon: <Shield size={14} />, color: totals.abuse > 0 ? 'text-red-700' : 'text-slate-600' },
-        ].map(c => (
-          <div key={c.label} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-            <div className={`flex items-center gap-1 text-xs mb-1 ${c.color}`}>{c.icon}<span>{c.label}</span></div>
-            <div className="text-base font-semibold text-slate-900">{c.value}</div>
-          </div>
+        ].filter((item) => item.label !== 'Abuse Flags' || item.value > 0).map(c => (
+          <span key={c.label} className={`app-summary-item ${c.label === 'Abuse Flags' ? 'app-summary-item--danger' : ''}`}>
+            <span className={c.color}>{c.icon}</span><strong>{c.value}</strong> {c.label.toLowerCase()}
+          </span>
         ))}
+          </div>
+        </div>
       </div>
 
       {/* Driver Cards */}
