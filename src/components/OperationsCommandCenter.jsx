@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { FileText, Users, AlertCircle, Clock, CheckCircle2, XCircle, Truck, Activity, BrainCircuit, Phone, MessageSquare, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTriangle, MapPin, Square, CheckSquare, X, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown, Archive, UploadCloud, Plus, Edit2, Route, Search, RotateCcw, User, Car, Map as MapIcon, Navigation, UserPlus, Flag, MoreVertical } from 'lucide-react';
+import { FileText, AlertCircle, Clock, CheckCircle2, XCircle, Truck, Activity, BrainCircuit, Phone, MessageSquare, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTriangle, MapPin, Square, CheckSquare, ArrowRight, ArrowUp, ArrowDown, TrendingUp, TrendingDown, Archive, UploadCloud, Plus, Edit2, Route, Search, RotateCcw, User, Car, Map as MapIcon, Navigation, UserPlus, Flag, MoreVertical } from 'lucide-react';
 import { db, doc, getDocFromServer } from '../config/firebase';
 import { localCalendarYmd } from '../utils/tripDate';
 import { saveClientProfile } from '../utils/clientProfileUtils';
@@ -18,6 +18,7 @@ import TripActionCenter from './trips/TripActionCenter';
 import { OPERATIONAL_VIEW_PRESETS, getOperationalViewPreset } from '../utils/operationalViews';
 import TableCheckbox from './ui/TableCheckbox';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
+import { compareStableRowOrder, createStableRowOrder } from '../utils/stableTableOrder';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -33,16 +34,17 @@ const MANIFEST_VIEW_OPTIONS = [
 
 
 const MANIFEST_TABLE_COLUMNS = [
-  { label: 'Trip #', sortKey: 'tripId' },
-  { label: 'Schedule', sortKey: 'time' },
-  { label: 'Client Ledger', sortKey: 'patient' },
+  { label: 'Trip', sortKey: 'tripId' },
+  { label: 'Time', sortKey: 'time' },
+  { label: 'Client', sortKey: 'patient' },
   { label: 'Pickup', sortKey: 'pickup' },
   { label: 'Dropoff', sortKey: 'dropoff' },
-  { label: 'Assignment', sortKey: 'assignment' },
+  { label: 'Driver', sortKey: 'assignment' },
   { label: 'Status', sortKey: 'status' },
-  { label: 'Reply', sortKey: 'reply' },
+  { label: 'SMS', sortKey: 'reply' },
   { label: 'Actions' },
 ];
+const EMPTY_STABLE_ROW_ORDER = Object.freeze({});
 
 const timeToMinutes = (t) => {
   if (!t) return 1440;
@@ -213,9 +215,9 @@ const getManifestDensityProfile = (density) => {
         cardTitle: 'text-sm',
         cardTime: 'text-xs',
         sectionGrid: 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]',
-        tableHead: 'px-3 py-1',
-        tableCell: 'px-3 py-1',
-        tableRowMinHeight: 'min-h-[24px]',
+        tableHead: 'px-2 py-1.5',
+        tableCell: 'px-2 py-1',
+        tableRowMinHeight: 'min-h-[28px]',
         showPhones: true,
         showNotes: true,
         showRoutes: true,
@@ -383,8 +385,6 @@ const getManifestDensityProfile = (density) => {
   }
 };
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
 const OPERATIONS_COMPACT_DEFAULTS_VERSION = '1';
 const readOperationsLayoutPreference = () => {
   const migrated = localStorage.getItem('agape_opsCompactDefaultsVersion') === OPERATIONS_COMPACT_DEFAULTS_VERSION;
@@ -397,7 +397,7 @@ const readOperationsLayoutPreference = () => {
 
 
 
-const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatchers, selectedTasks, setSelectedTasks, searchQuery, setSearchQuery, operationsTab, setOperationsTab, setManualAssignTrip, addToast, addAuditLog, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, requestDeleteTrip, updateTrip, makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onOpenLiveMap, onDriveTrip, logs = [] }) => {
+const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatchers, selectedTasks, setSelectedTasks, searchQuery, setSearchQuery, operationsTab, setOperationsTab, setManualAssignTrip, addToast, addAuditLog, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, requestDeleteTrip, updateTrip, makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onDriveTrip, logs = [] }) => {
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('agape_opsFilterStatus') || 'all');
   const [filterUrgency, setFilterUrgency] = useState(() => localStorage.getItem('agape_opsFilterUrgency') || 'all');
   const [filterInOut, setFilterInOut] = useState(() => localStorage.getItem('agape_opsFilterInOut') || 'all');
@@ -419,16 +419,14 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const [routeTemplates, setRouteTemplates] = useState([]);
   const [showIntelligence, setShowIntelligence] = useState(() => readOperationsLayoutPreference().showIntelligence);
   const [expandedTripIds, setExpandedTripIds] = useState([]);
-
-
   const [aiSortOrder, setAiSortOrder] = useState(null);
-  const [, setAiSortLoading] = useState(false);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [inlineEditSaving, setInlineEditSaving] = useState(false);
   const [saveAsProfile, setSaveAsProfile] = useState(false);
   const [inlineEditError, setInlineEditError] = useState('');
-  const [sortKeyOverrides, setSortKeyOverrides] = useState({});
+  const [stableManifestOrder, setStableManifestOrder] = useState({});
+  const [stableManifestContext, setStableManifestContext] = useState('');
   const [activeTripRow, setActiveTripRow] = useState(null);
   const [actionsMenuTripId, setActionsMenuTripId] = useState(null);
   const actionsMenuRef = useRef(null);
@@ -436,6 +434,8 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const boardActionsMenuRef = useRef(null);
   const [actionCenterTrip, setActionCenterTrip] = useState(null);
   const [activeSavedView, setActiveSavedView] = useState(() => localStorage.getItem('agape_opsSavedView') || 'all');
+  const resetManifestRows = useCallback(() => setManifestLimit(150), []);
+  const resetFleetRows = useCallback(() => setFleetLimit(60), []);
 
   const applySavedView = useCallback((viewId) => {
     const view = getOperationalViewPreset(viewId);
@@ -450,15 +450,10 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     setFilterInOut('all');
     setServiceFilter('all');
     setSearchQuery('');
+    resetManifestRows();
+    resetFleetRows();
     localStorage.setItem('agape_opsSavedView', view.id);
-  }, [setOperationsTab, setSearchQuery]);
-
-  useEffect(() => {
-    if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
-      const timer = setTimeout(() => setSortKeyOverrides({}), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [editingTripId]);
+  }, [resetFleetRows, resetManifestRows, setOperationsTab, setSearchQuery]);
 
   const getClientPhone = useCallback(
     (trip) => resolveClientPhoneForTrip(trip, trips),
@@ -470,6 +465,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + days);
     setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    resetManifestRows();
   };
   const isToday = selectedDate === localCalendarYmd();
   const formatDateLabel = (dateStr) => {
@@ -486,17 +482,15 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   const willCallTrips = useMemo(() => todayTrips.filter(t => t.time === 'Will Call'), [todayTrips]);
   useEffect(() => {
-    if (sortBy !== 'ai') { setAiSortOrder(null); return; }
+    if (sortBy !== 'ai') return undefined;
     const filtered = inProgressTrips.filter(t => !TERMINAL_STATUSES.includes(t.status)).slice(0, 100);
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) return undefined;
     let cancelled = false;
-    setAiSortLoading(true);
-    aiPrioritizeTrips(filtered).then(order => { if (!cancelled) { setAiSortOrder(order); setAiSortLoading(false); } }).catch(() => { if (!cancelled) setAiSortLoading(false); });
+    aiPrioritizeTrips(filtered).then(order => { if (!cancelled) setAiSortOrder(order); }).catch(() => { if (!cancelled) setAiSortOrder(null); });
     return () => { cancelled = true; };
-  }, [sortBy, inProgressTrips.length]);
+  }, [sortBy, inProgressTrips]);
   const densityProfile = useMemo(() => getManifestDensityProfile(manifestDensity), [manifestDensity]);
   const isLeanDensity = densityProfile.lineCount <= 3;
-  const isReportDensity = densityProfile.lineCount === 1;
 
   useEffect(() => {
     localStorage.setItem('agape_opsFilterStatus', filterStatus);
@@ -555,9 +549,11 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const handleSortSelect = useCallback((nextSortBy) => {
     setSortBy(nextSortBy);
     setSortDirection('asc');
-  }, []);
+    resetManifestRows();
+  }, [resetManifestRows]);
   const handleColumnSort = useCallback((nextSortBy) => {
     if (!nextSortBy) return;
+    resetManifestRows();
     setSortBy((currentSortBy) => {
       if (currentSortBy === nextSortBy) {
         setSortDirection((currentDirection) => currentDirection === 'asc' ? 'desc' : 'asc');
@@ -566,13 +562,27 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       setSortDirection('asc');
       return nextSortBy;
     });
-  }, []);
+  }, [resetManifestRows]);
 
   const searchedTrips = useMemo(() => searchQuery
     ? todayTrips.filter(t => tripMatchesSearch(t, searchQuery, [
         driverById.get(t.driverId)?.phone,
       ]))
     : todayTrips, [driverById, searchQuery, todayTrips]);
+  const manifestContextKey = JSON.stringify([
+    selectedDate,
+    searchQuery,
+    operationsTab,
+    filterStatus,
+    filterUrgency,
+    filterInOut,
+    driverFilter,
+    serviceFilter,
+    sortBy,
+    sortDirection,
+    showOnlyAttention,
+  ]);
+  const activeStableManifestOrder = stableManifestContext === manifestContextKey ? stableManifestOrder : EMPTY_STABLE_ROW_ORDER;
 
   const routeTripMap = useMemo(() => {
     const map = {};
@@ -649,12 +659,8 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       return '';
     };
     result.sort((a, b) => {
-      const aKey = sortKeyOverrides[a.id];
-      const bKey = sortKeyOverrides[b.id];
-      if (aKey !== undefined || bKey !== undefined) {
-        if (aKey !== undefined && bKey !== undefined) return String(aKey).localeCompare(String(bKey));
-        return aKey !== undefined ? -1 : 1;
-      }
+      const stableOrderDiff = compareStableRowOrder(a.id, b.id, activeStableManifestOrder);
+      if (stableOrderDiff !== null) return stableOrderDiff;
       if (sortBy === 'time' && timeSortBottomInactive) {
         const inactiveDiff = Number(shouldPinToTimeSortBottom(a)) - Number(shouldPinToTimeSortBottom(b));
         if (inactiveDiff !== 0) return inactiveDiff;
@@ -717,15 +723,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       return (originalOrder.get(a.id) || 0) - (originalOrder.get(b.id) || 0);
     });
     return result;
-  }, [searchedTrips, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, driverById, routeTripMap, sortKeyOverrides]);
-
-  useEffect(() => {
-    setManifestLimit(150);
-  }, [searchQuery, operationsTab, filterStatus, filterUrgency, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, showOnlyAttention]);
-
-  useEffect(() => {
-    setFleetLimit(60);
-  }, [driverFilter, operationsTab]);
+  }, [searchedTrips, filterStatus, filterUrgency, filterInOut, driverFilter, serviceFilter, sortBy, sortDirection, timeSortBottomInactive, operationsTab, aiSortOrder, driverById, routeTripMap, activeStableManifestOrder]);
 
   const getDriverTrips = (driverId) => {
     return activeTripsByDriver.get(driverId) || [];
@@ -901,17 +899,16 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       notes: original.notes || '',
     });
     setInlineEditError('');
-    setSortKeyOverrides(() => {
-      const next = {};
-      next[original.id] = original.time || '';
-      return next;
-    });
-  }, [trips]);
+    setStableManifestOrder(createStableRowOrder(filteredTrips));
+    setStableManifestContext(manifestContextKey);
+    setActiveTripRow(original.id);
+  }, [filteredTrips, manifestContextKey, trips]);
 
   const cancelInlineEdit = useCallback(() => {
     setEditingTripId(null);
     setEditingTripData(null);
-    setSortKeyOverrides({});
+    setStableManifestOrder({});
+    setStableManifestContext('');
     setInlineEditError('');
   }, []);
 
@@ -954,7 +951,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       setEditingTripId(null);
       setEditingTripData(null);
       setSaveAsProfile(false);
-      setSortKeyOverrides(prev => ({ ...prev, [editingTripId]: d.time || prev[editingTripId] || '' }));
+      setActiveTripRow(editingTripId);
       addToast?.('Trip Updated', `${d.patient || editingTripId} saved.`, 'success');
     } catch (error) {
       setInlineEditError(error?.message || 'Trip was not saved.');
@@ -962,7 +959,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     } finally {
       setInlineEditSaving(false);
     }
-  }, [editingTripId, editingTripData, trips, updateTrip, addToast, inlineEditSaving]);
+  }, [editingTripId, editingTripData, trips, updateTrip, addToast, inlineEditSaving, saveAsProfile, currentUser]);
 
   const markTripException = useCallback((trip, status) => {
     const run = () => applyTripStatusWithAudit(trip, status, {
@@ -1040,14 +1037,8 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     const bookingReference = getBookingReference(trip);
     const clientIdentifier = getClientIdentifier(trip);
     const clientPhone = formatPhoneDisplay(getClientPhone(trip));
-    const pickupPhone = formatPhoneDisplay(trip.pickupPhone);
     const dropoffPhone = formatPhoneDisplay(trip.dropoffPhone);
-    const pickupFacilityName = getPickupFacilityName(trip);
-    const dropoffFacilityName = getDropoffFacilityName(trip);
     const serviceLabel = trip.type || trip.serviceType || trip.tripType || '';
-    const insurer = String(trip.insurance || trip.insuranceProvider || trip.payor || '').trim();
-    const medicaidId = String(trip.medicaidId || trip.memberId || '').trim();
-    const weight = String(trip.weight || trip.passengerWeight || '').trim();
     const rawRow = trip?._originalRow || {};
     const getRawValue = (...keys) => {
       for (const key of keys) {
@@ -1057,23 +1048,10 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     };
     const requestedPickup = formatManifestValue(getRawValue('Requested Time Pickup')) || trip.time || '';
     const requestedDropoff = formatManifestValue(getRawValue('Requested Time Dropoff')) || trip.dropoffTime || '';
-    const requestedLateDropoff = formatManifestValue(getRawValue('Requested Late Dropoff'));
-    const pickupComments = formatManifestValue(getRawValue('Pickup Comments'));
-    const dropoffComments = formatManifestValue(getRawValue('Dropoff Comments'));
     const generalComments = formatManifestValue(getRawValue('Comments'));
     const manifestMessage = formatManifestValue(getRawValue('Message'));
-    const pickupCity = formatManifestValue(getRawValue('City (Orig)'));
-    const dropoffCity = formatManifestValue(getRawValue('City (Dest)'));
-    const passengerTypes = formatManifestValue(getRawValue('Passenger Types'));
     const spaceTypes = formatManifestValue(getRawValue('Space Types')) || serviceLabel;
-    const mobilityAids = formatManifestValue(getRawValue('Mobility Aids'));
-    const sharedWith = formatManifestValue(getRawValue('Shared With'));
-    const purpose = formatManifestValue(trip.purpose || getRawValue('Purpose'));
     const directDistance = formatManifestValue(trip.directDistance || getRawValue('Direct Distance'));
-    const hasNote = hasDisplayValue(getRawValue('Has Note'))
-      ? (String(getRawValue('Has Note')).trim() === '1' ? 'Yes' : String(getRawValue('Has Note')).trim() === '0' ? 'No' : formatManifestValue(getRawValue('Has Note')))
-      : '';
-    const uploadDate = formatManifestValue(getRawValue('Date')) || formatManifestValue(trip.date);
     const mobility = [
       trip.wheelchair && 'Wheelchair',
       trip.bariatric && 'Bariatric',
@@ -1084,79 +1062,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       trip.roundTrip && 'Round Trip',
       trip.returnRide && 'Return Ride',
     ].filter(Boolean);
-    const manifestSummaryItems = [
-      ['Client', trip.patient || 'Unnamed Client'],
-      ['Booking ID', bookingReference],
-      ['Client ID', clientIdentifier],
-      ['Date', uploadDate],
-      ['Requested pickup', requestedPickup],
-      ['Requested dropoff', requestedDropoff],
-      ['Late dropoff', requestedLateDropoff],
-      ['Purpose', purpose],
-      ['Passenger types', passengerTypes],
-      ['Space types', spaceTypes],
-      ['Mobility aids', mobilityAids],
-      ['Distance', directDistance],
-      ['Insurance', insurer],
-      ['Medicaid ID', !clientIdentifier ? medicaidId : ''],
-      ['Weight', weight],
-      ['Driver', driver?.name || trip.driverName || 'Awaiting assignment'],
-      ['Vehicle', driver?.vehicle || trip.completedVehicle || ''],
-      ['Shared with', sharedWith],
-      ['Has note', hasNote],
-    ].filter(([, value]) => hasDisplayValue(value));
-    const pickupItems = [
-      ['Site', pickupFacilityName],
-      ['Address', trip.pickup || 'Missing pickup address'],
-      ['City', pickupCity],
-      ['Client phone', clientPhone],
-      ['Pickup phone', pickupPhone && pickupPhone !== clientPhone ? pickupPhone : ''],
-      ['Pickup comments', pickupComments],
-    ].filter(([, value]) => hasDisplayValue(value));
-    const dropoffItems = [
-      ['Site', dropoffFacilityName],
-      ['Address', trip.dropoff || 'Missing dropoff address'],
-      ['City', dropoffCity],
-      ['Hospital phone', trip.hospitalPhone || dropoffPhone],
-      ['Dropoff phone', trip.hospitalPhone && dropoffPhone && formatPhoneDisplay(trip.hospitalPhone) !== dropoffPhone ? dropoffPhone : ''],
-      ['Dropoff comments', dropoffComments],
-    ].filter(([, value]) => hasDisplayValue(value));
-    const noteItems = [
-      ['Manifest comments', generalComments],
-      ['Message', manifestMessage],
-      ['System notes', trip.notes || trip.specialInstructions || trip.comment || ''],
-    ].filter(([, value]) => hasDisplayValue(value));
-    const surfacedRawKeys = new Set([
-      'Booking Id',
-      'Client Name',
-      'Requested Time Pickup',
-      'Phone Pickup',
-      'Pickup Comments',
-      'Requested Time Dropoff',
-      'Dropoff Comments',
-      'Phone Dropoff',
-      'Requested Late Dropoff',
-      'Site Name(orig)',
-      'Origin',
-      'City (Orig)',
-      'Site Name(dest)',
-      'Destination',
-      'City (Dest)',
-      'Comments',
-      'Direct Distance',
-      'Passenger Types',
-      'Space Types',
-      'Mobility Aids',
-      'Message',
-      'Has Note',
-      'Date',
-      'Purpose',
-      'Shared With',
-      'Unnamed: 1',
-    ]);
-    const extraUploadedFields = Object.entries(rawRow)
-      .filter(([key, value]) => !surfacedRawKeys.has(key) && !String(key || '').startsWith('Unnamed:') && hasDisplayValue(value))
-      .map(([key, value]) => [key, formatManifestValue(value)]);
 
     return (
       <div className="w-full border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-sm space-y-1.5">
@@ -1228,20 +1133,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const visibleTrips = useMemo(() => manifestFeedTrips.slice(0, manifestLimit), [manifestFeedTrips, manifestLimit]);
   const visibleTripIds = useMemo(() => new Set(visibleTrips.map((trip) => trip.id)), [visibleTrips]);
   const selectedVisibleCount = useMemo(() => selectedTasks.filter((id) => visibleTripIds.has(id)).length, [selectedTasks, visibleTripIds]);
-  const intelligenceScore = useMemo(() => {
-    const lateCount = visibleTrips.filter((trip) => getTripUrgencyLevel(trip) === 'late').length;
-    const unassignedCount = visibleTrips.filter((trip) => trip.status === 'Unassigned').length;
-    const availableCount = drivers.filter((driver) => driver.status === 'Available').length;
-    const routeCount = routeTemplates.filter((route) => (route.sequence || []).length > 0).length;
-    return clamp(
-      100 - lateCount * 14 - unassignedCount * 7 - Math.max(0, unassignedCount - availableCount) * 10 + Math.min(routeCount * 2, 8) - Math.min(visibleTrips.length, 40) * 0.1,
-      35,
-      99
-    );
-  }, [drivers, routeTemplates, visibleTrips]);
-  const intelligenceTone = intelligenceScore >= 85 ? 'emerald' : intelligenceScore >= 65 ? 'amber' : 'rose';
-  const intelligenceLabel = intelligenceScore >= 85 ? 'Stable' : intelligenceScore >= 65 ? 'Watch' : 'Critical';
-
   const manifestGroupedSections = useMemo(() => {
     const sections = new Map();
     const buildGroup = (trip) => {
@@ -1301,7 +1192,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     >
       <label className="inline-flex w-[78px] shrink-0 items-center">
         <span className="sr-only">Trip workspace</span>
-        <select aria-label="Trip workspace" value={operationsTab} onChange={(event) => setOperationsTab(event.target.value)} className="h-8 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-950 px-2 text-[10px] font-bold text-white outline-none focus:ring-2 focus:ring-blue-500">
+        <select aria-label="Trip workspace" value={operationsTab} onChange={(event) => { setOperationsTab(event.target.value); resetManifestRows(); resetFleetRows(); }} className="h-8 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-950 px-2 text-[10px] font-bold text-white outline-none focus:ring-2 focus:ring-blue-500">
           <option value="manifest">Manifest</option>
           <option value="willcall">Will Call</option>
           <option value="fleet">Fleet</option>
@@ -1320,7 +1211,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         <button onClick={() => shiftDate(-1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Previous service date">
           <ChevronLeft size={14} />
         </button>
-        <button onClick={() => setSelectedDate(localCalendarYmd())} className={`h-7 max-w-[60px] truncate rounded-lg px-1 text-[10px] font-bold transition-colors ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`} title={isToday ? 'Today' : 'Return to today'}>
+        <button onClick={() => { setSelectedDate(localCalendarYmd()); resetManifestRows(); }} className={`h-7 max-w-[60px] truncate rounded-lg px-1 text-[10px] font-bold transition-colors ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`} title={isToday ? 'Today' : 'Return to today'}>
           {formatDateLabel(selectedDate)}
         </button>
         <button onClick={() => shiftDate(1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Next service date">
@@ -1339,7 +1230,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       {/* Search */}
       <label className="flex h-8 !min-w-[84px] flex-1 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2">
         <Search size={11} className="text-slate-400" />
-        <input aria-label="Search trips" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search…" className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[10px] font-semibold text-slate-700 placeholder:text-slate-400 outline-none" />
+        <input aria-label="Search trips" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); resetManifestRows(); }} placeholder="Search…" className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[10px] font-semibold text-slate-700 placeholder:text-slate-400 outline-none" />
       </label>
 
       {/* Sort */}
@@ -1352,13 +1243,13 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           <option value="patient">Sort: Client</option>
           <option value="urgency">Sort: Urgency</option>
         </select>
-        <button type="button" onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-700" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
+        <button type="button" onClick={() => { setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); resetManifestRows(); }} className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-700" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
           {sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
         </button>
       </label>
 
       {/* Filters */}
-      <select aria-label="Trip status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="h-8 w-[84px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
+      <select aria-label="Trip status" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); resetManifestRows(); }} className="h-8 w-[84px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Status</option>
         <option value="Unassigned">Unassigned</option>
         <option value="Assigned">Assigned</option>
@@ -1366,13 +1257,13 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         <option value="Completed">Completed</option>
       </select>
 
-      <select aria-label="Trip direction" value={filterInOut} onChange={(e) => { setFilterInOut(e.target.value); localStorage.setItem('agape_opsFilterInOut', e.target.value); }} className="h-8 w-[82px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
+      <select aria-label="Trip direction" value={filterInOut} onChange={(e) => { setFilterInOut(e.target.value); resetManifestRows(); localStorage.setItem('agape_opsFilterInOut', e.target.value); }} className="h-8 w-[82px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Trips</option>
         <option value="inout">IN/OUT Only</option>
         <option value="not-inout">Non IN/OUT</option>
       </select>
 
-      <select aria-label="Driver" value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="h-8 w-[86px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
+      <select aria-label="Driver" value={driverFilter} onChange={(e) => { setDriverFilter(e.target.value); resetManifestRows(); resetFleetRows(); }} className="h-8 w-[86px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Drivers</option>
         <option value="unassigned">Unassigned</option>
         {driverOptions.map((driver) => (
@@ -1462,7 +1353,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
     const driverName = driver ? driver.name : 'Unassigned';
     const driverCar = driver ? (driver.vehicle || 'Active') : 'N/A';
     const etaDisplay = trip.eta || 'Pending';
-    const routeMileage = trip.estMiles ? `${trip.estMiles} mi` : (trip.distance ? `${trip.distance} mi` : 'N/A');
 
     if (editingTripId === trip.id) return renderInlineTripCard(trip);
 
@@ -2027,25 +1917,20 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm text-slate-900">Dispatch Ledger</p>
-                <p className="text-xs font-medium text-slate-500">
-                  Structured manifest view with richer client detail, routing context, and driver assignment controls.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-700">{visibleTrips.length} visible</span>
-              </div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex h-10 items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/90 px-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <FileText size={15} className="shrink-0 text-blue-600" />
+              <p className="truncate text-sm font-semibold text-slate-900">Dispatch ledger</p>
+              <span className="shrink-0 text-xs font-semibold text-slate-500">{visibleTrips.length} visible</span>
             </div>
+            <p className="truncate text-[11px] font-medium text-slate-500">Select a row, press Enter to view, or use ↑ ↓ to navigate</p>
           </div>
 
           <div className="app-table-frame">
-            <table className="w-full table-fixed text-xs">
+            <table className="operations-trip-ledger w-full table-fixed text-xs">
               <colgroup>
-                <col className="w-8" />
+                <col className="w-11" />
                 <col className="w-[7%]" />
                 <col className="w-[8%]" />
                 <col className="w-[18%]" />
@@ -2058,7 +1943,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-blue-900/20 text-slate-100">
                 <tr>
-                  <th className={`${densityProfile.tableHead} text-left align-middle`}>
+                  <th className={`${densityProfile.tableHead} !px-2 text-center align-middle`}>
                     <TableCheckbox
                       checked={selectedVisibleCount === visibleTrips.length && visibleTrips.length > 0}
                       indeterminate={selectedVisibleCount > 0 && selectedVisibleCount < visibleTrips.length}
@@ -2070,12 +1955,12 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                     />
                   </th>
                   {MANIFEST_TABLE_COLUMNS.map(({ label, sortKey }) => (
-                    <th key={label} className={`${densityProfile.tableHead} text-left text-xs uppercase tracking-widest text-slate-200 align-middle`}>
+                    <th key={label} className={`${densityProfile.tableHead} text-left text-xs uppercase tracking-wide text-slate-200 align-middle`}>
                       {sortKey ? (
                         <button
                           type="button"
                           onClick={() => handleColumnSort(sortKey)}
-                          className={`group inline-flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-left uppercase tracking-widest transition-colors ${
+                          className={`group inline-flex w-full items-center gap-1 rounded-lg px-1 py-1 text-left uppercase tracking-wide transition-colors ${
                             sortBy === sortKey ? 'bg-white/12 text-white' : 'text-blue-50/90 hover:bg-white/10 hover:text-white'
                           }`}
                           title={`Sort by ${label}`}
@@ -2098,8 +1983,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                 {visibleTrips.map((trip, index) => {
                   const isExpanded = isTripExpanded(trip.id);
                   const isEditing = editingTripId === trip.id;
-                  const ie = isEditing ? editingTripData : null;
-                  const inlineCellClass = 'w-full rounded-md border border-blue-400 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100';
                   const isSelected = selectedTasks.includes(trip.id);
                   const urgency = getTripUrgencyLevel(trip);
                   const isLate = urgency === 'late';
@@ -2115,11 +1998,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                   const dropoffFacilityName = getDropoffFacilityName(trip);
                   const serviceLabel = trip.type || trip.serviceType;
                   const clientSummary = [bookingReference, clientIdentifier && `ID ${clientIdentifier}`, serviceLabel].filter(Boolean).join(' • ');
-                  const contactSummary = [
-                    clientPhone && `Client ${clientPhone}`,
-                    densityProfile.showSecondaryPhones && pickupPhone && pickupPhone !== clientPhone && `Pickup ${pickupPhone}`,
-                    densityProfile.showSecondaryPhones && hospitalPhone && `Hospital ${hospitalPhone}`,
-                  ].filter(Boolean).join(' • ');
                   const visibleRouteAssignments = routeAssignments.slice(0, densityProfile.routeChipLimit);
                   const rowBg = isSelected
                     ? 'bg-blue-50'
@@ -2131,30 +2009,38 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                   return (
                     <React.Fragment key={trip.id}>
                     <tr
-                      className={`${activeTripRow === trip.id ? 'bg-blue-100' : rowBg} transition-colors hover:bg-blue-50/70 cursor-pointer`}
+                      className={`${activeTripRow === trip.id ? 'bg-blue-100' : rowBg} cursor-pointer transition-colors hover:bg-blue-50/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+                      data-agape-selected={isSelected ? 'true' : undefined}
+                      aria-selected={isSelected}
+                      aria-expanded={isEditing || isExpanded}
+                      aria-label={`Trip ${trip.bookingId || trip.id}, ${trip.patient || 'unnamed client'}`}
                       onClick={() => setActiveTripRow(trip.id)}
+                      onDoubleClick={() => toggleTripExpanded(trip.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          toggleTripExpanded(trip.id);
+                        } else if (event.key === ' ' && !event.target.closest('input, textarea, select, button, a')) {
+                          event.preventDefault();
+                          setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]);
+                        }
+                      }}
                     >
-                      <td className={`${densityProfile.tableCell} align-top`}>
-                        <div className={`flex ${densityProfile.tableRowMinHeight} items-start pt-1`}>
-                          {isEditing ? (
-                            <div className="flex gap-1">
-                              <button type="button" onClick={(event) => { event.stopPropagation(); saveInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-emerald-100 p-1.5 text-emerald-700 disabled:opacity-50" title="Save row"><CheckCircle2 size={15} /></button>
-                              <button type="button" onClick={(event) => { event.stopPropagation(); cancelInlineEdit(); }} disabled={inlineEditSaving} className="rounded bg-rose-50 p-1.5 text-rose-600 disabled:opacity-50" title="Cancel"><X size={15} /></button>
-                            </div>
-                          ) : <TableCheckbox
+                      <td className={`${densityProfile.tableCell} !px-2 align-middle`}>
+                        <div className={`flex ${densityProfile.tableRowMinHeight} items-center justify-center`}>
+                          <TableCheckbox
                             checked={isSelected}
                             label={`Select trip ${trip.bookingId || trip.id}`}
                             onChange={() => setSelectedTasks((prev) => prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id])}
-                          />}
+                          />
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
-                          {isEditing ? <input value={ie.bookingId} onChange={event => setEditingTripData(current => ({ ...current, bookingId: event.target.value }))} className={inlineCellClass} aria-label="Booking ID" /> : <span className="text-xs font-mono text-slate-500">{trip.bookingId || trip.id || '—'}</span>}
+                          <span className="truncate font-mono text-xs font-semibold text-slate-600">{trip.bookingId || trip.id || '—'}</span>
                         </div>
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {isEditing ? <input type="time" value={isoToTimeInput(ie.time)} onChange={event => setEditingTripData(current => ({ ...current, time: event.target.value }))} className={inlineCellClass} aria-label="Scheduled time" /> : (
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col ${densityProfile.lineCount >= 3 ? 'justify-between' : 'justify-center'}`}>
                           <div className="flex items-center gap-1.5">
                             <div className={`font-mono ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-emerald-600'} ${manifestDensity === 'executive' ? 'text-lg' : manifestDensity === 'dense' ? 'text-xs' : densityProfile.lineCount <= 2 ? 'text-xs' : 'text-base'}`}>
@@ -2177,25 +2063,10 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                             </div>
                           )}
                         </div>
-                        )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {isEditing ? (
-                          <div className="space-y-1.5">
-                            <input value={ie.patient} onChange={event => setEditingTripData(current => ({ ...current, patient: event.target.value }))} className={inlineCellClass} aria-label="Passenger" />
-                            <input value={ie.type} onChange={event => setEditingTripData(current => ({ ...current, type: event.target.value }))} className={inlineCellClass} aria-label="Service type" placeholder="Service type" />
-                            <input type="date" value={ie.date} onChange={event => setEditingTripData(current => ({ ...current, date: event.target.value }))} className={inlineCellClass} aria-label="Service date" />
-                            <input value={ie.pickupPhone} onChange={event => setEditingTripData(current => ({ ...current, pickupPhone: event.target.value }))} className={inlineCellClass} aria-label="Pickup phone" placeholder="Pickup phone" />
-                            <input value={ie.dropoffPhone} onChange={event => setEditingTripData(current => ({ ...current, dropoffPhone: event.target.value }))} className={inlineCellClass} aria-label="Dropoff phone" placeholder="Dropoff phone" />
-                            <textarea value={ie.notes} onChange={event => setEditingTripData(current => ({ ...current, notes: event.target.value }))} className={inlineCellClass} rows="2" aria-label="Notes" placeholder="Notes" />
-                            <label className="flex items-center gap-2 cursor-pointer rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold text-slate-600">
-                              <input type="checkbox" checked={saveAsProfile} onChange={e => setSaveAsProfile(e.target.checked)} className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                              Save as client default
-                            </label>
-                          </div>
-                        ) : (
                         <div className={`flex ${densityProfile.tableRowMinHeight} flex-col justify-center gap-0.5`}>
-                          <div className="leading-snug text-slate-900 text-xs">
+                          <div className="truncate text-xs font-semibold leading-snug text-slate-900">
                             {trip.patient || 'Unnamed Client'}
                           </div>
                           {densityProfile.lineCount <= 2 ? (
@@ -2240,10 +2111,9 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                             </div>
                           )}
                         </div>
-                        )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {isEditing ? <div className="space-y-1.5"><textarea value={ie.pickup} onChange={event => setEditingTripData(current => ({ ...current, pickup: event.target.value }))} className={inlineCellClass} rows="3" aria-label="Pickup address" /><input type="time" value={ie._pickupTime} onChange={event => setEditingTripData(current => ({ ...current, _pickupTime: event.target.value }))} className={inlineCellClass} aria-label="Pickup arrival" /><input type="number" min="0" value={ie._pickupOdometer} onChange={event => setEditingTripData(current => ({ ...current, _pickupOdometer: event.target.value }))} className={inlineCellClass} aria-label="Pickup odometer" placeholder="Start odometer" /></div> : densityProfile.lineCount === 1 ? (
+                        {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs text-slate-700 truncate`}>
                             {trip.pickup || '—'}
                           </div>
@@ -2266,7 +2136,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {isEditing ? <div className="space-y-1.5"><textarea value={ie.dropoff} onChange={event => setEditingTripData(current => ({ ...current, dropoff: event.target.value }))} className={inlineCellClass} rows="3" aria-label="Dropoff address" /><input type="time" value={ie._dropoffTime} onChange={event => setEditingTripData(current => ({ ...current, _dropoffTime: event.target.value }))} className={inlineCellClass} aria-label="Dropoff arrival" /><input type="number" min="0" value={ie._dropoffOdometer} onChange={event => setEditingTripData(current => ({ ...current, _dropoffOdometer: event.target.value }))} className={inlineCellClass} aria-label="Dropoff odometer" placeholder="End odometer" /></div> : densityProfile.lineCount === 1 ? (
+                        {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs text-slate-700 truncate`}>
                             {trip.dropoff || '—'}
                           </div>
@@ -2286,12 +2156,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {isEditing ? (
-                          <select value={ie.driverId || ''} onChange={event => setEditingTripData(current => ({ ...current, driverId: event.target.value }))} className={inlineCellClass} aria-label="Driver">
-                            <option value="">Unassigned</option>
-                            {drivers.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-                          </select>
-                        ) : densityProfile.lineCount === 1 ? (
+                        {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center text-xs truncate`}>
                             {driver ? (
                               <span className="text-slate-800">{driver.name}</span>
@@ -2347,15 +2212,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                         )}
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
-                        {isEditing ? (
-                          <div className="space-y-1.5">
-                            <select value={ie.status} onChange={event => setEditingTripData(current => ({ ...current, status: event.target.value }))} className={inlineCellClass} aria-label="Status">
-                              {['Unassigned', 'Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(status => <option key={status} value={status}>{status}</option>)}
-                            </select>
-                            <input type="number" min="0" step="0.1" value={ie.distance} onChange={event => setEditingTripData(current => ({ ...current, distance: event.target.value }))} className={inlineCellClass} aria-label="Distance" placeholder="Distance" />
-                            {inlineEditError && <p className="text-[10px] font-semibold text-rose-700">{inlineEditError}</p>}
-                          </div>
-                        ) : densityProfile.lineCount === 1 ? (
+                        {densityProfile.lineCount === 1 ? (
                           <div className={`flex ${densityProfile.tableRowMinHeight} items-center`}>
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs ${getStatusPillClass(trip.status)}`}>
                               {trip.status}
@@ -2391,7 +2248,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                       </td>
                       <td className={`${densityProfile.tableCell} align-top`}>
                         <div className={`flex ${densityProfile.tableRowMinHeight} items-center justify-center`}>
-                          <button onClick={(e) => { e.stopPropagation(); setSmsConversationTrip(trip); }} className="min-h-[40px] rounded-lg p-2 hover:bg-slate-100 transition-colors" title="View messages">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setSmsConversationTrip(trip); }} className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-slate-100" title="View messages" aria-label={`View messages for ${trip.patient || trip.bookingId || trip.id}`}>
                             {trip.clientConfirmation === 'confirmed' ? (
                               <CheckCircle2 size={16} className="text-emerald-500" />
                             ) : trip.clientConfirmation === 'not_coming' ? (
@@ -2402,84 +2259,41 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                           </button>
                         </div>
                       </td>
-                      <td className={`${densityProfile.tableCell} align-top`}>
-                        <div className={`flex ${densityProfile.tableRowMinHeight} items-center gap-0.5`} onClick={(e) => e.stopPropagation()}>
-                          {!isEditing && (
-                            <button type="button" onClick={() => startInlineEdit(trip)} className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-100 transition-colors" title="Edit this row">
-                              <Edit2 size={14} />
-                            </button>
-                          )}
-                          <button onClick={() => setManualAssignTrip(trip)} className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-100 transition-colors" title="Assign / Reassign driver">
-                            <Users size={14} />
+                      <td className={`${densityProfile.tableCell} !px-1 align-middle`}>
+                        <div className={`flex ${densityProfile.tableRowMinHeight} items-center justify-end gap-0.5`} onClick={(e) => e.stopPropagation()}>
+                          <button type="button" onClick={() => startInlineEdit(trip)} disabled={isEditing} className="flex h-7 w-7 items-center justify-center rounded-lg text-blue-600 transition-colors hover:bg-blue-100 disabled:bg-blue-50 disabled:text-blue-300" title={isEditing ? 'Editing this trip' : 'Edit trip'} aria-label={`Edit trip ${trip.bookingId || trip.id}`}>
+                            <Edit2 size={14} />
                           </button>
-                          <div className="relative" ref={actionsMenuTripId === trip.id ? actionsMenuRef : undefined}>
-                            <button
-                              type="button"
-                              onClick={() => setActionsMenuTripId(actionsMenuTripId === trip.id ? null : trip.id)}
-                              className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                              title="More actions"
-                            >
-                              <MoreVertical size={14} />
-                            </button>
-                            {actionsMenuTripId === trip.id && (
-                              <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                                <button onClick={() => { setActionsMenuTripId(null); triggerSmartAssign(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
-                                  <BrainCircuit size={13} className="text-indigo-500" /> AI Assign
-                                </button>
-                                <button onClick={() => { setActionsMenuTripId(null); makeCall(getClientPhone(trip), trip.patient); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                  <Phone size={13} className="text-emerald-500" /> Call Client
-                                </button>
-                                <button onClick={() => { setActionsMenuTripId(null); openSmsForTrip(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700">
-                                  <MessageSquare size={13} className="text-blue-500" /> SMS Client
-                                </button>
-                                <div className="my-1 border-t border-slate-100" />
-                                {hasPermission(role, 'canDeleteTrip') && (
-                                  <>
-                                    <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'Rerouted'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700">
-                                      <MapPin size={13} className="text-amber-500" /> Reroute
-                                    </button>
-                                    <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'No Show'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-800">
-                                      <AlertCircle size={13} className="text-slate-500" /> No Show
-                                    </button>
-                                    <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'Cancelled'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-rose-50 hover:text-rose-700">
-                                      <XCircle size={13} className="text-rose-500" /> Cancel
-                                    </button>
-                                    <button onClick={() => { setActionsMenuTripId(null); requestDeleteTrip(trip.id); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-800">
-                                      <Archive size={13} className="text-slate-500" /> Archive
-                                    </button>
-                                  </>
-                                )}
-                                <div className="my-1 border-t border-slate-100" />
-                                <button onClick={() => {
-                                  setActionsMenuTripId(null);
-                                  const nowInOut = !isInOutTrip(trip);
-                                  updateTrip?.(trip.id, {
-                                    inOutTrip: nowInOut,
-                                    inOut: nowInOut,
-                                    tripKind: nowInOut ? 'IN_OUT' : '',
-                                    inOutStayWithClient: nowInOut,
-                                    inOutWaitMinutes: nowInOut ? 5 : null,
-                                    inOutLeg: nowInOut ? (trip.inOutLeg || 'A') : null,
-                                  });
-                                }} className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${isInOutTrip(trip) ? 'text-emerald-700 hover:bg-emerald-50' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'}`}>
-                                  <RotateCcw size={13} className={isInOutTrip(trip) ? 'text-emerald-500' : 'text-slate-500'} /> {isInOutTrip(trip) ? 'Remove IN/OUT' : 'Mark IN/OUT'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
                           <button
                             type="button"
                             onClick={() => toggleTripExpanded(trip.id)}
-                            className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
                             title={isExpanded ? 'Collapse' : 'Expand'}
+                            aria-label={`${isExpanded ? 'Collapse' : 'View'} trip ${trip.bookingId || trip.id}`}
                           >
                             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActionCenterTrip(trip)}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                            title="All trip actions"
+                            aria-label={`Open actions for trip ${trip.bookingId || trip.id}`}
+                          >
+                            <MoreVertical size={14} />
                           </button>
                         </div>
                       </td>
                     </tr>
-                    {isExpanded && (
-                      <tr className={`${rowBg} border-t border-slate-100`}>
+                    {isEditing && (
+                      <tr data-agape-detail-row="true" className="border-t border-blue-200 bg-blue-50/40">
+                        <td colSpan={10} className="p-3">
+                          {renderInlineTripCard(trip)}
+                        </td>
+                      </tr>
+                    )}
+                    {!isEditing && isExpanded && (
+                      <tr data-agape-detail-row="true" className={`${rowBg} border-t border-slate-100`}>
                         <td colSpan={10} className="px-3 pb-3">
                           {renderExpandedTripDetails(trip, { compact: densityProfile.lineCount <= 2, embeddedInTable: true })}
                         </td>
@@ -2838,11 +2652,11 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           drivers={drivers}
           dispatchers={dispatchers}
           routeTemplates={routeTemplates}
-          onFocusLate={() => { setOperationsTab('manifest'); setFilterStatus('all'); setFilterUrgency('late'); }}
-          onFocusUpcoming={() => { setOperationsTab('manifest'); setFilterStatus('all'); setFilterUrgency('upcoming'); }}
-          onFocusUnassigned={() => { setOperationsTab('manifest'); setFilterStatus('Unassigned'); setFilterUrgency('all'); }}
-          onFocusFleet={() => { setOperationsTab('fleet'); setFilterStatus('all'); setFilterUrgency('all'); }}
-          onFocusRoutes={() => { if (onOpenSequencer) onOpenSequencer(); else setOperationsTab('manifest'); }}
+          onFocusLate={() => { setOperationsTab('manifest'); setFilterStatus('all'); setFilterUrgency('late'); resetManifestRows(); }}
+          onFocusUpcoming={() => { setOperationsTab('manifest'); setFilterStatus('all'); setFilterUrgency('upcoming'); resetManifestRows(); }}
+          onFocusUnassigned={() => { setOperationsTab('manifest'); setFilterStatus('Unassigned'); setFilterUrgency('all'); resetManifestRows(); }}
+          onFocusFleet={() => { setOperationsTab('fleet'); setFilterStatus('all'); setFilterUrgency('all'); resetFleetRows(); }}
+          onFocusRoutes={() => { if (onOpenSequencer) onOpenSequencer(); else { setOperationsTab('manifest'); resetManifestRows(); } }}
           onOptimize={triggerFleetOptimization}
         />
       )}
@@ -2868,16 +2682,32 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         open={Boolean(actionCenterTrip)}
         trip={actionCenterTrip}
         driver={actionCenterTrip ? drivers.find((entry) => entry.id === actionCenterTrip.driverId) : null}
+        phone={actionCenterTrip ? getClientPhone(actionCenterTrip) : ''}
         role={role}
         onClose={() => setActionCenterTrip(null)}
         callbacks={{
           onView: (trip) => setTripDetails?.(trip),
           onDrive: (trip) => trip.driverId ? onDriveTrip?.(trip) : setManualAssignTrip(trip),
           onAssign: (trip) => setManualAssignTrip(trip),
+          onSmartAssign: (trip) => triggerSmartAssign?.(trip),
           onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
           onCall: (trip) => makeCall?.(getClientPhone(trip), trip.patient),
           onMessage: (trip) => sendSMS?.(getClientPhone(trip), trip.patient),
           onEdit: startInlineEdit,
+          onToggleInOut: (trip) => {
+            const nowInOut = !isInOutTrip(trip);
+            updateTrip?.(trip.id, {
+              inOutTrip: nowInOut,
+              inOut: nowInOut,
+              tripKind: nowInOut ? 'IN_OUT' : '',
+              inOutStayWithClient: nowInOut,
+              inOutWaitMinutes: nowInOut ? 5 : null,
+              inOutLeg: nowInOut ? (trip.inOutLeg || 'A') : null,
+            });
+          },
+          onReroute: hasPermission(role, 'canDeleteTrip') ? (trip) => markTripException(trip, 'Rerouted') : null,
+          onNoShow: hasPermission(role, 'canDeleteTrip') ? (trip) => markTripException(trip, 'No Show') : null,
+          onCancel: hasPermission(role, 'canDeleteTrip') ? (trip) => markTripException(trip, 'Cancelled') : null,
           onArchive: (trip) => requestDeleteTrip?.(trip.id),
         }}
       />

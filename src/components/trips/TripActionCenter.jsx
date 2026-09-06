@@ -1,16 +1,16 @@
 import React, { useEffect, useMemo } from 'react';
 import {
-  Archive, ClipboardList, Edit2, History, MapPin, MessageSquare,
-  Navigation, Phone, RotateCcw, UserRoundCog, X,
+  AlertCircle, Archive, BrainCircuit, ClipboardList, Edit2, History, MapPin, MessageSquare,
+  Navigation, Phone, RotateCcw, UserRoundCog, X, XCircle,
 } from 'lucide-react';
 import { resolveClientPhoneForTrip } from '../../utils/clientPhoneResolution';
 
 const TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
 
-export const buildTripActionModel = ({ trip, role, driver, callbacks = {} }) => {
+export const buildTripActionModel = ({ trip, role, driver, phone: resolvedPhone, callbacks = {} }) => {
   if (!trip) return [];
   const canOperate = role === 'admin' || role === 'dispatcher' || role === 'fleet_manager';
-  const phone = resolveClientPhoneForTrip(trip);
+  const phone = resolvedPhone || resolveClientPhoneForTrip(trip);
   const actions = [
     callbacks.onView && { id: 'view', label: 'Trip details', hint: 'Review the complete trip record', icon: ClipboardList, onSelect: callbacks.onView },
     callbacks.onDrive && canOperate && !TERMINAL_STATUSES.has(trip.status) && {
@@ -22,10 +22,15 @@ export const buildTripActionModel = ({ trip, role, driver, callbacks = {} }) => 
       tone: 'primary',
     },
     callbacks.onAssign && canOperate && { id: 'assign', label: driver ? 'Reassign driver' : 'Assign driver', hint: driver?.name || 'Choose an available driver', icon: UserRoundCog, onSelect: callbacks.onAssign },
+    callbacks.onSmartAssign && canOperate && { id: 'smart-assign', label: 'AI driver suggestion', hint: 'Review the best available assignment', icon: BrainCircuit, onSelect: callbacks.onSmartAssign },
     callbacks.onNavigate && trip.pickup && { id: 'navigate', label: 'Navigate to pickup', hint: trip.pickup, icon: MapPin, onSelect: callbacks.onNavigate },
     callbacks.onCall && phone && { id: 'call', label: 'Call passenger', hint: phone, icon: Phone, onSelect: callbacks.onCall },
     callbacks.onMessage && phone && { id: 'message', label: 'Message passenger', hint: phone, icon: MessageSquare, onSelect: callbacks.onMessage },
     callbacks.onEdit && canOperate && { id: 'edit', label: 'Edit trip', hint: 'Update manifest details', icon: Edit2, onSelect: callbacks.onEdit },
+    callbacks.onToggleInOut && canOperate && { id: 'toggle-in-out', label: trip.inOutTrip || trip.inOut ? 'Remove IN/OUT' : 'Mark IN/OUT', hint: 'Update the trip direction workflow', icon: RotateCcw, onSelect: callbacks.onToggleInOut },
+    callbacks.onReroute && canOperate && { id: 'reroute', label: 'Reroute trip', hint: 'Record this trip as rerouted', icon: MapPin, onSelect: callbacks.onReroute, tone: 'warning' },
+    callbacks.onNoShow && canOperate && { id: 'no-show', label: 'Mark no show', hint: 'Record a passenger no-show', icon: AlertCircle, onSelect: callbacks.onNoShow, tone: 'warning' },
+    callbacks.onCancel && canOperate && { id: 'cancel', label: 'Cancel trip', hint: 'Record this trip as cancelled', icon: XCircle, onSelect: callbacks.onCancel, tone: 'danger' },
     callbacks.onAudit && { id: 'audit', label: 'Audit history', hint: 'Review recorded changes', icon: History, onSelect: callbacks.onAudit },
     callbacks.onRestore && role === 'admin' && { id: 'restore', label: 'Restore trip', hint: 'Return this trip to operations', icon: RotateCcw, onSelect: callbacks.onRestore, tone: 'success' },
     callbacks.onArchive && (role === 'admin' || role === 'dispatcher') && { id: 'archive', label: 'Archive trip', hint: 'Password confirmation is required', icon: Archive, onSelect: callbacks.onArchive, tone: 'danger' },
@@ -33,10 +38,10 @@ export const buildTripActionModel = ({ trip, role, driver, callbacks = {} }) => 
   return actions.filter(Boolean);
 };
 
-const TripActionCenter = ({ open, trip, driver, role, onClose, callbacks = {} }) => {
+const TripActionCenter = ({ open, trip, driver, phone, role, onClose, callbacks = {} }) => {
   const actions = useMemo(
-    () => buildTripActionModel({ trip, driver, role, callbacks }),
-    [callbacks, driver, role, trip],
+    () => buildTripActionModel({ trip, driver, phone, role, callbacks }),
+    [callbacks, driver, phone, role, trip],
   );
 
   useEffect(() => {
@@ -75,8 +80,10 @@ const TripActionCenter = ({ open, trip, driver, role, onClose, callbacks = {} })
               ? 'border-blue-200 bg-blue-600 text-white hover:bg-blue-700'
               : action.tone === 'danger'
                 ? 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100'
-                : action.tone === 'success'
+              : action.tone === 'success'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+                  : action.tone === 'warning'
+                    ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100'
                   : 'border-slate-200 bg-white text-slate-900 hover:border-blue-200 hover:bg-blue-50';
             return (
               <button

@@ -115,7 +115,7 @@ describe('global page and table layout contract', () => {
     expect(css).not.toContain('width: max-content;');
   });
 
-  it('uses a visible native checkbox and an indeterminate select-all state', () => {
+  it('uses a fully visible code-rendered checkbox and an indeterminate select-all state', () => {
     const css = read('src/index.css');
     const checkbox = read('src/components/ui/TableCheckbox.jsx');
     const operations = read('src/components/OperationsCommandCenter.jsx');
@@ -123,7 +123,19 @@ describe('global page and table layout contract', () => {
     expect(css).toContain('input[type="checkbox"]:checked');
     expect(css).toContain('input[type="checkbox"]:indeterminate');
     expect(checkbox).toContain('inputRef.current.indeterminate');
+    expect(checkbox).toContain('<Check size={15} strokeWidth={3.25} />');
+    expect(checkbox).toContain('<Minus size={15} strokeWidth={3.25} />');
     expect(operations).toContain('label="Select all visible trips"');
+  });
+
+  it('keeps desktop trip editing full-width and out of fixed ledger cells', () => {
+    const operations = read('src/components/OperationsCommandCenter.jsx');
+    expect(operations).toContain('className="operations-trip-ledger w-full table-fixed text-xs"');
+    expect(operations).toContain('<col className="w-11" />');
+    expect(operations).toContain('<tr data-agape-detail-row="true" className="border-t border-blue-200 bg-blue-50/40">');
+    expect(operations).toContain('{renderInlineTripCard(trip)}');
+    expect(operations).not.toContain('const inlineCellClass');
+    expect(operations).not.toContain('setTimeout(() => setSortKeyOverrides');
   });
 
   it('records the no-parallel-implementation cleanup rule for future work', () => {

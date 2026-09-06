@@ -893,7 +893,7 @@ input[type="checkbox"] {
   background-color: #ffffff;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: 0.78rem 0.78rem;
+  background-size: 0.9rem 0.9rem;
   cursor: pointer;
   vertical-align: middle;
 }
@@ -919,10 +919,16 @@ table thead input[type="checkbox"] {
   border-color: rgba(255, 255, 255, 0.9) !important;
 }
 
-table th input[type="checkbox"],
-table td input[type="checkbox"] {
+table th > input[type="checkbox"],
+table td > input[type="checkbox"] {
   display: block;
   margin-inline: auto;
+}
+
+/* TableCheckbox supplies its own code-rendered state so the mark cannot be
+   cropped by a narrow fixed-layout table cell or a browser-native glyph. */
+table .peer[type="checkbox"] {
+  background-image: none !important;
 }
 
 /* ===== RESIZABLE TABLE COLUMNS ===== */
