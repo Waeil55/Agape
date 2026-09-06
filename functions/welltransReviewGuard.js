@@ -58,7 +58,7 @@ function evaluateWellTransReviewBatch({
   manifest = {},
   logs = [],
   nowMs = Date.now(),
-  minimumWorkerVersion = "5.0.6",
+  minimumWorkerVersion = "5.0.7",
   maxHeartbeatAgeMs = 60_000,
 }) {
   const blockers = [];

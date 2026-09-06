@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $ConfirmPreference = 'None'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Security
-$agentVersion = '5.0.6'
+$agentVersion = '5.0.7'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'
@@ -19,6 +19,45 @@ $runtimeRoot = Join-Path $installRoot 'runtime'
 $nodeRoot = Join-Path $runtimeRoot 'node'
 $nodeExecutable = Join-Path $nodeRoot 'node.exe'
 $workerLockPath = Join-Path $secretRoot 'welltrans-worker.pid'
+$agentRuntimeRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\Runtime'
+$settingsHostPidPath = Join-Path $agentRuntimeRoot 'welltrans-settings-host.pid'
+$settingsHostWasRunning = $false
+$installSucceeded = $false
+
+function Stop-AgapeWellTransSettingsHost {
+  if (-not (Test-Path -LiteralPath $settingsHostPidPath)) { return $false }
+  $settingsHostPid = 0
+  [void][int]::TryParse((Get-Content -LiteralPath $settingsHostPidPath -Raw).Trim(), [ref]$settingsHostPid)
+  $settingsHostCommand = if ($settingsHostPid -gt 0) {
+    Get-CimInstance Win32_Process -Filter "ProcessId=$settingsHostPid" -ErrorAction SilentlyContinue
+  } else { $null }
+  $expectedEntry = [Regex]::Escape((Join-Path $installRoot 'src\welltrans.settings-host.js'))
+  if ($settingsHostCommand -and
+      $settingsHostCommand.Name -eq 'node.exe' -and
+      $settingsHostCommand.CommandLine -match $expectedEntry) {
+    Stop-Process -Id $settingsHostPid -Force -ErrorAction SilentlyContinue
+    try { Wait-Process -Id $settingsHostPid -Timeout 5 -ErrorAction SilentlyContinue } catch {}
+    Remove-Item -LiteralPath $settingsHostPidPath -Force -ErrorAction SilentlyContinue
+    return $true
+  }
+  Remove-Item -LiteralPath $settingsHostPidPath -Force -ErrorAction SilentlyContinue
+  return $false
+}
+
+function Start-AgapeWellTransSettingsHost {
+  $settingsHostEntry = Join-Path $installRoot 'src\welltrans.settings-host.js'
+  if (-not (Test-Path -LiteralPath $nodeExecutable) -or
+      -not (Test-Path -LiteralPath $settingsHostEntry)) { return }
+  New-Item -ItemType Directory -Path $agentRuntimeRoot -Force | Out-Null
+  $env:WELLTRANS_SESSION_KEY = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_KEY', 'User')
+  $env:WELLTRANS_CREDENTIAL_FILE = Join-Path $secretRoot 'welltrans-login.vault'
+  $env:AGAPE_LOCAL_SETTINGS_PORT = '43127'
+  $env:AGAPE_LOCAL_SETTINGS_ORIGINS = 'https://agape5.web.app'
+  if (-not $env:WELLTRANS_SESSION_KEY) { return }
+  $settingsHostProcess = Start-Process -FilePath $nodeExecutable `
+    -ArgumentList "`"$settingsHostEntry`"" -WindowStyle Hidden -PassThru
+  Set-Content -LiteralPath $settingsHostPidPath -Value $settingsHostProcess.Id -NoNewline
+}
 
 New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $secretRoot -Force | Out-Null
@@ -58,6 +97,10 @@ try {
     }
     Remove-Item -LiteralPath $workerLockPath -Force -ErrorAction SilentlyContinue
   }
+  # The local settings service loads dependencies from this installation.
+  # Stop only the PID whose command line exactly matches this Agent before
+  # npm replaces node_modules, then restart the upgraded service on success.
+  $settingsHostWasRunning = Stop-AgapeWellTransSettingsHost
   [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
   foreach ($directory in @('src', 'launcher')) {
     $source = Join-Path $sourceRoot $directory
@@ -192,7 +235,11 @@ try {
   }
 
   Push-Location $installRoot
+  $previousProcessPath = $env:Path
   try {
+    # npm.cmd invokes package postinstall scripts through `node`; make the
+    # bundled runtime discoverable even when Node is absent from system PATH.
+    $env:Path = "$nodeRoot;$previousProcessPath"
     & $npmExecutable ci --omit=dev --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw "npm installation failed with code $LASTEXITCODE." }
     if (-not $SkipBrowserInstall) {
@@ -200,6 +247,7 @@ try {
       if ($LASTEXITCODE -ne 0) { throw "Chromium installation failed with code $LASTEXITCODE." }
     }
   } finally {
+    $env:Path = $previousProcessPath
     Pop-Location
   }
 
@@ -216,7 +264,13 @@ try {
 
   Set-Content -LiteralPath (Join-Path $installRoot 'VERSION') -Value $agentVersion -NoNewline
   & icacls.exe $secretRoot /inheritance:r /grant:r "$env:USERNAME`:(OI)(CI)F" | Out-Null
+  $installSucceeded = $true
+  Start-AgapeWellTransSettingsHost
   Write-Host "Agape WellTrans Agent $agentVersion installed successfully." -ForegroundColor Green
 } finally {
+  if ($installSucceeded -and $settingsHostWasRunning -and
+      -not (Test-Path -LiteralPath $settingsHostPidPath)) {
+    Start-AgapeWellTransSettingsHost
+  }
   Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
 }

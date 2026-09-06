@@ -7,6 +7,46 @@ $agentDataRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare'
 $rollbackRoot = Join-Path $agentDataRoot 'WellTransAgentRollback'
 $pendingPath = Join-Path $agentDataRoot 'welltrans-update-pending.json'
 $activeBackupPath = $null
+$settingsRuntimeRoot = Join-Path $agentDataRoot 'Runtime'
+$settingsHostPidPath = Join-Path $settingsRuntimeRoot 'welltrans-settings-host.pid'
+$settingsHostWasRunning = $false
+
+function Stop-AgapeWellTransSettingsHost {
+  if (-not (Test-Path -LiteralPath $settingsHostPidPath)) { return $false }
+  $settingsHostPid = 0
+  [void][int]::TryParse((Get-Content -LiteralPath $settingsHostPidPath -Raw).Trim(), [ref]$settingsHostPid)
+  $settingsHostCommand = if ($settingsHostPid -gt 0) {
+    Get-CimInstance Win32_Process -Filter "ProcessId=$settingsHostPid" -ErrorAction SilentlyContinue
+  } else { $null }
+  $expectedEntry = [Regex]::Escape((Join-Path $installRoot 'src\welltrans.settings-host.js'))
+  if ($settingsHostCommand -and
+      $settingsHostCommand.Name -eq 'node.exe' -and
+      $settingsHostCommand.CommandLine -match $expectedEntry) {
+    Stop-Process -Id $settingsHostPid -Force -ErrorAction SilentlyContinue
+    try { Wait-Process -Id $settingsHostPid -Timeout 5 -ErrorAction SilentlyContinue } catch {}
+    Remove-Item -LiteralPath $settingsHostPidPath -Force -ErrorAction SilentlyContinue
+    return $true
+  }
+  Remove-Item -LiteralPath $settingsHostPidPath -Force -ErrorAction SilentlyContinue
+  return $false
+}
+
+function Start-AgapeWellTransSettingsHost {
+  if (-not $settingsHostWasRunning -or (Test-Path -LiteralPath $settingsHostPidPath)) { return }
+  $nodeExecutable = Join-Path $installRoot 'runtime\node\node.exe'
+  $settingsHostEntry = Join-Path $installRoot 'src\welltrans.settings-host.js'
+  if (-not (Test-Path -LiteralPath $nodeExecutable) -or
+      -not (Test-Path -LiteralPath $settingsHostEntry)) { return }
+  New-Item -ItemType Directory -Path $settingsRuntimeRoot -Force | Out-Null
+  $env:WELLTRANS_SESSION_KEY = [Environment]::GetEnvironmentVariable('WELLTRANS_SESSION_KEY', 'User')
+  $env:WELLTRANS_CREDENTIAL_FILE = Join-Path $env:USERPROFILE 'AgapeSecrets\welltrans-login.vault'
+  $env:AGAPE_LOCAL_SETTINGS_PORT = '43127'
+  $env:AGAPE_LOCAL_SETTINGS_ORIGINS = 'https://agape5.web.app'
+  if (-not $env:WELLTRANS_SESSION_KEY) { return }
+  $settingsHostProcess = Start-Process -FilePath $nodeExecutable `
+    -ArgumentList "`"$settingsHostEntry`"" -WindowStyle Hidden -PassThru
+  Set-Content -LiteralPath $settingsHostPidPath -Value $settingsHostProcess.Id -NoNewline
+}
 
 if (Test-Path -LiteralPath $pendingPath) {
   $pending = Get-Content -LiteralPath $pendingPath -Raw | ConvertFrom-Json
@@ -71,6 +111,10 @@ try {
   if (-not (Test-Path -LiteralPath $installer)) {
     throw 'Agape agent update does not contain an installer.'
   }
+
+  # The settings service has loaded modules under node_modules. Stop only the
+  # validated process for this installation before npm replaces dependencies.
+  $settingsHostWasRunning = Stop-AgapeWellTransSettingsHost
 
   New-Item -ItemType Directory -Path $rollbackRoot -Force | Out-Null
   if (Test-Path -LiteralPath $backupPath) {
@@ -142,11 +186,15 @@ try {
         }
       }
       $npmExecutable = Join-Path $installRoot 'runtime\node\npm.cmd'
+      $nodeRoot = Join-Path $installRoot 'runtime\node'
       if (Test-Path -LiteralPath $npmExecutable) {
         Push-Location $installRoot
+        $previousProcessPath = $env:Path
         try {
+          $env:Path = "$nodeRoot;$previousProcessPath"
           & $npmExecutable ci --omit=dev --no-audit --no-fund
         } finally {
+          $env:Path = $previousProcessPath
           Pop-Location
         }
       }
@@ -155,6 +203,7 @@ try {
   }
   throw "Agent update failed and the previous release was restored: $updateFailure"
 } finally {
+  Start-AgapeWellTransSettingsHost
   if (Test-Path -LiteralPath $updateRoot) {
     $resolvedUpdateRoot = (Resolve-Path -LiteralPath $updateRoot).Path
     $resolvedTemp = (Resolve-Path -LiteralPath $env:TEMP).Path

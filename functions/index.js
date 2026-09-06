@@ -1911,7 +1911,7 @@ exports.confirmWellTransReviewBatchApplied = functions
       manifest,
       logs,
       nowMs: Date.now(),
-      minimumWorkerVersion: "5.0.6",
+      minimumWorkerVersion: "5.0.7",
     });
     if (!reviewGuard.ready) {
       throw new functions.https.HttpsError(
