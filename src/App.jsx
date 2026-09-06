@@ -1910,6 +1910,32 @@ const App = () => {
     }
     const prevTrip = trips.find(t => t.id === updatedTrip.id) || null;
     let nextTripState = { ...updatedTrip };
+
+    // Normalize status to canonical PascalCase to prevent case-sensitive filter mismatches.
+    // Without this, a manual Firestore edit or import with 'completed' or 'COMPLETED' would
+    // be invisible under the 'Completed' filter in DesktopReportsPage and TripsPage.
+    if (nextTripState.status) {
+      const raw = String(nextTripState.status).trim();
+      const lower = raw.toLowerCase();
+      const STATUS_CANONICAL = {
+        'unassigned': 'Unassigned',
+        'assigned': 'Assigned',
+        'in progress': 'In Progress',
+        'navigating pickup': 'Navigating Pickup',
+        'at pickup': 'At Pickup',
+        'in transit': 'In Transit',
+        'at dropoff': 'At Dropoff',
+        'completed': 'Completed',
+        'no show': 'No Show',
+        'cancelled': 'Cancelled',
+        'canceled': 'Cancelled',
+        'rerouted': 'Rerouted',
+      };
+      const canonical = STATUS_CANONICAL[lower];
+      if (canonical && raw !== canonical) {
+        nextTripState.status = canonical;
+      }
+    }
     if (nextTripState.driverId) {
       const driver = drivers.find(d => d.id === nextTripState.driverId);
       if (driver) {
@@ -2366,7 +2392,7 @@ const App = () => {
     const trip = trips.find(t => t.id === tripId);
     if (!trip) return;
     // Idempotency: a duplicated completion call must never double-write.
-    if (trip.status === 'Completed' && trip.completedAt) return;
+    if (String(trip.status || '').toLowerCase() === 'completed' && trip.completedAt) return;
     if (!trip?.pickupOdometer || !trip?.arrivalTime || !trip?.departedPickupTime || !trip?.arrivalDropoffTime || (!trip?.paperSignatureConfirmed && !trip?.unableToSign)) {
       addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${trip?.patient || tripId} before all required steps were finished.`, 'rose');
       return;
@@ -2756,23 +2782,33 @@ const App = () => {
   };
 
   const handleDriverTripUpdate = useCallback((tripId, status, extraData = {}) => {
+    // Normalize status to canonical PascalCase to prevent case-sensitive filter mismatches.
+    const raw = String(status || '').trim();
+    const lower = raw.toLowerCase();
+    const STATUS_CANONICAL = {
+      'unassigned': 'Unassigned', 'assigned': 'Assigned', 'in progress': 'In Progress',
+      'navigating pickup': 'Navigating Pickup', 'at pickup': 'At Pickup',
+      'in transit': 'In Transit', 'at dropoff': 'At Dropoff', 'completed': 'Completed',
+      'no show': 'No Show', 'cancelled': 'Cancelled', 'canceled': 'Cancelled', 'rerouted': 'Rerouted',
+    };
+    const normalizedStatus = STATUS_CANONICAL[lower] || status;
     const previousTrip = trips.find((trip) => trip.id === tripId);
     if (role === 'driver') {
-      void upsertDriverTrip(tripId, { status, ...extraData });
+      void upsertDriverTrip(tripId, { status: normalizedStatus, ...extraData });
     } else {
       void setTrips((previous) => previous.map((trip) => (
-        trip.id === tripId ? { ...trip, status, ...extraData } : trip
+        trip.id === tripId ? { ...trip, status: normalizedStatus, ...extraData } : trip
       )));
     }
     if (!previousTrip) return;
-    const nextTrip = { ...previousTrip, status, ...extraData };
+    const nextTrip = { ...previousTrip, status: normalizedStatus, ...extraData };
     const diffs = Object.keys(nextTrip)
       .filter((key) => String(previousTrip[key]) !== String(nextTrip[key]))
       .map((key) => ({ field: key, before: previousTrip[key], after: nextTrip[key] }));
     if (diffs.length === 0) return;
     addAuditLog(
       'Driver Update',
-      `${currentUser} updated trip ${tripId} (${previousTrip.patient || 'Unknown'}) to ${status}`,
+      `${currentUser} updated trip ${tripId} (${previousTrip.patient || 'Unknown'}) to ${normalizedStatus}`,
       'blue',
       {
         entity: 'trip', id: tripId, diffs,

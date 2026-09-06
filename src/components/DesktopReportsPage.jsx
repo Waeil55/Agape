@@ -416,7 +416,7 @@ const DesktopReportsPage = ({
     return trips
       .filter((trip) => allDates || tripCalendarDateKey(trip.date) === dateStr)
       .filter((trip) => {
-        if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
+        if (statusFilter !== 'all' && String(trip.status || '').trim().toLowerCase() !== statusFilter.toLowerCase()) return false;
         if (driverFilter !== 'all' && trip.driverId !== driverFilter) return false;
         if (reviewFilter === 'reviewed' && !trip.reviewed) return false;
         if (reviewFilter === 'pending' && trip.reviewed) return false;
@@ -442,9 +442,9 @@ const DesktopReportsPage = ({
 
   const summary = useMemo(() => {
     const reviewed = reportRows.filter(({ trip }) => trip.reviewed).length;
-    const done = reportRows.filter(({ trip }) => trip.status === 'Completed').length;
-    const noShow = reportRows.filter(({ trip }) => trip.status === 'No Show').length;
-    const cancelled = reportRows.filter(({ trip }) => trip.status === 'Cancelled').length;
+    const done = reportRows.filter(({ trip }) => String(trip.status || '').toLowerCase() === 'completed').length;
+    const noShow = reportRows.filter(({ trip }) => String(trip.status || '').toLowerCase() === 'no show').length;
+    const cancelled = reportRows.filter(({ trip }) => String(trip.status || '').toLowerCase() === 'cancelled' || String(trip.status || '').toLowerCase() === 'canceled').length;
     const distance = reportRows.reduce((sum, row) => {
       const miles = Number(calcMiles(row.trip));
       return Number.isFinite(miles) ? sum + miles : sum;

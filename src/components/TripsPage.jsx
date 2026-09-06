@@ -140,7 +140,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const filteredTrips = useMemo(() => [...trips]
     .filter(t => showAllDates || tripMatchesCalendarDay(t.date, manifestDate))
     .filter((trip) => {
-      if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
+      if (statusFilter !== 'all' && String(trip.status || '').trim().toLowerCase() !== statusFilter.toLowerCase()) return false;
       if (driverFilter === 'unassigned' && trip.driverId) return false;
       if (driverFilter !== 'all' && driverFilter !== 'unassigned' && trip.driverId !== driverFilter) return false;
       if (serviceFilter !== 'all' && (trip.type || trip.serviceType || '') !== serviceFilter) return false;
@@ -559,7 +559,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
               <option value="Assigned">Assigned</option>
               <option value="In Progress">In Progress</option>
               <option value="Completed">Completed</option>
+              <option value="No Show">No Show</option>
               <option value="Cancelled">Cancelled</option>
+              <option value="Rerouted">Rerouted</option>
             </select>
           </div>
           <div>
