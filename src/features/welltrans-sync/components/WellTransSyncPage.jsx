@@ -681,60 +681,63 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
-  // Derive weekday label and relative day hint for the date navigation display.
-  const syncDateObj = (() => { try { return new Date(`${syncDate}T12:00:00`); } catch { return null; } })();
-  const syncDateWeekday = syncDateObj ? syncDateObj.toLocaleDateString('en-US', { weekday: 'short' }) : '';
-  const syncDateMonthDay = syncDateObj ? syncDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : syncDate;
   const todayStr = new Date().toLocaleDateString('en-CA');
-  const dayDiff = syncDateObj ? Math.round((syncDateObj - new Date(`${todayStr}T12:00:00`)) / 86_400_000) : null;
-  const dayHint = dayDiff === 0 ? 'Today' : dayDiff === -1 ? 'Yesterday' : dayDiff === 1 ? 'Tomorrow' : dayDiff != null ? `${Math.abs(dayDiff)}d ${dayDiff < 0 ? 'ago' : 'ahead'}` : '';
-
   const coveragePct = Math.min(100, healthScore);
   const coverageBarColor = coverage.coverageComplete ? 'bg-emerald-500' : coveragePct >= 75 ? 'bg-amber-400' : 'bg-rose-500';
+  const issueCount = failedLogs.length + Number(coverage.invalid || 0);
+  const agentHealth = worker?.agentV5 || worker?.agentV4;
+  const portalHealthy = workerHealthy && canaryHealthy && agentHealth?.healthy !== false;
+  const portalStatusLabel = agentHealth?.healthy === false
+    ? 'Agent needs attention'
+    : workerStatusLabel === 'Online'
+      ? (canaryHealthy ? 'Portal ready' : 'Portal verification needed')
+      : workerStatusLabel;
+  const portalStatusTitle = [
+    agentHealth ? `Agent ${agentHealth.healthy ? 'healthy' : 'needs attention'}` : 'Agent status unavailable',
+    `Portal contract ${canaryHealthy ? 'verified' : 'not verified'}`,
+    workerStatusLabel,
+  ].join(' · ');
 
   return (
     <div ref={pageRef} className="flex flex-col h-full min-h-0 overflow-hidden" tabIndex={-1}>
 
-      {/* ═══ ROW 1 — Brand + Date Navigation + Live Stats + Agent Status ═══ */}
+      {/* One compact, authoritative toolbar. Counts and status are not repeated. */}
       <div className="shrink-0 border-b border-slate-200 bg-white shadow-sm">
-        <div className="app-filter-bar gap-y-2 px-3 py-2">
-
-          {/* Brand pill */}
-          <div className="flex shrink-0 h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-[11px] font-black text-white mr-3">
+        <div
+          data-testid="welltrans-toolbar"
+          className="app-filter-bar !flex-nowrap gap-1.5 px-2 py-1.5"
+        >
+          <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-2.5 text-[10px] font-bold text-white">
             <Sparkles size={12} className="text-blue-300" />
             <span className="tracking-wider">PORTAL COMPLETION</span>
           </div>
 
-          {/* Date navigator */}
-          <div className="flex shrink-0 items-center gap-1 mr-3">
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-0.5">
             <button
               onClick={() => navigateDate(-1)}
               title="Previous day (←)"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition"
+              aria-label="Previous service date"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white hover:text-slate-800"
             >
               <ChevronLeft size={14} />
             </button>
-            <div className="flex flex-col items-center rounded-lg border border-slate-300 bg-slate-50 px-2 py-0.5 min-w-[120px]">
-              <input
-                type="date"
-                value={syncDate}
-                disabled={Boolean(busy)}
-                onChange={event => changeSyncDate(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === 'ArrowLeft') { event.preventDefault(); navigateDate(-1); }
-                  if (event.key === 'ArrowRight') { event.preventDefault(); navigateDate(1); }
-                }}
-                aria-label="Service date"
-                className="w-[105px] bg-transparent text-[11px] font-bold text-slate-900 outline-none cursor-pointer disabled:cursor-not-allowed"
-              />
-              <span className="text-[9px] font-semibold text-slate-500 leading-none">
-                {syncDateWeekday && `${syncDateWeekday}, ${syncDateMonthDay}`}
-              </span>
-            </div>
+            <input
+              type="date"
+              value={syncDate}
+              disabled={Boolean(busy)}
+              onChange={event => changeSyncDate(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'ArrowLeft') { event.preventDefault(); navigateDate(-1); }
+                if (event.key === 'ArrowRight') { event.preventDefault(); navigateDate(1); }
+              }}
+              aria-label="Service date"
+              className="h-7 w-[112px] bg-transparent px-1 text-[10px] font-bold text-slate-900 outline-none disabled:cursor-not-allowed"
+            />
             <button
               onClick={() => navigateDate(1)}
               title="Next day (→)"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition"
+              aria-label="Next service date"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white hover:text-slate-800"
             >
               <ChevronRight size={14} />
             </button>
@@ -742,88 +745,50 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
               <button
                 onClick={() => changeSyncDate(todayStr)}
                 title="Go to today"
-                className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition"
+                className="h-7 rounded-lg bg-blue-50 px-2 text-[9px] font-bold text-blue-700 transition hover:bg-blue-100"
               >
                 Today
               </button>
             )}
-            {dayHint && dayHint !== 'Today' && (
-              <span className="text-[9px] font-semibold text-slate-400 ml-0.5">{dayHint}</span>
-            )}
           </div>
 
-          {/* Coverage progress */}
-          <div className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 mr-3 min-w-[130px]">
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Coverage</span>
-                <span className={`text-[10px] font-black ${coverage.coverageComplete ? 'text-emerald-600' : coveragePct >= 75 ? 'text-amber-600' : 'text-rose-600'}`}>
-                  {coveragePct}%
-                </span>
-              </div>
-              <div className="h-1 w-full rounded-full bg-slate-200 overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-500 ${coverageBarColor}`} style={{ width: `${coveragePct}%` }} />
-              </div>
-              <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[8px] text-slate-400">{successfulCount} verified</span>
-                <span className="text-[8px] text-slate-400">{completedTrips.length} total</span>
-              </div>
+          <div
+            className="flex h-8 min-w-0 shrink items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2"
+            title={`Coverage ${coveragePct}% — ${successfulCount} of ${completedTrips.length} verified`}
+          >
+            <BarChart3 size={11} className="shrink-0 text-slate-400" />
+            <strong className={`text-[11px] ${coverage.coverageComplete ? 'text-emerald-600' : coveragePct >= 75 ? 'text-amber-600' : 'text-rose-600'}`}>
+              {coveragePct}%
+            </strong>
+            <span className="text-[9px] font-semibold text-slate-600">{successfulCount}/{completedTrips.length} verified</span>
+            <div className="h-1 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200">
+              <div className={`h-full rounded-full transition-all duration-500 ${coverageBarColor}`} style={{ width: `${coveragePct}%` }} />
             </div>
+            {stagedCount > 0 && <span className="text-[9px] font-bold text-purple-700">{stagedCount} review</span>}
+            {issueCount > 0 && <span className="text-[9px] font-bold text-rose-700">{issueCount} issues</span>}
           </div>
 
-          {/* Live stats chips */}
-          <div className="flex shrink-0 items-center gap-1.5 mr-3">
-            {[
-              { label: 'Trips', value: completedTrips.length, tone: 'text-slate-900', bg: 'bg-slate-50 border-slate-200' },
-              { label: 'Review', value: stagedCount, tone: 'text-purple-700', bg: stagedCount > 0 ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200' },
-              { label: 'Verified', value: successfulCount, tone: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
-              { label: 'Issues', value: failedLogs.length + coverage.invalid, tone: 'text-rose-700', bg: failedLogs.length + coverage.invalid > 0 ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200' },
-            ].map(({ label, value, tone, bg }) => (
-              <div key={label} className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] text-slate-400 ${bg}`}>
-                <strong className={`text-[12px] font-black ${tone}`}>{value}</strong>
-                <span className="font-medium">{label}</span>
-              </div>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowInstallHelp(true)}
+            title={`${portalStatusTitle} — open agent setup`}
+            className={`flex h-8 min-w-0 shrink items-center gap-1.5 rounded-xl border px-2 text-[9px] font-bold transition ${
+              portalHealthy
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+            }`}
+          >
+            <ShieldCheck size={11} className="shrink-0" />
+            <span className="max-w-[132px] truncate">{portalStatusLabel}</span>
+          </button>
 
-          {/* Agent status */}
-          <div className="flex shrink-0 items-center gap-1.5 ml-auto">
-            {(worker?.agentV5 || worker?.agentV4) && (
-              <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${
-                (worker.agentV5 || worker.agentV4).healthy ? 'border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-rose-200 bg-rose-50 text-rose-800'
-              }`} title={`${(worker.agentV5 || worker.agentV4).components?.length || 0} components`}>
-                <Bot size={10} /> V5 {(worker.agentV5 || worker.agentV4).healthy ? 'ok' : '!'}
-              </div>
-            )}
-            <div className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[9px] font-semibold ${canaryHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-              <ShieldCheck size={10} /> {canaryHealthy ? 'Portal ✓' : 'Portal?'}
-            </div>
-            <div className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-bold ${
-              workerHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'
-            }`} title={workerStatusLabel}>
-              <span className={`h-1.5 w-1.5 rounded-full ${workerHealthy ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-              <span className="max-w-[130px] truncate">{workerStatusLabel}</span>
-            </div>
-            <button type="button" onClick={() => setShowInstallHelp(true)} title="Agent setup and download"
-              className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-500 hover:border-blue-300 hover:text-blue-700 transition">
-              <Download size={11} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ═══ ROW 2 — Action Bar ═══ */}
-      <div className="shrink-0 border-b border-slate-100 bg-slate-50/80">
-        <div className="app-filter-bar gap-1.5 px-3 py-1.5">
-
-          {/* Driver scope */}
           <select value={driverScopeId} disabled={stagedCount > 0 || Boolean(busy)} onChange={event => {
             setDriverScopeId(event.target.value);
             setSelectedIds([]);
             setQueuePage(0);
           }} aria-label="Choose drivers to fill"
             title="Fill every driver or isolate one authoritative driver batch"
-            className="h-7 max-w-[220px] rounded-md border border-indigo-200 bg-indigo-50 px-2 text-[10px] font-bold text-indigo-800 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">
+            className="h-8 w-[clamp(112px,11vw,180px)] min-w-0 rounded-xl border border-indigo-200 bg-indigo-50 px-2 text-[9px] font-bold text-indigo-800 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">
             <option value="all">All drivers ({allCompletedTrips.length})</option>
             {driverScopes.map(item => (
               <option key={item.id} value={item.id}>
@@ -832,32 +797,29 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             ))}
           </select>
 
-          {/* Primary: Fill */}
           <button disabled={!settings.enabled || Boolean(busy)} onClick={startAndFillDate}
-            className="h-7 rounded-md bg-blue-600 px-3 text-[10px] font-bold text-white hover:bg-blue-700 disabled:opacity-40 transition flex items-center gap-1">
+            title={selectedDriverScope ? `Fill ${selectedDriverScope.name}` : 'Fill all drivers'}
+            className="flex h-8 shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-2.5 text-[9px] font-bold text-white transition hover:bg-blue-700 disabled:opacity-40">
             {busy === 'start-fill' ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
-            Fill {selectedDriverScope ? selectedDriverScope.name : 'All'} ({completedTrips.length})
+            Fill {selectedDriverScope ? 'Driver' : 'All'} ({completedTrips.length})
           </button>
 
-          {/* Confirm Applied */}
           {stagedCount > 0 && (
             <button disabled={!workerBatchReady || Boolean(busy)} onClick={confirmReviewBatchApplied}
-              className="h-7 rounded-md border border-purple-300 bg-purple-600 px-2.5 text-[10px] font-bold text-white hover:bg-purple-700 disabled:opacity-40 transition flex items-center gap-1">
+              className="flex h-8 shrink-0 items-center gap-1 rounded-xl border border-purple-300 bg-purple-600 px-2 text-[9px] font-bold text-white transition hover:bg-purple-700 disabled:opacity-40">
               <CheckCircle2 size={10} /> Confirm Applied ({stagedCount})
             </button>
           )}
 
-          {/* Sync selected */}
-          <button disabled={!selectedIds.length || !settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
-            className="h-7 rounded-md border border-blue-200 bg-blue-50 px-2.5 text-[10px] font-semibold text-blue-700 disabled:opacity-40 transition">
-            Sync Selected ({selectedIds.length})
-          </button>
+          {selectedIds.length > 0 && (
+            <button disabled={!settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
+              className="h-8 shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-2 text-[9px] font-bold text-blue-700 transition disabled:opacity-40">
+              Sync ({selectedIds.length})
+            </button>
+          )}
 
-          <div className="h-5 w-px bg-slate-300 mx-0.5" />
-
-          {/* Bulk select */}
           <select aria-label="Select trips" defaultValue="" onChange={event => { if (event.target.value) handleBulkSelect(event.target.value); event.target.value = ''; }}
-            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
+            className="h-8 w-[76px] shrink-0 rounded-xl border border-slate-200 bg-white px-1.5 text-[9px] font-semibold text-slate-600 outline-none">
             <option value="" disabled>Select…</option>
             <option value="ready">All ready ({readyTrips.length})</option>
             <option value="failed">All failed ({failedLogs.length})</option>
@@ -865,44 +827,47 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             <option value="none">Clear selection</option>
           </select>
 
-          {/* Retry */}
-          <button disabled={!workerDateMatches || !retryableFailed.length || Boolean(busy)} onClick={() => runQueue(retryableFailed.map(log => log.tripId), 'retry')}
-            className="h-7 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-semibold text-amber-700 disabled:opacity-40 transition flex items-center gap-1">
-            <RefreshCw size={10} /> Retry ({retryableFailed.length})
-          </button>
-
-          {/* Export */}
-          <button onClick={exportAllTripsCSV} className="h-7 rounded-md border border-emerald-200 bg-white px-2.5 text-[10px] font-semibold text-slate-600 hover:bg-emerald-50 transition flex items-center gap-1">
-            <Download size={10} /> Export
-          </button>
-
-          <div className="h-5 w-px bg-slate-300 mx-0.5" />
-
-          {/* Tab switcher */}
-          {[
-            ['queue', `Trips (${completedTrips.length})`],
-            ['logs', `History (${currentLogs.length})`],
-            ['settings', 'Settings'],
-          ].map(([id, label]) => (
-            <button key={id} onClick={() => {
-              if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
-              setTab(id);
-            }} className={`h-7 rounded-md px-2.5 text-[10px] font-semibold transition ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>
-              {label}
+          {retryableFailed.length > 0 && (
+            <button disabled={!workerDateMatches || Boolean(busy)} onClick={() => runQueue(retryableFailed.map(log => log.tripId), 'retry')}
+              className="flex h-8 shrink-0 items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-[9px] font-bold text-amber-700 transition disabled:opacity-40">
+              <RefreshCw size={10} /> Retry ({retryableFailed.length})
             </button>
-          ))}
+          )}
 
-          {/* Search + filter — only on queue tab */}
+          <button
+            onClick={exportAllTripsCSV}
+            title="Export current trips"
+            aria-label="Export current trips"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-white text-slate-600 transition hover:bg-emerald-50"
+          >
+            <Download size={11} />
+          </button>
+
+          <div className="flex h-8 shrink-0 items-center rounded-xl bg-slate-100 p-0.5">
+            {[
+              ['queue', 'Trips'],
+              ['logs', 'History'],
+              ['settings', 'Settings'],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => {
+                if (id === 'settings' && !draftSettings) setDraftSettings({ ...settings, fieldMapping: { ...settings.fieldMapping } });
+                setTab(id);
+              }} aria-pressed={tab === id} className={`h-7 rounded-lg px-2 text-[9px] font-semibold transition ${tab === id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           {tab === 'queue' && (
             <>
-              <div className="h-5 w-px bg-slate-300 mx-0.5" />
-              <div className="relative">
+              <div className="relative min-w-[84px] flex-1">
                 <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input type="text" placeholder="Search trips…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
-                  className="h-7 w-36 rounded-md border border-slate-200 bg-white pl-6 pr-2 text-[10px] outline-none focus:border-blue-400" />
+                  className="h-8 w-full rounded-xl border border-slate-200 bg-white pl-6 pr-2 text-[9px] outline-none focus:border-blue-400" />
               </div>
               <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}
-                className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none">
+                aria-label="Filter portal trips"
+                className="h-8 w-[82px] shrink-0 rounded-xl border border-slate-200 bg-white px-1.5 text-[9px] font-semibold text-slate-600 outline-none">
                 <option value="all">All trips</option>
                 <option value="ready">Not queued</option>
                 <option value="staged">Review</option>

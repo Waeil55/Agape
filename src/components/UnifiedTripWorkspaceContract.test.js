@@ -39,7 +39,9 @@ describe('unified trip workspace information architecture', () => {
     expect(mobileMenu).not.toContain("id: 'archives'");
     expect(mobileMenu).not.toContain("id: 'welltrans'");
     expect(portal).toContain('PORTAL COMPLETION');
-    expect(portal).toContain('app-filter-bar gap-y-2 px-3 py-2');
+    expect(portal).toContain('data-testid="welltrans-toolbar"');
+    expect(portal).toContain('app-filter-bar !flex-nowrap');
+    expect(portal.match(/app-filter-bar/g)).toHaveLength(1);
   });
 
   it('preserves backward navigation without exposing duplicate destinations', () => {

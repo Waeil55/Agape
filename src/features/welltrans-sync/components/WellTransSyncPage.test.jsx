@@ -122,7 +122,12 @@ describe('WellTransSyncPage', () => {
 
     await Promise.resolve();
 
-    expect(container.textContent).toContain('Trips (1)');
+    expect(container.querySelectorAll('[data-testid="welltrans-toolbar"]')).toHaveLength(1);
+    expect(container.querySelector('[data-testid="welltrans-toolbar"]')?.className).toContain('!flex-nowrap');
+    expect(container.textContent).toContain('0/1 verified');
+    expect(container.textContent).not.toContain('1 total');
+    expect(container.textContent).not.toContain('0 Review');
+    expect(container.textContent).not.toContain('0 Issues');
     expect(container.textContent).toContain('107485530');
     expect(container.textContent).toContain('Test Driver');
   });

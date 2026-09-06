@@ -2834,7 +2834,7 @@ const App = () => {
 
     return (
       <div className="agape-login flex-1 relative overflow-y-auto px-4 py-6" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
-        <div className="agape-login-backdrop absolute inset-0" aria-hidden="true" />
+        <div className="agape-login-backdrop absolute inset-0 pointer-events-none" aria-hidden="true" />
         <div className="agape-login-stage relative z-10 mx-auto grid min-h-full w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="agape-login-mobile-intro lg:hidden">
             <div className="agape-login-live-pill">
@@ -2947,7 +2947,14 @@ const App = () => {
                 </div>
               </div>
 
-              {loginError && <p className={`text-sm font-semibold text-center mt-2 p-3 rounded-lg border ${loginError.toLowerCase().includes('sent') ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>{loginError}</p>}
+              {loginError && (
+                <div className="mt-3 p-4 rounded-xl border-2 border-rose-200 bg-rose-50 text-center animate-pulse-once">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <svg className="w-5 h-5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                    <p className="text-sm font-bold text-rose-700">{loginError}</p>
+                  </div>
+                </div>
+              )}
 
               <button type="submit" className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">Authorize Access</button>
 

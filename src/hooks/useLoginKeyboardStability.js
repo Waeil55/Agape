@@ -63,7 +63,12 @@ export default function useLoginKeyboardStability(enabled) {
 
     const handleFocusOut = () => {
       requestAnimationFrame(() => {
-        if (document.activeElement?.closest?.('.agape-login')) return;
+        const active = document.activeElement;
+        // Clear the keyboard lock when focus moves outside the login container,
+        // OR when it moves to a non-input element (e.g. the submit button).
+        // Without the second check, tapping "Authorize Access" keeps will-change
+        // transform on the login panel, which can break touch events on WebKit.
+        if (active?.closest?.('.agape-login') && active?.matches?.('input, textarea, select')) return;
         clearLock();
       });
     };
