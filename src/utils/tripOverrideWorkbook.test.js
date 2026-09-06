@@ -10,7 +10,7 @@ describe('trip override workbook', () => {
       clientName: 'Aaron King',
       legLabel: 'Before pickup', originCity: 'Carmel', destinationCity: 'Fishers',
       tripPickupCity: 'Indianapolis', tripDropoffCity: 'Carmel',
-      originalTripCost: 40, tripType: 'A', unloadedMiles: 25, unloadedRate: 0.8,
+      originalTripCost: 40, originalTripCostStatus: 'valid', originalTripCostReason: 'Verified fare', tripType: 'A', unloadedMiles: 25, unloadedRate: 0.8,
       unloadedAmount: 20, rawGapHours: 2.25, waitHours: 1.5, waitRate: 9,
       waitCost: 13.5, totalCost: 73.5, unloadedReason: 'Qualifying empty segment',
       waitReason: 'Billable time after threshold, rounded up to 30 min',
@@ -35,7 +35,9 @@ describe('trip override workbook', () => {
     expect(sheet['!cols']).toHaveLength(OVERRIDE_EXPORT_HEADERS.length);
     expect(sheet.H3.f).toBe('SUM(H2:H2)');
     expect(sheet.Q3.f).toBe('SUM(Q2:Q2)');
-    expect(sheet['!autofilter'].ref).toBe('A1:X2');
+    expect(sheet.Y2.v).toBe('Verified');
+    expect(sheet.Z2.v).toBe('Verified fare');
+    expect(sheet['!autofilter'].ref).toBe('A1:Z2');
 
     const serialized = writeTripOverrideWorkbook([{
       serviceDate: '2026-08-01', trip: { id: 't1' }, legLabel: 'Before pickup',
@@ -59,5 +61,20 @@ describe('trip override workbook', () => {
     expect(sheet.L2.f).toBe('0');
     expect(sheet.P2.f).toBe('0');
     expect(sheet.Q2.f).toBe('0');
+  });
+
+  it('exports unavailable base fares as labeled blanks instead of fake zero-dollar costs', () => {
+    const sheet = buildTripOverrideWorkbook([{
+      serviceDate: '2026-08-31', trip: { id: '107706395', bookingId: '107706395' },
+      legLabel: 'Before pickup', originCity: 'Indianapolis', destinationCity: 'Carmel',
+      originalTripCost: null, originalTripCostStatus: 'invalid',
+      originalTripCostReason: 'Original Trip Cost: non-currency text', originalTripCostIncluded: true,
+      tripType: 'A', unloadedMiles: 25, unloadedRate: 0.8, unloadedAmount: 20,
+      rawGapHours: 2, waitHours: 1, waitRate: 9, waitCost: 9, totalCost: 29,
+    }]).Sheets['Trip Cost Overrides'];
+    expect(sheet.H2).toBeUndefined();
+    expect(sheet.Q2.v).toBe(29);
+    expect(sheet.Y2.v).toBe('Invalid');
+    expect(sheet.Z2.v).toContain('non-currency');
   });
 });

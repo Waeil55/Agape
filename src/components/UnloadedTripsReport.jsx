@@ -21,6 +21,13 @@ const shiftDate = (value, days) => {
 };
 const money = (value) => Number(value || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const decimal = (value) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const originalCostLabel = (row) => {
+  if (row.originalTripCostStatus === 'valid') return money(row.originalTripCost);
+  if (row.originalTripCostStatus === 'invalid') return 'Invalid fare';
+  if (row.originalTripCostStatus === 'missing') return 'Not provided';
+  return '—';
+};
+const isIncompleteTotal = (row) => row.originalTripCostIncluded && row.originalTripCostStatus !== 'valid';
 const odometer = (value) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('en-US') : 'Missing';
 const text = (value) => String(value ?? '').trim();
 const dateTime = (value) => value instanceof Date && Number.isFinite(value.getTime())
@@ -46,7 +53,7 @@ const TABLE_COLUMNS = [
   ['A/W', 'Ambulatory or Wheelchair', '4%'],
   ['Empty mi', 'Billable Unloaded Miles', '7%'],
   ['Mileage', 'Mileage Override Amount', '8%'],
-  ['Wait hr', 'Billable Waiting Hours', '6%'],
+  ['Paid wait', 'Billable waiting hours after the threshold', '6%'],
   ['Wait cost', 'Waiting Cost', '7%'],
   ['Original', 'Original Trip Cost', '5%'],
   ['Total', 'Total Cost', '5%'],
@@ -154,12 +161,18 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
     driverNamesById,
   }), [candidateType, driverFilter, driverNamesById, gapFromCity, gapToCity, legType, minimumUnloaded, minimumWait, result.rows, search]);
 
-  const totals = useMemo(() => rows.reduce((sum, row) => ({
-    original: sum.original + row.originalTripCost,
-    unloaded: sum.unloaded + row.unloadedAmount,
-    waiting: sum.waiting + row.waitCost,
-    total: sum.total + row.totalCost,
-  }), { original: 0, unloaded: 0, waiting: 0, total: 0 }), [rows]);
+  const totals = useMemo(() => rows.reduce((sum, row) => {
+    const original = row.originalTripCostStatus === 'valid' ? Number(row.originalTripCost || 0) : 0;
+    return {
+      original: sum.original + original,
+      unloaded: sum.unloaded + Number(row.unloadedAmount || 0),
+      waiting: sum.waiting + Number(row.waitCost || 0),
+      missingFares: sum.missingFares + (row.originalTripCostIncluded && row.originalTripCostStatus === 'missing' ? 1 : 0),
+      invalidFares: sum.invalidFares + (row.originalTripCostIncluded && row.originalTripCostStatus === 'invalid' ? 1 : 0),
+    };
+  }, { original: 0, unloaded: 0, waiting: 0, missingFares: 0, invalidFares: 0 }), [rows]);
+  const knownSubtotal = totals.original + totals.unloaded + totals.waiting;
+  const incompleteFareCount = totals.missingFares + totals.invalidFares;
   const boundaryStatus = useMemo(() => {
     const activeIds = new Set(result.boundaryRequests.map((request) => request.id));
     return [...boundaryDistances].reduce((summary, [id, value]) => ({
@@ -357,10 +370,10 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
       <div className="shrink-0 px-3 py-2">
         <div className="app-summary-strip" aria-label="Override cost summary" data-testid="override-cost-summary">
           <div className="app-summary-metrics">
-            <span className="app-summary-item"><strong>{money(totals.original)}</strong> original</span>
+            <span className="app-summary-item"><strong>{money(totals.original)}</strong> known original</span>
             <span className="app-summary-item"><strong>{money(totals.unloaded)}</strong> mileage</span>
             <span className="app-summary-item"><strong>{money(totals.waiting)}</strong> waiting</span>
-            <span className="app-summary-item app-summary-item--accent"><strong>{money(totals.total)}</strong> total</span>
+            <span className="app-summary-item app-summary-item--accent"><strong>{money(knownSubtotal)}</strong> known subtotal</span>
           </div>
         </div>
       </div>
@@ -370,6 +383,13 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
           <span className="block truncate" title={`Unloaded miles must exceed ${result.policy.unloadedThresholdMiles} miles at ${money(result.policy.unloadedRate)} per mile. Waiting must exceed ${result.policy.waitingThresholdHours} hours; only time beyond the threshold is rounded up to ${result.policy.waitRoundingMinutes}-minute increments at ${money(result.policy.waitRate)} per hour.`}>
             Showing {rows.length} of {result.rows.length} evaluated gaps · {viewCounts.override || 0} override candidates · {viewCounts.review || 0} need data review · policy: empty miles &gt; {decimal(result.policy.unloadedThresholdMiles)} at {money(result.policy.unloadedRate)}/mi · wait &gt; {decimal(result.policy.waitingThresholdHours)} hr at {money(result.policy.waitRate)}/hr
           </span>
+        </div>
+      )}
+
+      {policyReady && incompleteFareCount > 0 && (
+        <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900" role="alert">
+          <AlertTriangle size={14} className="shrink-0" />
+          <span>{incompleteFareCount} Booking ID{incompleteFareCount === 1 ? '' : 's'} {incompleteFareCount === 1 ? 'has' : 'have'} an unavailable base fare ({totals.invalidFares} invalid, {totals.missingFares} not provided). Known original and subtotal exclude those fares; mileage and waiting supplements remain calculated.</span>
         </div>
       )}
 
@@ -398,12 +418,12 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
         <div className="space-y-2 md:hidden">
           {rows.map((row) => (
             <article key={row.rowId} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="flex items-center justify-between gap-2"><p className="truncate font-mono text-xs font-bold text-blue-700">#{row.trip.bookingId || row.trip.id}</p><p className="shrink-0 text-xs font-bold text-slate-900">{money(row.totalCost)}</p></div>
+              <div className="flex items-center justify-between gap-2"><p className="truncate font-mono text-xs font-bold text-blue-700">#{row.trip.bookingId || row.trip.id}</p><p className={`shrink-0 text-xs font-bold ${isIncompleteTotal(row) ? 'text-amber-800' : 'text-slate-900'}`}>{money(row.totalCost)}{isIncompleteTotal(row) ? ' partial' : ''}</p></div>
               <p className="mt-1 truncate text-sm font-semibold text-slate-950" title={clientName(row)}>{clientName(row)}</p>
               <p className="mt-1 truncate text-xs font-semibold text-slate-800" title={`${row.originCity} to ${row.destinationCity}`}>{row.originCity || 'Missing city'} → {row.destinationCity || 'Missing city'}</p>
               <p className="mt-1 truncate text-[10px] font-semibold text-slate-500">{row.legLabel} · {driverName(row)}</p>
               <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]"><div><p className="text-slate-500">Empty miles</p><p className="font-bold text-slate-900">{decimal(row.unloadedMiles)}</p></div><div><p className="text-slate-500">Mileage</p><p className="font-bold text-blue-700">{money(row.unloadedAmount)}</p></div><div><p className="text-slate-500">Wait</p><p className="font-bold text-slate-900">{decimal(row.waitHours)} hr · {money(row.waitCost)}</p></div></div>
-              <details className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-600"><summary className="cursor-pointer text-blue-700">Audit details</summary><div className="mt-2 space-y-1"><p>Passenger trip: {row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p>Empty leg: {row.originAddress || 'Missing origin'} → {row.destinationAddress || 'Missing destination'}</p><p>{row.mileageSource}: {row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${decimal(row.rawUnloadedMiles)} mi`}</p><p>{row.unloadedReason}</p><p>{row.waitReason}</p><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={() => void excludeRoute(row)} className="mt-2 inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'All overrides excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude all for this route'}</button></div></details>
+              <details className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-600"><summary className="cursor-pointer text-blue-700">Audit details</summary><div className="mt-2 space-y-1"><p>Passenger trip: {row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p>Empty leg: {row.originAddress || 'Missing origin'} → {row.destinationAddress || 'Missing destination'}</p><p>{row.mileageSource}: {row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${decimal(row.rawUnloadedMiles)} mi`}</p><p>Base fare: {originalCostLabel(row)} · {row.originalTripCostReason}</p><p>{row.unloadedReason}</p><p>Waiting: raw {decimal(row.rawGapHours)} hr; paid {decimal(row.waitHours)} hr. {row.waitReason}</p><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={() => void excludeRoute(row)} className="mt-2 inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'All overrides excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude all for this route'}</button></div></details>
             </article>
           ))}
         </div>
@@ -430,8 +450,8 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                       <td className="px-2 py-1.5 font-mono font-semibold text-blue-700" title={row.unloadedReason}>{money(row.unloadedAmount)}</td>
                       <td className="px-2 py-1.5 font-mono" title={`${decimal(row.rawGapHours)} raw hours`}>{decimal(row.waitHours)}</td>
                       <td className="px-2 py-1.5 font-mono" title={row.waitReason}>{money(row.waitCost)}</td>
-                      <td className="px-2 py-1.5 font-mono" title={money(row.originalTripCost)}>{money(row.originalTripCost)}</td>
-                      <td className="px-2 py-1.5 font-mono font-bold text-slate-950" title={money(row.totalCost)}>{money(row.totalCost)}</td>
+                      <td className={`px-2 py-1.5 font-mono ${row.originalTripCostStatus === 'invalid' || row.originalTripCostStatus === 'missing' ? 'font-semibold text-amber-800' : ''}`} title={row.originalTripCostReason}>{originalCostLabel(row)}</td>
+                      <td className={`px-2 py-1.5 font-mono font-bold ${isIncompleteTotal(row) ? 'text-amber-800' : 'text-slate-950'}`} title={isIncompleteTotal(row) ? `Partial subtotal: ${row.originalTripCostReason}` : money(row.totalCost)}>{money(row.totalCost)}{isIncompleteTotal(row) ? ' partial' : ''}</td>
                     </tr>
                     {expanded && (
                       <tr id={`override-detail-${rowId}`} data-agape-detail-row="true" className="bg-slate-50">
@@ -440,7 +460,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Passenger trip</p><p className="mt-1 truncate text-slate-900" title={clientName(row)}>{clientName(row)}</p><p className="truncate" title={`${row.tripPickupCity} → ${row.tripDropoffCity}`}>{row.tripPickupCity || 'Missing'} → {row.tripDropoffCity || 'Missing'}</p><p className="truncate text-slate-500" title={`${row.tripPickupAddress} → ${row.tripDropoffAddress}`}>{row.tripPickupAddress || 'Pickup missing'} → {row.tripDropoffAddress || 'Dropoff missing'}</p></div>
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Unloaded leg</p><p className="mt-1">{row.legLabel}: {row.originCity || 'Missing'} → {row.destinationCity || 'Missing'}</p><p className="truncate text-slate-500" title={`${row.originAddress} → ${row.destinationAddress}`}>{row.originAddress || 'Origin missing'} → {row.destinationAddress || 'Destination missing'}</p></div>
                             <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Mileage evidence</p><p className="mt-1">{row.mileageSource === 'Recorded odometer chain' ? `${odometer(row.originOdometer)} → ${odometer(row.destinationOdometer)} mi` : `${row.mileageSource} · raw ${decimal(row.rawUnloadedMiles)} mi`}</p><p className="text-slate-500">{decimal(row.unloadedMiles)} × {money(row.unloadedRate)} = {money(row.unloadedAmount)}</p></div>
-                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Waiting evidence</p><p className="mt-1">{row.originTimestamp ? `${dateTime(row.originTimestamp)} → ${dateTime(row.destinationTimestamp)}` : 'Not applicable to this home boundary leg'} · raw gap {decimal(row.rawGapHours)} hr</p><p className="text-slate-500">Billable {decimal(row.waitHours)} hr × {money(row.waitRate)} = {money(row.waitCost)}</p></div>
+                            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Waiting evidence</p><p className="mt-1">{row.originTimestamp ? `${dateTime(row.originTimestamp)} → ${dateTime(row.destinationTimestamp)}` : 'Not applicable to this home boundary leg'} · raw gap {decimal(row.rawGapHours)} hr</p><p className="text-slate-500">Paid after threshold {decimal(row.waitHours)} hr × {money(row.waitRate)} = {money(row.waitCost)}</p><p className={row.originalTripCostStatus === 'invalid' || row.originalTripCostStatus === 'missing' ? 'text-amber-800' : 'text-slate-500'}>Base fare: {originalCostLabel(row)} · {row.originalTripCostReason}</p></div>
                           </div>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold"><div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2"><p className={row.unloadedAmount > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Mileage: {row.unloadedReason}</p><p className={row.waitCost > 0 ? 'text-emerald-700' : row.requiresReview ? 'text-amber-800' : 'text-slate-600'}>Waiting: {row.waitReason}</p></div><button type="button" disabled={!updateOverridePolicy || row.pairExcluded || !row.cityPairComplete || excludingRowId === row.rowId} onClick={(event) => { event.stopPropagation(); void excludeRoute(row); }} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40"><Ban size={12} />{row.pairExcluded ? 'All overrides excluded' : excludingRowId === row.rowId ? 'Saving…' : 'Exclude all for route'}</button></div>
                         </td>
@@ -450,7 +470,7 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
                 );
               })}
             </tbody>
-            {!!rows.length && <tfoot><tr className="bg-slate-100 font-bold"><td className="px-2 py-2" colSpan="7">SUBTOTALS</td><td /><td className="px-2 py-2 font-mono">{money(totals.unloaded)}</td><td /><td className="px-2 py-2 font-mono">{money(totals.waiting)}</td><td className="px-2 py-2 font-mono">{money(totals.original)}</td><td className="px-2 py-2 font-mono">{money(totals.total)}</td></tr></tfoot>}
+            {!!rows.length && <tfoot><tr className="bg-slate-100 font-bold"><td className="px-2 py-2" colSpan="7">SUBTOTALS</td><td /><td className="px-2 py-2 font-mono">{money(totals.unloaded)}</td><td /><td className="px-2 py-2 font-mono">{money(totals.waiting)}</td><td className="px-2 py-2 font-mono" title={incompleteFareCount ? `${incompleteFareCount} base fares unavailable` : 'All displayed base fares verified'}>{money(totals.original)}{incompleteFareCount ? ' known' : ''}</td><td className="px-2 py-2 font-mono" title={incompleteFareCount ? 'Known subtotal excludes unavailable base fares' : 'Complete subtotal'}>{money(knownSubtotal)}{incompleteFareCount ? ' known' : ''}</td></tr></tfoot>}
           </table>
         </div>
         {!rows.length && <div className="flex h-44 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 text-center text-sm font-semibold text-slate-500">{candidateType === 'override' ? 'No trips qualify for a mileage or waiting override in this range.' : candidateType === 'review' ? 'No blocked gaps need data review in this range.' : 'No evaluated gaps match these filters.'}</div>}

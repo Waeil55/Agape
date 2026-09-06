@@ -17,7 +17,7 @@ export const OVERRIDE_EXPORT_HEADERS = [
   'Wait Time Hours',
   'Cost per Wait Hour',
   'Wait Cost',
-  'Total Cost',
+  'Known Subtotal',
   'Unloaded Decision',
   'Waiting Decision',
   'Mileage Excluded',
@@ -25,6 +25,8 @@ export const OVERRIDE_EXPORT_HEADERS = [
   'Matched Exclusion Rules',
   'Passenger Pickup City',
   'Passenger Dropoff City',
+  'Original Cost Status',
+  'Original Cost Decision',
 ];
 
 const currencyColumns = [7, 10, 11, 14, 15, 16];
@@ -59,6 +61,8 @@ const rowValues = (row, driverName) => [
   (row.matchedExclusionRules || []).map((rule) => `${rule.scope}: ${rule.fromCity} > ${rule.toCity === '*' ? 'Any destination' : rule.toCity}`).join('; '),
   row.tripPickupCity,
   row.tripDropoffCity,
+  row.originalTripCostStatus === 'valid' ? 'Verified' : row.originalTripCostStatus === 'invalid' ? 'Invalid' : row.originalTripCostStatus === 'missing' ? 'Not provided' : 'Counted on another leg',
+  row.originalTripCostReason || '',
 ];
 
 export const buildTripOverrideWorkbook = (rows = [], driverById = new Map()) => {
@@ -76,7 +80,7 @@ export const buildTripOverrideWorkbook = (rows = [], driverById = new Map()) => 
     subtotal('L'), '',
     subtotal('N'), '',
     subtotal('P'),
-    subtotal('Q'), '', '', '', '', '', '', '',
+    subtotal('Q'), '', '', '', '', '', '', '', '', '',
   ]);
 
   const sheet = XLSX.utils.aoa_to_sheet(values, { cellDates: true });
@@ -84,8 +88,9 @@ export const buildTripOverrideWorkbook = (rows = [], driverById = new Map()) => 
     { wch: 12 }, { wch: 15 }, { wch: 24 }, { wch: 22 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
     { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 11 }, { wch: 16 }, { wch: 23 }, { wch: 18 }, { wch: 12 },
     { wch: 17 }, { wch: 19 }, { wch: 42 }, { wch: 42 }, { wch: 18 }, { wch: 18 }, { wch: 42 }, { wch: 22 }, { wch: 22 },
+    { wch: 22 }, { wch: 48 },
   ];
-  sheet['!autofilter'] = { ref: `A1:X${Math.max(1, subtotalRow - 1)}` };
+  sheet['!autofilter'] = { ref: `A1:Z${Math.max(1, subtotalRow - 1)}` };
   sheet['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
 
   for (let row = 1; row < subtotalRow; row += 1) {

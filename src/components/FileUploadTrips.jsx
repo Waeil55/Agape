@@ -9,6 +9,7 @@ import { normalizeDateValue } from '../utils/normalizeDate';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 import { isCompanyDriverPlaceholder } from '../utils/driverIdentity';
+import { findTripFareColumn, readImportedTripFare, TRIP_FARE_HEADER_ALIASES } from '../utils/tripFare';
 import {
   analyzePhoneOwnershipForTrips,
   isValidPhoneDigits,
@@ -38,7 +39,7 @@ const COLUMN_ALIASES = {
   dropoff: ['dropoff', 'dropoff address', 'dropoff_address', 'drop off', 'destination', 'to', 'to address', 'to_address', 'do', 'dest', 'dropoff location', 'end address', 'end', 'drop-off address', 'drop off address', 'do address'],
   pickupCity: ['city (orig)', 'pickup city', 'origin city', 'from city', 'city orig', 'orig city'],
   dropoffCity: ['city (dest)', 'dropoff city', 'destination city', 'to city', 'city dest', 'dest city'],
-  originalTripCost: ['original trip cost', 'original cost', 'trip cost', 'base cost', 'base fare', 'fare', 'cost'],
+  originalTripCost: [...TRIP_FARE_HEADER_ALIASES],
   pickupPhone: ['pickup phone', 'pickup phone number', 'pickup_phone', 'phone', 'client phone', 'passenger phone', 'primary phone', 'phone number', 'tel', 'telephone', 'contact', 'member phone', 'mobile', 'cell phone', 'cell', 'primary contact'],
   dropoffPhone: ['dropoff phone', 'dropoff phone number', 'dropoff_phone', 'phone dropoff', 'facility phone', 'destination phone', 'location phone', 'secondary phone', 'dest phone', 'facility contact', 'location contact'],
   hospitalPhone: ['hospital phone', 'hospital', 'facility phone number', 'medical phone', 'clinic phone'],
@@ -320,6 +321,7 @@ function processRawRows(rawRows) {
 
 function mapColumns(row) {
   const headers = Object.keys(row);
+  const fareHeader = findTripFareColumn(headers);
   const find = (aliases) => {
     const idx = findColumn(headers, aliases);
     return idx !== -1 ? row[headers[idx]] || '' : '';
@@ -331,7 +333,7 @@ function mapColumns(row) {
     dropoff: find(COLUMN_ALIASES.dropoff),
     pickupCity: find(COLUMN_ALIASES.pickupCity),
     dropoffCity: find(COLUMN_ALIASES.dropoffCity),
-    originalTripCost: find(COLUMN_ALIASES.originalTripCost),
+    originalTripCost: fareHeader ? row[fareHeader] || '' : '',
     pickupPhone: find(COLUMN_ALIASES.pickupPhone),
     dropoffPhone: find(COLUMN_ALIASES.dropoffPhone),
     time: find(COLUMN_ALIASES.time),
@@ -661,8 +663,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       const colMap = {};
       Object.keys(COLUMN_ALIASES).forEach(field => {
-        const idx = findColumn(Object.keys(rows[0]), COLUMN_ALIASES[field]);
-        colMap[field] = idx !== -1 ? Object.keys(rows[0])[idx] : null;
+        if (field === 'originalTripCost') {
+          colMap[field] = findTripFareColumn(Object.keys(rows[0]));
+        } else {
+          const idx = findColumn(Object.keys(rows[0]), COLUMN_ALIASES[field]);
+          colMap[field] = idx !== -1 ? Object.keys(rows[0])[idx] : null;
+        }
       });
 
       // Detect Site Names
@@ -691,6 +697,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
       const mapped = rows.map((row, idx) => {
         const m = mapColumns(row);
+        const importedFare = readImportedTripFare(row);
 
         const notes = [m.notes, row['Pickup Comments'], row['Dropoff Comments'], row['Comments'], row['Message']]
           .filter(Boolean)
@@ -816,7 +823,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
           dropoff: dropoffAddr,
           pickupCity: extract(m.pickupCity, row['City (Orig)'], row['Pickup City'], row['From City']),
           dropoffCity: extract(m.dropoffCity, row['City (Dest)'], row['Dropoff City'], row['To City']),
-          originalTripCost: extract(m.originalTripCost, row['Original Trip Cost'], row['Original Cost'], row['Trip Cost'], row['Base Fare'], row['Cost']),
+          originalTripCost: importedFare.status === 'valid' ? importedFare.amount : '',
+          originalTripCostImportStatus: importedFare.status,
+          originalTripCostImportSource: importedFare.header || '',
+          originalTripCostImportReason: importedFare.reason,
           pickupSiteName: extract(colMap.pickupSite ? row[colMap.pickupSite] : '', m.pickupSiteName, row['Pickup Site'], row['pickupSiteName'], row['Origin Site'], row['Pickup Location Name']),
           dropoffSiteName: extract(colMap.dropoffSite ? row[colMap.dropoffSite] : '', m.dropoffSiteName, row['Dropoff Site'], row['dropoffSiteName'], row['Destination Site']),
           pickupPhone: validPhoneValue(extract(m.pickupPhone, row['Pickup Phone'], row['pickupPhone'])),
@@ -868,8 +878,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
           // --- RAW DATA (always preserved) ---
           _originalRow: row,
-          _hasIssues: false,
-          _issues: [],
+          _hasIssues: importedFare.status === 'invalid',
+          _issues: importedFare.status === 'invalid' ? [`${importedFare.header || 'Original trip cost'}: ${importedFare.reason}. The trip can be imported, but cost totals will remain incomplete until corrected.`] : [],
           _confidence: 100,
         };
       });
@@ -1048,8 +1058,6 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const avgConfidence = mappedTrips.length > 0
     ? Math.round(mappedTrips.reduce((s, t) => s + (t._confidence || 100), 0) / mappedTrips.length)
     : 100;
-  const uniqueDates = [...new Set(mappedTrips.map(t => t.date).filter(Boolean))].sort();
-
   return (
     <div className="space-y-6 pb-24 max-md:[&_button]:min-h-11">
       {step === 'upload' && (

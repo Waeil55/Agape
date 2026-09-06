@@ -5,6 +5,7 @@ import {
   extractCityFromAddress,
   filterTripCostOverrideRows,
   getBoundaryDistanceKey,
+  getOriginalTripCostDetails,
   isOverridePolicyDocumentValid,
   normalizeOverridePolicy,
 } from './tripCostOverrides';
@@ -225,6 +226,30 @@ describe('trip cost override calculation', () => {
     const ownedRows = result.rows.filter((row) => row.trip.bookingId === 'B-2');
     expect(ownedRows.reduce((sum, row) => sum + row.originalTripCost, 0)).toBe(40);
     expect(ownedRows.reduce((sum, row) => sum + row.totalCost, 0)).toBe(104);
+  });
+
+  it('never converts an address into an original trip cost', () => {
+    const corrupted = trip('107706395', {
+      originalTripCost: '2231 E 151st St Carmel Indiana 46033',
+      pickup: '2231 E 151st St Carmel Indiana 46033',
+    });
+    const details = getOriginalTripCostDetails(corrupted);
+    expect(details).toMatchObject({ status: 'invalid', amount: null });
+
+    const row = rowFor(analyze([corrupted]), '107706395');
+    expect(row).toMatchObject({
+      originalTripCost: null,
+      originalTripCostStatus: 'invalid',
+      originalTripCostIncluded: true,
+    });
+    expect(row.totalCost).toBe(0);
+  });
+
+  it('distinguishes a missing base fare from a verified zero fare', () => {
+    const missing = getOriginalTripCostDetails(trip('missing', { originalTripCost: '' }));
+    const zero = getOriginalTripCostDetails(trip('zero-fare', { originalTripCost: '$0.00' }));
+    expect(missing).toMatchObject({ status: 'missing', amount: null });
+    expect(zero).toMatchObject({ status: 'valid', amount: 0 });
   });
 
   it('applies route exclusions directionally and allows other routes', () => {

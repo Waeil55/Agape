@@ -1,6 +1,7 @@
 import { hasExplicitTime, toValidDate } from './safeDate';
 import { buildDriverIndex, findDriverInIndex } from './driverIndex';
 import { timeToMinutes, tripCalendarDateKey } from './tripDate';
+import { parseTripFare } from './tripFare';
 
 export const DEFAULT_OVERRIDE_POLICY = Object.freeze({
   homeAddress: '',
@@ -293,29 +294,52 @@ const vehicleKey = (trip) => normalizeText(firstValue(
   trip?.vehicle,
 )).toLowerCase();
 
+const roundCurrency = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const numeric = (value) => {
   const number = Number.parseFloat(String(value ?? '').replace(/[^0-9.-]/g, ''));
   return Number.isFinite(number) ? number : null;
 };
-const roundCurrency = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
-export const getOriginalTripCost = (trip) => {
+export const getOriginalTripCostDetails = (trip) => {
   const raw = trip?._originalRow || {};
-  const value = numeric(firstValue(
-    trip?.originalTripCost,
-    trip?.originalCost,
-    trip?.baseFare,
-    trip?.baseCost,
-    trip?.fare,
-    trip?.cost,
-    raw['Original Trip Cost'],
-    raw['Original Cost'],
-    raw['Trip Cost'],
-    raw['Base Fare'],
-    raw.Cost,
-  ));
-  return value !== null && value >= 0 ? value : 0;
+  if (trip?.originalTripCostImportStatus === 'invalid' && normalizeText(trip?.originalTripCost) === '') {
+    return {
+      status: 'invalid',
+      amount: null,
+      reason: normalizeText(trip.originalTripCostImportReason) || 'The imported original trip cost is invalid',
+    };
+  }
+  const candidates = [
+    ['Original Trip Cost', trip?.originalTripCost],
+    ['Original Cost', trip?.originalCost],
+    ['Base Fare', trip?.baseFare],
+    ['Base Cost', trip?.baseCost],
+    ['Fare', trip?.fare],
+    ['Provider Cost', trip?.providerCost],
+    ['Provider Pay', trip?.providerPay],
+    ['Original Trip Cost', raw['Original Trip Cost']],
+    ['Original Cost', raw['Original Cost']],
+    ['Trip Cost', raw['Trip Cost']],
+    ['Base Fare', raw['Base Fare']],
+    ['Base Cost', raw['Base Cost']],
+    ['Provider Cost', raw['Provider Cost']],
+    ['Provider Pay', raw['Provider Pay']],
+    ['Fare', raw.Fare],
+    ['Cost', raw.Cost],
+  ].filter(([, value]) => value !== undefined && value !== null && normalizeText(value) !== '');
+  if (!candidates.length) return parseTripFare(null);
+
+  const parsed = candidates.map(([source, value]) => ({ source, ...parseTripFare(value) }));
+  const invalid = parsed.find((candidate) => candidate.status === 'invalid');
+  if (invalid) return { ...invalid, reason: `${invalid.source}: ${invalid.reason}` };
+  const amounts = [...new Set(parsed.map((candidate) => candidate.amount))];
+  if (amounts.length !== 1) {
+    return { status: 'invalid', amount: null, reason: 'Conflicting original trip cost values were recorded' };
+  }
+  return { status: 'valid', amount: amounts[0], reason: `${parsed[0].source}: ${parsed[0].reason}` };
 };
+
+export const getOriginalTripCost = (trip) => getOriginalTripCostDetails(trip).amount;
 
 export const getAmbulatoryWheelchairCode = (trip) => /wheel|\bw\b/i.test(normalizeText(firstValue(
   trip?.type,
@@ -635,7 +659,10 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
       originAddress,
       destinationAddress,
       driverKey: entry.driver,
-      originalTripCost: 0,
+      originalTripCost: null,
+      originalTripCostStatus: 'not_applicable',
+      originalTripCostReason: 'Original cost is counted once per Booking ID',
+      originalTripCostIncluded: false,
       tripType: getAmbulatoryWheelchairCode(entry.trip),
       rawUnloadedMiles: mileage.miles,
       originOdometer: mileage.originOdometer,
@@ -685,9 +712,14 @@ export const analyzeTripCostOverrides = (trips = [], options = {}) => {
   });
   rowsByTrip.forEach((tripRows) => {
     const costOwner = tripRows.find((row) => row.isOverrideCandidate) || tripRows[0];
+    const fare = getOriginalTripCostDetails(costOwner.trip);
     tripRows.forEach((row) => {
-      row.originalTripCost = row === costOwner ? getOriginalTripCost(row.trip) : 0;
-      row.totalCost = roundCurrency(row.originalTripCost + row.unloadedAmount + row.waitCost);
+      const ownsOriginalCost = row === costOwner;
+      row.originalTripCostIncluded = ownsOriginalCost;
+      row.originalTripCostStatus = ownsOriginalCost ? fare.status : 'not_applicable';
+      row.originalTripCostReason = ownsOriginalCost ? fare.reason : 'Original cost is counted on the other override leg for this Booking ID';
+      row.originalTripCost = ownsOriginalCost && fare.status === 'valid' ? fare.amount : null;
+      row.totalCost = roundCurrency((row.originalTripCost || 0) + row.unloadedAmount + row.waitCost);
     });
   });
 
