@@ -124,7 +124,7 @@ describe('WellTransSyncPage', () => {
 
     expect(container.querySelectorAll('[data-testid="welltrans-toolbar"]')).toHaveLength(1);
     expect(container.querySelector('[data-testid="welltrans-toolbar"]')?.className).toContain('!flex-nowrap');
-    expect(container.querySelector('[data-testid="welltrans-toolbar"] .min-w-\\[84px\\]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="welltrans-toolbar"] .\\!min-w-\\[84px\\]')).not.toBeNull();
     expect(container.textContent).toContain('0/1 verified');
     expect(container.textContent).not.toContain('1 total');
     expect(container.textContent).not.toContain('0 Review');

@@ -709,8 +709,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
         >
           <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-2.5 text-[10px] font-bold text-white">
             <Sparkles size={12} className="text-blue-300" />
-            <span className="hidden tracking-wider xl:inline">PORTAL COMPLETION</span>
-            <span className="tracking-wider xl:hidden">PORTAL</span>
+            <span className="hidden tracking-wider 2xl:inline">PORTAL COMPLETION</span>
+            <span className="tracking-wider 2xl:hidden">PORTAL</span>
           </div>
 
           <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-0.5">
@@ -732,7 +732,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                 if (event.key === 'ArrowRight') { event.preventDefault(); navigateDate(1); }
               }}
               aria-label="Service date"
-              className="h-7 w-[112px] bg-transparent px-1 text-[10px] font-bold text-slate-900 outline-none disabled:cursor-not-allowed"
+              className="h-7 w-[96px] bg-transparent px-1 text-[10px] font-bold text-slate-900 outline-none disabled:cursor-not-allowed 2xl:w-[112px]"
             />
             <button
               onClick={() => navigateDate(1)}
@@ -757,12 +757,12 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             className="flex h-8 min-w-0 shrink items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2"
             title={`Coverage ${coveragePct}% — ${successfulCount} of ${completedTrips.length} verified`}
           >
-            <BarChart3 size={11} className="shrink-0 text-slate-400" />
+            <BarChart3 size={11} className="hidden shrink-0 text-slate-400 2xl:block" />
             <strong className={`text-[11px] ${coverage.coverageComplete ? 'text-emerald-600' : coveragePct >= 75 ? 'text-amber-600' : 'text-rose-600'}`}>
               {coveragePct}%
             </strong>
             <span className="text-[9px] font-semibold text-slate-600">{successfulCount}/{completedTrips.length} verified</span>
-            <div className="hidden h-1 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200 xl:block">
+            <div className="hidden h-1 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200 2xl:block">
               <div className={`h-full rounded-full transition-all duration-500 ${coverageBarColor}`} style={{ width: `${coveragePct}%` }} />
             </div>
             {stagedCount > 0 && <span className="text-[9px] font-bold text-purple-700">{stagedCount} review</span>}
@@ -773,7 +773,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             type="button"
             onClick={() => setShowInstallHelp(true)}
             title={`${portalStatusTitle} — open agent setup`}
-            className={`flex h-8 min-w-0 shrink items-center gap-1.5 rounded-xl border px-2 text-[9px] font-bold transition ${
+            className={`flex h-8 w-[92px] min-w-0 shrink-0 items-center gap-1.5 rounded-xl border px-2 text-[9px] font-bold transition 2xl:w-auto ${
               portalHealthy
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                 : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
@@ -789,7 +789,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
             setQueuePage(0);
           }} aria-label="Choose drivers to fill"
             title="Fill every driver or isolate one authoritative driver batch"
-            className="h-8 w-[clamp(112px,11vw,180px)] min-w-0 rounded-xl border border-indigo-200 bg-indigo-50 px-2 text-[9px] font-bold text-indigo-800 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">
+            className="h-8 w-[100px] min-w-0 rounded-xl border border-indigo-200 bg-indigo-50 px-2 text-[9px] font-bold text-indigo-800 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-50 2xl:w-[clamp(112px,11vw,180px)]">
             <option value="all">All drivers ({allCompletedTrips.length})</option>
             {driverScopes.map(item => (
               <option key={item.id} value={item.id}>
@@ -861,7 +861,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
 
           {tab === 'queue' && (
             <>
-              <div className="relative min-w-[84px] flex-1">
+              <div className="relative !min-w-[84px] flex-1">
                 <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input type="text" placeholder="Search trips…" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
                   className="h-8 w-full rounded-xl border border-slate-200 bg-white pl-6 pr-2 text-[9px] outline-none focus:border-blue-400" />
