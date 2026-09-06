@@ -1689,6 +1689,14 @@ textarea::placeholder {
   max-width: 100%;
 }
 
+/* Desktop command strips stay on one compact row. Mobile keeps the existing
+   wrapping behavior so touch controls are never clipped or pushed off-screen. */
+@media (min-width: 768px) {
+  .app-filter-bar {
+    flex-wrap: nowrap;
+  }
+}
+
 .app-table-frame {
   width: 100%;
   max-width: 100%;

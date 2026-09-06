@@ -399,10 +399,10 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
         </div>
 
         {/* Tabs */}
-        <div className="app-filter-bar mb-5 gap-1 rounded-2xl bg-slate-200/60 p-1.5">
+        <div className="app-filter-bar mb-4 gap-1 rounded-xl bg-slate-200/60 p-1">
           {[{ id: 'sessions', label: 'Timesheets' }, { id: 'requests', label: `Driver requests (${correctionRequests.filter((request) => request.status === 'pending').length})` }, { id: 'gaps', label: 'Activity audit' }, { id: 'abuse', label: 'Integrity signals' }, { id: 'payroll', label: 'Payroll review' }].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap px-4 py-2.5 text-sm font-semibold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
-              {tab.label}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`h-9 min-w-0 rounded-xl px-2 text-[11px] font-semibold transition-all md:flex-1 ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
+              <span className="block truncate">{tab.label}</span>
             </button>
           ))}
         </div>

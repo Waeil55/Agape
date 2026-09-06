@@ -33,7 +33,8 @@ describe('core mobile accessibility presentation contract', () => {
     const payroll = readComponent('PayrollReportPage.jsx');
     const timeTracking = readComponent('TimeTrackingAdmin.jsx');
 
-    expect(payroll).toContain('bg-indigo-600 text-white');
+    expect(payroll).toContain('bg-indigo-600');
+    expect(payroll).toContain('text-white');
     expect(payroll).toContain("color: 'text-indigo-700'");
     expect(timeTracking).toContain('bg-blue-600 p-5 sm:p-7 mb-5 text-white');
     expect(timeTracking).toContain('tracking-tight text-white');

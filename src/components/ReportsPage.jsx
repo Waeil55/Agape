@@ -82,7 +82,7 @@ const ReportsPage = (props) => {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Reports workspace">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5 sm:px-4">
+      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-1 sm:px-4">
         <label className="relative flex min-h-14 items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3 sm:hidden">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><ActiveIcon size={17} /></span>
           <span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-700">Reports workspace</span><span className="block truncate text-sm font-bold text-slate-950">{activeSection.label}</span><span className="block truncate text-[10px] font-semibold text-slate-600">{activeSection.description}</span></span>
@@ -91,7 +91,7 @@ const ReportsPage = (props) => {
             {sections.map((item) => <option key={item.id} value={item.id}>{item.label}{Number.isFinite(item.count) ? ` (${item.count})` : ''}</option>)}
           </select>
         </label>
-        <div className="app-filter-bar hidden gap-2 sm:flex" role="tablist" aria-label="Reports and records sections">
+        <div className="app-filter-bar !flex-nowrap hidden gap-1.5 sm:flex" role="tablist" aria-label="Reports and records sections">
           {sections.map((item) => {
             const Icon = item.icon;
             const active = section === item.id;
@@ -102,17 +102,17 @@ const ReportsPage = (props) => {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setSection(item.id)}
-                className={`group flex h-11 min-w-0 flex-1 basis-[180px] items-center gap-2 rounded-xl border px-2.5 py-1 text-left transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
+                className={`group flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 text-left transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'}`}
               >
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-blue-700'}`}>
-                  <Icon size={15} aria-hidden="true" />
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-blue-700'}`}>
+                  <Icon size={13} aria-hidden="true" />
                 </span>
                 <span className="min-w-0">
-                  <span className="flex items-center gap-1.5 text-xs font-bold">
+                  <span className="flex items-center gap-1 text-[11px] font-bold whitespace-nowrap">
                     {item.label}
                     {Number.isFinite(item.count) && <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.count}</span>}
                   </span>
-                  <span className={`hidden max-w-[180px] truncate text-[10px] font-semibold sm:block ${active ? 'text-blue-100' : 'text-slate-500'}`}>{item.description}</span>
+                  <span className={`hidden max-w-[180px] truncate text-[9px] font-semibold 2xl:block ${active ? 'text-blue-100' : 'text-slate-500'}`}>{item.description}</span>
                 </span>
               </button>
             );

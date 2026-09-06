@@ -306,32 +306,27 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
         </div>
       )}
 
-      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2">
-        <div className="app-filter-bar gap-2">
-          <label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-            <Search size={14} className="shrink-0 text-slate-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Booking, rider, driver, or empty-leg city" className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-semibold outline-none" />
+      <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5">
+        <div className="app-filter-bar !flex-nowrap gap-1.5" role="toolbar" aria-label="Trip cost override controls" data-testid="override-toolbar">
+          <label className="flex h-8 !min-w-[100px] flex-1 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2">
+            <Search size={12} className="shrink-0 text-slate-400" />
+            <input aria-label="Search trip cost overrides" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search trips…" className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[10px] font-semibold outline-none" />
           </label>
-          <div className="flex h-9 items-center rounded-xl border border-slate-200 bg-white">
-            <button type="button" onClick={() => moveWeek(-7)} className="grid h-full w-8 place-items-center text-slate-600 hover:bg-slate-50" aria-label="Previous week"><ChevronLeft size={15} /></button>
-            <input aria-label="From date" type="date" value={fromDate} disabled={allDates} onChange={(event) => setFromDate(event.target.value)} className="h-8 w-[122px] border-0 px-1 text-xs font-semibold disabled:opacity-40" />
-            <span className="text-xs font-semibold text-slate-400">–</span>
-            <input aria-label="To date" type="date" value={toDate} disabled={allDates} onChange={(event) => setToDate(event.target.value)} className="h-8 w-[122px] border-0 px-1 text-xs font-semibold disabled:opacity-40" />
-            <button type="button" onClick={() => moveWeek(7)} className="grid h-full w-8 place-items-center text-slate-600 hover:bg-slate-50" aria-label="Next week"><ChevronRight size={15} /></button>
+          <div className="flex h-8 shrink-0 items-center rounded-xl border border-slate-200 bg-white">
+            <button type="button" onClick={() => moveWeek(-7)} className="grid h-full w-7 place-items-center rounded-l-xl text-slate-600 hover:bg-slate-50" aria-label="Previous week"><ChevronLeft size={14} /></button>
+            <input aria-label="From date" type="date" value={fromDate} disabled={allDates} onChange={(event) => setFromDate(event.target.value)} className="h-7 w-[100px] border-0 px-1 text-[10px] font-semibold disabled:opacity-40 2xl:w-[112px]" />
+            <span className="text-[10px] font-semibold text-slate-400">–</span>
+            <input aria-label="To date" type="date" value={toDate} disabled={allDates} onChange={(event) => setToDate(event.target.value)} className="h-7 w-[100px] border-0 px-1 text-[10px] font-semibold disabled:opacity-40 2xl:w-[112px]" />
+            <button type="button" onClick={() => moveWeek(7)} className="grid h-full w-7 place-items-center rounded-r-xl text-slate-600 hover:bg-slate-50" aria-label="Next week"><ChevronRight size={14} /></button>
           </div>
-          <select aria-label="Driver" value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)} className="h-9 min-w-[145px] px-2 text-xs font-semibold"><option value="all">All drivers</option>{driverOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>
-          <button type="button" onClick={openHomeEditor} aria-expanded={showHomeEditor} aria-label="Edit shared home address" className={`inline-flex h-9 min-w-0 max-w-[260px] items-center gap-1.5 rounded-xl border px-3 text-xs font-bold ${sharedHomeMissing ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><MapPin size={14} className="shrink-0" /><span className="shrink-0">Home:</span><span className="truncate font-semibold">{sharedHomeLabel}</span></button>
-          <button type="button" onClick={resetFilters} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><RotateCcw size={14} /> Reset</button>
-          <button type="button" onClick={exportRows} disabled={!policyReady || !rows.length} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"><Download size={14} /> Excel</button>
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {FILTER_VIEWS.map(([key, label]) => (
-            <button key={key} type="button" onClick={() => setCandidateType(key)} aria-pressed={candidateType === key} className={`h-8 rounded-xl border px-3 text-[11px] font-bold transition ${candidateType === key ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`}>
-              {label} <span className={candidateType === key ? 'text-blue-100' : 'text-slate-400'}>{viewCounts[key] || 0}</span>
-            </button>
-          ))}
-          <button type="button" onClick={() => setAdvancedOpen((value) => !value)} aria-expanded={advancedOpen} className="ml-auto inline-flex h-8 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Advanced <ChevronDown size={13} className={advancedOpen ? 'rotate-180' : ''} /></button>
+          <select aria-label="Driver" value={driverFilter} onChange={(event) => setDriverFilter(event.target.value)} className="h-8 w-[90px] min-w-0 shrink-0 px-1.5 text-[10px] font-semibold 2xl:w-[130px]"><option value="all">All drivers</option>{driverOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>
+          <button type="button" onClick={openHomeEditor} aria-expanded={showHomeEditor} aria-label="Edit shared home address" title={`Edit shared home address: ${sharedHomeLabel}`} className={`inline-flex h-8 w-[150px] min-w-0 shrink-0 items-center gap-1.5 rounded-xl border px-2 text-[10px] font-bold 2xl:w-[220px] ${sharedHomeMissing ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><MapPin size={13} className="shrink-0" /><span className="shrink-0">Home:</span><span className="truncate font-semibold">{sharedHomeLabel}</span></button>
+          <select aria-label="Override result view" value={candidateType} onChange={(event) => setCandidateType(event.target.value)} className="h-8 w-[132px] min-w-0 shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-2 text-[10px] font-bold text-blue-800 outline-none focus:ring-2 focus:ring-blue-500 2xl:w-[160px]">
+            {FILTER_VIEWS.map(([key, label]) => <option key={key} value={key}>{label} ({viewCounts[key] || 0})</option>)}
+          </select>
+          <button type="button" onClick={resetFilters} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50" aria-label="Reset override filters" title="Reset override filters"><RotateCcw size={13} /></button>
+          <button type="button" onClick={exportRows} disabled={!policyReady || !rows.length} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40" aria-label="Export override report to Excel" title="Export to Excel"><Download size={13} /></button>
+          <button type="button" onClick={() => setAdvancedOpen((value) => !value)} aria-expanded={advancedOpen} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 hover:bg-slate-50">Advanced <ChevronDown size={12} className={advancedOpen ? 'rotate-180' : ''} /></button>
         </div>
 
         {advancedOpen && (

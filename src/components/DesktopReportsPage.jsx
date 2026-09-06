@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import { CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Edit2, Search, Upload, XCircle } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Edit2, Search, Upload, XCircle } from 'lucide-react';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { getReviewBatchScope } from '../utils/portalSelectors';
@@ -129,12 +129,12 @@ const exportReviewCsv = (rows) => {
 };
 
 const CompactSelect = ({ value, onChange, children, className = '', ariaLabel }) => (
-  <label className={`relative inline-flex items-center ${className}`}>
+  <label className={`relative inline-flex min-w-0 shrink-0 items-center ${className}`}>
     <select
       aria-label={ariaLabel}
       value={value}
       onChange={onChange}
-      className="appearance-none rounded-lg border border-slate-200 bg-slate-50 pl-2 pr-7 py-1 text-[11px] font-medium text-slate-600 outline-none transition hover:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+      className="h-8 min-w-0 appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-2 pr-6 text-[10px] font-semibold text-slate-600 outline-none transition hover:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
     >
       {children}
     </select>
@@ -798,7 +798,7 @@ const DesktopReportsPage = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[var(--bg-app)] font-sans text-slate-900">
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
-        <div role="toolbar" aria-label="Trip report controls" className="app-filter-bar gap-1 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm">
+        <div role="toolbar" aria-label="Trip report controls" data-testid="reports-toolbar" className="app-filter-bar !flex-nowrap gap-1.5 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm">
           {/* View Tabs */}
           <CompactSelect ariaLabel="Report view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
             <option value="review">Review view</option>
@@ -806,43 +806,35 @@ const DesktopReportsPage = ({
             <option value="invoice">Invoice view</option>
           </CompactSelect>
 
-          <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
           {/* Date Nav */}
-          <div className="flex items-center gap-0.5 shrink-0">
-            <button onClick={() => shiftDate(-1)} className="min-h-[28px] min-w-[28px] rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center transition-colors">
+          <div className="flex h-8 shrink-0 items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+            <button onClick={() => shiftDate(-1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Previous report date">
               <ChevronLeft size={14} />
             </button>
-            <button className="px-2 py-1 rounded-md text-[11px] font-semibold bg-blue-600 text-white whitespace-nowrap">
+            <button className="h-7 max-w-[82px] truncate rounded-lg bg-blue-600 px-1.5 text-[10px] font-bold text-white" title={formatDateLabel(dateStr, true)}>
               {formatDateLabel(dateStr)}
             </button>
-            <button onClick={() => shiftDate(1)} className="min-h-[28px] min-w-[28px] rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center transition-colors">
+            <button onClick={() => shiftDate(1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Next report date">
               <ChevronRight size={14} />
             </button>
           </div>
 
-          <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
           {/* Search */}
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 shrink-0 min-w-[120px]">
+          <label className="flex h-8 !min-w-[92px] flex-1 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2">
             <Search size={11} className="text-slate-400" />
             <input
               aria-label="Search trip reports"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Name, trip, phone..."
-              className="w-full bg-transparent text-[11px] font-medium text-slate-700 placeholder:text-slate-400 outline-none"
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[10px] font-semibold text-slate-700 placeholder:text-slate-400 outline-none"
             />
-          </div>
+          </label>
 
-          <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
-          <label className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
+          <label className="flex h-8 shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600">
             <input type="checkbox" checked={allDates} onChange={(event) => setAllDates(event.target.checked)} className="h-3 w-3 rounded border-slate-300" />
             All dates
           </label>
-
-          <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
           {/* Filters */}
           <CompactSelect ariaLabel="Trip status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -866,7 +858,6 @@ const DesktopReportsPage = ({
 
           {viewMode === 'review' && (
             <>
-              <div className="w-px h-4 bg-slate-200 shrink-0"></div>
               <div className="flex items-center gap-1 shrink-0">
                 <label className="flex items-center gap-1 cursor-pointer">
                   <input type="checkbox" checked={!hiddenColumns.includes('travelTime')} onChange={() => toggleColumn('travelTime')} className="w-3 h-3 rounded border-slate-300" />
@@ -880,40 +871,30 @@ const DesktopReportsPage = ({
             </>
           )}
 
-          <div className="flex-1"></div>
-
           {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
-            <button type="button" onClick={() => setShowUploadModal?.(true)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
-              <Upload size={13} /> Upload
+            <button type="button" onClick={() => setShowUploadModal?.(true)} className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50" aria-label="Upload trip report data" title="Upload trip report data">
+              <Upload size={13} />
             </button>
-            <button type="button" onClick={() => exportReviewCsv(reportRows)} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[11px] font-semibold text-white transition-colors whitespace-nowrap">
+            <button type="button" onClick={() => exportReviewCsv(reportRows)} className="inline-flex h-8 items-center gap-1 rounded-xl bg-blue-600 px-2 text-[10px] font-bold text-white transition-colors hover:bg-blue-700 whitespace-nowrap">
               <Download size={13} /> CSV
             </button>
           </div>
         </div>
 
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <CalendarDays size={16} className="text-slate-500" />
-              <span className="text-lg font-semibold text-slate-800">{allDates ? 'All service dates' : formatDateLabel(dateStr, true)}</span>
-            </div>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{reportRows.length} trips</span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{summary.reviewed}/{reportRows.length} reviewed</span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{formatMinutes(summary.moving)} moving</span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">{formatMinutes(summary.stopped)} stopped</span>
+        <div className="flex h-9 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-100 bg-slate-50/80 px-3" aria-label="Visible trip report summary">
+          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden text-[10px] font-semibold text-slate-600">
+            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{reportRows.length} trips</span>
+            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{summary.reviewed}/{reportRows.length} reviewed</span>
+            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{formatMinutes(summary.moving)} moving</span>
+            <span className="shrink-0 rounded-lg bg-white px-2 py-1 shadow-sm">{formatMinutes(summary.stopped)} stopped</span>
+            <span className="shrink-0 text-rose-700">NS {summary.noShow}</span>
+            <span className="shrink-0 text-amber-700">Cancelled {summary.cancelled}</span>
+            <span className="shrink-0">{Math.round(summary.distance)} mi</span>
           </div>
-
-          <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <button type="button" onClick={() => markRowsReviewed(true)} className="min-h-[40px] rounded-xl bg-emerald-100 px-3 text-xs font-semibold normal-case text-emerald-700 hover:bg-emerald-200">Mark Day Done</button>
-            <button type="button" onClick={() => markRowsReviewed(false)} className="min-h-[40px] rounded-xl bg-white px-3 text-xs font-semibold normal-case text-slate-600 hover:bg-slate-100">Reset Review</button>
-            <span>Total <b className="text-slate-900">{reportRows.length}</b></span>
-            <span>Done <b className="text-emerald-700">{summary.done}</b></span>
-            <span>RW <b className="text-slate-900">{summary.reviewed}</b></span>
-            <span>NS <b className="text-rose-700">{summary.noShow}</b></span>
-            <span>Can <b className="text-amber-700">{summary.cancelled}</b></span>
-            <span>Lng <b className="text-slate-900">{Math.round(summary.distance)}mi</b></span>
+          <div className="flex shrink-0 items-center gap-1">
+            <button type="button" onClick={() => markRowsReviewed(true)} className="h-7 rounded-xl bg-emerald-100 px-2 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200">Mark visible done</button>
+            <button type="button" onClick={() => markRowsReviewed(false)} className="h-7 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600 hover:bg-slate-100">Reset review</button>
           </div>
         </div>
 

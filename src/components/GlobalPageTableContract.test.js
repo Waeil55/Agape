@@ -23,7 +23,7 @@ describe('global page and table layout contract', () => {
     expect(read('src/components/DriverPage.jsx')).not.toContain('app-page-frame w-full h-full');
   });
 
-  it('wraps filter controls without horizontal scrolling and keeps the desktop header compact', () => {
+  it('keeps desktop filter controls on one line without horizontal scrolling and preserves mobile wrapping', () => {
     const files = collectSourceFiles(join(root, 'src'));
     const css = read('src/index.css');
     const dashboard = read('src/components/DesktopEnterpriseDashboard.jsx');
@@ -32,6 +32,7 @@ describe('global page and table layout contract', () => {
     const portal = read('src/features/welltrans-sync/components/WellTransSyncPage.jsx');
 
     expect(css).toMatch(/\.app-filter-bar\s*\{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?overflow-x:\s*hidden;/);
+    expect(css).toMatch(/@media \(min-width:\s*768px\)[\s\S]*?\.app-filter-bar\s*\{[\s\S]*?flex-wrap:\s*nowrap;/);
     for (const path of files) {
       expect(readFileSync(path, 'utf8'), path).not.toMatch(/overflow-x-(?:auto|scroll)/);
     }
@@ -46,9 +47,26 @@ describe('global page and table layout contract', () => {
 
   it('keeps the reports workspace switcher at a compact accessible height', () => {
     const reportsShell = read('src/components/ReportsPage.jsx');
-    expect(reportsShell).toContain('group flex h-11 min-w-0');
+    expect(reportsShell).toContain('group flex h-9 min-w-0');
     expect(reportsShell).not.toContain('group flex min-h-12 min-w-0');
-    expect(reportsShell).toContain('shrink-0 border-b border-slate-200 bg-white px-3 py-1.5');
+    expect(reportsShell).toContain('shrink-0 border-b border-slate-200 bg-white px-3 py-1');
+  });
+
+  it('uses one authoritative compact command strip for comparable desktop workspaces', () => {
+    const operations = read('src/components/OperationsCommandCenter.jsx');
+    const tripReports = read('src/components/DesktopReportsPage.jsx');
+    const overrides = read('src/components/UnloadedTripsReport.jsx');
+    const archives = read('src/components/ArchivesPage.jsx');
+    const payroll = read('src/components/PayrollReportPage.jsx');
+
+    expect(operations).toContain('data-testid="operations-toolbar"');
+    expect(operations).toContain('className="app-filter-bar !flex-nowrap');
+    expect(operations.slice(operations.indexOf('data-testid="operations-toolbar"'), operations.indexOf('const renderInlineTripCard'))).not.toContain('w-px h-4');
+    expect(tripReports).toContain('data-testid="reports-toolbar"');
+    expect(overrides).toContain('data-testid="override-toolbar"');
+    expect(overrides).toContain('aria-label="Override result view"');
+    expect(archives).toContain('data-testid="archives-toolbar"');
+    expect(payroll).toContain('data-testid="payroll-toolbar"');
   });
 
   it('keeps every real table inside the page without horizontal table scrolling', () => {

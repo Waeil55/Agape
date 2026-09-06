@@ -1293,87 +1293,72 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   // ==================== CONTROL BAR (DEDUPED COMMAND STRIP) ====================
 
   const renderControlBar = () => (
-    <div className="app-filter-bar gap-1 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm">
-      {/* Main Tabs */}
-      <div className="flex items-center gap-0.5 shrink-0 bg-slate-100 p-0.5 rounded-lg">
-        {['manifest', 'willcall', 'fleet'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setOperationsTab(tab)}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap ${
-              operationsTab === tab
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-white'
-            }`}
-          >
-            {tab === 'manifest' ? 'Manifest' : tab === 'willcall' ? 'Will Call' : 'Fleet'}
-          </button>
-        ))}
-      </div>
+    <div
+      role="toolbar"
+      aria-label="Trip workspace controls"
+      data-testid="operations-toolbar"
+      className="app-filter-bar !flex-nowrap gap-1.5 border-b border-slate-200 bg-white px-2 py-1.5 shrink-0 sticky top-0 z-20 shadow-sm"
+    >
+      <label className="inline-flex w-[84px] shrink-0 items-center">
+        <span className="sr-only">Trip workspace</span>
+        <select aria-label="Trip workspace" value={operationsTab} onChange={(event) => setOperationsTab(event.target.value)} className="h-8 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-950 px-2 text-[10px] font-bold text-white outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="manifest">Manifest</option>
+          <option value="willcall">Will Call</option>
+          <option value="fleet">Fleet</option>
+        </select>
+      </label>
 
-      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
-      <label className="inline-flex items-center gap-1 shrink-0">
+      <label className="inline-flex w-[96px] shrink-0 items-center">
         <span className="sr-only">Saved operational view</span>
-        <select value={activeSavedView} onChange={(event) => applySavedView(event.target.value)} className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-800 outline-none focus:ring-2 focus:ring-blue-500">
+        <select aria-label="Saved operational view" value={activeSavedView} onChange={(event) => applySavedView(event.target.value)} className="h-8 w-full min-w-0 rounded-xl border border-blue-200 bg-blue-50 px-2 text-[10px] font-bold text-blue-800 outline-none focus:ring-2 focus:ring-blue-500">
           {OPERATIONAL_VIEW_PRESETS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
         </select>
       </label>
 
-      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
       {/* Date Nav */}
-      <div className="flex items-center gap-0.5 shrink-0">
-        <button onClick={() => shiftDate(-1)} className="min-h-[28px] min-w-[28px] rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center transition-colors">
+      <div className="flex h-8 shrink-0 items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+        <button onClick={() => shiftDate(-1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Previous service date">
           <ChevronLeft size={14} />
         </button>
-        <button onClick={() => setSelectedDate(localCalendarYmd())} className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+        <button onClick={() => setSelectedDate(localCalendarYmd())} className={`h-7 max-w-[76px] truncate rounded-lg px-1.5 text-[10px] font-bold transition-colors ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`} title={isToday ? 'Today' : 'Return to today'}>
           {formatDateLabel(selectedDate)}
-          {isToday && <span className="ml-1 text-[9px] opacity-80">Today</span>}
         </button>
-        <button onClick={() => shiftDate(1)} className="min-h-[28px] min-w-[28px] rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center transition-colors">
+        <button onClick={() => shiftDate(1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white" aria-label="Next service date">
           <ChevronRight size={14} />
         </button>
       </div>
 
-      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
       {/* Quick Actions */}
-      <button onClick={() => setShowAddTripModal(true)} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[11px] font-semibold text-white transition-colors whitespace-nowrap shrink-0">
+      <button onClick={() => setShowAddTripModal(true)} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-2 text-[10px] font-bold text-white transition-colors hover:bg-blue-700 whitespace-nowrap">
         <Plus size={13} /> Trip
       </button>
-      <button onClick={() => setShowUploadModal(true)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0">
-        <UploadCloud size={13} /> Upload
+      <button onClick={() => setShowUploadModal(true)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50" aria-label="Upload trips" title="Upload trips">
+        <UploadCloud size={13} />
       </button>
-      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
 
       {/* Search */}
-      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 shrink-0 min-w-[120px]">
+      <label className="flex h-8 !min-w-[84px] flex-1 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2">
         <Search size={11} className="text-slate-400" />
-        <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="w-full bg-transparent text-[11px] font-medium text-slate-700 placeholder:text-slate-400 outline-none" />
-      </div>
-
-      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
+        <input aria-label="Search trips" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search…" className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[10px] font-semibold text-slate-700 placeholder:text-slate-400 outline-none" />
+      </label>
 
       {/* Sort */}
       <label className="inline-flex shrink-0 items-center gap-1">
         <span className="sr-only">Sort trips by</span>
-        <select aria-label="Sort trips" value={sortBy} onChange={(event) => handleSortSelect(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 outline-none focus:ring-2 focus:ring-blue-500">
+        <select aria-label="Sort trips" value={sortBy} onChange={(event) => handleSortSelect(event.target.value)} className="h-8 w-[76px] min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500">
           <option value="time">Sort: Time</option>
           <option value="assignment">Sort: Driver</option>
           <option value="status">Sort: Status</option>
           <option value="patient">Sort: Client</option>
           <option value="urgency">Sort: Urgency</option>
         </select>
-        <button type="button" onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="flex min-h-[28px] min-w-[28px] items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-700" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
+        <button type="button" onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-700" aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
           {sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
         </button>
       </label>
 
-      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
       {/* Filters */}
-      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-1.5 py-1 text-[11px] font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white cursor-pointer shrink-0">
+      <select aria-label="Trip status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="h-8 w-[74px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Status</option>
         <option value="Unassigned">Unassigned</option>
         <option value="Assigned">Assigned</option>
@@ -1381,13 +1366,13 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         <option value="Completed">Completed</option>
       </select>
 
-      <select value={filterInOut} onChange={(e) => { setFilterInOut(e.target.value); localStorage.setItem('agape_opsFilterInOut', e.target.value); }} className="px-1.5 py-1 text-[11px] font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white cursor-pointer shrink-0">
+      <select aria-label="Trip direction" value={filterInOut} onChange={(e) => { setFilterInOut(e.target.value); localStorage.setItem('agape_opsFilterInOut', e.target.value); }} className="h-8 w-[76px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Trips</option>
         <option value="inout">IN/OUT Only</option>
         <option value="not-inout">Non IN/OUT</option>
       </select>
 
-      <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="px-1.5 py-1 text-[11px] font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white cursor-pointer shrink-0 max-w-[130px]">
+      <select aria-label="Driver" value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="h-8 w-[84px] min-w-0 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-600 outline-none hover:bg-white focus:ring-2 focus:ring-blue-500">
         <option value="all">All Drivers</option>
         <option value="unassigned">Unassigned</option>
         {driverOptions.map((driver) => (
@@ -1395,25 +1380,25 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         ))}
       </select>
 
-      <div className="w-px h-4 bg-slate-200 shrink-0"></div>
-
       {/* View + AI */}
-      <label className="shrink-0">
+      <label className="w-[60px] shrink-0">
         <span className="sr-only">Manifest layout</span>
-        <select aria-label="Manifest layout" value={manifestView} onChange={(event) => setManifestView(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+        <select aria-label="Manifest layout" value={manifestView} onChange={(event) => setManifestView(event.target.value)} className="h-8 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-1.5 text-[10px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
           {MANIFEST_VIEW_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.value === 'card' ? 'Cards' : option.value === 'table' ? 'Ledger' : option.label}</option>)}
         </select>
       </label>
 
       <button
         onClick={() => setShowIntelligence(prev => !prev)}
-        className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-all whitespace-nowrap shrink-0 ${
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[10px] font-bold transition-all ${
           showIntelligence
             ? 'bg-purple-600 text-white shadow-sm'
             : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
         }`}
+        aria-label={`${showIntelligence ? 'Hide' : 'Show'} AI insights`}
+        title={`${showIntelligence ? 'Hide' : 'Show'} AI insights`}
       >
-        <BrainCircuit size={12} /> AI
+        <BrainCircuit size={13} />
       </button>
     </div>
   );

@@ -117,31 +117,23 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
 
   return (
     <div className="min-h-0 flex-1 text-slate-900 pb-24 max-md:[&_button]:min-h-11">
-      {/* Header */}
-      <div className="px-3 sm:px-4 pt-4 pb-3 bg-white border-b border-slate-200">
-        <div className="flex items-center justify-between mb-1">
-          <button onClick={exportCSV} disabled={hasUnscopedSourceRecords} title={hasUnscopedSourceRecords ? 'Export blocked: one or more source records has no valid service date.' : 'Export payroll CSV'} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:bg-slate-300">
-            <Download size={13} /> Export CSV
-          </button>
-        </div>
-        <p className="text-xs text-slate-500 ml-10">Event-driven · GPS-verified · Audit-logged</p>
-      </div>
-
-      {/* Filters */}
-      <div className="px-3 sm:px-4 pb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div role="toolbar" aria-label="Payroll report controls" data-testid="payroll-toolbar" className="grid grid-cols-2 gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:flex sm:flex-nowrap sm:items-center sm:px-4">
         <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-          className="col-span-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-indigo-400" />
+          aria-label="Payroll service date" className="h-9 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none sm:w-[126px] sm:shrink-0" />
         <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)}
-          className="col-span-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-indigo-400">
+          aria-label="Payroll driver" className="h-9 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none sm:w-[130px] sm:shrink-0">
           <option value="ALL">All Drivers</option>
           {drivers.map(d => <option key={d.id} value={d.id}>{d.name || d.email}</option>)}
         </select>
         <select value={policyMode} onChange={e => onPolicyChange?.(e.target.value)}
-          className="col-span-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-indigo-400">
+          aria-label="Payroll policy" className="h-9 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none sm:w-[150px] sm:shrink-0">
           {Object.entries(POLICY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search driver..."
-          className="col-span-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-400" />
+          aria-label="Search payroll drivers" className="h-9 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:outline-none sm:!min-w-[100px] sm:flex-1" />
+        <button onClick={exportCSV} disabled={hasUnscopedSourceRecords} title={hasUnscopedSourceRecords ? 'Export blocked: one or more source records has no valid service date.' : 'Export payroll CSV'} className="col-span-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300 sm:col-span-1 sm:shrink-0">
+          <Download size={13} /> Export CSV
+        </button>
       </div>
 
       {/* Summary Cards */}

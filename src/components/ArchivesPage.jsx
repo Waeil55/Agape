@@ -273,24 +273,22 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) =>
 
   return (
     <div aria-label="Archived trips" className="flex flex-col flex-1 min-h-0 bg-slate-100 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-3 py-1.5 flex flex-col lg:flex-row lg:items-center shrink-0 gap-1.5 sticky top-0 z-20">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <div className="flex items-center gap-1 bg-slate-100 rounded px-2 py-1 min-w-[140px] max-w-[240px]">
+      <div role="toolbar" aria-label="Archived trip controls" data-testid="archives-toolbar" className="app-filter-bar !flex-nowrap gap-1.5 border-b border-slate-200 bg-white px-3 py-1.5 shrink-0 sticky top-0 z-20">
+          <label className="flex h-8 !min-w-[100px] max-w-[260px] flex-1 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2">
             <Search size={11} className="text-slate-500 shrink-0" />
-            <input type="text" placeholder="Search..." value={searchQuery}
+            <input aria-label="Search archived trips" type="text" placeholder="Search archived trips…" value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-xs outline-none w-full placeholder:text-slate-500" />
-            {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-500 hover:text-slate-600"><X size={11} /></button>}
-          </div>
-          <div className="flex items-center gap-1 bg-slate-100 rounded px-2 py-1">
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[10px] font-semibold outline-none placeholder:text-slate-500" />
+            {searchQuery && <button onClick={() => setSearchQuery('')} className="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-700" aria-label="Clear archive search"><X size={11} /></button>}
+          </label>
+          <div className="flex h-8 shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2">
             <Calendar size={11} className="text-slate-500" />
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-              className="px-1 py-0.5 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[110px]" />
-            <span className="text-xs text-slate-500">to</span>
+              aria-label="Archive start date" className="h-7 w-[100px] border-0 px-1 text-[10px] font-semibold outline-none focus:border-blue-500 2xl:w-[112px]" />
+            <span className="text-[10px] font-semibold text-slate-500">to</span>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-              className="px-1 py-0.5 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 w-[110px]" />
+              aria-label="Archive end date" className="h-7 w-[100px] border-0 px-1 text-[10px] font-semibold outline-none focus:border-blue-500 2xl:w-[112px]" />
           </div>
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto overscroll-contain">

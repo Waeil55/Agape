@@ -49,8 +49,8 @@ const SystemControlCenter = ({ trips = [], drivers = [], vehicles = [], logs = [
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 sm:flex sm:items-center sm:justify-between">
         <div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white"><ActiveIcon size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-blue-700">System control center</p><h3 className="text-lg font-semibold text-slate-950">{active.title}</h3><p className="text-xs font-semibold text-slate-600">{active.description}</p></div></div>
       </div>
-      <div className="app-filter-bar gap-2 pb-1" role="tablist" aria-label="System controls">
-        {MODULES.map((entry) => { const Icon = entry.icon; const selected = module === entry.id; return <button key={entry.id} role="tab" aria-selected={selected} onClick={() => setModule(entry.id)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-bold ${selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><Icon size={15} />{entry.label}</button>; })}
+      <div className="app-filter-bar gap-1.5 pb-1" role="tablist" aria-label="System controls">
+        {MODULES.map((entry) => { const Icon = entry.icon; const selected = module === entry.id; return <button key={entry.id} role="tab" aria-selected={selected} onClick={() => setModule(entry.id)} className={`inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-[11px] font-bold md:flex-1 ${selected ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><Icon size={13} className="shrink-0" /><span className="truncate">{entry.label}</span></button>; })}
       </div>
       <Suspense fallback={<LoadingPanel />}><div role="tabpanel">{content}</div></Suspense>
     </div>
