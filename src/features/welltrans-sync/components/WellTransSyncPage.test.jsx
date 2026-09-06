@@ -10,6 +10,9 @@ import { isValidWellTransServiceDate } from '../utils/welltransDate';
 import WellTransSyncPage from './WellTransSyncPage';
 
 const mockUseWellTransSync = vi.fn();
+const serviceMocks = vi.hoisted(() => ({
+  queueWellTransSync: vi.fn(),
+}));
 
 vi.mock('../hooks/useWellTransSync', () => ({
   useWellTransSync: (...args) => mockUseWellTransSync(...args),
@@ -25,7 +28,7 @@ vi.mock('../services/welltransService', () => ({
   explainWellTransFailureAI: vi.fn(),
   exportWellTransLogsCSV: vi.fn(),
   isWellTransFailureRetryable: vi.fn(() => false),
-  queueWellTransSync: vi.fn(),
+  queueWellTransSync: serviceMocks.queueWellTransSync,
   saveWellTransSettings: vi.fn(),
   clearLocalWellTransCredentials: vi.fn(),
   getLocalWellTransCredentialStatus: vi.fn(),
@@ -56,6 +59,9 @@ describe('WellTransSyncPage', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     global.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 404, json: async () => ({}) }));
+    serviceMocks.queueWellTransSync.mockResolvedValue({
+      data: { queued: 1, rejected: 0, expected: 1 },
+    });
     mockUseWellTransSync.mockReturnValue({
       settings: {
         enabled: false,
@@ -130,5 +136,36 @@ describe('WellTransSyncPage', () => {
     expect(container.textContent).not.toContain('0 Issues');
     expect(container.textContent).toContain('107485530');
     expect(container.textContent).toContain('Test Driver');
+  });
+
+  it('launches the registered Agent protocol before starting asynchronous reconciliation', async () => {
+    const state = mockUseWellTransSync();
+    mockUseWellTransSync.mockReturnValue({
+      ...state,
+      settings: { ...state.settings, enabled: true },
+    });
+    let launchedHref = '';
+    const protocolClick = vi.spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function captureProtocolLaunch() {
+        launchedHref = this.href;
+      });
+
+    await act(async () => {
+      root = ReactDOM.createRoot(container);
+      root.render(<WellTransSyncPage trips={[]} drivers={[]} vehicles={[]} role="dispatcher" />);
+    });
+    const openAndFill = [...container.querySelectorAll('button')]
+      .find(button => button.textContent.includes('Open & Fill'));
+
+    await act(async () => {
+      openAndFill.click();
+      await Promise.resolve();
+    });
+
+    expect(launchedHref).toMatch(/^agape-welltrans:\/\/start\?/);
+    expect(launchedHref).toContain('scope=all');
+    expect(protocolClick.mock.invocationCallOrder[0])
+      .toBeLessThan(serviceMocks.queueWellTransSync.mock.invocationCallOrder[0]);
+    expect(document.querySelector('a[href^="agape-welltrans://"]')).toBeNull();
   });
 });
