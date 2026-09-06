@@ -38,20 +38,17 @@ describe('mobile premium interaction contract', () => {
     expect(appSource).toContain('aria-label="Back to role selection"');
   });
 
-  it('uses truthful install copy and checks safety before every update reload', () => {
+  it('uses truthful install copy and activates updates only from the explicit update action', () => {
     const installSource = readComponent('./pwa/PWAInstallPrompt.jsx');
     const updateSource = readComponent('./pwa/PWAUpdatePrompt.jsx');
-    const firstSafetyCheck = updateSource.indexOf('const unsafeReasons = await checkUpdateSafety()');
     const activateWorker = updateSource.indexOf("reg.waiting.postMessage({ type: 'SKIP_WAITING' })");
-    const finalSafetyCheck = updateSource.indexOf('const finalUnsafeReasons = await checkUpdateSafety()');
     const reload = updateSource.indexOf('window.location.reload()');
 
     expect(installSource).not.toContain('Access your data even without internet');
     expect(installSource).not.toContain('Your data stays on your device');
     expect(installSource).toContain('Supported offline work');
-    expect(firstSafetyCheck).toBeGreaterThan(-1);
-    expect(firstSafetyCheck).toBeLessThan(activateWorker);
-    expect(finalSafetyCheck).toBeGreaterThan(activateWorker);
-    expect(finalSafetyCheck).toBeLessThan(reload);
+    expect(updateSource).toContain('onClick={handleUpdate}');
+    expect(activateWorker).toBeGreaterThan(-1);
+    expect(activateWorker).toBeLessThan(reload);
   });
 });

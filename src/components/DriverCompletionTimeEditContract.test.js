@@ -22,9 +22,9 @@ describe('driver completion time editing contract', () => {
     expect(body).not.toContain('setDepartedTime(');
   });
 
-  it('keeps chronological validation in the final completion submission', () => {
+  it('validates the entered trip sequence without blocking on a stale pickup-arrival event', () => {
     const body = functionBody('submitComplete', 'getPrimaryTripAction');
-    expect(body).toContain('pickupDepartureMs < pickupArrivalMs');
+    expect(body).not.toContain('pickupDepartureMs < pickupArrivalMs');
     expect(body).toContain('dropoffArrivalMs < pickupDepartureMs');
   });
 });
