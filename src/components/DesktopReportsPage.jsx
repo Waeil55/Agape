@@ -173,7 +173,7 @@ const DesktopReportsPage = ({
       const timer = setTimeout(() => setSortKeyOverrides({}), 1500);
       return () => clearTimeout(timer);
     }
-  }, [editingRow, editingCell]);
+  }, [editingRow, editingCell, sortKeyOverrides]);
 
   const inputRef = useRef(null);
   const startRowEdit = useCallback((trip) => {

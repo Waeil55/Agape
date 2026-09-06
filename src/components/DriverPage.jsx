@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
 import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
-import { latestWorkflowTimestamp, minuteEpoch, normalizeCompletionClocks } from '../utils/tripCompletionTimes';
+import { latestWorkflowTimestamp, minuteEpoch } from '../utils/tripCompletionTimes';
 import {
   calculateTripWindowLift,
   resolveTripKeyboardTop,
   TRIP_ODOMETER_WINDOW_EXTRA_LIFT_RATIO,
 } from '../utils/tripKeyboardLayout';
 import { buildDriverTimeConflicts } from '../utils/tripConflicts';
-import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, saveOdometerReading, saveTripWorkflowUpdate, onSnapshot, functions, httpsCallable } from '../config/firebase';
+import { auth, db, doc, setDoc, collection, serverTimestamp, query, where, EmailAuthProvider, reauthenticateWithCredential, onSnapshot, functions, httpsCallable } from '../config/firebase';
 import { optimizeRoute as aiOptimizeRoute } from '../config/ai';
 import { getDistanceMiles, getTravelDuration, geocodeAddress } from '../config/maps';
 import { showLocalNotification } from '../config/notifications';
@@ -729,6 +729,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     data: readWorkflowProgress(workflowStorageKey),
   }));
   const workflowProgress = workflowProgressState.data;
+  const workflowProgressRef = useRef(workflowProgress);
+  useEffect(() => {
+    workflowProgressRef.current = workflowProgress;
+  }, [workflowProgress]);
   const setWorkflowProgressData = useCallback((updater) => {
     setWorkflowProgressState((prev) => {
       const baseData = prev.storageKey === workflowStorageKey ? prev.data : readWorkflowProgress(workflowStorageKey);
@@ -1072,47 +1076,62 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [pullDistance, isRefreshing]);
 
   const advanceWorkflow = useCallback((trip, status, extraFields = {}, options = {}) => {
-    if (!trip?.id || !status) return;
+    if (!trip?.id || !status) return Promise.resolve(false);
     const workflowUpdatedAt = new Date().toISOString();
-    setWorkflowProgressData((prev) => {
-      const previousProgress = prev[trip.id] || {};
-      const currentTrip = applyWorkflowProgress(trip, previousProgress);
-      const incomingTrip = { ...currentTrip, status, ...extraFields };
-      const currentIndex = getWorkflowStepIndex(currentTrip);
-      const incomingIndex = getWorkflowStepIndex(incomingTrip);
+    const previousMap = workflowProgressRef.current || {};
+    const previousProgress = previousMap[trip.id] || null;
+    const currentTrip = applyWorkflowProgress(trip, previousProgress || {});
+    const incomingTrip = { ...currentTrip, status, ...extraFields };
+    const currentIndex = getWorkflowStepIndex(currentTrip);
+    const incomingIndex = getWorkflowStepIndex(incomingTrip);
+    if (!options.allowRegression && incomingIndex < currentIndex) return Promise.resolve(false);
 
-      if (!options.allowRegression && incomingIndex < currentIndex) {
-        return prev;
-      }
-
-      const nextProgress = {
-        ...previousProgress,
-        tripId: trip.id,
-        status,
-        ...extraFields,
-        workflowRegression: !!options.allowRegression,
-        workflowUpdatedAt,
-      };
-
-      if (options.allowRegression) {
-        Object.entries(WORKFLOW_FIELD_MIN_STEP).forEach(([field, minStep]) => {
-          if (minStep > incomingIndex) nextProgress[field] = null;
-        });
-      }
-
-      return { ...prev, [trip.id]: nextProgress };
-    });
-    const allFields = { status, ...extraFields, workflowUpdatedAt };
-    onUpdateTrip?.(trip.id, status, allFields);
-    saveTripWorkflowUpdate(trip.id, allFields).catch((err) => {
-      console.error('[DriverPage] Failed to persist workflow update:', err);
-    });
-    if (status === 'In Progress' && me?.id) {
-      setDoc(doc(db, 'driverProfiles', me.id), { activeTripId: trip.id, userId: auth.currentUser?.uid || '' }, { merge: true }).catch((err) => {
-        console.error('[DriverPage] Failed to persist activeTripId:', err);
+    const nextProgress = {
+      ...(previousProgress || {}),
+      tripId: trip.id,
+      status,
+      ...extraFields,
+      workflowRegression: !!options.allowRegression,
+      workflowUpdatedAt,
+    };
+    if (options.allowRegression) {
+      Object.entries(WORKFLOW_FIELD_MIN_STEP).forEach(([field, minStep]) => {
+        if (minStep > incomingIndex) nextProgress[field] = null;
       });
     }
-  }, [onUpdateTrip, setWorkflowProgressData, me?.id]);
+    const nextMap = { ...previousMap, [trip.id]: nextProgress };
+    workflowProgressRef.current = nextMap;
+    setWorkflowProgressData(nextMap);
+
+    const rollbackProgress = () => {
+      const currentMap = workflowProgressRef.current || {};
+      if (currentMap[trip.id]?.workflowUpdatedAt !== workflowUpdatedAt) return;
+      const rolledBack = { ...currentMap };
+      if (previousProgress) rolledBack[trip.id] = previousProgress;
+      else delete rolledBack[trip.id];
+      workflowProgressRef.current = rolledBack;
+      setWorkflowProgressData(rolledBack);
+    };
+    const allFields = { status, ...extraFields, workflowUpdatedAt };
+    return Promise.resolve(onUpdateTrip?.(trip.id, status, allFields))
+      .then((saved) => {
+        if (saved !== true) {
+          rollbackProgress();
+          return false;
+        }
+        if (status === 'In Progress' && me?.id) {
+          setDoc(doc(db, 'driverProfiles', me.id), { activeTripId: trip.id, userId: auth.currentUser?.uid || '' }, { merge: true }).catch((err) => {
+            console.error('[DriverPage] Failed to persist activeTripId:', err);
+          });
+        }
+        return true;
+      })
+      .catch((error) => {
+        rollbackProgress();
+        console.error('[DriverPage] Failed to persist workflow update:', error);
+        return false;
+      });
+  }, [onUpdateTrip, setWorkflowProgressData, me]);
 
   const clearActiveTrip = useCallback(() => {
     if (me?.id) {
@@ -1139,12 +1158,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       const signature = JSON.stringify({ status: mergedTrip.status, ...getWorkflowExtraFields(progress) });
       if (workflowSyncRef.current[tripId] === signature) return;
       workflowSyncRef.current[tripId] = signature;
-      onUpdateTrip?.(tripId, mergedTrip.status, getWorkflowExtraFields(progress));
-      saveTripWorkflowUpdate(tripId, {
-        status: mergedTrip.status,
+      Promise.resolve(onUpdateTrip?.(tripId, mergedTrip.status, {
         ...getWorkflowExtraFields(progress),
         workflowUpdatedAt: progress.workflowUpdatedAt || new Date().toISOString(),
-      }).catch((err) => {
+      })).catch((err) => {
         console.error('[DriverPage] Failed to replay workflow progress:', err);
       });
     });
@@ -2724,7 +2741,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         setGuidedStepIndex(0);
         guidedLastAdvance.current = -1;
       } else {
-        const nextStep = guidedSteps[nextIndex];
         setGuidedStepIndex(nextIndex);
       }
     }
@@ -3163,87 +3179,106 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
     tripActionInFlightRef.current = true;
     try {
-    const odo = evaluation.value;
-    setOdometerError('');
-    // Record pickup arrival + departure timestamps using canonical fields
-    const nowIso = new Date().toISOString();
-    const driverLocation = getDriverClockLocation();
-    const pickupLocation = getTripPickupLocation(showOdometerPrompt) || driverLocation;
+      const odo = evaluation.value;
+      setOdometerError('');
+      const nowIso = new Date().toISOString();
+      const driverLocation = getDriverClockLocation();
+      const pickupLocation = getTripPickupLocation(showOdometerPrompt) || driverLocation;
+      let homeTravel = null;
+      let homeLocation = null;
+      let autoClock = null;
 
-    await resumeBreakFromPickup(showOdometerPrompt, pickupLocation, nowIso, driverLocation);
+      if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
+        homeLocation = Number.isFinite(Number(me?.homeLat)) && Number.isFinite(Number(me?.homeLng))
+          ? { lat: Number(me.homeLat), lng: Number(me.homeLng) }
+          : null;
+        const pickupDestination = pickupLocation || driverLocation || showOdometerPrompt.pickup;
+        homeTravel = timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && homeLocation
+          ? await calculateBoundaryTravel(homeLocation, pickupDestination)
+          : null;
+        const anchor = calculateAnchor({
+          policyMode: timeTrackingPolicyMode,
+          driver: me,
+          lastWorkLocation: ttLastTripEventRef.current?.location || null,
+          pickupLocation: pickupLocation || driverLocation,
+          pickupTime: new Date(nowIso),
+        });
+        const travelMinutes = Math.max(0, homeTravel?.minutes ?? anchor.travelMinutes ?? 0);
+        autoClock = {
+          anchor,
+          travelMinutes,
+          clockInTime: homeTravel?.minutes > 0
+            ? new Date(new Date(nowIso).getTime() - travelMinutes * 60000).toISOString()
+            : (anchor.clockInTime ? anchor.clockInTime.toISOString() : nowIso),
+          anchorType: homeTravel?.minutes > 0 ? 'HOME_ROUTE' : anchor.anchorType,
+        };
+      }
 
-    let autoStartedShift = false;
-    let homeTravel = null;
-    let homeLocation = null;
-    if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
-      homeLocation = Number.isFinite(Number(me?.homeLat)) && Number.isFinite(Number(me?.homeLng))
-        ? { lat: Number(me.homeLat), lng: Number(me.homeLng) }
-        : null;
-      const pickupDestination = pickupLocation || driverLocation || showOdometerPrompt.pickup;
-      homeTravel = timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && homeLocation
-        ? await calculateBoundaryTravel(homeLocation, pickupDestination)
-        : null;
-      const anchor = calculateAnchor({
-        policyMode: timeTrackingPolicyMode,
-        driver: me,
-        lastWorkLocation: ttLastTripEventRef.current?.location || null,
-        pickupLocation: pickupLocation || driverLocation,
-        pickupTime: new Date(nowIso),
+      const saved = await advanceWorkflow(showOdometerPrompt, 'At Pickup', {
+        pickupOdometer: odo,
+        arrivalTime: nowIso,
+        startTime: nowIso,
+        ...(homeTravel?.minutes > 0 ? {
+          homeToPickupTravelMinutes: homeTravel.minutes,
+          homeToPickupCalculatedAt: nowIso,
+          homeToPickupCalculationSource: homeTravel.source,
+          homeToPickupConfidence: homeTravel.confidence,
+          homeToPickupDistanceMiles: homeTravel.distanceMiles ?? null,
+          homeLocationSnapshot: homeLocation,
+          pickupLocationSnapshot: pickupLocation || driverLocation || null,
+        } : {}),
       });
-      const travelMin = Math.max(0, homeTravel?.minutes ?? anchor.travelMinutes ?? 0);
-      const autoClockInTime = homeTravel?.minutes > 0
-        ? new Date(new Date(nowIso).getTime() - travelMin * 60000).toISOString()
-        : (anchor.clockInTime ? anchor.clockInTime.toISOString() : nowIso);
-      const anchorType = homeTravel?.minutes > 0 ? 'HOME_ROUTE' : anchor.anchorType;
-      onDriverStatusUpdate?.(driverId, true, {
-        clockTimestamp: autoClockInTime,
-        clockEventType: 'auto_in',
-        clockEventSource: 'verified_trip_pickup',
-        timeTrackingState: TT.ON_SHIFT_ACTIVE,
-        timeTrackingPolicy: timeTrackingPolicyMode,
-        timeTrackingAnchor: anchorType,
-        timeTrackingTravelMinutes: travelMin,
-        timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
-        timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
-        ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
-      });
-      setTtState(TT.ON_SHIFT_ACTIVE);
-      ttStateRef.current = TT.ON_SHIFT_ACTIVE;
-      ttClockInTimeRef.current = autoClockInTime;
-      ttEventsLogRef.current = [{
-        type: 'AUTO_CLOCK_IN',
-        timestamp: autoClockInTime,
-        location: anchor.anchorLocation || driverLocation || pickupLocation,
-        anchorType,
-        travelMinutes: travelMin,
-        policyMode: timeTrackingPolicyMode,
-      }];
-      setTtBillableMin(0);
-      setTtBreakMin(0);
-      ttBreakStartRef.current = null;
-      autoStartedShift = true;
-      setShowToast({ type: 'success', message: `Auto clocked in - ${travelMin} min travel included.` });
-    }
-    advanceWorkflow(showOdometerPrompt, 'At Pickup', {
-      pickupOdometer: odo,
-      arrivalTime: nowIso,
-      startTime: nowIso,
-      ...(homeTravel?.minutes > 0 ? {
-        homeToPickupTravelMinutes: homeTravel.minutes,
-        homeToPickupCalculatedAt: nowIso,
-        homeToPickupCalculationSource: homeTravel.source,
-        homeToPickupConfidence: homeTravel.confidence,
-        homeToPickupDistanceMiles: homeTravel.distanceMiles ?? null,
-        homeLocationSnapshot: homeLocation,
-        pickupLocationSnapshot: pickupLocation || driverLocation || null,
-      } : {}),
-    });
-    if (autoStartedShift || ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
-      ttLogTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt.id, driverLocation || pickupLocation);
-    }
-    setLastOdometer(odo);
-    setShowOdometerPrompt(null);
-    setOdometerValue('');
+      if (!saved) {
+        setOdometerError('The pickup odometer was not saved. Your entry is preserved; check the connection and retry.');
+        return;
+      }
+
+      let autoStartedShift = false;
+      try {
+        await resumeBreakFromPickup(showOdometerPrompt, pickupLocation, nowIso, driverLocation);
+        if (autoClock) {
+          const { anchor, travelMinutes, clockInTime, anchorType } = autoClock;
+          await Promise.resolve(onDriverStatusUpdate?.(driverId, true, {
+            clockTimestamp: clockInTime,
+            clockEventType: 'auto_in',
+            clockEventSource: 'verified_trip_pickup',
+            timeTrackingState: TT.ON_SHIFT_ACTIVE,
+            timeTrackingPolicy: timeTrackingPolicyMode,
+            timeTrackingAnchor: anchorType,
+            timeTrackingTravelMinutes: travelMinutes,
+            timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
+            timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
+            ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
+          }));
+          setTtState(TT.ON_SHIFT_ACTIVE);
+          ttStateRef.current = TT.ON_SHIFT_ACTIVE;
+          ttClockInTimeRef.current = clockInTime;
+          ttEventsLogRef.current = [{
+            type: 'AUTO_CLOCK_IN',
+            timestamp: clockInTime,
+            location: anchor.anchorLocation || driverLocation || pickupLocation,
+            anchorType,
+            travelMinutes,
+            policyMode: timeTrackingPolicyMode,
+          }];
+          setTtBillableMin(0);
+          setTtBreakMin(0);
+          ttBreakStartRef.current = null;
+          autoStartedShift = true;
+          setShowToast({ type: 'success', message: `Auto clocked in - ${travelMinutes} min travel included.` });
+        }
+      } catch (timeTrackingError) {
+        console.error('[DriverPage] Pickup saved but time tracking update failed:', timeTrackingError);
+        setShowToast({ type: 'error', message: 'Pickup saved. Time tracking still needs synchronization.' });
+      }
+      if (autoStartedShift || ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+        ttLogTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt.id, driverLocation || pickupLocation);
+      }
+      setLastOdometer(odo);
+      setShowOdometerPrompt(null);
+      setOdometerValue('');
+    } catch (error) {
+      setOdometerError(error?.message || 'The pickup odometer could not be saved. Retry.');
     } finally {
       tripActionInFlightRef.current = false;
     }
@@ -3433,7 +3468,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         const credential = EmailAuthProvider.credential(auth.currentUser.email, d._password);
         await reauthenticateWithCredential(auth.currentUser, credential);
       }
-      advanceWorkflow(original, cleanData.status || original.status, cleanData);
+      const saved = await advanceWorkflow(original, cleanData.status || original.status, cleanData);
+      if (!saved) throw new Error('Trip changes could not be saved. Check the connection and retry.');
       setShowTripDetails(prev => (prev?.id === original.id ? { ...prev, ...cleanData } : prev));
       setEditingTripId(null);
       setEditingTripData(null);
@@ -3585,7 +3621,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         }, 'Route Dismissed', `${currentUser} dismissed route "${dismissSequence.name || 'Assigned Route'}".`);
       } else if (type === 'edittrip') {
         if (editedData) {
-          advanceWorkflow(trip, editedData.status || trip.status, editedData);
+          const saved = await advanceWorkflow(trip, editedData.status || trip.status, editedData);
+          if (!saved) throw new Error('Trip changes could not be saved. Check the connection and retry.');
           setShowTripDetails(prev => (prev?.id === trip.id ? { ...prev, ...editedData } : prev));
           if (onAddAuditLog) {
             onAddAuditLog('Trip Updated', `${currentUser} updated trip details for ${trip.patient}.`, 'blue');
@@ -3594,13 +3631,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       } else if (type === 'edittripcomplete') {
         if (editedData) {
           const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
-          advanceWorkflow(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
+          const saved = await advanceWorkflow(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
+          if (!saved) throw new Error('Trip completion could not be saved. Check the connection and retry.');
           setShowTripDetails(prev => (prev?.id === trip.id ? { ...prev, ...editedData, status: 'Completed', completedVehicle: me?.vehicle || '' } : prev));
           if (onAddAuditLog) {
             onAddAuditLog('Trip Completed via Edit', `${currentUser} completed trip for ${trip.patient} (odo: ${odo.toLocaleString()} mi).`, 'emerald');
           }
           setLastOdometer(odo);
-          if (navigator.onLine) { saveOdometerReading(trip.id, odo).catch(() => {}); }
           setExpandedTripId(null);
           setSelectedTrips(prev => prev.filter(id => id !== trip.id));
         }
@@ -3633,8 +3670,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       setPasswordError('');
       setRestorePrompt(null);
       setSelectedLegsForAction(new Set());
-    } catch {
-      setPasswordError('Incorrect password. Try again.');
+    } catch (error) {
+      const isCredentialError = String(error?.code || '').includes('auth/');
+      setPasswordError(isCredentialError ? 'Incorrect password. Try again.' : (error?.message || 'The trip change could not be saved. Retry.'));
     }
     setPasswordVerifying(false);
   };
@@ -3716,11 +3754,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const dropoffArrivalIso = timeToIsoForTripDate(arrivalDropoffTime, serviceDate)
       || showCompleteModal.arrivalDropoffTime
       || now;
-    const pickupArrivalIso = getCompletionPickupBoundary(showCompleteModal);
-    // The form intentionally captures minute precision. Compare the stored
-    // workflow timestamps at that same precision so 10:35 is not rejected
-    // merely because the arrival event contains seconds (for example 10:35:38).
-    const pickupArrivalMs = pickupArrivalIso ? minuteEpoch(pickupArrivalIso) : NaN;
     const pickupDepartureMs = minuteEpoch(departedPickupIso);
     const dropoffArrivalMs = minuteEpoch(dropoffArrivalIso);
     if (dropoffArrivalMs < pickupDepartureMs) {
@@ -3742,8 +3775,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const estimatedHomeArrivalTime = homeTravel?.minutes > 0
       ? new Date(new Date(dropoffArrivalIso).getTime() + homeTravel.minutes * 60000).toISOString()
       : null;
-    setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
-    advanceWorkflow(showCompleteModal, 'Completed', {
+    const saved = await advanceWorkflow(showCompleteModal, 'Completed', {
       pickupOdometer: pickupOdo,
       dropoffOdometer: odo,
       completedAt: now,
@@ -3762,6 +3794,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         timeTrackingBoundaryPolicy: POLICY_MODES.PAY_FROM_HOME,
       } : {}),
     });
+    if (saved === false) {
+      setCompleteError('The trip could not be saved. Your entry is preserved; check the connection and retry.');
+      return;
+    }
+    setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
     if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
       ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, getTripDropoffLocation(showCompleteModal) || getDriverClockLocation());
     }
@@ -3772,11 +3809,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setCompleteError('');
     setCompleteTimeNotice('');
     setCompleteAck(false);
-
-    // Save odometer to Firestore directly
-    if (navigator.onLine) {
-      saveOdometerReading(showCompleteModal.id, odo).catch(() => {});
-    }
 
     // Reset trip selection and expanded state after completion
     setSelectedTrips(prev => prev.filter(id => id !== showCompleteModal.id));
@@ -5911,13 +5943,20 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const updated = {
                         ...editFields,
                         workflowUpdatedAt: new Date().toISOString(),
                       };
-                      onUpdateTrip?.(showTripDetails.id, showTripDetails.status || 'Assigned', updated);
-                      saveTripWorkflowUpdate(showTripDetails.id, updated).catch(err => console.error(err));
+                      const saved = await Promise.resolve(onUpdateTrip?.(
+                        showTripDetails.id,
+                        showTripDetails.status || 'Assigned',
+                        updated,
+                      ));
+                      if (saved !== true) {
+                        setShowToast({ type: 'error', message: 'Trip changes were not saved. Check the connection and retry.' });
+                        return;
+                      }
                       onAddAuditLog?.('Trip Details Edited', `${currentUser} updated trip data for ${editFields.patient}.`, 'blue');
                       setShowTripDetails(prev => ({ ...prev, ...editFields }));
                       setIsEditingDetails(false);
@@ -7000,7 +7039,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           setSelectedLegsForAction(prev => prev.size === cancelPrompt.legs.length ? new Set() : new Set(cancelPrompt.legs.map(l => l.id)));
         };
         const actionLabel = cancelPrompt.type === 'noshow' ? 'No Show' : cancelPrompt.type === 'reroute' ? 'Reroute' : 'Cancel';
-        const gradientFrom = cancelPrompt.type === 'noshow' ? 'from-orange-500 to-amber-600' : cancelPrompt.type === 'reroute' ? 'from-purple-600 to-purple-500' : 'from-rose-600 to-rose-500';
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 140 }} onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }}>
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
@@ -7260,7 +7298,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {quickSmsMenuTrip && (() => {
         const smsTrip = quickSmsMenuTrip;
         const smsPrimary = getPrimaryContactForTrip(smsTrip);
-        const smsFirstName = String(smsTrip.patient || '').trim().split(/\s+/)[0] || 'there';
         const smsFirstContact = smsPrimary ? !hasMessagedClientBefore(smsPrimary.phone) : false;
         const smsTripKey = tripCalendarDateKey(smsTrip.date);
         const todayKey = localCalendarYmd();

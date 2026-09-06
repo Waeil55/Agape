@@ -1,6 +1,6 @@
 # Agape Care Real-Time Event Engine
 
-Task 2 adds the core event stream for operational state changes. The current application still preserves its existing UI behavior and legacy mirrors, but central write paths now emit append-only `system_events` records.
+The real-time event engine records operational state changes from the current authoritative collection write paths. Obsolete `appData` trip-array mirrors and direct trip helper writes are not part of this architecture.
 
 ## Event Stream
 
@@ -67,11 +67,7 @@ Trip array writes in `useFirestoreAppData()` now compare before/after state and 
 - `trip_cancelled` when status becomes cancelled/canceled
 - `trip_updated` for other trip mutations
 
-Direct trip helpers in `src/config/firebase.js` also emit events:
-
-- `updateTripStatus()`
-- `saveOdometerReading()`
-- `saveTripWorkflowUpdate()`
+Driver workflow changes use `upsertDriverTrip()` in `useFirestoreAppData()`. It commits the authoritative `trips` document and its `driverTripProgress` and `tripLedger` mirrors in one Firestore batch; the collection writer then emits the corresponding event.
 
 ### Driver state
 
@@ -79,13 +75,11 @@ Driver array/profile writes now emit:
 
 - `driver_status_changed`
 
-Direct driver helpers also emit events:
-
-- `updateDriverProfile()`
+Driver profile writes are routed through `useFirestoreAppData()`.
 
 ### Location state
 
-`updateDriverLocation()` now writes latest location to:
+The application location stream writes latest location to:
 
 ```txt
 driver_locations/{driverId}

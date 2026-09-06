@@ -11,7 +11,6 @@ import { requestNotificationPermission, showLocalNotification, onForegroundMessa
 import { playNotificationSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS } from './utils/nativeActions';
 import { resolveTripVehicle } from './utils/vehiclePersistence';
-import { getVehicleMaintenanceStatus } from './utils/fleetMaintenance';
 import { initPlatform } from './utils/platform';
 import {
   buildTelemetryDocId,
@@ -964,7 +963,7 @@ const App = () => {
       cutoff.setDate(cutoff.getDate() - 10);
       const cutoffKey = todayLocal(cutoff);
       const filtered = recentDocs
-        .filter((item) => !item.date || item.date >= cutoffKey)
+        .filter((item) => !item.date || (tripCalendarDateKey(item.date) || '') >= cutoffKey)
         .sort((a, b) => Date.parse(b?.lastPingAt || b?.updatedAtLocal || 0) - Date.parse(a?.lastPingAt || a?.updatedAtLocal || 0));
       startTransition(() => setDriverTelemetry(filtered));
     }, (err) => {
@@ -2388,72 +2387,6 @@ const App = () => {
     );
   };
 
-  const handleCompleteTrip = (tripId, driverId, odometer) => {
-    const trip = trips.find(t => t.id === tripId);
-    if (!trip) return;
-    // Idempotency: a duplicated completion call must never double-write.
-    if (String(trip.status || '').toLowerCase() === 'completed' && trip.completedAt) return;
-    if (!trip?.pickupOdometer || !trip?.arrivalTime || !trip?.departedPickupTime || !trip?.arrivalDropoffTime || (!trip?.paperSignatureConfirmed && !trip?.unableToSign)) {
-      addAuditLog('Trip Completion Blocked', `${currentUser || 'Driver'} attempted to complete ${trip?.patient || tripId} before all required steps were finished.`, 'rose');
-      return;
-    }
-    const completedAt = new Date().toISOString();
-    const completionDriver = driversRef.current.find(driver => driver.id === driverId)
-      || driversRef.current.find(driver => normalizeEmail(driver.email) === normalizeEmail(trip.driverEmail));
-    const nextTrip = enrichTripMetrics({
-      ...trip,
-      status: 'Completed',
-      dropoffOdometer: odometer,
-      completedAt,
-      completedVehicle: resolveTripVehicle(trip, completionDriver) || '',
-      completedDriverName: completionDriver?.name || trip.completedDriverName || trip.driverName || '',
-    });
-    const completedVehicleName = nextTrip.completedVehicle;
-    if (role === 'driver') {
-      upsertDriverTrip(tripId, nextTrip);
-      upsertDriverProfile(driverId, { odometer });
-    } else {
-      setTrips(prev => prev.map(t => t.id === tripId ? nextTrip : t));
-      setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, odometer } : d));
-    }
-    if (completedVehicleName && Number.isFinite(Number(odometer))) {
-      syncVehicleOdometerFromTrip(nextTrip, odometer, completedAt);
-    }
-    const diffs = [];
-    Object.keys(nextTrip || {}).forEach((key) => {
-      if (String(trip?.[key]) !== String(nextTrip?.[key])) {
-        diffs.push({ field: key, before: trip?.[key], after: nextTrip?.[key] });
-      }
-    });
-    const driver = completionDriver;
-    addAuditLog(
-      'Trip Completed',
-      `${driver?.name || 'Driver'} completed trip ${tripId} (${trip?.patient}). Odometer: ${odometer?.toLocaleString()} mi.`,
-      'emerald',
-      { entity: 'trip', id: tripId, diffs, summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; ') }
-    );
-    // Maintenance check uses the same authoritative policy as the fleet workspace.
-    if (driver) {
-      const assignedVehicle = vehicles.find((vehicle) => vehicle.id === driver.vehicleId
-        || String(vehicle.name || '').trim().toLowerCase() === String(completedVehicleName || '').trim().toLowerCase());
-      if (assignedVehicle) {
-        const service = getVehicleMaintenanceStatus({ ...assignedVehicle, odometer: Math.max(Number(assignedVehicle.odometer || 0), Number(odometer || 0)) }, [], drivers, appSettings.maintenancePolicy);
-        if (service.attention) {
-          const details = [
-            service.oil.status !== 'healthy' ? `oil ${service.oil.status.replace('_', ' ')} (${service.oil.milesRemaining.toLocaleString()} mi remaining)` : '',
-            service.filter.status !== 'healthy' ? `filter ${service.filter.status.replace('_', ' ')}${service.filter.nextServiceDate ? ` (${service.filter.nextServiceDate})` : ''}` : '',
-          ].filter(Boolean).join('; ');
-          addAuditLog('Maintenance Alert', `${assignedVehicle.name}: ${details}.`, ['overdue', 'due'].includes(service.status) ? 'rose' : 'amber', { entity: 'vehicle', id: assignedVehicle.id, maintenanceStatus: service.status });
-          if (notificationsEnabled && role !== 'driver') showLocalNotification('Vehicle maintenance reminder', `${assignedVehicle.name}: ${details}.`, 'notification');
-        }
-      }
-    }
-    if (notificationsEnabled) {
-      playNotificationSound();
-      showLocalNotification('✅ Trip Completed', `${trip?.patient || 'Trip'} marked as completed. Odometer: ${odometer?.toLocaleString()} mi.`);
-    }
-  };
-
   const handleUpdateDriverLocation = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
     if (!driverId) return;
 
@@ -2781,7 +2714,7 @@ const App = () => {
     }
   };
 
-  const handleDriverTripUpdate = useCallback((tripId, status, extraData = {}) => {
+  const handleDriverTripUpdate = useCallback(async (tripId, status, extraData = {}) => {
     // Normalize status to canonical PascalCase to prevent case-sensitive filter mismatches.
     const raw = String(status || '').trim();
     const lower = raw.toLowerCase();
@@ -2793,19 +2726,19 @@ const App = () => {
     };
     const normalizedStatus = STATUS_CANONICAL[lower] || status;
     const previousTrip = trips.find((trip) => trip.id === tripId);
-    if (role === 'driver') {
-      void upsertDriverTrip(tripId, { status: normalizedStatus, ...extraData });
-    } else {
-      void setTrips((previous) => previous.map((trip) => (
+    const persistence = role === 'driver'
+      ? upsertDriverTrip(tripId, { status: normalizedStatus, ...extraData })
+      : setTrips((previous) => previous.map((trip) => (
         trip.id === tripId ? { ...trip, status: normalizedStatus, ...extraData } : trip
       )));
-    }
-    if (!previousTrip) return;
+    const saved = await Promise.resolve(persistence);
+    if (saved !== true) return false;
+    if (!previousTrip) return true;
     const nextTrip = { ...previousTrip, status: normalizedStatus, ...extraData };
     const diffs = Object.keys(nextTrip)
       .filter((key) => String(previousTrip[key]) !== String(nextTrip[key]))
       .map((key) => ({ field: key, before: previousTrip[key], after: nextTrip[key] }));
-    if (diffs.length === 0) return;
+    if (diffs.length === 0) return true;
     addAuditLog(
       'Driver Update',
       `${currentUser} updated trip ${tripId} (${previousTrip.patient || 'Unknown'}) to ${normalizedStatus}`,
@@ -2815,6 +2748,7 @@ const App = () => {
         summary: diffs.map((diff) => `${diff.field}: ${diff.before ?? '—'} → ${diff.after ?? '—'}`).join('; '),
       },
     );
+    return true;
   }, [addAuditLog, currentUser, role, setTrips, trips, upsertDriverTrip]);
 
   const renderLoginScreen = () => {
@@ -3128,9 +3062,6 @@ const App = () => {
               onDriverStatusUpdate={handleDriverStatusUpdate}
               onUpdateClockEvents={handleUpdateClockEvents}
               onUpdateHourlyRate={handleUpdateHourlyRate}
-              onCompleteTrip={(tripId, driverId, odometer) => {
-                handleCompleteTrip(tripId, driverId, odometer);
-              }}
               onAddAuditLog={addAuditLog}
               onAddTrip={addTrip}
               requestAuthAction={requestAuthAction}
@@ -3227,7 +3158,6 @@ const App = () => {
               }}
               onUpdateDriverTrip={handleDriverTripUpdate}
               onDriverStatusUpdate={handleDriverStatusUpdate}
-              onCompleteTrip={handleCompleteTrip}
               onLogout={handleLogout}
             /></Suspense>
           )}

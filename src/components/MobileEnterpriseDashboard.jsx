@@ -592,7 +592,6 @@ const MobileEnterpriseDashboard = (props) => {
                     defaultTripId={tripWorkflowActive ? trip.id : null}
                     initialShowDetailsId={!tripWorkflowActive ? trip.id : null}
                     onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
-                    onCompleteTrip={props.onCompleteTrip}
                     onDriverStatusUpdate={props.onDriverStatusUpdate}
                     onUpdateClockEvents={props.onUpdateClockEvents}
                     onUpdateHourlyRate={props.onUpdateHourlyRate}

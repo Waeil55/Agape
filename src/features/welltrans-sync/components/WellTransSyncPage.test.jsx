@@ -85,7 +85,7 @@ describe('WellTransSyncPage', () => {
       workerOnline: false,
       workerCalibrated: false,
       workerUpgradeRequired: false,
-      requiredWorkerVersion: '5.0.7',
+      requiredWorkerVersion: '5.0.8',
       workerStandby: false,
       loading: false,
       dateTrips: [],

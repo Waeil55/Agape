@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Plus, MapPin, Clock, User, Phone, FileText, Calendar, Repeat, Hash, Truck, Navigation } from 'lucide-react';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { getClientProfile, prefillFromProfile } from '../utils/clientProfileUtils';
@@ -68,10 +68,10 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
     }
   }, [role, selectableDrivers]);
 
-  const update = (field, value) => {
+  const update = useCallback((field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
-  };
+    setErrors(prev => (prev[field] ? { ...prev, [field]: '' } : prev));
+  }, []);
 
   const profileTimerRef = useRef(null);
   const handlePatientChange = useCallback((value) => {
@@ -84,7 +84,9 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
         setForm(prev => prefillFromProfile(profile, prev));
       }
     }, 500);
-  }, []);
+  }, [update]);
+
+  useEffect(() => () => clearTimeout(profileTimerRef.current), []);
 
   const toggleWeekday = (day) => {
     setForm(prev => ({

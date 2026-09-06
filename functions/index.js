@@ -13,6 +13,15 @@ const {
   evaluateWellTransReviewBatch,
   hasVerifiedEvidence: hasVerifiedWellTransReviewEvidence,
 } = require("./welltransReviewGuard");
+const {
+  buildInboundSmsLog,
+  maskPhone,
+  normalizePhone,
+  parseConfirmation,
+  updateTripConfirmationById,
+  validateDriverSmsAccess,
+  verifyTelnyxSignature: verifyTelnyxWebhookSignature,
+} = require("./telnyxWebhook");
 
 function resolveRuntimeProjectId() {
   if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
@@ -136,14 +145,6 @@ exports.auditChatMessageChanges = functions.firestore
     }
     return null;
   });
-
-function normalizePhone(raw) {
-  if (!raw) return raw;
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("1")) return "+" + digits;
-  if (digits.length === 10) return "+1" + digits;
-  return "+" + digits;
-}
 
 async function requireRole(context, allowedRoles) {
   if (!context.auth) {
@@ -644,7 +645,12 @@ exports.sendSms = functions
     const telnyxData = res.data?.data || {};
     const messageId = telnyxData.id;
     const status = telnyxData.to?.[0]?.status || "queued";
-    functions.logger.info("Telnyx send response:", { messageId, status, to, from: fromNumber });
+    functions.logger.info("Telnyx send response:", {
+      messageId,
+      status,
+      to: maskPhone(to),
+      from: maskPhone(fromNumber),
+    });
     if (tripId) {
       await admin.firestore().collection("smsLogs").add({
         tripId,
@@ -661,7 +667,11 @@ exports.sendSms = functions
   } catch (err) {
     const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
     const errCode = err.response?.data?.errors?.[0]?.code || "";
-    functions.logger.error("Telnyx send error:", { detail: errDetail, code: errCode, response: err.response?.data });
+    functions.logger.error("Telnyx send error:", {
+      code: errCode,
+      status: err.response?.status || null,
+      hasProviderDetail: Boolean(errDetail),
+    });
     throw new functions.https.HttpsError("internal", errDetail || "Failed to send SMS.");
   }
 });
@@ -669,11 +679,34 @@ exports.sendSms = functions
 exports.sendDriverSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
   .https.onCall(async (data, context) => {
-  await requireRole(context, ["admin", "dispatcher", "driver"]);
+  const actor = await requireRole(context, ["admin", "dispatcher", "driver"]);
   const { to: rawTo, text, tripId } = data;
   const to = normalizePhone(rawTo);
   if (!to || !text) {
     throw new functions.https.HttpsError("invalid-argument", "Both 'to' and 'text' are required.");
+  }
+  if (actor.role === "driver") {
+    const safeTripId = String(tripId || "").trim();
+    if (!safeTripId) {
+      throw new functions.https.HttpsError("failed-precondition", "A trip is required before messaging a client.");
+    }
+    const tripSnapshot = await admin.firestore().doc(`trips/${safeTripId}`).get();
+    if (!tripSnapshot.exists) {
+      throw new functions.https.HttpsError("not-found", "The assigned trip could not be found.");
+    }
+    const access = validateDriverSmsAccess({
+      trip: tripSnapshot.data(),
+      actor,
+      uid: context.auth.uid,
+      tokenEmail: context.auth.token?.email || "",
+      recipient: to,
+    });
+    if (access.reason === "client_phone_unverified") {
+      throw new functions.https.HttpsError("failed-precondition", "The client phone needs dispatcher review before messaging.");
+    }
+    if (!access.allowed) {
+      throw new functions.https.HttpsError("permission-denied", "This trip or client phone is not assigned to your account.");
+    }
   }
   try {
     const telnyx = getTelnyxConfig();
@@ -695,7 +728,13 @@ exports.sendDriverSms = functions
     const telnyxData = res.data?.data || {};
     const messageId = telnyxData.id;
     const status = telnyxData.to?.[0]?.status || "queued";
-    functions.logger.info("Telnyx driver SMS:", { messageId, status, to, from: fromNumber, driverId: context.auth.uid });
+    functions.logger.info("Telnyx driver SMS:", {
+      messageId,
+      status,
+      to: maskPhone(to),
+      from: maskPhone(fromNumber),
+      driverId: context.auth.uid,
+    });
     if (tripId) {
       await admin.firestore().collection("smsLogs").add({
         tripId,
@@ -711,10 +750,14 @@ exports.sendDriverSms = functions
     }
     return { success: true, messageId, status };
   } catch (err) {
-    const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
     const errCode = err.response?.data?.errors?.[0]?.code || "";
-    functions.logger.error("Telnyx driver SMS error:", { detail: errDetail, code: errCode, response: err.response?.data });
-    throw new functions.https.HttpsError("internal", errDetail || "Failed to send SMS.");
+    functions.logger.error("Telnyx driver SMS error:", {
+      code: errCode,
+      status: err.response?.status || null,
+      to: maskPhone(to),
+      tripId: String(tripId || "").slice(0, 80),
+    });
+    throw new functions.https.HttpsError("unavailable", "The message service is temporarily unavailable.");
   }
 });
 
@@ -768,7 +811,11 @@ exports.sendBulkSms = functions
       }
     } catch (err) {
       const errorMsg = err.response?.data?.errors?.[0]?.detail || err.message;
-      functions.logger.error(`Failed to send SMS to ${to}:`, err.response?.data || err.message);
+      functions.logger.error("Bulk SMS send failed.", {
+        to: maskPhone(to),
+        status: err.response?.status || null,
+        code: err.response?.data?.errors?.[0]?.code || null,
+      });
       results.push({ to, success: false, error: errorMsg });
       failed++;
       if (!firstError) firstError = errorMsg;
@@ -783,61 +830,16 @@ exports.sendBulkSms = functions
   };
 });
 
-const CONFIRM_WORDS = ["yes", "yea", "yep", "sure", "confirm", "confirmed", "coming", "1", "ok", "okay"];
-const DENY_WORDS = ["no", "nah", "nope", "cancel", "not coming", "not", "0", "stop"];
-
-function parseConfirmation(text) {
-  const t = (text || "").trim().toLowerCase().replace(/[^a-z0-9 ]/g, "");
-  if (CONFIRM_WORDS.some(w => t === w || t.startsWith(w + " "))) return "confirmed";
-  if (DENY_WORDS.some(w => t === w || t.startsWith(w + " "))) return "not_coming";
-  return null;
-}
-
 function verifyTelnyxSignature(req) {
   const publicKey = getTelnyxConfig().webhook_public_key;
   if (!publicKey) {
-    functions.logger.warn("Telnyx webhook public key not configured — skipping signature verification");
-    return true;
+    functions.logger.error("Telnyx webhook public key is not configured; the request was rejected.");
+    return false;
   }
   const signature = req.headers["telnyx-signature-ed25519"];
   const timestamp = req.headers["telnyx-timestamp"];
-  if (!signature || !timestamp) {
-    functions.logger.warn("Missing Telnyx webhook signature headers");
-    return false;
-  }
-  try {
-    const timestampValue = Number(timestamp);
-    const timestampMs = timestampValue > 1e12 ? timestampValue : timestampValue * 1000;
-    if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
-      functions.logger.warn("Telnyx webhook timestamp outside tolerance", { timestamp });
-      return false;
-    }
-
-    const payload = req.rawBody?.toString("utf8") || JSON.stringify(req.body);
-    const signedPayload = Buffer.from(`${timestamp}|${payload}`, "utf8");
-    const publicKeyMaterial = String(publicKey).trim();
-    let keyObject;
-
-    if (publicKeyMaterial.includes("BEGIN PUBLIC KEY")) {
-      keyObject = crypto.createPublicKey(publicKeyMaterial);
-    } else {
-      const rawKey = Buffer.from(
-        publicKeyMaterial,
-        /^[0-9a-f]{64}$/i.test(publicKeyMaterial) ? "hex" : "base64"
-      );
-      const spkiPrefix = Buffer.from("302a300506032b6570032100", "hex");
-      keyObject = crypto.createPublicKey({
-        key: rawKey.length === 32 ? Buffer.concat([spkiPrefix, rawKey]) : rawKey,
-        format: "der",
-        type: "spki",
-      });
-    }
-
-    return crypto.verify(null, signedPayload, keyObject, Buffer.from(signature, "base64"));
-  } catch (err) {
-    functions.logger.error("Telnyx signature verification error:", err);
-    return false;
-  }
+  const payload = req.rawBody?.toString("utf8") || JSON.stringify(req.body);
+  return verifyTelnyxWebhookSignature({ publicKey, signature, timestamp, payload });
 }
 
 exports.handleInboundSms = functions
@@ -860,7 +862,7 @@ exports.handleInboundSms = functions
       const status = payload?.to?.[0]?.status || payload?.status || "";
       const toNumber = typeof payload?.to === "string" ? payload.to :
                        payload?.to?.[0]?.phone_number || payload?.to?.phone_number || "";
-      functions.logger.info("Delivery receipt:", { messageId, status, to: toNumber });
+      functions.logger.info("Delivery receipt:", { messageId, status, to: maskPhone(toNumber) });
       if (messageId && status) {
         const smsSnapshot = await admin.firestore()
           .collection("smsLogs")
@@ -895,21 +897,27 @@ exports.handleInboundSms = functions
     const messageId = payload.id || payload.message_id || "";
 
     if (!from || !text) {
-      functions.logger.warn("Inbound SMS skipped — missing from or text", { from, text, payload });
+      functions.logger.warn("Inbound SMS skipped — missing required fields", {
+        hasFrom: Boolean(from),
+        hasText: Boolean(text),
+      });
       res.status(200).json({ ok: true, skipped: "missing fields" });
       return;
     }
 
-    await admin.firestore().collection("smsLogs").add({
-      direction: "inbound",
+    await admin.firestore().collection("smsLogs").add(buildInboundSmsLog({
       from,
       to,
       text,
       messageId,
-      raw: JSON.stringify(payload),
+      eventType,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    }));
+    functions.logger.info("Inbound SMS logged:", {
+      from: maskPhone(from),
+      to: maskPhone(to),
+      messageId,
     });
-    functions.logger.info("Inbound SMS logged:", { from, to, messageId });
 
     const confirmation = parseConfirmation(text);
     if (confirmation && from) {
@@ -925,22 +933,14 @@ exports.handleInboundSms = functions
         const smsData = smsSnapshot.docs[0].data();
         const tripId = smsData.metadata?.tripId || smsData.tripId;
         if (tripId) {
-          const appDataRef = admin.firestore().doc("appData/agape");
-          const appData = await appDataRef.get();
-          if (appData.exists) {
-            const trips = [...(appData.data().trips || [])];
-            const idx = trips.findIndex(t => t.id === tripId);
-            if (idx !== -1) {
-              trips[idx] = { ...trips[idx], clientConfirmation: confirmation };
-              await appDataRef.update({
-                trips,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedField: "trips",
-                updatedAtLocal: new Date().toISOString(),
-              });
-              functions.logger.info("Trip confirmation updated:", { tripId, confirmation });
-            }
-          }
+          const updated = await updateTripConfirmationById({
+            db: admin.firestore(),
+            tripId,
+            confirmation,
+            serverTimestamp: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          if (updated) functions.logger.info("Trip confirmation updated:", { tripId, confirmation });
+          else functions.logger.warn("Trip confirmation was not applied because the exact trip ID was not found.", { tripId });
         }
       }
     }
@@ -1911,7 +1911,7 @@ exports.confirmWellTransReviewBatchApplied = functions
       manifest,
       logs,
       nowMs: Date.now(),
-      minimumWorkerVersion: "5.0.7",
+      minimumWorkerVersion: "5.0.8",
     });
     if (!reviewGuard.ready) {
       throw new functions.https.HttpsError(

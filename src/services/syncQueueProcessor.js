@@ -1,4 +1,4 @@
-import { db, doc, setDoc, serverTimestamp, deleteDoc } from '../config/firebase';
+import { db, doc, setDoc, serverTimestamp, deleteDoc, writeBatch } from '../config/firebase';
 import {
   completeSyncOperation,
   deadLetterSyncOperation,
@@ -179,6 +179,24 @@ export class SyncQueueProcessor {
           }, { merge: true });
           return;
         }
+      case 'setDocs': {
+        if (!Array.isArray(operation.writes) || operation.writes.length < 1 || operation.writes.length > 450) {
+          throw new PermanentSyncError('setDocs requires between 1 and 450 writes');
+        }
+        const batch = writeBatch(db);
+        operation.writes.forEach((write, index) => {
+          if (!write?.collection || !write?.docId || !write?.data || typeof write.data !== 'object') {
+            throw new PermanentSyncError(`setDocs write ${index + 1} requires collection, docId, and data`);
+          }
+          batch.set(doc(db, write.collection, write.docId), {
+            ...sanitizeFirestorePayload(write.data),
+            syncedAt: serverTimestamp(),
+            syncedAtLocal: new Date().toISOString(),
+          }, { merge: true });
+        });
+        await batch.commit();
+        return;
+      }
       case 'deleteDoc':
         if (!operation.collection || !operation.docId) throw new PermanentSyncError('deleteDoc requires collection and docId');
         await deleteDoc(doc(db, operation.collection, operation.docId));

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
+import { tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
 
 const formatClock24 = (value) => {
@@ -195,8 +196,8 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) =>
   const filtered = useMemo(() => {
     let list = [...trashedTrips];
 
-    if (startDate) list = list.filter(t => (t.date || '') >= startDate);
-    if (endDate) list = list.filter(t => (t.date || '') <= endDate);
+    if (startDate) list = list.filter(t => (tripCalendarDateKey(t.date) || '') >= startDate);
+    if (endDate) list = list.filter(t => (tripCalendarDateKey(t.date) || '') <= endDate);
 
     if (searchQuery) {
       list = list.filter(t => tripMatchesSearch(t, searchQuery, [
@@ -220,7 +221,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) =>
 
   const grouped = useMemo(() => {
     const groups = filtered.reduce((acc, trip) => {
-      const key = trip.date || 'No Date';
+      const key = tripCalendarDateKey(trip.date) || 'No Date';
       if (!acc[key]) acc[key] = [];
       acc[key].push(trip);
       return acc;

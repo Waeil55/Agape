@@ -1,22 +1,22 @@
 {
-    "publishedAt":  "2026-09-06T21:13:17.4195848Z",
-    "sha256":  "1ab1e28c5f07dc336969d4580f9f4f303adb1af60eb8acf0be31420ac70ea052",
-    "components":  {
-                       "automaticUpdater":  "integrated",
-                       "localIntelligence":  "integrated_no_external_api",
-                       "roleSupervisor":  "integrated",
-                       "fillEngine":  "integrated",
-                       "independentReviewer":  "integrated",
-                       "correctionEngine":  "integrated",
-                       "operatorToolbar":  "integrated",
-                       "secureLocalSignIn":  "integrated",
-                       "brokerTransportBoundary":  "integrated",
-                       "capabilityKernel":  "integrated"
-                   },
-    "version":  "5.0.7",
-    "file":  "agape-welltrans-agent.zip",
-    "setupFile":  "AgapeWellTransAgentSetup.exe",
-    "setupSha256":  "39e3a5a1992ddba7f898780169544aabd24db12a84138bc9142891800469f36f",
-    "setupSignatureStatus":  "Unsigned",
-    "signed":  false
+  "file": "agape-welltrans-agent.zip",
+  "version": "5.0.8",
+  "sha256": "715020f8d5322a5d3039cc5d21ca99bc174964147075d076eb530152c8622824",
+  "publishedAt": "2026-09-06T22:55:53.5299771Z",
+  "components": {
+    "correctionEngine": "integrated",
+    "fillEngine": "integrated",
+    "automaticUpdater": "integrated",
+    "localIntelligence": "integrated_no_external_api",
+    "brokerTransportBoundary": "integrated",
+    "operatorToolbar": "integrated",
+    "secureLocalSignIn": "integrated",
+    "roleSupervisor": "integrated",
+    "independentReviewer": "integrated",
+    "capabilityKernel": "integrated"
+  },
+  "setupFile": "AgapeWellTransAgentSetup.exe",
+  "setupSha256": "67db76181f3a0c148cc9d8b8fc99e95c87d0ecd6da31223b77ff4aeb7f5dbee5",
+  "setupSignatureStatus": "Unsigned",
+  "signed": false
 }

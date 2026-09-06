@@ -41,7 +41,7 @@ const manifest = {
   blockedCount: 0,
 };
 const worker = {
-  version: "5.0.7",
+  version: "5.0.8",
   state: "review_ready_verified",
   selectedDate: "2026-09-06",
   reviewSessionId: "session-1",

@@ -8,6 +8,7 @@ const driverSource = fs.readFileSync(path.join(here, 'DriverPage.jsx'), 'utf8');
 const tripWindowCss = fs.readFileSync(path.join(here, '..', 'styles', 'tripWindows.css'), 'utf8');
 const firebaseSource = fs.readFileSync(path.join(here, '..', 'config', 'firebase.js'), 'utf8');
 const appDataSource = fs.readFileSync(path.join(here, '..', 'hooks', 'useFirestoreAppData.js'), 'utf8');
+const workflowPersistenceSource = fs.readFileSync(path.join(here, '..', 'utils', 'tripWorkflowPersistence.js'), 'utf8');
 
 describe('driver mobile active-trip navigation regression', () => {
   it('puts a started active trip back in the bottom navigation', () => {
@@ -44,9 +45,9 @@ describe('driver mobile active-trip navigation regression', () => {
     expect(driverSource).not.toContain('cancellationReason: reason || undefined');
     expect(driverSource).not.toContain('exceptionReason: reason || undefined');
     expect(driverSource).toContain('cancellationReason: reason || null');
-    expect(appDataSource).toContain('const safeUpdates = sanitizeForFirestore(updates)');
-    expect(appDataSource).toContain('...safeUpdates, tripId, workflowUpdatedAt: now');
-    expect(appDataSource).toContain("data: progressDoc");
-    expect(firebaseSource).toContain('sanitizeFirestorePayload(updates)');
+    expect(workflowPersistenceSource).toContain('const safeUpdates = sanitizeFirestorePayload(updates)');
+    expect(appDataSource).toContain('buildTripWorkflowPersistenceRecords({');
+    expect(appDataSource).toContain("type: 'setDocs'");
+    expect(firebaseSource).toContain('sanitizeFirestoreWriteData(data)');
   });
 });

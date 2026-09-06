@@ -7,7 +7,7 @@ import {
   emitSystemEvents,
 } from '../services/firestoreEventEngine';
 import { buildOperationalTripRecord, isOperationalTrip } from '../utils/tripLifecycle';
-import { localCalendarYmd } from '../utils/tripDate';
+import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import {
   filterValidTripRecords,
   isCorruptedTripRecord,
@@ -25,6 +25,7 @@ import { createSerializedOperationQueue } from '../utils/serializedOperationQueu
 import { buildAssignmentMutations } from '../utils/assignmentPersistence';
 import { isPermanentSyncFailure } from '../services/syncQueueProcessor';
 import { sanitizeFirestorePayload } from '../utils/firestorePayload';
+import { buildTripWorkflowPersistenceRecords } from '../utils/tripWorkflowPersistence';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -32,6 +33,7 @@ const DISPATCHER_PROFILE_COLLECTION = 'dispatcherProfiles';
 const VEHICLE_COLLECTION = 'fleetVehicles';
 const PHONE_NUMBERS_DOC = 'systemConfig/phoneNumbers';
 const DRIVER_TRIP_PROGRESS_COLLECTION = 'driverTripProgress';
+const TRIP_LEDGER_COLLECTION = 'tripLedger';
 const MIRRORED_TRIP_FIELDS = new Set(['trips', 'trashedTrips']);
 
 const yieldBeforePersistenceWork = () => {
@@ -395,7 +397,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
           return;
         }
         if (trip.source === 'dispatch_upload' || trip.source === 'report_upload') {
-          if (trip.date && trip.date !== todayKey) {
+          if (trip.date && tripCalendarDateKey(trip.date) !== todayKey) {
             const created = trip.createdAt || trip.updatedAtLocal || '';
             if (String(created).includes(todayKey) && trip.status !== 'Completed') {
               console.warn(`[DATE CHECK] Trip ${trip.id} created today but date="${trip.date}" (expected "${todayKey}"). Check for UTC date shift.`);
@@ -870,34 +872,75 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
   const upsertDriverTrip = useCallback((tripId, updates = {}) => enqueueFieldPersistence('trips', async () => {
     if (!tripId) return false;
     const now = new Date().toISOString();
-    const safeUpdates = sanitizeForFirestore(updates);
-    const progressDoc = sanitizeForFirestore(attachTenantScope({ ...safeUpdates, tripId, workflowUpdatedAt: now }, activeTenantId));
-
-    // Update local state optimistic UI
     const currentTrips = dataRef.current.trips || [];
-    const nextTrips = currentTrips.map(t => t.id === tripId ? { ...t, ...safeUpdates } : t);
+    const currentTrip = currentTrips.find((trip) => String(trip.id) === String(tripId));
+    let records;
+    try {
+      records = buildTripWorkflowPersistenceRecords({
+        tripId,
+        currentTrip,
+        updates,
+        tenantId: activeTenantId,
+        nowIso: now,
+      });
+    } catch (error) {
+      setState((previous) => ({
+        ...previous,
+        error: error.message || 'Trip progress could not be prepared for saving',
+      }));
+      return false;
+    }
+
+    const { authoritativeTrip, authoritativePatch, progressPatch, ledgerPatch } = records;
+    const nextTrips = currentTrips.map((trip) => (
+      String(trip.id) === String(tripId) ? authoritativeTrip : trip
+    ));
+    const workflowOperations = [{
+      type: 'setDocs',
+      writes: [
+        { collection: TRIPS_COLLECTION, docId: String(tripId), data: authoritativePatch },
+        { collection: DRIVER_TRIP_PROGRESS_COLLECTION, docId: String(tripId), data: progressPatch },
+        { collection: TRIP_LEDGER_COLLECTION, docId: String(tripId), data: ledgerPatch },
+      ],
+    }];
     dataRef.current = { ...dataRef.current, trips: nextTrips };
     setState(prev => ({ ...prev, trips: nextTrips }));
 
     try {
-      const progressOperation = {
-        type: 'setDoc', collection: DRIVER_TRIP_PROGRESS_COLLECTION,
-        docId: String(tripId), data: progressDoc,
-      };
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await saveFieldWithSyncOperations('trips', nextTrips, [progressOperation], { tenantId: activeTenantId, userId: auth.currentUser?.uid || '' });
+        await saveFieldWithSyncOperations('trips', nextTrips, workflowOperations, {
+          tenantId: activeTenantId,
+          userId: auth.currentUser?.uid || '',
+        });
         return true;
       }
       await saveLocalField('trips', nextTrips, { previousValue: currentTrips, tenantId: activeTenantId });
-      await setDoc(doc(db, DRIVER_TRIP_PROGRESS_COLLECTION, tripId), progressDoc, { merge: true });
+      const batch = writeBatch(db);
+      batch.set(doc(db, TRIPS_COLLECTION, String(tripId)), {
+        ...authoritativePatch,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      batch.set(doc(db, DRIVER_TRIP_PROGRESS_COLLECTION, String(tripId)), {
+        ...progressPatch,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      batch.set(doc(db, TRIP_LEDGER_COLLECTION, String(tripId)), {
+        ...ledgerPatch,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      await batch.commit();
+      const events = buildTripEvents([currentTrip], [authoritativeTrip], getCurrentEventActor());
+      if (events.length > 0) {
+        emitSystemEvents(events).catch((error) => console.error('Driver trip event emit failed:', error));
+      }
       return true;
     } catch (err) {
       if (!isPermanentSyncFailure(err) && auth.currentUser?.uid) {
         try {
-          await saveFieldWithSyncOperations('trips', nextTrips, [{
-            type: 'setDoc', collection: DRIVER_TRIP_PROGRESS_COLLECTION,
-            docId: String(tripId), data: progressDoc,
-          }], { tenantId: activeTenantId, userId: auth.currentUser.uid });
+          await saveFieldWithSyncOperations('trips', nextTrips, workflowOperations, {
+            tenantId: activeTenantId,
+            userId: auth.currentUser.uid,
+          });
           return true;
         } catch (queueError) {
           console.error('Failed to queue driver trip progress:', queueError);

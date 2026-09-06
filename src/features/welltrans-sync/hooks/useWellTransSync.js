@@ -14,7 +14,7 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
-const REQUIRED_WORKER_VERSION = '5.0.7';
+const REQUIRED_WORKER_VERSION = '5.0.8';
 const isTripRecord = trip => Boolean(trip && typeof trip === 'object' && !Array.isArray(trip));
 const safely = (operation, fallback) => {
   try { return operation(); } catch { return fallback; }

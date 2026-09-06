@@ -6,6 +6,13 @@ const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, requ
   const { ready } = useGoogleMaps();
   const autocompleteRef = useRef(null);
   const isSettingRef = useRef(false);
+  const onChangeRef = useRef(onChange);
+  const onPlaceSelectRef = useRef(onPlaceSelect);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    onPlaceSelectRef.current = onPlaceSelect;
+  }, [onChange, onPlaceSelect]);
 
   useEffect(() => {
     if (!ready || !inputRef.current || !window.google?.maps?.places) return;
@@ -21,8 +28,8 @@ const PlacesAutocompleteInput = ({ value, onChange, placeholder, className, requ
         if (place?.formatted_address) {
           isSettingRef.current = true;
           inputRef.current.value = place.formatted_address;
-          onChange(place.formatted_address);
-          if (onPlaceSelect) onPlaceSelect(place);
+          onChangeRef.current(place.formatted_address);
+          onPlaceSelectRef.current?.(place);
           setTimeout(() => { isSettingRef.current = false; }, 100);
         }
       });

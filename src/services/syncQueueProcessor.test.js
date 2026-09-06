@@ -6,6 +6,7 @@ const firebaseMock = vi.hoisted(() => ({
   doc: vi.fn((_db, collectionName, docId) => `${collectionName}/${docId}`),
   serverTimestamp: vi.fn(() => 'server-timestamp'),
   setDoc: vi.fn(),
+  writeBatch: vi.fn(),
 }));
 
 const localDBMock = vi.hoisted(() => {
@@ -76,6 +77,10 @@ function authenticatedStartedProcessor() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  firebaseMock.writeBatch.mockImplementation(() => ({
+    set: vi.fn(),
+    commit: vi.fn().mockResolvedValue(undefined),
+  }));
   vi.stubGlobal('navigator', { onLine: true });
   localDBMock.getPendingSyncOperations.mockResolvedValue([]);
   localDBMock.getSyncQueueStatus.mockResolvedValue({
@@ -149,6 +154,31 @@ describe('SyncQueueProcessor ownership and terminal failure handling', () => {
     );
     const savedPayload = firebaseMock.setDoc.mock.calls[0][1];
     expect(Object.prototype.hasOwnProperty.call(savedPayload, 'cancellationReason')).toBe(false);
+    expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(1);
+  });
+
+  it('replays a multi-document workflow operation as one atomic batch', async () => {
+    const processor = authenticatedStartedProcessor();
+    localDBMock.getPendingSyncOperations.mockResolvedValue([
+      operation({
+        type: 'setDocs',
+        writes: [
+          { collection: 'trips', docId: 'trip-1', data: { status: 'Completed' } },
+          { collection: 'driverTripProgress', docId: 'trip-1', data: { status: 'Completed' } },
+          { collection: 'tripLedger', docId: 'trip-1', data: { status: 'Completed' } },
+        ],
+        collection: undefined,
+        docId: undefined,
+        data: undefined,
+      }),
+    ]);
+
+    await processor.processNow();
+
+    expect(firebaseMock.writeBatch).toHaveBeenCalledTimes(1);
+    const batch = firebaseMock.writeBatch.mock.results[0].value;
+    expect(batch.set).toHaveBeenCalledTimes(3);
+    expect(batch.commit).toHaveBeenCalledTimes(1);
     expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(1);
   });
 
