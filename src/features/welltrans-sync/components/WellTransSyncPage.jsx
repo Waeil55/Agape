@@ -709,7 +709,8 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
         >
           <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-2.5 text-[10px] font-bold text-white">
             <Sparkles size={12} className="text-blue-300" />
-            <span className="tracking-wider">PORTAL COMPLETION</span>
+            <span className="hidden tracking-wider xl:inline">PORTAL COMPLETION</span>
+            <span className="tracking-wider xl:hidden">PORTAL</span>
           </div>
 
           <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-0.5">
@@ -761,7 +762,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
               {coveragePct}%
             </strong>
             <span className="text-[9px] font-semibold text-slate-600">{successfulCount}/{completedTrips.length} verified</span>
-            <div className="h-1 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200">
+            <div className="hidden h-1 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200 xl:block">
               <div className={`h-full rounded-full transition-all duration-500 ${coverageBarColor}`} style={{ width: `${coveragePct}%` }} />
             </div>
             {stagedCount > 0 && <span className="text-[9px] font-bold text-purple-700">{stagedCount} review</span>}
