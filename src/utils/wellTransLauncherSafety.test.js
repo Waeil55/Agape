@@ -7,15 +7,16 @@ const source = readFileSync(
 );
 
 describe('WellTrans launcher session ownership', () => {
-  it('never replaces a healthy worker because the browser handle is unavailable', () => {
-    expect(source).toMatch(/if \(\$workerNode -and -not \$replacementRequired\) \{\s*exit 0\s*\}/);
+  it('preserves the validated live Agent even when no browser handle is available', () => {
+    expect(source).toMatch(
+      /if \(\$ownerProcess\) \{[\s\S]*if \(\$visibleBrowser\) \{[\s\S]*A duplicate protocol launch only updates[\s\S]*exit 0\s*\}/,
+    );
   });
 
-  it('keeps process-tree termination after the healthy-worker guard', () => {
-    const guard = source.indexOf('if ($workerNode -and -not $replacementRequired)');
-    const termination = source.indexOf('Stop-Process -Id $ownerPid');
-    expect(guard).toBeGreaterThan(-1);
-    expect(termination).toBeGreaterThan(guard);
+  it('never terminates or replaces the live process tree from a duplicate launch', () => {
+    expect(source).not.toContain('$replacementRequired');
+    expect(source).not.toContain('Stop-Process -Id $ownerPid');
+    expect(source).toContain('if ($orphanWorker)');
   });
 
   it('confirms a pending update while its worker is still healthy', () => {
