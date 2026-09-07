@@ -318,13 +318,14 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   const workerConnecting = worker?.state === 'connecting';
   const workerNeedsDate = worker?.state === 'date_selection_required';
   const workerReviewError = worker?.state === 'review_error';
+  const workerNeedsManualReviewReset = worker?.state === 'manual_review_reset_required';
   const workerReconciliationBlocked = [
     'reconciliation_blocked',
     'reconciliation_blocked_do_not_apply',
   ].includes(worker?.state);
   const workerHealthy = settings.enabled && workerOnline
     && !workerNeedsLogin && !workerNeedsDate && !workerConnecting
-    && !workerReviewError && !workerReconciliationBlocked
+    && !workerReviewError && !workerNeedsManualReviewReset && !workerReconciliationBlocked
     && (!workerCalibrated || workerDateMatches);
   const canaryHealthy = canary?.passed === true
     && (!canary?.serviceDate || canary.serviceDate === syncDate);
@@ -354,7 +355,9 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
   const workerStatusLabel = !settings.enabled
     ? 'Disabled'
     : workerReviewError
-      ? 'Safety stop — discard review'
+      ? 'Safety stop — browser preserved'
+    : workerNeedsManualReviewReset
+      ? 'Close Edit Itinerary to recover'
     : workerReconciliationBlocked
       ? 'Incomplete date — action required'
     : workerOnline && worker?.selectedDate && worker.selectedDate !== syncDate
@@ -931,17 +934,17 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       )}
 
       {/* Worker warnings */}
-      {(workerUpgradeRequired || workerReviewError || workerNeedsDate
+      {(workerUpgradeRequired || workerReviewError || workerNeedsManualReviewReset || workerNeedsDate
         || (workerCalibrated && !workerDateMatches)
         || coverage.missingCount > 0 || coverage.invalid > 0 || coverage.unverifiedCompleted > 0) && (
         <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-2 space-y-1.5">
-          {workerReviewError && (
+          {(workerReviewError || workerNeedsManualReviewReset) && (
             <div className="flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-300 px-3 py-2 text-[11px] font-semibold text-rose-800">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>
-                Safety stop: this WellTrans review session contains unverified edits. Do not click Apply.
-                Click Close in the Edit Itinerary window, close that agent browser, then click Reconcile &amp; Fill Date
-                to begin a clean verified session.
+                Safety stop: {worker?.lastErrorSummary || 'the current WellTrans review could not be verified.'}
+                {' '}Do not click Apply. If Edit Itinerary is open, close only that dialog yourself.
+                Keep the Agent browser open, then click Reconcile &amp; Fill Date; the Agent will rebuild in the same browser.
               </span>
             </div>
           )}

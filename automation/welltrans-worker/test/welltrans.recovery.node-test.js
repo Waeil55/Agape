@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   isPortalClosedError,
-  REVIEW_SESSION_RESTART_EXIT_CODE,
   recoveryDecision,
 } from '../src/welltrans.recovery.js';
 
@@ -25,11 +24,10 @@ test('a proven rollback continues without discarding prior staged work', () => {
   });
 });
 
-test('an unverified rollback automatically abandons the unsafe browser session', () => {
+test('an unverified rollback keeps the browser open for a manual review reset', () => {
   assert.deepEqual(recoveryDecision({ success: false, safeToContinue: false }), {
-    action: 'restart_clean_session',
+    action: 'hold_for_manual_review_reset',
     reason: 'rollback_unverified',
-    exitCode: REVIEW_SESSION_RESTART_EXIT_CODE,
     retryBooking: true,
   });
 });

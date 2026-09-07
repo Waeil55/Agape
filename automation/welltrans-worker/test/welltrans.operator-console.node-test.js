@@ -162,9 +162,9 @@ describe('WellTrans one-line operator toolbar', () => {
     assert.equal(page.isClosed(), false);
     await host.locator('[data-role="driver"]').selectOption('driver-2');
     await updateWellTransOperatorConsole(page, { state: 'review_error' });
-    await host.locator('[data-action="restart"]').click();
+    await host.locator('[data-action="recover"]').click();
     assert.deepEqual(commands.map(item => item.action), [
-      'reconcile', 'switch-date', 'detect-date', 'verify', 'pause', 'switch-driver', 'restart',
+      'reconcile', 'switch-date', 'detect-date', 'verify', 'pause', 'switch-driver', 'recover',
     ]);
     assert.equal(commands[1].payload.serviceDate, '2026-07-28');
     assert.deepEqual(commands[5].payload, {

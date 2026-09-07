@@ -1,3 +1,7 @@
+param(
+  [int]$AuthorizedLauncherPid = 0
+)
+
 $ErrorActionPreference = 'Stop'
 $ConfirmPreference = 'None'
 $ProgressPreference = 'SilentlyContinue'
@@ -139,7 +143,7 @@ try {
     }
   }
 
-  & $installer -SkipBrowserInstall
+  & $installer -SkipBrowserInstall -AuthorizedLauncherPid $AuthorizedLauncherPid
   $nodeExecutable = Join-Path $installRoot 'runtime\node\node.exe'
   if (-not (Test-Path -LiteralPath $nodeExecutable)) {
     throw 'Updated Agent runtime is unavailable.'

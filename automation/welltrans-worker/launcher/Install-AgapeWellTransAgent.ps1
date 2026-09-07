@@ -1,12 +1,13 @@
 param(
-  [switch]$SkipBrowserInstall
+  [switch]$SkipBrowserInstall,
+  [int]$AuthorizedLauncherPid = 0
 )
 
 $ErrorActionPreference = 'Stop'
 $ConfirmPreference = 'None'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Security
-$agentVersion = '5.0.8'
+$agentVersion = '5.0.9'
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'AgapeCare\WellTransAgent'
 $secretRoot = Join-Path $env:USERPROFILE 'AgapeSecrets'
@@ -64,14 +65,21 @@ New-Item -ItemType Directory -Path $secretRoot -Force | Out-Null
 Start-Transcript -Path $installLog -Append | Out-Null
 
 try {
-  # Never replace dependencies underneath a live Playwright review. If only a
-  # stale supervisor remains, retire that exact process tree before installing
-  # so one clean version owns the machine and stale locks cannot suppress Fill.
+  # Never replace dependencies underneath a live Playwright review. Automatic
+  # updates may run inside the one lock-owning launcher only before its worker
+  # starts or after that worker has exited. Every other live owner is preserved.
+  $preserveWorkerLock = $false
   if (Test-Path -LiteralPath $workerLockPath) {
     $ownerPid = 0
     [void][int]::TryParse((Get-Content -LiteralPath $workerLockPath -Raw).Trim(), [ref]$ownerPid)
-    $owner = if ($ownerPid -gt 0) { Get-Process -Id $ownerPid -ErrorAction SilentlyContinue } else { $null }
-    if ($owner) {
+    $ownerCommand = if ($ownerPid -gt 0) {
+      Get-CimInstance Win32_Process -Filter "ProcessId=$ownerPid" -ErrorAction SilentlyContinue
+    } else { $null }
+    $expectedLauncher = [Regex]::Escape((Join-Path $installRoot 'launcher\Start-AgapeWellTrans.ps1'))
+    $ownerIsLauncher = $ownerCommand -and
+      $ownerCommand.Name -eq 'powershell.exe' -and
+      $ownerCommand.CommandLine -match $expectedLauncher
+    if ($ownerIsLauncher) {
       $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
       $descendantIds = New-Object 'System.Collections.Generic.HashSet[int]'
       [void]$descendantIds.Add([int]$ownerPid)
@@ -85,17 +93,19 @@ try {
           }
         }
       }
-      $visibleBrowser = $descendantIds | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue } |
-        Where-Object { $_.ProcessName -match '^(chrome|chromium)$' -and $_.MainWindowHandle -ne 0 } |
+      $workerEntryPattern = [Regex]::Escape((Join-Path $installRoot 'src\index.js'))
+      $liveWorker = $descendantIds |
+        ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId=$_" -ErrorAction SilentlyContinue } |
+        Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match $workerEntryPattern } |
         Select-Object -First 1
-      if ($visibleBrowser) {
-        throw 'A WellTrans review window is open. Review and Apply or Close it before upgrading; the installer will never discard unapplied rows.'
+      if ($ownerPid -ne $AuthorizedLauncherPid -or $AuthorizedLauncherPid -ne $PID -or $liveWorker) {
+        throw 'The WellTrans Agent is running. Finish or close its review before upgrading; the installer will not stop the browser or worker.'
       }
-      $descendantIds | Where-Object { $_ -ne $ownerPid } | Sort-Object -Descending |
-        ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
-      Stop-Process -Id $ownerPid -Force -ErrorAction SilentlyContinue
+      $preserveWorkerLock = $true
     }
-    Remove-Item -LiteralPath $workerLockPath -Force -ErrorAction SilentlyContinue
+    if (-not $preserveWorkerLock) {
+      Remove-Item -LiteralPath $workerLockPath -Force -ErrorAction SilentlyContinue
+    }
   }
   # The local settings service loads dependencies from this installation.
   # Stop only the PID whose command line exactly matches this Agent before

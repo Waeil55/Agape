@@ -55,7 +55,7 @@ const wellTransSourceFingerprint = payload => createHash('sha256')
   .digest('hex');
 const workerId = process.env.COMPUTERNAME || process.env.HOSTNAME || 'worker';
 const workerInstanceId = `${workerId}-${randomUUID()}`;
-const workerVersion = '5.0.8';
+const workerVersion = '5.0.9';
 const capabilityKernel = createCapabilityKernel(workerInstanceId);
 const writerCapability = capabilityKernel.issue(AGENT_ROLES.WRITER);
 const supervisor = createAgentSupervisor([
@@ -90,7 +90,7 @@ const operatorControl = {
   forceReconcile: false,
   forceVerify: false,
   forceReindex: false,
-  restartRequested: false,
+  recoveryRequested: false,
   fatalReviewError: false,
   lastCommand: null,
   message: 'Automatically detecting the opened WellTrans date.',
@@ -146,6 +146,54 @@ const publishHeartbeat = (state = 'online') => Promise.all([
 ]);
 const publishInstanceHeartbeat = state => db.doc(`welltrans_workers/${workerInstanceId}`)
   .set(heartbeatPayload(state), { merge: true });
+const classifySessionFailure = error => {
+  const message = String(error?.message || error || '').toLowerCase();
+  if (isPortalClosedError(error)) {
+    return { code: 'browser_interrupted', summary: 'The WellTrans browser was interrupted before the current operation finished.' };
+  }
+  if (message.includes('production canary') || message.includes('portal contract')) {
+    return { code: 'portal_contract_changed', summary: 'The WellTrans page structure could not be verified, so filling was stopped before new edits.' };
+  }
+  if (message.includes('schedule') || message.includes('service date')) {
+    return { code: 'schedule_not_verified', summary: 'The exact WellTrans service date could not be verified.' };
+  }
+  if (message.includes('permission') || message.includes('credential') || message.includes('unauthenticated')) {
+    return { code: 'agent_authorization_failed', summary: 'The Agent could not verify its authorized cloud connection.' };
+  }
+  if (error?.welltransManualReviewResetRequired === true) {
+    return { code: 'manual_review_reset_required', summary: 'A trip could not be rolled back completely. Manually close Edit Itinerary; the browser will remain open.' };
+  }
+  return { code: 'worker_session_error', summary: 'The Agent stopped safely before it could finish. Retry recovery in the same browser.' };
+};
+const publishSessionFailure = async (error, reviewOpen) => {
+  const failure = classifySessionFailure(error);
+  const update = {
+    ...heartbeatPayload('review_error'),
+    lastErrorCode: failure.code,
+    lastErrorSummary: failure.summary,
+    lastErrorAt: FieldValue.serverTimestamp(),
+    recoveryRequiresManualReviewClose: reviewOpen === true,
+  };
+  await Promise.all([
+    db.doc('welltrans_worker_status/primary').set(update, { merge: true }),
+    db.doc(`welltrans_workers/${workerInstanceId}`).set(update, { merge: true }),
+  ]);
+  return failure;
+};
+const clearSessionFailure = () => Promise.all([
+  db.doc('welltrans_worker_status/primary').set({
+    lastErrorCode: FieldValue.delete(),
+    lastErrorSummary: FieldValue.delete(),
+    lastErrorAt: FieldValue.delete(),
+    recoveryRequiresManualReviewClose: FieldValue.delete(),
+  }, { merge: true }),
+  db.doc(`welltrans_workers/${workerInstanceId}`).set({
+    lastErrorCode: FieldValue.delete(),
+    lastErrorSummary: FieldValue.delete(),
+    lastErrorAt: FieldValue.delete(),
+    recoveryRequiresManualReviewClose: FieldValue.delete(),
+  }, { merge: true }),
+]);
 const stateForReviewSummary = summary => (
   summary.failed || summary.blocked || summary.missing
     ? 'reconciliation_blocked_do_not_apply'
@@ -289,8 +337,8 @@ async function handleOperatorCommand(action, payload = {}) {
   } else if (action === 'reconcile') {
     operatorControl.autoRun = true;
     if (operatorControl.fatalReviewError) {
-      operatorControl.restartRequested = true;
-      operatorControl.message = 'The previous review is unsafe. Starting a clean session, then filling the opened date.';
+      operatorControl.recoveryRequested = true;
+      operatorControl.message = 'Recovery queued. The Agent will keep this browser open and resume after the unsafe Edit Itinerary review is closed.';
     } else {
       operatorControl.forceReconcile = true;
       operatorControl.forceReindex = true;
@@ -323,8 +371,8 @@ async function handleOperatorCommand(action, payload = {}) {
       || Number(latestReviewSummary.processing || 0) > 0;
     if (operatorControl.fatalReviewError) {
       await activateRequestedDate(serviceDate);
-      operatorControl.restartRequested = true;
-      operatorControl.message = `Starting a clean session, then selecting and filling ${serviceDate}.`;
+      operatorControl.recoveryRequested = true;
+      operatorControl.message = `Recovery queued. This browser will stay open, then select and fill ${serviceDate} after the unsafe Edit Itinerary review is closed.`;
     } else if (currentReviewOpen) {
       operatorControl.pendingDateSwitch = serviceDate;
       operatorControl.autoRun = true;
@@ -355,10 +403,10 @@ async function handleOperatorCommand(action, payload = {}) {
     operatorControl.message = type === 'driver'
       ? `Driver scope changed to ${option.name}. Only that driver's completed trips will be filled.`
       : 'Driver scope changed to All drivers. Trips will be grouped by driver for review.';
-  } else if (action === 'restart') {
-    operatorControl.restartRequested = true;
+  } else if (action === 'recover') {
+    operatorControl.recoveryRequested = true;
     operatorControl.autoRun = false;
-    operatorControl.message = 'Starting a clean review session. Unsaved WellTrans edits will be discarded; Apply is never clicked.';
+    operatorControl.message = 'Safe reset queued. Close the WellTrans Edit Itinerary dialog yourself if it is open; the Agent will keep the browser open and rebuild the review.';
   } else {
     throw new Error(`Unsupported operator command: ${action}`);
   }
@@ -501,7 +549,7 @@ async function waitForRequestedSchedule(page, selectedDate) {
     const currentDate = await readVisiblePortalDate(page, selectedDate)
       || await getSelectedPortalDate(page).catch(() => selectedDate);
     requestedServiceDate = await readEffectiveRequestedServiceDate();
-    if (operatorControl.restartRequested || !operatorControl.autoRun) {
+    if (operatorControl.recoveryRequested || !operatorControl.autoRun) {
       return currentDate;
     }
     if (!requestedServiceDate) {
@@ -1926,7 +1974,11 @@ async function main() {
       });
     },
   });
+  for (;;) {
   try {
+    operatorControl.fatalReviewError = false;
+    operatorControl.recoveryRequested = false;
+    operatorControl.autoRun = true;
     await installWellTransOperatorConsole(session.page, handleOperatorCommand);
     await updateOperatorConsole(session.page, {}, {
       state: 'detecting_date',
@@ -1946,6 +1998,7 @@ async function main() {
     lastAuthoritativeReconcileAt = Date.now();
     const recovered = await recoverStaleReviewJobs(selectedDate);
     const initialSummary = await publishDateReviewSummary(selectedDate);
+    await clearSessionFailure();
     await updateOperatorConsole(session.page, initialSummary, {
       state: 'calibrated',
       message: `Opened date ${selectedDate} detected and indexed exactly.`,
@@ -1965,16 +2018,22 @@ async function main() {
       + `${authoritative.expected} completed, ${authoritative.blocked} blocked.\n`,
     );
     do {
-      if (operatorControl.restartRequested) {
-        operatorControl.message = 'Closing this unsaved review and starting a clean Agent session.';
-        await updateOperatorConsole(session.page, {}, {
-          state: 'restarting_safe_session',
-          message: operatorControl.message,
-        });
-        await publishHeartbeat('restarting_safe_session');
-        process.exitCode = 42;
-        await session.browser.close().catch(() => {});
-        return;
+      if (operatorControl.recoveryRequested) {
+        const reviewOpen = await isEditItineraryOpen(session.page).catch(() => false);
+        if (reviewOpen) {
+          operatorControl.autoRun = false;
+          operatorControl.message = 'Safe reset is waiting. Close the WellTrans Edit Itinerary dialog yourself; this browser will remain open.';
+          await publishHeartbeat('manual_review_reset_required');
+          await updateOperatorConsole(session.page, {}, {
+            state: 'manual_review_reset_required',
+            message: operatorControl.message,
+          });
+          await sleep(500);
+          continue;
+        }
+        const recoverySignal = new Error('In-place WellTrans session recovery requested.');
+        recoverySignal.welltransRecoverInPlace = true;
+        throw recoverySignal;
       }
       const activeDate = await waitForRequestedSchedule(session.page, selectedDate);
       if (activeDate !== selectedDate) {
@@ -2208,7 +2267,7 @@ async function main() {
               completedAttempts: Number(job.attempt || 0) + 1,
               maxAttempts: 2,
             });
-            if (recovery.action === 'restart_clean_session') {
+            if (recovery.action === 'hold_for_manual_review_reset') {
               if (recovery.retryBooking) {
                 await job.ref.update({
                   status: 'pending',
@@ -2222,16 +2281,16 @@ async function main() {
               operatorControl.autoRun = false;
               operatorControl.message = `Booking ${job.bookingId || job.tripId} could not be rolled back completely. `
                 + (recovery.retryBooking
-                  ? 'Discarding this unsafe browser session and retrying once from a clean grid.'
-                  : 'Circuit breaker blocked this booking. Discarding the unsafe session and continuing the remaining trips.');
+                  ? 'Close the Edit Itinerary dialog yourself; the Agent will keep this browser open and retry once from a clean grid.'
+                  : 'Circuit breaker blocked this booking. Close the Edit Itinerary dialog yourself; the Agent will keep this browser open and continue the remaining trips from a clean grid.');
               await updateOperatorConsole(session.page, {}, {
-                state: 'recovering_clean_session',
+                state: 'manual_review_reset_required',
                 message: operatorControl.message,
               });
-              await publishHeartbeat('recovering_clean_session');
-              process.exitCode = recovery.exitCode;
-              await session.browser.close().catch(() => {});
-              return;
+              await publishHeartbeat('manual_review_reset_required');
+              const unsafeReviewError = new Error(operatorControl.message);
+              unsafeReviewError.welltransManualReviewResetRequired = true;
+              throw unsafeReviewError;
             }
             const currentSummary = await publishDateReviewSummary(selectedDate);
             await publishInstanceHeartbeat(stateForReviewSummary(currentSummary));
@@ -2250,32 +2309,33 @@ async function main() {
         if (!once) await sleep(Number(process.env.WELLTRANS_POLL_MS) || 1500);
       }
     } while (!once);
+    return;
   } catch (error) {
     console.error(error);
-    process.exitCode = 1;
     operatorControl.fatalReviewError = true;
     let reviewWasOpen = await isEditItineraryOpen(session.page).catch(() => false);
-    process.stdout.write('\nThe agent encountered an error. The review browser will remain open for inspection until it is closed by the operator.\n');
-    operatorControl.message = `${error?.message || error} Close or discard the unsaved review, then choose Reset Session.`;
+    const failure = await publishSessionFailure(error, reviewWasOpen).catch(() => classifySessionFailure(error));
+    process.stdout.write('\nThe Agent stopped safely. The WellTrans browser will remain open.\n');
+    operatorControl.message = reviewWasOpen
+      ? `${failure.summary} Do not Apply. Close only the Edit Itinerary dialog, then choose Fill Date.`
+      : `${failure.summary} Choose Fill Date to retry without closing this browser.`;
+    let recoverInPlace = error?.welltransRecoverInPlace === true && !reviewWasOpen;
     while (session.browser.isConnected()) {
-      await publishHeartbeat('review_error').catch(() => {});
+      await publishSessionFailure(error, reviewWasOpen).catch(() => {});
       await updateOperatorConsole(session.page, {}, {
         state: 'review_error_do_not_apply',
         message: operatorControl.message,
       });
-      if (operatorControl.restartRequested) {
-        await publishHeartbeat('restarting_safe_session').catch(() => {});
-        process.exitCode = 42;
-        await session.browser.close().catch(() => {});
-        return;
-      }
       const reviewIsOpen = await isEditItineraryOpen(session.page).catch(() => false);
       if (reviewWasOpen && !reviewIsOpen) {
-        operatorControl.message = 'Unsafe review was closed by the operator. Starting a clean session automatically.';
-        await publishHeartbeat('restarting_safe_session').catch(() => {});
-        process.exitCode = 42;
-        await session.browser.close().catch(() => {});
-        return;
+        operatorControl.message = 'Unsafe review was closed by the operator. Rebuilding in this same browser.';
+        recoverInPlace = true;
+        break;
+      }
+      if (operatorControl.recoveryRequested && !reviewIsOpen) {
+        operatorControl.message = 'Re-indexing and retrying in this same browser.';
+        recoverInPlace = true;
+        break;
       }
       reviewWasOpen = reviewWasOpen || reviewIsOpen;
       await sleep(1000);
@@ -2285,7 +2345,27 @@ async function main() {
     // browser without treating the interruption as a completed review.
     if (isPortalClosedError(error) || !session.browser.isConnected()) {
       process.exitCode = 43;
+      return;
     }
+    if (recoverInPlace) {
+      process.exitCode = 0;
+      operatorControl.recoveryRequested = false;
+      operatorControl.fatalReviewError = false;
+      operatorControl.autoRun = true;
+      operatorControl.forceReconcile = true;
+      operatorControl.forceReindex = true;
+      reviewSessionId = '';
+      finalReviewAuditValid = false;
+      reviewGridSortedForSession = false;
+      portalGridIndex = null;
+      latestPortalCanary = null;
+      resetWellTransSessionCaches();
+      await publishHeartbeat('recovering_in_place').catch(() => {});
+      await sleep(750);
+      continue;
+    }
+    return;
+  }
   }
 }
 

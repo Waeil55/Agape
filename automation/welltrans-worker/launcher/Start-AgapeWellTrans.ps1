@@ -25,29 +25,6 @@ $rollbackRoot = Join-Path $agentDataRoot 'WellTransAgentRollback'
 $pendingUpdatePath = Join-Path $agentDataRoot 'welltrans-update-pending.json'
 $workerProcess = $null
 $versionPath = Join-Path $workerDirectory 'VERSION'
-$releaseManifestUrl = 'https://agape5.web.app/welltrans-agent/version.json'
-$installedVersion = if (Test-Path -LiteralPath $versionPath) {
-  (Get-Content -LiteralPath $versionPath -Raw).Trim()
-} else {
-  '0.0.0'
-}
-$upgradeRequired = $false
-try {
-  $releaseManifest = Invoke-RestMethod -Uri "${releaseManifestUrl}?cache=$([DateTime]::UtcNow.Ticks)" -TimeoutSec 5
-  $upgradeRequired = $releaseManifest.version -and
-    ([Version]$releaseManifest.version -gt [Version]$installedVersion)
-} catch {
-  $upgradeRequired = $false
-}
-
-# Download and integrity-check the new release without interrupting an open
-# human review. The new files become active only when a safe session starts.
-if ($upgradeRequired) {
-  $updater = Join-Path $PSScriptRoot 'Update-AgapeWellTransAgent.ps1'
-  if (Test-Path -LiteralPath $updater) {
-    & $updater
-  }
-}
 
 $requestedDateMatch = [Regex]::Match(
   [Uri]::UnescapeDataString($ProtocolUrl),
@@ -131,10 +108,16 @@ if (Test-Path -LiteralPath $lockPath) {
   $ownerPid = 0
   [void][int]::TryParse((Get-Content -LiteralPath $lockPath -Raw).Trim(), [ref]$ownerPid)
   $ownerProcess = if ($ownerPid -gt 0) { Get-Process -Id $ownerPid -ErrorAction SilentlyContinue } else { $null }
+  $ownerCommand = if ($ownerProcess) {
+    Get-CimInstance Win32_Process -Filter "ProcessId=$ownerPid" -ErrorAction SilentlyContinue
+  } else { $null }
+  $expectedLauncher = [Regex]::Escape($PSCommandPath)
+  if (-not $ownerCommand -or
+      $ownerCommand.Name -ne 'powershell.exe' -or
+      $ownerCommand.CommandLine -notmatch $expectedLauncher) {
+    $ownerProcess = $null
+  }
   if ($ownerProcess) {
-    $installedFilesChangedWhileRunning = (Test-Path -LiteralPath $versionPath) -and
-      ((Get-Item -LiteralPath $versionPath).LastWriteTimeUtc -gt $ownerProcess.StartTime.ToUniversalTime())
-    $replacementRequired = $upgradeRequired -or $installedFilesChangedWhileRunning
     $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
     $descendantIds = New-Object 'System.Collections.Generic.HashSet[int]'
     [void]$descendantIds.Add([int]$ownerPid)
@@ -170,40 +153,27 @@ public static class AgapeWindowFocus {
 '@
       [AgapeWindowFocus]::ShowWindow($visibleBrowser.MainWindowHandle, 9) | Out-Null
       [AgapeWindowFocus]::SetForegroundWindow($visibleBrowser.MainWindowHandle) | Out-Null
-      exit 0
     }
-
-    $workerNode = $descendantIds |
-      ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId=$_" -ErrorAction SilentlyContinue } |
-      Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'src\\index\.js' } |
-      Select-Object -First 1
-    # MainWindowHandle is not a reliable browser-health signal. Chromium can
-    # temporarily report no top-level handle while navigating, authenticating,
-    # switching desktops, or while Windows is restoring the window. Never kill
-    # a healthy Agent solely because that handle is unavailable; doing so can
-    # discard an operator's unapplied WellTrans review session.
-    if ($workerNode -and -not $replacementRequired) {
-      exit 0
-    }
-
-    if (-not $replacementRequired) { exit 0 }
-
-    # Replace only this validated Agape process tree when no review browser is
-    # visible. An update never discards unsaved human-review edits and never
-    # clicks Apply or Close.
-    $descendantIds |
-      Where-Object { $_ -ne $ownerPid } |
-      Sort-Object -Descending |
-      ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
-    Stop-Process -Id $ownerPid -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 500
+    # A duplicate protocol launch only updates the requested date/scope files
+    # above and focuses Chromium when Windows exposes its handle. It must never
+    # replace or terminate the active process tree: a hidden/minimized window,
+    # an arriving release, or a transient navigation is not proof that the
+    # human review is safe to discard. The active Agent reads the request files
+    # and the new release is installed after that owner exits normally.
+    exit 0
   }
   Remove-Item -LiteralPath $lockPath -Force
 }
 $workerEntryPattern = [Regex]::Escape((Join-Path $workerDirectory 'src\index.js'))
-Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+$orphanWorker = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
   Where-Object { $_.CommandLine -match $workerEntryPattern } |
-  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  Select-Object -First 1
+if ($orphanWorker) {
+  # Fail closed if the lock was lost while a worker is still alive. Starting a
+  # second writer is more dangerous than requiring the operator to restart the
+  # existing process explicitly.
+  exit 0
+}
 
 Set-Content -LiteralPath $lockPath -Value $PID -NoNewline
 
@@ -217,7 +187,7 @@ Get-ChildItem -LiteralPath $runtimeDirectory -Filter 'welltrans-credential-*.jso
 try {
   $updater = Join-Path $PSScriptRoot 'Update-AgapeWellTransAgent.ps1'
   if (Test-Path -LiteralPath $updater) {
-    & $updater
+    & $updater -AuthorizedLauncherPid $PID
   }
 } catch {
   New-Item -ItemType Directory -Path $secretDirectory -Force | Out-Null
@@ -289,12 +259,12 @@ try {
     # Materialize the native process handle immediately. Windows PowerShell
     # 5.1 can lose the exit-code handle when a short-lived worker exits before
     # it is first observed, producing a null ExitCode and preventing the
-    # supervisor from honoring the safe-session restart signal (42).
+    # supervisor from honoring the browser-interruption recovery signal (43).
     [void]$workerProcess.Handle
     # A pending release is healthy once its worker remains alive for a full
     # minute. Clear the rollback marker while it is running; otherwise a later
-    # intentional clean-session restart can be misclassified as startup
-    # failure and silently restore the previous (unsafe) launcher.
+    # browser-interruption recovery can be misclassified as startup
+    # failure and silently restore the previous release.
     while (-not $workerProcess.HasExited) {
       if (((Get-Date) - $workerStartedAt).TotalSeconds -ge 60 -and
           (Test-Path -LiteralPath $pendingUpdatePath)) {
@@ -318,26 +288,21 @@ try {
     $workerProcess.WaitForExit()
     $workerProcess.Refresh()
     $workerExitCode = $workerProcess.ExitCode
-    if ($workerExitCode -eq 42 -or $workerExitCode -eq 43) {
-      if ($workerExitCode -eq 43) {
-        $unexpectedBrowserRestartCount++
-        Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Browser interruption detected; opening a clean headed session ($unexpectedBrowserRestartCount/3)."
-        if ($unexpectedBrowserRestartCount -ge 3) {
-          $workerError = 'The browser stopped three times. Automatic restart paused to prevent an unstable loop; start Fill Date again after checking Windows security software.'
-          break
-        }
-        Start-Sleep -Seconds 2
-      } else {
-        $unexpectedBrowserRestartCount = 0
-        Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Clean review session restart requested."
+    if ($workerExitCode -eq 43) {
+      $unexpectedBrowserRestartCount++
+      Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('o'))] Browser interruption detected; opening a clean headed session ($unexpectedBrowserRestartCount/3)."
+      if ($unexpectedBrowserRestartCount -ge 3) {
+        $workerError = 'The browser stopped three times. Automatic restart paused to prevent an unstable loop; start Fill Date again after checking Windows security software.'
+        break
       }
+      Start-Sleep -Seconds 2
       $updater = Join-Path $PSScriptRoot 'Update-AgapeWellTransAgent.ps1'
       if (Test-Path -LiteralPath $updater) {
-        & $updater
+        & $updater -AuthorizedLauncherPid $PID
       }
       $workerProcess = $null
     }
-  } while ($workerExitCode -eq 42 -or $workerExitCode -eq 43)
+  } while ($workerExitCode -eq 43)
   if (-not $workerError -and $workerProcess -and $workerProcess.ExitCode -ne 0) {
     $workerError = "Agent exited with code $($workerProcess.ExitCode)."
     $workerRuntimeSeconds = ((Get-Date) - $workerStartedAt).TotalSeconds

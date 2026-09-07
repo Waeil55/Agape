@@ -408,7 +408,7 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).toContain('data-role="verifier"');
     expect(operatorConsole).toContain('Independent deterministic reviewer integrated into this installed Agent');
     expect(operatorConsole).toContain('Agent command acknowledgement timed out.');
-    expect(operatorConsole).toContain('Reset Session');
+    expect(operatorConsole).toContain('>Recover</button>');
     expect(operatorConsole).toContain('role="toolbar"');
     expect(operatorConsole).toContain("'top:8px'");
     expect(operatorConsole).toContain("'left:50%'");
@@ -420,9 +420,10 @@ describe('WellTrans staging safety contract', () => {
     expect(operatorConsole).toContain('data-role="collapse"');
     expect(worker).toContain('await installWellTransOperatorConsole(session.page, handleOperatorCommand)');
     expect(worker).toContain('operatorControl.dateOverride');
-    expect(worker).toContain("action === 'restart'");
+    expect(worker).toContain("action === 'recover'");
     expect(worker).toContain('operatorControl.fatalReviewError');
-    expect(worker).toContain("operatorControl.message = 'The previous review is unsafe. Starting a clean session, then filling the opened date.'");
+    expect(worker).toContain('operatorControl.recoveryRequested = true');
+    expect(worker).toContain('The Agent will keep this browser open');
     expect(worker).toContain('return currentDate;');
   });
 
@@ -448,11 +449,13 @@ describe('WellTrans staging safety contract', () => {
     expect(worker).toContain('verifiedFields');
   });
 
-  it('automatically starts a clean session after the operator closes an unsafe review', () => {
+  it('recovers in the same browser after the operator closes an unsafe review', () => {
     const worker = readFileSync(workerSourcePath, 'utf8');
     expect(worker).toContain('if (reviewWasOpen && !reviewIsOpen)');
-    expect(worker).toContain("process.exitCode = 42");
+    expect(worker).toContain("publishHeartbeat('recovering_in_place')");
     expect(worker).toContain('Unsafe review was closed by the operator');
+    expect(worker).not.toContain('process.exitCode = 42');
+    expect(worker).not.toContain('await session.browser.close()');
   });
 
   it('keeps Apply and Close as explicit human-only actions', () => {

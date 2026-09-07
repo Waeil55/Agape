@@ -47,8 +47,8 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey, bottomAction
       .primary{background:#2563eb;border-color:#3b82f6;color:#fff}
       .primary:hover{background:#1d4ed8}
       .verify{background:#047857;border-color:#059669;color:#fff}
-      .restart{background:#fff1f2;border-color:#fda4af;color:#be123c}
-      .restart[hidden]{display:none}
+      .recover{background:#fff1f2;border-color:#fda4af;color:#be123c}
+      .recover[hidden]{display:none}
       .metric{display:flex;align-items:baseline;gap:3px;padding:3px 6px;border-radius:7px;background:#f1f5f9;
         color:#64748b;font-size:8px;text-transform:uppercase}
       .metric b{color:#0f172a;font-size:11px}
@@ -77,7 +77,7 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey, bottomAction
       <button class="optional" data-action="detect-date" title="Cancel a pending date switch and use the date currently open in WellTrans">Use Open Date</button>
       <button class="verify optional" data-action="verify" title="Independently read every staged field back without clicking Apply" disabled>Verify Review</button>
       <button class="optional" data-action="pause">Pause</button>
-      <button class="restart optional" data-action="restart" title="Discard an unsafe unsaved session and start clean" hidden>Reset Session</button>
+      <button class="recover optional" data-action="recover" title="Keep this browser open and rebuild after you manually close an unsafe Edit Itinerary review" hidden>Recover</button>
       <span class="metric"><b data-role="staged">0</b> filled</span>
       <span class="metric"><b data-role="pending">0</b> pending</span>
       <span class="metric"><b data-role="failed">0</b> blocked</span>
@@ -356,8 +356,8 @@ const consoleBootstrap = ({ consoleId, commandBinding, positionKey, bottomAction
       state.paused = next.autoRun === false;
       const pause = $('[data-action="pause"]');
       if (pause) pause.textContent = state.paused ? 'Resume' : 'Pause';
-      const restart = $('[data-action="restart"]');
-      if (restart) restart.hidden = !/(error|blocked|unsafe|failed)/i.test(String(next.state || ''));
+      const recover = $('[data-action="recover"]');
+      if (recover) recover.hidden = !/(error|blocked|unsafe|failed)/i.test(String(next.state || ''));
     },
   };
 };

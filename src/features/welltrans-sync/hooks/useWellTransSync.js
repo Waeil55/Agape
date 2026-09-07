@@ -14,6 +14,8 @@ const logMillis = log => log?.updatedAt?.toMillis?.()
   || log?.updatedAt?.toDate?.()?.getTime?.()
   || log?.createdAt?.toDate?.()?.getTime?.()
   || 0;
+// Keep 5.0.8 review evidence valid while an already-open human review finishes.
+// The release manifest independently upgrades the installed Agent to 5.0.9.
 const REQUIRED_WORKER_VERSION = '5.0.8';
 const isTripRecord = trip => Boolean(trip && typeof trip === 'object' && !Array.isArray(trip));
 const safely = (operation, fallback) => {
@@ -124,7 +126,7 @@ export const useWellTransSync = (trips = [], serviceDate = '', driverScopeId = '
       'online', 'connecting', 'waiting_for_login', 'date_selection_required',
       'processing', 'staging', 'indexing_schedule', 'verifying_applied_records',
       'verifying_staged_records', 'reconciling_authoritative_trips', 'inspection',
-      'running_portal_canary', 'recovering_clean_session', 'restarting_safe_session',
+      'running_portal_canary', 'recovering_in_place', 'manual_review_reset_required',
       'calibrated', 'review_ready', 'review_batch_ready',
       'review_ready_verified', 'review_batch_verified', 'paused_review_ready',
       'batch_apply_confirmed', 'reconciliation_blocked',
