@@ -32,3 +32,34 @@ export function getAuthVerificationIssue(result) {
 
   return 'Account access could not be verified. No workspace data was opened; contact an administrator if this continues.';
 }
+
+export function getLoginFailurePresentation(error) {
+  const code = String(error?.code || error?.name || '').trim().toLowerCase();
+  if (code.includes('network-request-failed') || code.includes('timeout')) {
+    return {
+      clearPassword: false,
+      message: 'The login service could not be reached. Check the connection and retry; you do not need to close the app.',
+    };
+  }
+  if (code.includes('too-many-requests')) {
+    return {
+      clearPassword: true,
+      message: 'Login is temporarily limited after repeated attempts. Wait briefly, then try once.',
+    };
+  }
+  if (
+    code.includes('invalid-credential')
+    || code.includes('wrong-password')
+    || code.includes('user-not-found')
+    || code.includes('invalid-email')
+  ) {
+    return { clearPassword: true, message: 'The username or password is incorrect.' };
+  }
+  if (code.includes('user-disabled')) {
+    return { clearPassword: true, message: 'This account is disabled. Contact an administrator.' };
+  }
+  return {
+    clearPassword: true,
+    message: 'Login could not be completed. Retry once; if it continues, contact an administrator.',
+  };
+}

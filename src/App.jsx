@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
 import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase } from 'lucide-react';
-import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, doc, getDoc, getDocFromCache, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromCache, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
@@ -40,6 +40,7 @@ import {
   AUTH_PROFILE_SERVER_TIMEOUT_MS,
   AUTH_WATCHDOG_TIMEOUT_MS,
   getAuthVerificationIssue,
+  getLoginFailurePresentation,
   isRecoverableAuthVerificationFailure,
 } from './utils/authStartup';
 
@@ -384,7 +385,6 @@ const App = () => {
   const authBootResolvedRef = useRef(false);
   const loginPortalRoleRef = useRef(null);
   const loginInProgressRef = useRef(false);
-  const loginAttemptRef = useRef(0);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
 
@@ -838,6 +838,7 @@ const App = () => {
   const [loginStep, setLoginStep] = useState('role_selection');
   const [pendingRole, setPendingRole] = useState(null);
   const [loginError, setLoginError] = useState('');
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
 
   const resetSessionState = useCallback((options = {}) => {
     const {
@@ -878,6 +879,7 @@ const App = () => {
 
     setDriverTelemetry([]);
     setPassword('');
+    setLoginSubmitting(false);
     setEmail(preserveEmail ? emailValue : '');
     setPendingRole(pendingRoleValue);
     setLoginStep(nextLoginStep);
@@ -1073,7 +1075,7 @@ const App = () => {
 
     // Helper: apply authenticated session state and clear loading immediately
     const applySession = (userRole, userEmail, userDoc, capturedUser, cachedTenantId = null) => {
-      if (cancelled) return;
+      if (cancelled || !capturedUser?.uid || auth.currentUser?.uid !== capturedUser.uid) return;
       const requestedPortalRole = loginPortalRoleRef.current;
 
       // Role gate check
@@ -1108,6 +1110,7 @@ const App = () => {
       setLoginStep('role_selection');
       setPendingRole(null);
       setPassword('');
+      setLoginSubmitting(false);
       setLoginError('');
       setStartupIssue('');
 
@@ -1146,7 +1149,7 @@ const App = () => {
 
     const verifyAppliedSessionInBackground = (capturedUser, cachedRole, cachedTenantId) => {
       getDocFromServer(doc(db, 'users', capturedUser.uid)).then((freshDoc) => {
-        if (cancelled) return;
+        if (cancelled || auth.currentUser?.uid !== capturedUser.uid) return;
         if (!freshDoc.exists() || !isEmploymentAccessActive(freshDoc.data())) {
           handleSecurityTermination({ message: 'Your Agape Care access has been disabled.' });
           return;
@@ -1178,6 +1181,7 @@ const App = () => {
 
     const pauseBootForRetry = (verificationResult) => {
       loginInProgressRef.current = false;
+      setLoginSubmitting(false);
       authBootResolvedRef.current = true;
       setStartupIssue(getAuthVerificationIssue(verificationResult));
       setShowLoadingRecovery(true);
@@ -1193,6 +1197,7 @@ const App = () => {
         return;
       }
       if (user) {
+        setIsLoading(true);
         const requestedPortalRole = loginPortalRoleRef.current;
         const userEmail = user.email || '';
 
@@ -1212,7 +1217,7 @@ const App = () => {
           AUTH_PROFILE_CACHE_TIMEOUT_MS,
           'cached user profile'
         );
-        if (cancelled) return;
+        if (cancelled || auth.currentUser?.uid !== user.uid) return;
 
         const cachedProfileDoc = cachedProfileResult.ok ? cachedProfileResult.value : null;
         const cachedProfileRole = cachedProfileDoc?.exists?.()
@@ -1236,7 +1241,7 @@ const App = () => {
           AUTH_PROFILE_SERVER_TIMEOUT_MS,
           'user profile'
         );
-        if (cancelled) return;
+        if (cancelled || auth.currentUser?.uid !== user.uid) return;
 
         if (!userDocResult.ok) {
           if (isRecoverableAuthVerificationFailure(userDocResult)) {
@@ -1389,35 +1394,18 @@ const App = () => {
         }
       } else {
         loginInProgressRef.current = false;
+        setLoginSubmitting(false);
         if (skipNextSignedOutResetRef.current) {
           skipNextSignedOutResetRef.current = false;
           authBootResolvedRef.current = true;
           setIsLoading(false);
           return;
         }
-        // If user was already authenticated in this session, this could be a transient
-        // token refresh or an IndexedDB corruption issue. Wait for session restoration.
+        // onAuthStateChanged emits null only after Firebase has resolved that the
+        // session is signed out. Resolve the UI once; do not start another sign-out
+        // or delay the login form behind a speculative token-refresh loop.
         if (authBootResolvedRef.current) {
-          console.warn('[Auth] Session went null after boot — waiting 5s for token refresh');
-          await new Promise(r => setTimeout(r, 5000));
-          if (cancelled) return;
-          if (auth.currentUser) {
-            loginAttemptRef.current = 0;
-            return;
-          }
-          loginAttemptRef.current += 1;
-          if (loginAttemptRef.current > 5) {
-            console.warn('[Auth] Multiple rapid null-state cycles detected — clearing all local state');
-            clearRoleCache();
-            skipNextSignedOutResetRef.current = true;
-            signOut(auth).catch(() => {});
-            resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
-            loginAttemptRef.current = 0;
-            return;
-          }
           clearRoleCache();
-          skipNextSignedOutResetRef.current = true;
-          signOut(auth).catch(() => {});
           resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
           return;
         }
@@ -1430,6 +1418,7 @@ const App = () => {
       } catch (bootErr) {
         console.error("Auth boot error:", bootErr);
         loginInProgressRef.current = false;
+        setLoginSubmitting(false);
         setStartupIssue('Startup encountered an error. Please retry.');
         if (authBootResolvedRef.current) {
           return;
@@ -1512,7 +1501,6 @@ const App = () => {
         return;
       }
       loginInProgressRef.current = true;
-      await setPersistence(auth, browserLocalPersistence);
       const userCred = await createUserWithEmailAndPassword(auth, authEmail, password);
       await setDoc(
         doc(db, 'users', userCred.user.uid),
@@ -1557,58 +1545,35 @@ const App = () => {
   };
 
   const executeLogin = async (selectedRole) => {
+    if (loginInProgressRef.current) return;
     const requestedRole = String(selectedRole || '').toLowerCase();
+    const { authEmail, username } = resolveAuthIdentifier(email);
+    if (!VALID_ROLES.has(requestedRole)) {
+      setLoginError('Select the correct login portal first.');
+      return;
+    }
+    if (!authEmail || !username) {
+      setLoginError('Enter a valid username.');
+      return;
+    }
     loginPortalRoleRef.current = requestedRole;
-    // Clear any stale role cache before attempting login — prevents ghost sessions
-    // from interfering when Firebase Auth IndexedDB has stale state.
-    clearRoleCache();
+    // readRoleCache validates the authenticated UID and role before use. Keep a
+    // matching cache so a returning user is not forced through a slow profile
+    // request after every successful Firebase login.
     setLoginError('');
-    setIsLoading(true);
     loginInProgressRef.current = true;
-    loginAttemptRef.current = 0;
+    setLoginSubmitting(true);
     try {
-      // Privileged portals end when the browser session closes. Drivers retain
-      // local persistence so navigation/reloads do not interrupt active field work;
-      // their live employment and device session are still continuously verified.
-      if (requestedRole === 'driver') {
-        try {
-          await setPersistence(auth, browserLocalPersistence);
-        } catch {
-          // Retry once — transient IndexedDB errors are common on cold boot
-          try {
-            await setPersistence(auth, browserLocalPersistence);
-          } catch {
-            // Last resort: session persistence keeps the driver logged in
-            // for the current browser session but will not survive a close.
-            await setPersistence(auth, browserSessionPersistence).catch(() => {});
-          }
-        }
-      } else {
-        await setPersistence(auth, browserSessionPersistence).catch(() => {});
-      }
-      const { authEmail, username } = resolveAuthIdentifier(email);
-      if (!authEmail || !username) {
-        setIsLoading(false);
-        setLoginError('Enter a valid username.');
-        loginInProgressRef.current = false;
-        return;
-      }
       const credential = await signInWithEmailAndPassword(auth, authEmail, password);
       beginSecuritySession(credential.user.uid);
     } catch (err) {
       loginInProgressRef.current = false;
+      setLoginSubmitting(false);
       loginPortalRoleRef.current = requestedRole;
       setIsLoading(false);
-      setPassword('');
-      // If the error mentions persistence or IndexedDB, hint at clearing browser data
-      const msg = String(err?.message || err || '').replace('Firebase: ', '');
-      // Only match Firebase-specific persistence errors — not ReferenceErrors
-      // for variable names that happen to contain "persist".
-      if (/auth.*persist|indexeddb|quota.*exceeded|storage.*unavailable/i.test(msg)) {
-        setLoginError(`${msg} — Try clearing your browser cache or use a private/incognito window.`);
-      } else {
-        setLoginError(msg);
-      }
+      const failure = getLoginFailurePresentation(err);
+      if (failure.clearPassword) setPassword('');
+      setLoginError(failure.message);
     }
   };
 
@@ -2852,7 +2817,7 @@ const App = () => {
           ) : (
             <form onSubmit={submitLogin} className="space-y-4">
               <div className="flex items-center gap-4 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <button type="button" onClick={() => {
+                <button type="button" disabled={loginSubmitting} onClick={() => {
                   loginPortalRoleRef.current = null;
                   setPendingRole(null);
                   setPassword('');
@@ -2890,11 +2855,11 @@ const App = () => {
                 </div>
               )}
 
-              <button type="submit" className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">Authorize Access</button>
+              <button type="submit" disabled={loginSubmitting} aria-busy={loginSubmitting} className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">{loginSubmitting ? 'Authenticating…' : 'Authorize Access'}</button>
 
               <div className="pt-2 flex items-center justify-between text-sm font-semibold">
-                <button type="button" onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
-                <button type="button" onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-semibold transition text-sm">Reset Help</button>
+                <button type="button" disabled={loginSubmitting} onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-full font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
+                <button type="button" disabled={loginSubmitting} onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-full font-semibold transition text-sm">Reset Help</button>
               </div>
             </form>
           )}

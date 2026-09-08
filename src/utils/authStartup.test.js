@@ -4,6 +4,7 @@ import {
   AUTH_LOADING_RECOVERY_DELAY_MS,
   AUTH_PROFILE_SERVER_TIMEOUT_MS,
   getAuthVerificationIssue,
+  getLoginFailurePresentation,
   isRecoverableAuthVerificationFailure,
 } from './authStartup';
 
@@ -39,5 +40,23 @@ describe('authentication startup recovery', () => {
     expect(app).toContain('onClick={retryStartupSession}');
     expect(app).not.toContain('user profile retry');
     expect(app).not.toContain('Could not reach the server. Check your connection and sign in again.');
+  });
+
+  it('keeps credentials available for a network retry without telling the user to close the app', () => {
+    const failure = getLoginFailurePresentation({ code: 'auth/network-request-failed' });
+
+    expect(failure.clearPassword).toBe(false);
+    expect(failure.message).toContain('do not need to close the app');
+  });
+
+  it('uses one local-first persistence authority and blocks overlapping sign-ins', () => {
+    const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+    const firebase = readFileSync(new URL('../config/firebase.js', import.meta.url), 'utf8');
+
+    expect(firebase).toContain('persistence: [browserLocalPersistence, browserSessionPersistence]');
+    expect(app).not.toContain('await setPersistence(auth');
+    expect(app).toContain('if (loginInProgressRef.current) return;');
+    expect(app).not.toContain('Session went null after boot — waiting 5s');
+    expect(app).toContain('disabled={loginSubmitting}');
   });
 });

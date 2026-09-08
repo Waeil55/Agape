@@ -29,7 +29,7 @@ import {
   enableNetwork,
   onSnapshot,
 } from 'firebase/firestore';
-import { initializeAuth, getAuth, browserSessionPersistence, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
+import { initializeAuth, getAuth, browserSessionPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -143,8 +143,8 @@ export { app, appCheck, db, auth, analytics, messaging, storage, storageRef, upl
   getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp, increment,
   writeBatch, setDoc, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, deleteDoc, deleteField, arrayUnion, arrayRemove, query, where, orderBy, limit, startAfter, runTransaction, enableNetwork, onSnapshot,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
-  EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail, setPersistence,
-  browserLocalPersistence, browserSessionPersistence, getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail,
+  getAuth, getMessaging, getToken, onMessage, logEvent, functions, httpsCallable };
 
 const _agapeApiKey = env.VITE_GOOGLE_MAPS_API_KEY || "";
 export function GOOGLE_MAPS_API_KEY() { return _agapeApiKey; }
