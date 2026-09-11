@@ -3,7 +3,6 @@ const crypto = require('node:crypto');
 const test = require('node:test');
 const {
   buildInboundSmsLog,
-  driverOwnsTrip,
   maskPhone,
   normalizeClientSmsText,
   normalizePhone,
@@ -12,7 +11,6 @@ const {
   resolveCanonicalClientPhone,
   smsConversationId,
   updateTripConfirmationById,
-  validateDriverSmsAccess,
   verifyTelnyxSignature,
 } = require('./telnyxWebhook');
 
@@ -72,6 +70,18 @@ test('inbound log stores only the operational fields and omits the raw webhook b
   assert.equal(normalizePhone('123'), '');
 });
 
+test('business SMS resolves only the canonical client number', () => {
+  assert.equal(resolveCanonicalClientPhone({
+    clientPhone: '(317) 555-0101',
+    pickupPhone: '(317) 555-0199',
+  }), '+13175550101');
+  assert.equal(resolveCanonicalClientPhone({
+    clientPhone: '(317) 555-0101',
+    phoneNeedsReview: true,
+  }), '');
+  assert.equal(resolveCanonicalClientPhone({ pickupPhone: '(317) 555-0199' }), '');
+});
+
 test('linked inbound logs carry only server-resolved conversation access fields', () => {
   const log = buildInboundSmsLog({
     from: '+13175550101',
@@ -83,60 +93,13 @@ test('linked inbound logs carry only server-resolved conversation access fields'
     conversationKey: '+13175550101',
     tripId: 'trip-1',
     tenantId: 'agape-care',
-    participantUserIds: ['driver-auth-1'],
+    participantUserIds: ['dispatcher-auth-1'],
     consentAction: null,
   });
   assert.equal(log.tripId, 'trip-1');
-  assert.deepEqual(log.participantUserIds, ['driver-auth-1']);
+  assert.deepEqual(log.participantUserIds, ['dispatcher-auth-1']);
   assert.equal(log.conversationKey, '+13175550101');
   assert.equal(Object.hasOwn(log, 'consentAction'), false);
-});
-
-test('driver SMS access requires the assigned trip and its canonical client phone', () => {
-  const trip = {
-    driverId: 'driver-profile-1',
-    driverEmail: 'driver@example.com',
-    tenantId: 'agape-care',
-    clientPhone: '(317) 555-0101',
-    pickupPhone: '(317) 555-0199',
-    hospitalPhone: '(317) 555-0188',
-  };
-  const actor = { profileId: 'driver-profile-1', tenantId: 'agape-care' };
-  assert.equal(driverOwnsTrip({ trip, actor, uid: 'auth-1' }), true);
-  assert.equal(resolveCanonicalClientPhone(trip), '+13175550101');
-  assert.deepEqual(validateDriverSmsAccess({
-    trip,
-    actor,
-    uid: 'auth-1',
-    recipient: '+1 317 555 0101',
-  }), { allowed: true, reason: '', clientPhone: '+13175550101' });
-  assert.equal(validateDriverSmsAccess({
-    trip,
-    actor,
-    uid: 'auth-1',
-    recipient: trip.pickupPhone,
-  }).reason, 'recipient_not_client');
-  assert.equal(validateDriverSmsAccess({
-    trip,
-    actor: { profileId: 'another-driver', tenantId: 'agape-care' },
-    uid: 'auth-2',
-    recipient: trip.clientPhone,
-  }).reason, 'trip_not_assigned');
-});
-
-test('driver SMS access fails closed for an unverified client phone or tenant mismatch', () => {
-  const actor = { profileId: 'driver-1', tenantId: 'agape-care' };
-  const baseTrip = { driverId: 'driver-1', tenantId: 'agape-care', clientPhone: '3175550101' };
-  assert.equal(validateDriverSmsAccess({
-    trip: { ...baseTrip, phoneNeedsReview: true },
-    actor,
-    recipient: baseTrip.clientPhone,
-  }).reason, 'client_phone_unverified');
-  assert.equal(validateDriverSmsAccess({
-    trip: { ...baseTrip, tenantId: 'another-tenant' },
-    actor,
-    recipient: baseTrip.clientPhone,
-  }).reason, 'tenant_mismatch');
 });
 
 test('confirmation updates the authoritative trip document and fails closed if it is missing', async () => {

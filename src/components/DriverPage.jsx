@@ -44,7 +44,7 @@ import { queueSyncOperation } from '../utils/localDB';
 import { normalizeTenantId } from '../utils/tenantScope';
 import { sanitizeOdometerInput } from '../utils/odometerInput';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
-import SmsConversationModal from './SmsConversationModal';
+import DriverQuickSmsSheet from './DriverQuickSmsSheet';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -928,7 +928,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return null;
   });
   const [showMoreOptions, setShowMoreOptions] = useState(null);
-  const [smsConversationTrip, setSmsConversationTrip] = useState(null);
+  const [quickSmsTrip, setQuickSmsTrip] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const toastTimeoutRef = useRef(null);
   useEffect(() => {
@@ -1349,9 +1349,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [driverScopedTrips, trips, phoneNumbers]);
 
   const getPrimaryContactForTrip = (trip) => getPrimaryContact(trip, trips, phoneNumbers);
-  const hasUnreadClientSms = (trip) => Array.isArray(trip?.clientSmsUnreadFor)
-    && trip.clientSmsUnreadFor.includes(auth.currentUser?.uid);
-
   const getContactsForTrip = (trip) => tripContacts[trip?.id] || [];
 
   // Count legs per patient for today/tomorrow
@@ -1731,7 +1728,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     || showCompleteModal
     || scheduleEditorTrip
     || showContactSelector
-    || smsConversationTrip
+    || quickSmsTrip
     || showMoreOptions
     || transferPrompt
     || passwordPrompt
@@ -1749,7 +1746,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       setActiveNativeOdometer(null);
       setScheduleEditorTrip(null);
       setShowContactSelector(null);
-      setSmsConversationTrip(null);
+      setQuickSmsTrip(null);
       setShowMoreOptions(null);
       setTransferPrompt(null);
       setPasswordPrompt(null);
@@ -1999,7 +1996,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         || (stop?.address && stop?.clientId && !realTripIds.has(stop.clientId))
       ));
   }, [assignedSequence, driverScopedTrips]);
-  const getRoutePlanStopPhone = useCallback((stop) => {
+  const getRoutePlanStopTrip = useCallback((stop) => {
     if (!stop) return '';
     const stopType = String(stop.type || '').toUpperCase() === 'DO' ? 'DO' : 'PU';
     const bookingId = String(stop.bookingId || '').trim().toLowerCase();
@@ -2014,9 +2011,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         || (name && tripName === name && ((stopType === 'PU' && pickup === address) || (stopType === 'DO' && dropoff === address)))
         || (address && (pickup === address || dropoff === address));
     });
-    if (matchedTrip) return resolveClientPhoneForTrip(matchedTrip, driverScopedTrips);
-    return resolveClientPhoneForTrip(stop);
+    return matchedTrip || null;
   }, [driverScopedTrips]);
+  const getRoutePlanStopPhone = useCallback((stop) => {
+    const matchedTrip = getRoutePlanStopTrip(stop);
+    return matchedTrip
+      ? resolveClientPhoneForTrip(matchedTrip, driverScopedTrips)
+      : resolveClientPhoneForTrip(stop);
+  }, [driverScopedTrips, getRoutePlanStopTrip]);
   const getRoutePlanStopKey = useCallback((stop) => (
     `${stop?.clientId || stop?.id || 'stop'}:${String(stop?.type || 'PU').toUpperCase()}:${stop?.stepNumber || stop?.sequenceIndex || 0}`
   ), []);
@@ -3016,11 +3018,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     handleCall(primary.phone, `${primary.label}: ${primary.name}`);
   };
 
-  // Single messaging entry point: every "SMS" button opens the Quick SMS
-  // conversation (manual composer + templates + replies). No native-SMS
-  // fallback exists because it splits client conversations across senders.
+  // Driver messages always leave through the device's native SMS composer.
+  // Telnyx conversations are an admin/dispatcher surface and are never mounted
+  // in the driver workspace.
   const handleSmartSMS = (trip) => {
-    setSmsConversationTrip(trip);
+    setQuickSmsTrip(trip);
   };
 
   const openContactSelector = (trip) => {
@@ -4069,7 +4071,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </button>
                 <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="relative h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
                   <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-blue-600"><MessageCircle size={17} /> SMS</span>
-                  {hasUnreadClientSms(trip) && <span className="absolute right-1 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-rose-500" aria-label="Unread client reply" />}
                 </button>
                 <button type="button" onClick={() => openContactSelector(trip)} className="h-11 text-white text-xs font-semibold cursor-pointer">
                   <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-violet-600"><PhoneForwarded size={17} /> Contacts</span>
@@ -4701,6 +4702,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 const isUpcoming = !isCompleted && !isCurrent;
                 const address = stop.address || '';
                 const stopPhone = getRoutePlanStopPhone(stop);
+                const stopTrip = getRoutePlanStopTrip(stop) || stop;
                 const stopTripId = stop.bookingId || stop.tripNumber || stop.clientId || stop.id || '';
                 const typeColor = stopType === 'DO' ? 'orange' : 'blue';
 
@@ -4809,7 +4811,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                             </button>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }}
+                              onClick={(e) => { e.stopPropagation(); handleSmartSMS(stopTrip); }}
                               className="h-8 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 text-xs font-medium flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
                               title="SMS client"
                               aria-label="SMS client"
@@ -5019,7 +5021,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <div className="flex items-center gap-2 mt-3 mb-4">
                             <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-1.5 rounded-xl flex items-center justify-center gap-2 transition-all" aria-label="Navigate"><Navigation size={16}/> Navigate</button>
                            <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-100" aria-label="Call"><Phone size={16}/></button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="relative w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label={hasUnreadClientSms(trip) ? 'Open unread client SMS reply' : 'Open client SMS'}><MessageCircle size={16}/>{hasUnreadClientSms(trip) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-rose-500" />}</button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="relative w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label="Text client from this phone"><MessageCircle size={16}/></button>
                           </div>
 
                           {(() => {
@@ -7274,13 +7276,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         </div>
       )}
 
-      {/* ===== CLIENT SMS CONVERSATION ===== */}
-      {smsConversationTrip && (
-        <SmsConversationModal
-          trip={smsConversationTrip}
-          role={role}
+      {/* ===== DRIVER NATIVE QUICK SMS ===== */}
+      {quickSmsTrip && (
+        <DriverQuickSmsSheet
+          trip={quickSmsTrip}
           allTrips={trips}
-          onClose={() => setSmsConversationTrip(null)}
+          onClose={() => setQuickSmsTrip(null)}
         />
       )}
 

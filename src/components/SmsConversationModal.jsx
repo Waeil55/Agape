@@ -16,7 +16,6 @@ import {
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { limit } from 'firebase/firestore';
 import {
-  auth,
   collection,
   db,
   onSnapshot,
@@ -26,13 +25,12 @@ import {
 } from '../config/firebase';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import {
+  AGAPE_BUSINESS_SMS_NUMBER,
   buildQuickSmsText,
   prepareClientSmsText,
   QUICK_SMS_TEMPLATES,
   suggestedQuickSmsTemplateId,
 } from '../utils/clientSms';
-
-const MAX_CONVERSATION_MESSAGES = 250;
 
 function normalizePhone(raw) {
   const digits = String(raw || '').replace(/\D/g, '');
@@ -91,12 +89,11 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
     () => normalizePhone(resolveClientPhoneForTrip(trip, allTrips)),
     [allTrips, trip],
   );
-  const isDriver = String(role || '').toLowerCase() === 'driver';
-  const currentUid = auth.currentUser?.uid || '';
+  const canUseBusinessSms = ['admin', 'dispatcher'].includes(String(role || '').toLowerCase());
   const suggestedTemplateId = useMemo(() => suggestedQuickSmsTemplateId(trip), [trip]);
 
   useEffect(() => {
-    if (!phone || (isDriver && !currentUid)) {
+    if (!phone || !canUseBusinessSms) {
       setMessages([]);
       setLoading(false);
       return undefined;
@@ -105,22 +102,12 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
     setLoading(true);
     setLoadError('');
     const snapshots = new Map();
-    const sources = isDriver
-      ? [
-          query(
-            collection(db, 'smsLogs'),
-            where('participantUserIds', 'array-contains', currentUid),
-            where('conversationKey', '==', phone),
-            orderBy('timestamp', 'desc'),
-            limit(MAX_CONVERSATION_MESSAGES),
-          ),
-        ]
-      : [
-          query(collection(db, 'smsLogs'), where('conversationKey', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
-          query(collection(db, 'smsLogs'), where('tripId', '==', trip.id), orderBy('timestamp', 'desc'), limit(100)),
-          query(collection(db, 'smsLogs'), where('to', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
-          query(collection(db, 'smsLogs'), where('from', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
-        ];
+    const sources = [
+      query(collection(db, 'smsLogs'), where('conversationKey', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
+      query(collection(db, 'smsLogs'), where('tripId', '==', trip.id), orderBy('timestamp', 'desc'), limit(100)),
+      query(collection(db, 'smsLogs'), where('to', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
+      query(collection(db, 'smsLogs'), where('from', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
+    ];
 
     const publish = () => {
       const unique = new Map();
@@ -141,15 +128,15 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
     }));
 
     return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
-  }, [currentUid, isDriver, phone, trip.id]);
+  }, [canUseBusinessSms, phone, trip.id]);
 
   useEffect(() => {
-    if (!phone || !trip.id) return;
+    if (!canUseBusinessSms || !phone || !trip.id) return;
     const markClientSmsRead = httpsCallable(getFunctions(), 'markClientSmsRead');
     markClientSmsRead({ tripId: trip.id, phone }).catch((error) => {
       console.warn('[clientSms] Could not mark conversation read:', error?.code || error?.message || error);
     });
-  }, [messages.length, phone, trip.id]);
+  }, [canUseBusinessSms, messages.length, phone, trip.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth', block: 'end' });
@@ -157,7 +144,7 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
 
   const handleSend = async (message) => {
     const preparedText = prepareClientSmsText(message ?? replyText, trip);
-    if (!preparedText || sending || !phone) return;
+    if (!canUseBusinessSms || !preparedText || sending || !phone) return;
     setSending(true);
     setSendError('');
     try {
@@ -187,6 +174,8 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
     }
   };
 
+  if (!canUseBusinessSms) return null;
+
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center overflow-hidden md:items-center md:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -202,7 +191,7 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><MessageSquare size={18} /></span>
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-semibold text-slate-900">{trip.patient || 'Client'}</h3>
-                <p className="truncate text-xs font-medium text-slate-500">Agape Care business SMS · {phone || 'No verified client phone'}</p>
+                <p className="truncate text-xs font-medium text-slate-500">Agape Care business SMS {AGAPE_BUSINESS_SMS_NUMBER} · {phone || 'No verified client phone'}</p>
               </div>
             </div>
             <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200" aria-label="Close SMS conversation"><X size={17} /></button>

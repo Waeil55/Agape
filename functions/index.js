@@ -23,7 +23,6 @@ const {
   resolveCanonicalClientPhone,
   smsConversationId,
   updateTripConfirmationById,
-  validateDriverSmsAccess,
   verifyTelnyxSignature: verifyTelnyxWebhookSignature,
 } = require("./telnyxWebhook");
 
@@ -50,6 +49,7 @@ admin.messaging = getMessaging;
 admin.storage = getStorage;
 
 const TELNYX_API_BASE = "https://api.telnyx.com/v2";
+const AGAPE_BUSINESS_SMS_NUMBER = "+18552223330";
 const runtimeConfigSecret = defineSecret("AGAPE_RUNTIME_CONFIG");
 
 function getRuntimeConfig() {
@@ -653,6 +653,11 @@ async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
     smsSenderReadinessCache = result;
     return result;
   }
+  if (fromNumber !== AGAPE_BUSINESS_SMS_NUMBER) {
+    result.reason = `The configured Telnyx sender must be ${AGAPE_BUSINESS_SMS_NUMBER}.`;
+    smsSenderReadinessCache = result;
+    return result;
+  }
 
   const headers = { Authorization: `Bearer ${apiKey}` };
   try {
@@ -721,7 +726,7 @@ async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
   return result;
 }
 
-async function requireSmsTrip({ tripId, to, actor, context }) {
+async function requireSmsTrip({ tripId, to, actor }) {
   const safeTripId = String(tripId || '').trim();
   if (!safeTripId) {
     throw new functions.https.HttpsError('failed-precondition', 'Choose a trip before messaging a client.');
@@ -734,28 +739,12 @@ async function requireSmsTrip({ tripId, to, actor, context }) {
   if (actor.tenantId && trip.tenantId && actor.tenantId !== trip.tenantId) {
     throw new functions.https.HttpsError('permission-denied', 'This trip belongs to another organization.');
   }
-  if (actor.role === 'driver') {
-    const access = validateDriverSmsAccess({
-      trip,
-      actor,
-      uid: context.auth.uid,
-      tokenEmail: context.auth.token?.email || '',
-      recipient: to,
-    });
-    if (access.reason === 'client_phone_unverified') {
-      throw new functions.https.HttpsError('failed-precondition', 'The client phone needs dispatcher review before messaging.');
-    }
-    if (!access.allowed) {
-      throw new functions.https.HttpsError('permission-denied', 'This trip or client phone is not assigned to your account.');
-    }
-  } else {
-    const clientPhone = resolveCanonicalClientPhone(trip);
-    if (!clientPhone) {
-      throw new functions.https.HttpsError('failed-precondition', 'The client phone needs review before messaging.');
-    }
-    if (clientPhone !== to) {
-      throw new functions.https.HttpsError('failed-precondition', 'The recipient does not match the verified client phone for this trip.');
-    }
+  const clientPhone = resolveCanonicalClientPhone(trip);
+  if (!clientPhone) {
+    throw new functions.https.HttpsError('failed-precondition', 'The client phone needs review before messaging.');
+  }
+  if (clientPhone !== to) {
+    throw new functions.https.HttpsError('failed-precondition', 'The recipient does not match the verified client phone for this trip.');
   }
   return trip;
 }
@@ -766,43 +755,6 @@ async function assertSmsConsent(to) {
   if (snapshot.exists && snapshot.data()?.optedOut === true) {
     throw new functions.https.HttpsError('failed-precondition', 'This client opted out of SMS. Do not send another message unless the client texts START.');
   }
-}
-
-async function resolveSmsParticipantUserIds(trip, actorUid) {
-  const participantUserIds = new Set([String(actorUid || '').trim()].filter(Boolean));
-  const tenantId = String(trip.tenantId || 'agape-care');
-  const driverProfileIds = [...new Set([
-    trip.driverId,
-    trip.assignedDriverId,
-    trip.driverProfileId,
-  ].map((value) => String(value || '').trim()).filter(Boolean))].slice(0, 10);
-  const driverEmails = [...new Set([
-    trip.driverEmail,
-    trip.assignedDriverEmail,
-  ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))].slice(0, 10);
-
-  const lookups = driverProfileIds.map((id) => admin.firestore().doc(`users/${id}`).get());
-  if (driverProfileIds.length) {
-    lookups.push(admin.firestore().collection('users').where('profileId', 'in', driverProfileIds).limit(10).get());
-  }
-  if (driverEmails.length) {
-    lookups.push(admin.firestore().collection('users').where('email', 'in', driverEmails).limit(10).get());
-  }
-
-  const snapshots = await Promise.all(lookups);
-  const addUser = (snapshot) => {
-    if (!snapshot?.exists) return;
-    const user = snapshot.data() || {};
-    const userTenantId = String(user.tenantId || 'agape-care');
-    if (String(user.role || '').toLowerCase() === 'driver' && userTenantId === tenantId) {
-      participantUserIds.add(snapshot.id);
-    }
-  };
-  snapshots.forEach((snapshot) => {
-    if (Array.isArray(snapshot?.docs)) snapshot.docs.forEach(addUser);
-    else addUser(snapshot);
-  });
-  return [...participantUserIds];
 }
 
 function smsLogBase({ actor, context, trip, to, text, requestId, participantUserIds }) {
@@ -828,7 +780,7 @@ async function sendClientSmsMessage({ actor, context, trip, to, text, requestId 
   }
 
   const fromNumber = normalizePhone(telnyx.from);
-  const participantUserIds = await resolveSmsParticipantUserIds(trip, context.auth.uid);
+  const participantUserIds = [context.auth.uid];
   const base = smsLogBase({ actor, context, trip, to, text, requestId, participantUserIds });
   const requestDocumentId = crypto.createHash('sha256').update(`${context.auth.uid}:${requestId}`).digest('hex');
   const requestRef = admin.firestore().doc(`smsSendRequests/${requestDocumentId}`);
@@ -957,7 +909,7 @@ async function sendClientSmsMessage({ actor, context, trip, to, text, requestId 
 }
 
 async function sendClientSmsHandler(data, context) {
-  const actor = await requireRole(context, ['admin', 'dispatcher', 'driver']);
+  const actor = await requireAdminOrDispatcher(context);
   const to = normalizePhone(data?.to);
   const text = normalizeClientSmsText(data?.text);
   const requestId = String(data?.requestId || '').trim();
@@ -970,7 +922,7 @@ async function sendClientSmsHandler(data, context) {
   if (!/^[A-Za-z0-9-]{8,120}$/.test(requestId)) {
     throw new functions.https.HttpsError('invalid-argument', 'A valid message request ID is required.');
   }
-  const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor, context });
+  const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor });
   return sendClientSmsMessage({ actor, context, trip, to, text, requestId });
 }
 
@@ -978,8 +930,9 @@ exports.sendClientSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
   .https.onCall(sendClientSmsHandler);
 
-// Compatibility aliases for installed clients. All three names execute the
-// single authoritative sender above; no native/personal-SMS fallback exists.
+// Compatibility aliases stay deployed so an older installed build cannot
+// bypass the current authorization boundary. The shared handler now rejects
+// every driver account before any Telnyx request is created.
 exports.sendSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
   .https.onCall(sendClientSmsHandler);
@@ -1011,7 +964,7 @@ exports.sendBulkSms = functions
     const requestId = String(message.requestId || `${Date.now()}-${index}-${tripId}`).trim();
     try {
       if (!to || !text) throw new functions.https.HttpsError('invalid-argument', 'A valid client phone and message are required.');
-      const trip = await requireSmsTrip({ tripId, to, actor, context });
+      const trip = await requireSmsTrip({ tripId, to, actor });
       const result = await sendClientSmsMessage({ actor, context, trip, to, text, requestId });
       results.push({ tripId, success: true, messageId: result.messageId, status: result.status });
       sent++;
@@ -1043,11 +996,47 @@ function verifyTelnyxSignature(req) {
   return verifyTelnyxWebhookSignature({ publicKey, signature, timestamp, payload });
 }
 
+function isActiveBusinessSmsProfile(profile = {}, tenantId = '') {
+  const role = String(profile.role || '').toLowerCase();
+  const accessStatus = String(profile.accessStatus || profile.employmentStatus || 'active').toLowerCase();
+  const profileTenantId = String(profile.tenantId || 'agape-care');
+  return ['admin', 'dispatcher'].includes(role)
+    && (!tenantId || profileTenantId === tenantId)
+    && profile.disabled !== true
+    && profile.active !== false
+    && !['disabled', 'inactive', 'revoked', 'suspended', 'terminated', 'separated'].includes(accessStatus);
+}
+
+async function resolveBusinessSmsParticipantUserIds(candidateUserIds, tenantId) {
+  const candidateIds = [...new Set((candidateUserIds || []).map(String).filter(Boolean))].slice(0, 100);
+  const candidateSnapshots = await Promise.all(
+    candidateIds.map((uid) => admin.firestore().doc(`users/${uid}`).get()),
+  );
+  const authorized = candidateSnapshots
+    .filter((snapshot) => snapshot.exists && isActiveBusinessSmsProfile(snapshot.data(), tenantId))
+    .map((snapshot) => snapshot.id);
+  if (authorized.length) return authorized;
+
+  // Legacy conversations may contain only an old driver participant. Keep the
+  // reply visible to operations by routing it to active business-SMS roles.
+  const operations = await admin.firestore().collection('users')
+    .where('role', 'in', ['admin', 'dispatcher'])
+    .limit(100)
+    .get();
+  return operations.docs
+    .filter((snapshot) => isActiveBusinessSmsProfile(snapshot.data(), tenantId))
+    .map((snapshot) => snapshot.id);
+}
+
 async function notifySmsParticipants(participantUserIds, tripId) {
   const userIds = [...new Set((participantUserIds || []).map(String).filter(Boolean))];
   if (!userIds.length) return;
   const users = await Promise.all(userIds.map((uid) => admin.firestore().doc(`users/${uid}`).get()));
-  const recipients = users.filter((snapshot) => snapshot.exists && snapshot.data()?.fcmToken);
+  const recipients = users.filter((snapshot) => (
+    snapshot.exists
+    && isActiveBusinessSmsProfile(snapshot.data())
+    && snapshot.data()?.fcmToken
+  ));
   const tokens = recipients.map((snapshot) => snapshot.data().fcmToken);
   if (!tokens.length) return;
   const response = await admin.messaging().sendEachForMulticast({
@@ -1085,9 +1074,9 @@ async function notifySmsParticipants(participantUserIds, tripId) {
 }
 
 exports.markClientSmsRead = functions.https.onCall(async (data, context) => {
-  const actor = await requireRole(context, ['admin', 'dispatcher', 'driver']);
+  const actor = await requireAdminOrDispatcher(context);
   const to = normalizePhone(data?.phone);
-  const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor, context });
+  const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor });
   await admin.firestore().doc(`trips/${trip.id}`).set({
     clientSmsUnreadFor: admin.firestore.FieldValue.arrayRemove(context.auth.uid),
     clientSmsLastReadAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1205,8 +1194,8 @@ exports.handleInboundSms = functions
     }
 
     const configuredSender = normalizePhone(getTelnyxConfig().from);
-    if (!configuredSender || to !== configuredSender) {
-      functions.logger.warn('Inbound SMS ignored because it targets an unconfigured sender.', { to: maskPhone(to) });
+    if (configuredSender !== AGAPE_BUSINESS_SMS_NUMBER || to !== AGAPE_BUSINESS_SMS_NUMBER) {
+      functions.logger.warn('Inbound SMS ignored because it does not target the approved business sender.', { to: maskPhone(to) });
       res.status(200).json({ ok: true, skipped: 'unconfigured sender' });
       return;
     }
@@ -1232,7 +1221,10 @@ exports.handleInboundSms = functions
     }
     const tripId = String(conversation.tripId || conversation.metadata?.tripId || '').trim();
     const tenantId = String(conversation.tenantId || 'agape-care');
-    const participantUserIds = [...new Set((conversation.participantUserIds || [conversation.driverId, conversation.senderUserId]).map(String).filter(Boolean))];
+    const participantUserIds = await resolveBusinessSmsParticipantUserIds(
+      conversation.participantUserIds || [conversation.senderUserId],
+      tenantId,
+    );
     const consentAction = parseSmsConsentAction(text);
     const batch = admin.firestore().batch();
     batch.create(inboundRef, buildInboundSmsLog({

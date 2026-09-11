@@ -2,15 +2,16 @@ import { localCalendarYmd, tripCalendarDateKey } from './tripDate';
 
 export const CLIENT_SMS_BRAND = 'Agape Care';
 export const CLIENT_SMS_OPT_OUT = 'Reply STOP to opt out.';
+export const AGAPE_BUSINESS_SMS_NUMBER = '+18552223330';
 
 export const QUICK_SMS_TEMPLATES = Object.freeze([
-  { id: 'tomorrow', label: 'Tomorrow Trip', body: "confirming your scheduled transportation for tomorrow. Please reply YES or NO." },
-  { id: 'today', label: 'Today Trip', body: "confirming your scheduled transportation for today. Please reply YES or NO." },
-  { id: 'soon', label: 'On My Way Soon', body: "your driver will be on the way shortly. Please reply if anything has changed." },
-  { id: 'way', label: 'On My Way', body: 'your driver is on the way for your scheduled pickup.' },
-  { id: 'ready', label: 'Pickup / Ready Time', body: "what time do you expect to be ready for pickup?" },
-  { id: 'checkin', label: 'Checking In', body: 'checking in about your scheduled transportation. Please reply if anything has changed.' },
-  { id: 'arrived', label: "I've Arrived", body: "your driver has arrived. Please reply when you're ready." },
+  { id: 'tomorrow', label: 'Tomorrow Trip', body: "confirming your scheduled transportation for tomorrow. Please reply YES or NO.", driverBody: "I'm confirming your scheduled transportation for tomorrow. Please reply YES or NO." },
+  { id: 'today', label: 'Today Trip', body: "confirming your scheduled transportation for today. Please reply YES or NO.", driverBody: "I'm confirming your scheduled transportation for today. Please reply YES or NO." },
+  { id: 'soon', label: 'On My Way Soon', body: "your driver will be on the way shortly. Please reply if anything has changed.", driverBody: "I'll be on the way shortly. Please reply if anything has changed." },
+  { id: 'way', label: 'On My Way', body: 'your driver is on the way for your scheduled pickup.', driverBody: "I'm on the way for your scheduled pickup." },
+  { id: 'ready', label: 'Pickup / Ready Time', body: "what time do you expect to be ready for pickup?", driverBody: 'What time do you expect to be ready for pickup?' },
+  { id: 'checkin', label: 'Checking In', body: 'checking in about your scheduled transportation. Please reply if anything has changed.', driverBody: "I'm checking in about your scheduled transportation. Please reply if anything has changed." },
+  { id: 'arrived', label: "I've Arrived", body: "your driver has arrived. Please reply when you're ready.", driverBody: "I've arrived. Please reply when you're ready." },
 ]);
 
 export function clientFirstName(trip = {}) {
@@ -33,6 +34,12 @@ export function prepareClientSmsText(message, trip = {}) {
 
 export function buildQuickSmsText(template, trip = {}) {
   return prepareClientSmsText(template?.body || '', trip);
+}
+
+export function buildDriverQuickSmsText(template, trip = {}) {
+  const body = String(template?.driverBody || template?.body || '').replace(/\s+/g, ' ').trim();
+  if (!body) return '';
+  return `Hi ${clientFirstName(trip)}, this is your Agape Care driver. ${body}`;
 }
 
 export function suggestedQuickSmsTemplateId(trip = {}, now = new Date()) {

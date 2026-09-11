@@ -5,6 +5,7 @@ import { auth, db, doc, functions, httpsCallable, setDoc, onSnapshot, updatePass
 import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 import OverrideHomeAddressEditor, { verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
 import OverrideExclusionRulesEditor from './OverrideExclusionRulesEditor';
+import { AGAPE_BUSINESS_SMS_NUMBER } from '../utils/clientSms';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -267,8 +268,8 @@ const SettingsPage = ({
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">Agape Care client messaging</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Client texts must use one registered business number. Failed sends never fall back to a personal iPhone.</p>
+                  <p className="text-sm font-semibold text-slate-900">Agape Care client messaging · {AGAPE_BUSINESS_SMS_NUMBER}</p>
+                  <p className="mt-1 text-xs font-medium text-slate-500">Telnyx business conversations are restricted to administrators and dispatchers. Driver quick messages open the driver's native phone Messages app instead.</p>
                 </div>
                 <button type="button" onClick={runSmsDiagnostics} disabled={smsDiagnosticsLoading} className="flex min-h-[40px] items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
                   <RefreshCw size={15} className={smsDiagnosticsLoading ? 'animate-spin' : ''} />

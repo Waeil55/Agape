@@ -4,15 +4,6 @@
       "collectionGroup": "smsLogs",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "participantUserIds", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "conversationKey", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "smsLogs",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "conversationKey", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "DESCENDING" }
       ]

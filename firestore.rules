@@ -184,14 +184,10 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /smsLogs/{messageId} {
-      // SMS bodies are server-authored communication records. Dispatchers can
-      // review all conversations; drivers can read only conversations in which
-      // the server recorded their authenticated UID as a participant.
-      allow read: if signedIn() && (
-        isDispatcher()
-        || (resource.data.get('participantUserIds', []) is list
-          && request.auth.uid in resource.data.get('participantUserIds', []))
-      );
+      // Telnyx bodies are server-authored business communications. They may
+      // contain sensitive client replies and are visible only to admins and
+      // dispatchers; drivers use their phone's native Messages app instead.
+      allow read: if signedIn() && isDispatcher();
       allow create, update, delete: if false;
     }
     match /smsConversations/{conversationId} {

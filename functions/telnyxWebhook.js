@@ -105,49 +105,6 @@ function resolveCanonicalClientPhone(trip = {}) {
   return '';
 }
 
-function driverOwnsTrip({ trip = {}, actor = {}, uid = '', tokenEmail = '' }) {
-  const actorIds = new Set([
-    uid,
-    actor.id,
-    actor.profileId,
-    actor.driverId,
-  ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
-  const assignedIds = [
-    trip.driverId,
-    trip.assignedDriverId,
-    trip.driverProfileId,
-  ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
-  if (assignedIds.some((value) => actorIds.has(value))) return true;
-
-  const actorEmails = new Set([
-    tokenEmail,
-    actor.email,
-    actor.driverEmail,
-  ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
-  const assignedEmails = [
-    trip.driverEmail,
-    trip.assignedDriverEmail,
-  ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
-  return assignedEmails.some((value) => actorEmails.has(value));
-}
-
-function validateDriverSmsAccess({ trip = {}, actor = {}, uid = '', tokenEmail = '', recipient = '' }) {
-  if (!driverOwnsTrip({ trip, actor, uid, tokenEmail })) {
-    return { allowed: false, reason: 'trip_not_assigned', clientPhone: '' };
-  }
-  if (actor.tenantId && trip.tenantId && actor.tenantId !== trip.tenantId) {
-    return { allowed: false, reason: 'tenant_mismatch', clientPhone: '' };
-  }
-  const clientPhone = resolveCanonicalClientPhone(trip);
-  if (!clientPhone) {
-    return { allowed: false, reason: 'client_phone_unverified', clientPhone: '' };
-  }
-  if (normalizePhone(recipient) !== clientPhone) {
-    return { allowed: false, reason: 'recipient_not_client', clientPhone };
-  }
-  return { allowed: true, reason: '', clientPhone };
-}
-
 function buildInboundSmsLog({
   from,
   to,
@@ -202,7 +159,6 @@ async function updateTripConfirmationById({
 
 module.exports = {
   buildInboundSmsLog,
-  driverOwnsTrip,
   maskPhone,
   normalizePhone,
   normalizeClientSmsText,
@@ -211,6 +167,5 @@ module.exports = {
   resolveCanonicalClientPhone,
   smsConversationId,
   updateTripConfirmationById,
-  validateDriverSmsAccess,
   verifyTelnyxSignature,
 };

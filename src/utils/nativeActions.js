@@ -244,37 +244,53 @@ export async function makeCall(phone, name) {
 }
 
 export async function sendSMS(phone, name) {
-  await impact('medium');
+  return sendSMSWithBody(phone, '', name);
+}
 
+export function buildSmsUrl(phone, body = '', ios = isIOS()) {
   const cleaned = cleanPhone(phone);
-  if (!cleaned) return;
+  if (!cleaned) return '';
+  const message = String(body || '').trim();
+  if (!message) return `sms:${cleaned}`;
+  // Apple uses `&body=` for an addressed SMS URL; Android uses a normal query.
+  // Keep this in one utility so every driver action opens the same native path.
+  return `sms:${cleaned}${ios ? '&' : '?'}body=${encodeURIComponent(message)}`;
+}
+
+/**
+ * Open the device's own Messages composer with a prefilled recipient/body.
+ * The app never sends the message and never chooses a carrier line; iOS or
+ * Android sends from the driver's configured phone line after they tap Send.
+ */
+export async function sendSMSWithBody(phone, body, name) {
+  // Keep the external-app handoff inside the original tap event. Awaiting a
+  // haptic promise first can consume Safari's user-activation window and make
+  // an installed PWA appear to ignore the SMS button.
+  void impact('medium');
+  const smsUrl = buildSmsUrl(phone, body);
+  if (!smsUrl) return false;
 
   if (isNativeShell()) {
     try {
       const { App } = await import('@capacitor/app');
-      await App.openUrl({ url: `sms:${cleaned}` });
-      return;
+      await App.openUrl({ url: smsUrl });
+      return true;
     } catch (err) {
-      console.error('Native SMS failed:', err);
+      console.error('Native SMS composer failed:', err);
     }
   }
 
-  // Try sms: protocol on mobile browsers
   const isMobileOrTablet = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   if (isMobileOrTablet) {
-    try {
-      // Try opening sms: protocol
-      const a = document.createElement('a');
-      a.href = `sms:${cleaned}`;
-      a.click();
-      return;
-    } catch (err) {
-      console.error('Mobile sms: protocol failed:', err);
-    }
+    const link = document.createElement('a');
+    link.href = smsUrl;
+    link.rel = 'noopener';
+    link.click();
+    return true;
   }
 
-  // Web/Desktop fallback: show helpful modal
   showWebFallbackModal('sms', phone, name);
+  return true;
 }
 
 export async function showCallActionSheet(phone, name) {
