@@ -31,6 +31,10 @@ import { buildAssignmentMutations } from '../utils/assignmentPersistence';
 import { isPermanentSyncFailure, syncQueueProcessor } from '../services/syncQueueProcessor';
 import { sanitizeFirestorePayload } from '../utils/firestorePayload';
 import { buildTripWorkflowPersistenceRecords } from '../utils/tripWorkflowPersistence';
+import {
+  isUnresolvedEmptyTripSnapshot,
+  mergeUnresolvedCachedFields,
+} from '../utils/realtimeCacheMerge';
 
 const TRIPS_COLLECTION = 'trips';
 const DRIVER_PROFILE_COLLECTION = 'driverProfiles';
@@ -270,7 +274,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    let remoteSnapshotReceived = false;
+    const remoteFieldsReceived = new Set();
     let localSaveTimer = null;
     let localSaveIdleCallback = null;
     const pendingLocalFields = new Map();
@@ -318,8 +322,13 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     // Render the last authoritative snapshot immediately, including after an
     // offline reload. Realtime listeners replace it when Firebase is reachable.
     readAppData(activeTenantId, auth.currentUser?.uid || '').then((cached) => {
-      if (cancelled || remoteSnapshotReceived || !cached) return;
-      const normalized = normalizeData(cached);
+      if (cancelled || !cached) return;
+      const normalizedCached = normalizeData(cached);
+      const normalized = normalizeData(mergeUnresolvedCachedFields(
+        dataRef.current,
+        normalizedCached,
+        remoteFieldsReceived,
+      ));
       dataRef.current = normalized;
       setState(prev => ({
         ...prev,
@@ -333,7 +342,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
 
     const applyCollectionData = (field, snap) => {
       if (cancelled) return;
-      remoteSnapshotReceived = true;
+      remoteFieldsReceived.add(field);
       const nextList = applyFirestoreDocumentChanges(
         collectionRecords.get(field) || [],
         snap.docChanges({ includeMetadataChanges: false }),
@@ -361,7 +370,6 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
           trips: normalized.trips,
           trashedTrips: normalized.trashedTrips,
         } : {}),
-        loading: false,
         initialized: true,
         error: null,
       }));
@@ -374,11 +382,15 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
 
     const applyTripsSnapshot = (snap) => {
       if (cancelled) return;
+      // Firestore can emit an empty in-memory cache event before its server
+      // response. Applying that event would make real trips disappear briefly.
+      if (isUnresolvedEmptyTripSnapshot(snap, tripsSnapshotInitialized)) return;
       const materialChanges = snap.docChanges({ includeMetadataChanges: false });
       const isInitialSnapshot = !tripsSnapshotInitialized;
       tripsSnapshotInitialized = true;
       if (!isInitialSnapshot && materialChanges.length === 0 && pendingTripImportsRef.current.size === 0) return;
-      remoteSnapshotReceived = true;
+      remoteFieldsReceived.add('trips');
+      remoteFieldsReceived.add('trashedTrips');
       materialChanges.forEach((change) => pendingTripImportsRef.current.delete(change.doc.id));
       remoteTripRecords = applyFirestoreDocumentChanges(
         remoteTripRecords,
@@ -444,23 +456,21 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       const MAX_RETRIES = 3;
       const getDelay = () => Math.min(2000 * Math.pow(2, retryCount - 1), 15000);
       const subscribe = () => {
-        const unsub = onSnapshot(ref, applyFn, (err) => {
+        const unsub = onSnapshot(ref, { includeMetadataChanges: true }, applyFn, (err) => {
           if (cancelled || shouldIgnoreRealtimePermissionError(err)) return;
           console.error(`${label} listener error (retry ${retryCount}):`, err);
           const cacheCorruption = /Target ID already exists|delete range from database without an in-progress transaction/i.test(err?.message || '');
           if (cacheCorruption) {
             setState(prev => ({
               ...prev,
-              error: 'The local Firestore cache became invalid. Close and reopen Agape Care to reconnect with a clean live cache.',
-              loading: false,
+              error: 'Live data connection was interrupted. Agape Care is reconnecting without changing saved records.',
             }));
-            return;
           }
-          if (/INTERNAL ASSERTION FAILED|Unexpected state/.test(err?.message || '')) {
+          if (cacheCorruption || /INTERNAL ASSERTION FAILED|Unexpected state/.test(err?.message || '')) {
             retryCount++;
             if (retryCount > MAX_RETRIES) {
               console.error(`${label} listener: max retries (${MAX_RETRIES}) reached. Giving up.`);
-              setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}`, loading: false }));
+              setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}` }));
               return;
             }
             const delay = getDelay();
@@ -475,7 +485,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
               }
             }, delay);
           } else {
-            setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}`, loading: false }));
+            setState(prev => ({ ...prev, error: `Firestore ${label} sync failed: ${err.message}` }));
           }
         });
         unsubscribers.push(unsub);
@@ -498,11 +508,11 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
 
     const unsubPhones = onSnapshot(doc(db, PHONE_NUMBERS_DOC), (snap) => {
       if (cancelled) return;
-      remoteSnapshotReceived = true;
+      remoteFieldsReceived.add('phoneNumbers');
       const phoneNumbers = snap.exists() ? { ...DEFAULT_DATA.phoneNumbers, ...snap.data() } : DEFAULT_DATA.phoneNumbers;
       const previousPhoneNumbers = dataRef.current.phoneNumbers;
       dataRef.current = { ...normalizeData(dataRef.current), phoneNumbers };
-      setState(prev => ({ ...prev, phoneNumbers, loading: false, error: null }));
+      setState(prev => ({ ...prev, phoneNumbers, error: null }));
       persistLocalSnapshot('phoneNumbers', phoneNumbers, previousPhoneNumbers);
     }, (err) => {
       if (cancelled || shouldIgnoreRealtimePermissionError(err)) return;
@@ -510,19 +520,9 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     });
     unsubscribers.push(unsubPhones);
 
-    // Hard timeout: if no onSnapshot has fired within 5 seconds, unblock loading.
-    // Data will continue streaming in reactively — this just prevents the UI from
-    // being permanently stuck on a loading screen due to slow initial Firestore response.
-    const loadingTimeoutId = setTimeout(() => {
-      if (!cancelled) {
-        setState(prev => prev.loading ? { ...prev, loading: false, initialized: true } : prev);
-      }
-    }, 5000);
-
     return () => {
       cancelled = true;
       cleanupFns.forEach((fn) => fn());
-      clearTimeout(loadingTimeoutId);
       clearTimeout(localSaveTimer);
       if (localSaveIdleCallback !== null && window.cancelIdleCallback) window.cancelIdleCallback(localSaveIdleCallback);
       unsubscribers.forEach((unsub) => unsub());

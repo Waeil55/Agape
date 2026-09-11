@@ -38,7 +38,8 @@ describe('driver mobile active-trip navigation regression', () => {
     expect(firebaseSource).not.toContain('persistentLocalCache');
     expect(firebaseSource).not.toContain('persistentMultipleTabManager');
     expect(appDataSource).toContain('Target ID already exists|delete range from database without an in-progress transaction');
-    expect(appDataSource).toContain('The local Firestore cache became invalid. Close and reopen Agape Care');
+    expect(appDataSource).toContain('Agape Care is reconnecting without changing saved records.');
+    expect(appDataSource).not.toContain('Close and reopen Agape Care');
   });
 
   it('normalizes every driver progress payload before live or offline persistence', () => {

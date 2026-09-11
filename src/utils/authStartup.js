@@ -3,6 +3,35 @@ export const AUTH_PROFILE_CACHE_TIMEOUT_MS = 1200;
 export const AUTH_LOADING_RECOVERY_DELAY_MS = 8000;
 export const AUTH_WATCHDOG_TIMEOUT_MS = 30000;
 export const AUTH_OBSERVER_ACK_TIMEOUT_MS = 750;
+export const AUTH_LOGIN_RETRY_DELAY_MS = 350;
+
+function isTransientLoginFailure(error) {
+  const code = String(error?.code || error?.name || '').trim().toLowerCase();
+  return code.includes('network-request-failed') || code.includes('timeout');
+}
+
+/**
+ * Retry a credential request once when the Firebase endpoint is temporarily
+ * unreachable. Authentication/permission failures are never retried.
+ */
+export async function signInWithTransientRetry(
+  operation,
+  { maxAttempts = 2, retryDelayMs = AUTH_LOGIN_RETRY_DELAY_MS } = {},
+) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientLoginFailure(error) || attempt >= maxAttempts) throw error;
+      if (retryDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+    }
+  }
+  throw lastError;
+}
 
 /**
  * Firebase can resolve a repeated sign-in for an already-restored user without

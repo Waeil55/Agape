@@ -43,13 +43,14 @@ import {
   getAuthVerificationIssue,
   getLoginFailurePresentation,
   isRecoverableAuthVerificationFailure,
+  signInWithTransientRetry,
   waitForMatchingAuthObserver,
 } from './utils/authStartup';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
 const APP_VERSION_KEY = 'agape_app_version';
-const APP_VERSION = 'v384';
+const APP_VERSION = 'v385';
 const ROLE_CACHE_KEY = 'agape_session_v1';
 const VALID_ROLES = new Set(['admin', 'dispatcher', 'driver']);
 const ROLE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -1594,7 +1595,9 @@ const App = () => {
       loginObserverAckRef.current = resolve;
     });
     try {
-      const credential = await signInWithEmailAndPassword(auth, authEmail, password);
+      const credential = await signInWithTransientRetry(
+        () => signInWithEmailAndPassword(auth, authEmail, password),
+      );
       beginSecuritySession(credential.user.uid);
       const observerHandledLogin = await waitForMatchingAuthObserver(
         observerAcknowledgement,

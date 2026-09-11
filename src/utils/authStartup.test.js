@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AUTH_LOADING_RECOVERY_DELAY_MS,
   AUTH_OBSERVER_ACK_TIMEOUT_MS,
@@ -7,6 +7,7 @@ import {
   getAuthVerificationIssue,
   getLoginFailurePresentation,
   isRecoverableAuthVerificationFailure,
+  signInWithTransientRetry,
   waitForMatchingAuthObserver,
 } from './authStartup';
 
@@ -49,6 +50,24 @@ describe('authentication startup recovery', () => {
 
     expect(failure.clearPassword).toBe(false);
     expect(failure.message).toContain('do not need to close the app');
+  });
+
+  it('retries one transient login network failure and returns the successful credential', async () => {
+    const operation = vi.fn()
+      .mockRejectedValueOnce({ code: 'auth/network-request-failed' })
+      .mockResolvedValueOnce({ user: { uid: 'driver-1' } });
+
+    await expect(signInWithTransientRetry(operation, { retryDelayMs: 0 }))
+      .resolves.toEqual({ user: { uid: 'driver-1' } });
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry invalid credentials', async () => {
+    const operation = vi.fn().mockRejectedValue({ code: 'auth/invalid-credential' });
+
+    await expect(signInWithTransientRetry(operation, { retryDelayMs: 0 }))
+      .rejects.toMatchObject({ code: 'auth/invalid-credential' });
+    expect(operation).toHaveBeenCalledTimes(1);
   });
 
   it('uses one local-first persistence authority and blocks overlapping sign-ins', () => {
