@@ -36,6 +36,7 @@ export class SyncQueueProcessor {
     this._timer = null;
     this._onlineTimer = null;
     this._processing = false;
+    this._rerunRequested = false;
     this._started = false;
     this._onProcess = null;
     this._authContext = null;
@@ -63,6 +64,7 @@ export class SyncQueueProcessor {
 
   stop() {
     this._started = false;
+    this._rerunRequested = false;
     this._authContext = null;
     if (this._timer) clearInterval(this._timer);
     if (this._onlineTimer) clearTimeout(this._onlineTimer);
@@ -77,7 +79,14 @@ export class SyncQueueProcessor {
   }
 
   async processNow() {
-    if (!this._started || this._processing || !navigator.onLine || !this._authContext) return;
+    if (!this._started || !navigator.onLine || !this._authContext) return;
+    if (this._processing) {
+      // A write can enter the durable outbox while an earlier drain is still
+      // running. Remember that request so the new write is sent immediately
+      // after the current ordered pass instead of waiting for the 5s timer.
+      this._rerunRequested = true;
+      return;
+    }
     const ownership = { ...this._authContext };
     const run = async (lock) => {
       if (lock === null) return;
@@ -145,6 +154,10 @@ export class SyncQueueProcessor {
       console.error('[SyncQueueProcessor] Processing failed:', error);
     } finally {
       this._processing = false;
+      if (this._rerunRequested && this._started && navigator.onLine && this._authContext) {
+        this._rerunRequested = false;
+        queueMicrotask(() => void this.processNow());
+      }
     }
   }
 
@@ -188,8 +201,14 @@ export class SyncQueueProcessor {
           if (!write?.collection || !write?.docId || !write?.data || typeof write.data !== 'object') {
             throw new PermanentSyncError(`setDocs write ${index + 1} requires collection, docId, and data`);
           }
+          const maintainsWorkflowFreshness = [
+            'trips',
+            'driverTripProgress',
+            'tripLedger',
+          ].includes(write.collection);
           batch.set(doc(db, write.collection, write.docId), {
             ...sanitizeFirestorePayload(write.data),
+            ...(maintainsWorkflowFreshness ? { updatedAt: serverTimestamp() } : {}),
             syncedAt: serverTimestamp(),
             syncedAtLocal: new Date().toISOString(),
           }, { merge: true });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense, Component } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense, Component, startTransition } from 'react';
 import {
   Map, ChevronLeft, Menu, BarChart2, Zap, Shield, X, MessageCircle, Home, Search
 } from 'lucide-react';
@@ -36,6 +36,18 @@ const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
 const GlobalEntitySearch = lazy(() => import('./GlobalEntitySearch'));
+
+const MOBILE_VIEW_PRELOADERS = Object.freeze({
+  trips: () => import('./TripsPage'),
+  map: () => import('./LiveMapPage'),
+  chat: () => import('./chat/ChatPage'),
+  reports: () => Promise.all([import('./ReportsPage'), import('./MobileReportsPage')]),
+  menu: () => import('./MobileMenuPage'),
+});
+const preloadMobileView = (view) => {
+  const load = MOBILE_VIEW_PRELOADERS[view];
+  if (load) void load().catch(() => {});
+};
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center h-32">
@@ -86,7 +98,7 @@ export const SubViewWrapper = ({ title, onBack, children, fullHeight = false, re
   </div>
 );
 
-export const MobileBottomNavigation = React.memo(({ currentView, subView, onNavigate }) => {
+export const MobileBottomNavigation = React.memo(({ currentView, subView, onNavigate, onPreload }) => {
   const { unreadCount } = useChat({ alerts: true });
   return (
     <nav className="bottom-nav" aria-label="Primary navigation">
@@ -101,6 +113,8 @@ export const MobileBottomNavigation = React.memo(({ currentView, subView, onNavi
               key={item.id}
               type="button"
               onClick={() => onNavigate(item.id)}
+              onPointerDown={() => onPreload?.(item.id)}
+              onFocus={() => onPreload?.(item.id)}
               aria-current={isActive ? 'page' : undefined}
               className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
             >
@@ -147,9 +161,12 @@ const MobileEnterpriseDashboard = (props) => {
   const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
 
   const handleNavClick = (view) => {
-    setCurrentView(view);
-    setSubView(null);
-    if (view === 'reports') setReportsSection('trips');
+    preloadMobileView(view);
+    startTransition(() => {
+      setCurrentView(view);
+      setSubView(null);
+      if (view === 'reports') setReportsSection('trips');
+    });
   };
 
   const VALID_VIEWS = ['trips', 'map', 'reports', 'tools', 'menu', 'chat'];
@@ -636,7 +653,7 @@ const MobileEnterpriseDashboard = (props) => {
 
       {/* ── BOTTOM NAVIGATION ────────────────────────────────────────── */}
       {showNav && (
-        <MobileBottomNavigation currentView={currentView} subView={subView} onNavigate={handleNavClick} />
+        <MobileBottomNavigation currentView={currentView} subView={subView} onNavigate={handleNavClick} onPreload={preloadMobileView} />
       )}
 
       {globalSearchOpen && (

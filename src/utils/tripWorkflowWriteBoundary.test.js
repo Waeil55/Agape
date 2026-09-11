@@ -18,15 +18,39 @@ describe('driver trip workflow write boundary', () => {
     expect(firebaseConfig).not.toContain("doc(db, 'appData', 'agape')");
   });
 
-  it('commits the trip, progress, and ledger mirrors in one batch', () => {
+  it('stages the trip, progress, and ledger mirrors as one durable atomic command', () => {
     const dataHook = readSource('../hooks/useFirestoreAppData.js');
     const boundary = dataHook.match(/const upsertDriverTrip[\s\S]*?\n {2}\}\), \[activeTenantId, enqueueFieldPersistence\]\);/)?.[0] || '';
 
-    expect(boundary).toContain('const batch = writeBatch(db);');
+    expect(boundary).toContain("type: 'setDocs'");
     expect(boundary).toContain('TRIPS_COLLECTION');
     expect(boundary).toContain('DRIVER_TRIP_PROGRESS_COLLECTION');
     expect(boundary).toContain('TRIP_LEDGER_COLLECTION');
-    expect(boundary).toContain('await batch.commit();');
+    expect(boundary).toContain("await saveRecordWithSyncOperations('trips', authoritativeTrip");
+    expect(boundary).toContain('void syncQueueProcessor.processNow();');
+    expect(boundary).not.toContain("await saveLocalField('trips', nextTrips");
+  });
+
+  it('does not read the progress mirror as a second realtime trip authority', () => {
+    const dataHook = readSource('../hooks/useFirestoreAppData.js');
+
+    expect(dataHook).not.toContain('setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION)');
+    expect(dataHook).not.toContain('applyTripProgressSnapshot');
+  });
+
+  it('keeps map enrichment out of both odometer save critical paths', () => {
+    const driverPage = readSource('../components/DriverPage.jsx');
+    const pickupStart = driverPage.indexOf('const submitOdometer = async () =>');
+    const pickupEnd = driverPage.indexOf('const handleArriveDropoff', pickupStart);
+    const pickupBoundary = driverPage.slice(pickupStart, pickupEnd);
+    const completionStart = driverPage.indexOf('const submitComplete = async () =>');
+    const completionEnd = driverPage.indexOf('const startTripAndOpen', completionStart);
+    const completionBoundary = driverPage.slice(completionStart, completionEnd);
+
+    expect(pickupBoundary).toContain('startBoundaryTravelLookup');
+    expect(pickupBoundary).not.toContain('await calculateBoundaryTravel');
+    expect(completionBoundary).toContain('startBoundaryTravelLookup');
+    expect(completionBoundary).not.toContain('await calculateBoundaryTravel');
   });
 
   it('keeps odometer dialogs open when persistence fails', () => {

@@ -200,6 +200,83 @@ describe('localDB durable outbox contract', () => {
     });
   });
 
+  it('persists one interactive record and its workflow command without rewriting appData', async () => {
+    database.stores.get('appData').set('tenant::agape-care', {
+      trips: [{ id: 'trip-older', status: 'Completed' }],
+    });
+
+    const result = await localDB.saveRecordWithSyncOperations(
+      'trips',
+      { id: 'trip-1', status: 'Completed', cancellationReason: undefined },
+      [{
+        type: 'setDocs',
+        writes: [
+          { collection: 'trips', docId: 'trip-1', data: { id: 'trip-1', status: 'Completed' } },
+          { collection: 'driverTripProgress', docId: 'trip-1', data: { status: 'Completed' } },
+          { collection: 'tripLedger', docId: 'trip-1', data: { status: 'Completed' } },
+        ],
+      }],
+      { tenantId: 'agape-care', userId: 'user-1' },
+    );
+
+    expect(result).toEqual({ queuedOperationIds: [1] });
+    expect(database.transactions).toHaveLength(1);
+    expect(database.transactions[0].storeNames.sort()).toEqual(['meta', 'syncQueue', 'trips']);
+    expect(database.stores.get('trips').get('trip-1')).toEqual({ id: 'trip-1', status: 'Completed' });
+    expect(database.stores.get('appData').get('tenant::agape-care')).toEqual({
+      trips: [{ id: 'trip-older', status: 'Completed' }],
+    });
+    expect(database.stores.get('syncQueue').get(1)).toMatchObject({
+      type: 'setDocs',
+      tenantId: 'agape-care',
+      userId: 'user-1',
+      status: 'pending',
+    });
+  });
+
+  it('replays only the active owner pending mutations over an offline snapshot', () => {
+    const snapshot = {
+      trips: [{ id: 'trip-1', status: 'Assigned', driver: 'Driver One' }],
+    };
+    const operations = [
+      {
+        id: 1,
+        type: 'setDocs',
+        status: 'pending',
+        createdAt: '2026-09-10T10:00:00.000Z',
+        tenantId: 'agape-care',
+        userId: 'user-1',
+        writes: [
+          { collection: 'trips', docId: 'trip-1', data: { status: 'Completed' } },
+          { collection: 'driverTripProgress', docId: 'trip-1', data: { tripId: 'trip-1', dropoffOdometer: 273100 } },
+        ],
+      },
+      {
+        id: 2,
+        type: 'setDoc',
+        status: 'pending',
+        createdAt: '2026-09-10T10:01:00.000Z',
+        tenantId: 'agape-care',
+        userId: 'another-user',
+        collection: 'trips',
+        docId: 'trip-1',
+        data: { status: 'Cancelled' },
+      },
+    ];
+
+    const restored = localDB.applyPendingSyncOperationsToAppData(snapshot, operations, {
+      tenantId: 'agape-care',
+      userId: 'user-1',
+    });
+
+    expect(restored.trips).toEqual([{
+      id: 'trip-1',
+      status: 'Completed',
+      driver: 'Driver One',
+      dropoffOdometer: 273100,
+    }]);
+  });
+
   it('patches changed collection records without clearing and rewriting the full store', async () => {
     const previousValue = [
       { id: 'trip-1', status: 'Assigned' },

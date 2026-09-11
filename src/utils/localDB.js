@@ -39,6 +39,64 @@ const STORES = {
 
 const snapshotKey = (tenantId = DEFAULT_TENANT_ID) => `tenant::${normalizeTenantId(tenantId)}`;
 
+const notifySyncQueueChanged = () => {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('agape:sync-queue-changed'));
+  }
+};
+
+const OUTBOX_COLLECTION_FIELDS = Object.freeze({
+  trips: 'trips',
+  driverTripProgress: 'trips',
+  driverProfiles: 'drivers',
+  dispatcherProfiles: 'dispatchers',
+  fleetVehicles: 'vehicles',
+  logs: 'logs',
+});
+
+const applyPendingWrite = (snapshot, write, type = 'setDoc') => {
+  const collectionName = String(write?.collection || '');
+  const docId = String(write?.docId || '').trim();
+  if (!collectionName || !docId) return snapshot;
+  if (collectionName === 'systemConfig' && docId === 'phoneNumbers' && type !== 'deleteDoc') {
+    return { ...snapshot, phoneNumbers: { ...(snapshot.phoneNumbers || {}), ...(write.data || {}) } };
+  }
+  const field = OUTBOX_COLLECTION_FIELDS[collectionName];
+  if (!field) return snapshot;
+  const writeData = { ...(write.data || {}) };
+  if (collectionName === 'driverTripProgress') delete writeData.tripId;
+  const records = Array.isArray(snapshot[field]) ? snapshot[field] : [];
+  if (type === 'deleteDoc') {
+    return { ...snapshot, [field]: records.filter((record) => String(record?.id || '') !== docId) };
+  }
+  const index = records.findIndex((record) => String(record?.id || '') === docId);
+  const current = index >= 0 ? records[index] : { id: docId };
+  const nextRecord = { ...current, ...writeData, id: docId };
+  const nextRecords = index >= 0
+    ? records.map((record, recordIndex) => recordIndex === index ? nextRecord : record)
+    : [nextRecord, ...records];
+  return { ...snapshot, [field]: nextRecords };
+};
+
+export function applyPendingSyncOperationsToAppData(snapshot = {}, operations = [], ownership) {
+  const normalizedOwnership = normalizeSyncOwnership(ownership);
+  return [...(operations || [])]
+    .filter((operation) => operation?.status === 'pending' && syncOperationBelongsTo(operation, normalizedOwnership))
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+    .reduce((nextSnapshot, operation) => {
+      if (operation.type === 'setDocs') {
+        return (operation.writes || []).reduce(
+          (current, write) => applyPendingWrite(current, write, 'setDoc'),
+          nextSnapshot,
+        );
+      }
+      if (operation.type === 'setDoc' || operation.type === 'deleteDoc') {
+        return applyPendingWrite(nextSnapshot, operation, operation.type);
+      }
+      return nextSnapshot;
+    }, snapshot || {});
+}
+
 export function normalizeSyncOwnership(value = {}) {
   const tenantId = typeof value.tenantId === 'string' ? value.tenantId.trim().toLowerCase() : '';
   const userId = typeof value.userId === 'string' ? value.userId.trim() : '';
@@ -135,12 +193,18 @@ export async function getDB() {
  * Read the full app state snapshot from IndexedDB.
  * Returns null if nothing stored (first visit).
  */
-export async function readAppData(tenantId = DEFAULT_TENANT_ID) {
+export async function readAppData(tenantId = DEFAULT_TENANT_ID, userId = '') {
   try {
     const db = await getDB();
     const data = await db.get(STORES.APP_DATA, snapshotKey(tenantId))
       || await db.get(STORES.APP_DATA, 'current');
-    return data || null;
+    if (!userId) return data || null;
+    const pending = await db.getAllFromIndex(STORES.SYNC_QUEUE, 'status', 'pending');
+    if (!data && pending.length === 0) return null;
+    return applyPendingSyncOperationsToAppData(data || {}, pending, {
+      tenantId: normalizeTenantId(tenantId),
+      userId,
+    });
   } catch (err) {
     console.warn('[localDB] readAppData failed:', err);
     return null;
@@ -383,7 +447,7 @@ export async function queueSyncOperation(operation) {
   const ownership = normalizeSyncOwnership(operation);
   const safeOperation = sanitizeFirestorePayload(operation);
   const db = await getDB();
-  return db.add(STORES.SYNC_QUEUE, {
+  const id = await db.add(STORES.SYNC_QUEUE, {
       ...safeOperation,
       ...ownership,
       status: 'pending',
@@ -392,6 +456,8 @@ export async function queueSyncOperation(operation) {
       lastAttemptAt: null,
       nextRetryAt: new Date().toISOString(),
   });
+  notifySyncQueueChanged();
+  return id;
 }
 
 /**
@@ -423,6 +489,7 @@ export async function completeSyncOperation(id) {
   const tx = db.transaction(STORES.SYNC_QUEUE, 'readwrite');
   await tx.objectStore(STORES.SYNC_QUEUE).delete(id);
   await tx.done;
+  notifySyncQueueChanged();
 }
 
 /**
@@ -449,6 +516,7 @@ export async function failSyncOperation(id, error) {
       nextRetryAt: nextRetry,
   });
   await tx.done;
+  notifySyncQueueChanged();
 }
 
 export async function deadLetterSyncOperation(id, error, reason = 'permanent_failure') {
@@ -467,6 +535,7 @@ export async function deadLetterSyncOperation(id, error, reason = 'permanent_fai
   });
   await queueStore.delete(id);
   await tx.done;
+  notifySyncQueueChanged();
 }
 
 export async function getSyncQueueStatus(ownership) {
@@ -556,6 +625,76 @@ export async function saveFieldWithSyncOperations(field, value, operations, owne
     _lastLocalWrite: new Date().toISOString(),
   }, snapshotKey(normalizedOwnership.tenantId));
   await tx.done;
+  if (queuedOperationIds.length > 0) notifySyncQueueChanged();
+  return { queuedOperationIds };
+}
+
+/**
+ * Durably stage one changed record and its cloud mutations without cloning an
+ * entire collection. Interactive trip/driver actions use this boundary so a
+ * save remains proportional to the record being changed, even when the tenant
+ * has a very large trip history. The outbox and local record are committed in
+ * the same IndexedDB transaction; the realtime listener later refreshes the
+ * full offline snapshot after Firebase confirms the mutation.
+ */
+export async function saveRecordWithSyncOperations(field, record, operations, ownership) {
+  const normalizedOwnership = normalizeSyncOwnership(ownership);
+  const storeMap = {
+    trips: STORES.TRIPS,
+    trashedTrips: STORES.TRASHED_TRIPS,
+    drivers: STORES.DRIVERS,
+    dispatchers: STORES.DISPATCHERS,
+    vehicles: STORES.VEHICLES,
+    logs: STORES.LOGS,
+  };
+  const granularStore = storeMap[field];
+  const safeRecord = sanitizeFirestorePayload(record);
+  const recordId = String(safeRecord?.id || '').trim();
+  if (!granularStore || !recordId || !safeRecord || typeof safeRecord !== 'object' || Array.isArray(safeRecord)) {
+    throw new TypeError(`Granular offline persistence requires one identified ${field} record`);
+  }
+
+  const safeOperations = (operations || []).map((operation) => {
+    const safeOperation = sanitizeFirestorePayload(operation);
+    const operationOwnership = safeOperation.tenantId || safeOperation.userId
+      ? normalizeSyncOwnership(safeOperation)
+      : normalizedOwnership;
+    if (operationOwnership.tenantId !== normalizedOwnership.tenantId
+      || operationOwnership.userId !== normalizedOwnership.userId) {
+      throw new TypeError('Queued operation ownership does not match the active session');
+    }
+    return safeOperation;
+  });
+  if (safeOperations.length === 0) {
+    throw new TypeError('Granular offline persistence requires at least one cloud operation');
+  }
+
+  const db = await getDB();
+  const tx = db.transaction([granularStore, STORES.SYNC_QUEUE, STORES.META], 'readwrite');
+  await tx.objectStore(granularStore).put({ ...safeRecord, id: recordId });
+  const queueStore = tx.objectStore(STORES.SYNC_QUEUE);
+  const queuedOperationIds = [];
+  const createdAt = new Date().toISOString();
+
+  for (const safeOperation of safeOperations) {
+    const id = await queueStore.add({
+      ...safeOperation,
+      ...normalizedOwnership,
+      status: 'pending',
+      attempts: 0,
+      createdAt,
+      lastAttemptAt: null,
+      nextRetryAt: createdAt,
+    });
+    queuedOperationIds.push(id);
+  }
+
+  await tx.objectStore(STORES.META).put(
+    { value: createdAt, field, recordId },
+    `lastLocalWrite::${normalizedOwnership.tenantId}`,
+  );
+  await tx.done;
+  notifySyncQueueChanged();
   return { queuedOperationIds };
 }
 
@@ -566,6 +705,7 @@ export async function clearSyncQueue() {
   try {
     const db = await getDB();
     await db.clear(STORES.SYNC_QUEUE);
+    notifySyncQueueChanged();
   } catch (err) {
     console.warn('[localDB] clearSyncQueue failed:', err);
   }
@@ -632,6 +772,7 @@ export default {
   saveAppData,
   saveField,
   saveFieldWithSyncOperations,
+  saveRecordWithSyncOperations,
   queueSyncOperation,
   getPendingSyncOperations,
   getSyncQueueStatus,

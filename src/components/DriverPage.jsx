@@ -186,6 +186,17 @@ const calculateBoundaryTravel = async (origin, destination) => {
   };
 };
 
+const startBoundaryTravelLookup = (origin, destination) => {
+  if (!origin || !destination) return Promise.resolve(null);
+  // Route enrichment is deliberately detached from the odometer button's
+  // critical save path. It may refine the already-durable trip immediately
+  // afterward, but a slow map provider must never hold the trip window open.
+  return calculateBoundaryTravel(origin, destination).catch((error) => {
+    console.warn('Boundary travel enrichment failed:', error);
+    return null;
+  });
+};
+
 const timeInputOrBlank = (value) => {
   const formatted = formatTimeInput(value);
   return /^\d{2}:\d{2}$/.test(formatted) ? formatted : '';
@@ -3179,104 +3190,106 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
     tripActionInFlightRef.current = true;
     try {
+      const pickupTrip = showOdometerPrompt;
       const odo = evaluation.value;
       setOdometerError('');
       const nowIso = new Date().toISOString();
       const driverLocation = getDriverClockLocation();
-      const pickupLocation = getTripPickupLocation(showOdometerPrompt) || driverLocation;
-      let homeTravel = null;
+      const pickupLocation = getTripPickupLocation(pickupTrip) || driverLocation;
       let homeLocation = null;
-      let autoClock = null;
+      let pickupBoundaryPromise = Promise.resolve(null);
+      const shouldAutoStartShift = !isClockedIn && ttStateRef.current === TT.OFF_SHIFT;
 
-      if (!isClockedIn && ttStateRef.current === TT.OFF_SHIFT) {
+      if (shouldAutoStartShift) {
         homeLocation = Number.isFinite(Number(me?.homeLat)) && Number.isFinite(Number(me?.homeLng))
           ? { lat: Number(me.homeLat), lng: Number(me.homeLng) }
           : null;
-        const pickupDestination = pickupLocation || driverLocation || showOdometerPrompt.pickup;
-        homeTravel = timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && homeLocation
-          ? await calculateBoundaryTravel(homeLocation, pickupDestination)
-          : null;
-        const anchor = calculateAnchor({
-          policyMode: timeTrackingPolicyMode,
-          driver: me,
-          lastWorkLocation: ttLastTripEventRef.current?.location || null,
-          pickupLocation: pickupLocation || driverLocation,
-          pickupTime: new Date(nowIso),
-        });
-        const travelMinutes = Math.max(0, homeTravel?.minutes ?? anchor.travelMinutes ?? 0);
-        autoClock = {
-          anchor,
-          travelMinutes,
-          clockInTime: homeTravel?.minutes > 0
-            ? new Date(new Date(nowIso).getTime() - travelMinutes * 60000).toISOString()
-            : (anchor.clockInTime ? anchor.clockInTime.toISOString() : nowIso),
-          anchorType: homeTravel?.minutes > 0 ? 'HOME_ROUTE' : anchor.anchorType,
-        };
+        const pickupDestination = pickupLocation || driverLocation || pickupTrip.pickup;
+        pickupBoundaryPromise = timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && homeLocation
+          ? startBoundaryTravelLookup(homeLocation, pickupDestination)
+          : Promise.resolve(null);
       }
 
-      const saved = await advanceWorkflow(showOdometerPrompt, 'At Pickup', {
+      const saved = await advanceWorkflow(pickupTrip, 'At Pickup', {
         pickupOdometer: odo,
         arrivalTime: nowIso,
         startTime: nowIso,
-        ...(homeTravel?.minutes > 0 ? {
-          homeToPickupTravelMinutes: homeTravel.minutes,
-          homeToPickupCalculatedAt: nowIso,
-          homeToPickupCalculationSource: homeTravel.source,
-          homeToPickupConfidence: homeTravel.confidence,
-          homeToPickupDistanceMiles: homeTravel.distanceMiles ?? null,
-          homeLocationSnapshot: homeLocation,
-          pickupLocationSnapshot: pickupLocation || driverLocation || null,
-        } : {}),
       });
       if (!saved) {
         setOdometerError('The pickup odometer was not saved. Your entry is preserved; check the connection and retry.');
         return;
       }
 
-      let autoStartedShift = false;
-      try {
-        await resumeBreakFromPickup(showOdometerPrompt, pickupLocation, nowIso, driverLocation);
-        if (autoClock) {
-          const { anchor, travelMinutes, clockInTime, anchorType } = autoClock;
-          await Promise.resolve(onDriverStatusUpdate?.(driverId, true, {
-            clockTimestamp: clockInTime,
-            clockEventType: 'auto_in',
-            clockEventSource: 'verified_trip_pickup',
-            timeTrackingState: TT.ON_SHIFT_ACTIVE,
-            timeTrackingPolicy: timeTrackingPolicyMode,
-            timeTrackingAnchor: anchorType,
-            timeTrackingTravelMinutes: travelMinutes,
-            timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
-            timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
-            ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
-          }));
-          setTtState(TT.ON_SHIFT_ACTIVE);
-          ttStateRef.current = TT.ON_SHIFT_ACTIVE;
-          ttClockInTimeRef.current = clockInTime;
-          ttEventsLogRef.current = [{
-            type: 'AUTO_CLOCK_IN',
-            timestamp: clockInTime,
-            location: anchor.anchorLocation || driverLocation || pickupLocation,
-            anchorType,
-            travelMinutes,
-            policyMode: timeTrackingPolicyMode,
-          }];
-          setTtBillableMin(0);
-          setTtBreakMin(0);
-          ttBreakStartRef.current = null;
-          autoStartedShift = true;
-          setShowToast({ type: 'success', message: `Auto clocked in - ${travelMinutes} min travel included.` });
-        }
-      } catch (timeTrackingError) {
-        console.error('[DriverPage] Pickup saved but time tracking update failed:', timeTrackingError);
-        setShowToast({ type: 'error', message: 'Pickup saved. Time tracking still needs synchronization.' });
-      }
-      if (autoStartedShift || ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
-        ttLogTripEvent('TRIP_ARRIVED_PICKUP', showOdometerPrompt.id, driverLocation || pickupLocation);
-      }
       setLastOdometer(odo);
       setShowOdometerPrompt(null);
       setOdometerValue('');
+
+      void (async () => {
+        let autoStartedShift = false;
+        try {
+          await resumeBreakFromPickup(pickupTrip, pickupLocation, nowIso, driverLocation);
+          if (shouldAutoStartShift) {
+            const homeTravel = await pickupBoundaryPromise;
+            const anchor = calculateAnchor({
+              policyMode: timeTrackingPolicyMode,
+              driver: me,
+              lastWorkLocation: ttLastTripEventRef.current?.location || null,
+              pickupLocation: pickupLocation || driverLocation,
+              pickupTime: new Date(nowIso),
+            });
+            const travelMinutes = Math.max(0, homeTravel?.minutes ?? anchor.travelMinutes ?? 0);
+            const clockInTime = homeTravel?.minutes > 0
+              ? new Date(new Date(nowIso).getTime() - travelMinutes * 60000).toISOString()
+              : (anchor.clockInTime ? anchor.clockInTime.toISOString() : nowIso);
+            const anchorType = homeTravel?.minutes > 0 ? 'HOME_ROUTE' : anchor.anchorType;
+            if (homeTravel?.minutes > 0) {
+              await advanceWorkflow(pickupTrip, 'At Pickup', {
+                homeToPickupTravelMinutes: homeTravel.minutes,
+                homeToPickupCalculatedAt: nowIso,
+                homeToPickupCalculationSource: homeTravel.source,
+                homeToPickupConfidence: homeTravel.confidence,
+                homeToPickupDistanceMiles: homeTravel.distanceMiles ?? null,
+                homeLocationSnapshot: homeLocation,
+                pickupLocationSnapshot: pickupLocation || driverLocation || null,
+              });
+            }
+            onDriverStatusUpdate?.(driverId, true, {
+              clockTimestamp: clockInTime,
+              clockEventType: 'auto_in',
+              clockEventSource: 'verified_trip_pickup',
+              timeTrackingState: TT.ON_SHIFT_ACTIVE,
+              timeTrackingPolicy: timeTrackingPolicyMode,
+              timeTrackingAnchor: anchorType,
+              timeTrackingTravelMinutes: travelMinutes,
+              timeTrackingCalculationSource: homeTravel?.source || 'LEGACY_ANCHOR',
+              timeTrackingConfidence: homeTravel?.confidence || (anchorType === 'HOME' ? 'route_estimate' : 'trip_verified'),
+              ...(anchor.anchorLocation || driverLocation ? { clockLocation: anchor.anchorLocation || driverLocation } : {}),
+            });
+            setTtState(TT.ON_SHIFT_ACTIVE);
+            ttStateRef.current = TT.ON_SHIFT_ACTIVE;
+            ttClockInTimeRef.current = clockInTime;
+            ttEventsLogRef.current = [{
+              type: 'AUTO_CLOCK_IN',
+              timestamp: clockInTime,
+              location: anchor.anchorLocation || driverLocation || pickupLocation,
+              anchorType,
+              travelMinutes,
+              policyMode: timeTrackingPolicyMode,
+            }];
+            setTtBillableMin(0);
+            setTtBreakMin(0);
+            ttBreakStartRef.current = null;
+            autoStartedShift = true;
+            setShowToast({ type: 'success', message: `Auto clocked in - ${Math.round(travelMinutes)} min travel included.` });
+          }
+        } catch (timeTrackingError) {
+          console.error('[DriverPage] Pickup saved but time tracking update failed:', timeTrackingError);
+          setShowToast({ type: 'error', message: 'Pickup saved. Time tracking still needs synchronization.' });
+        }
+        if (autoStartedShift || ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+          ttLogTripEvent('TRIP_ARRIVED_PICKUP', pickupTrip.id, driverLocation || pickupLocation);
+        }
+      })();
     } catch (error) {
       setOdometerError(error?.message || 'The pickup odometer could not be saved. Retry.');
     } finally {
@@ -3725,6 +3738,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const submitComplete = async () => {
     if (!showCompleteModal) return;
+    const completionTrip = showCompleteModal;
     const pickupOdo = Number(completePickupOdometer);
     if (!Number.isFinite(pickupOdo) || pickupOdo <= 0) {
       setCompleteError('Enter the pickup odometer reading before completing this trip.');
@@ -3749,10 +3763,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const odo = evaluation.value;
     setCompleteError('');
     const now = new Date().toISOString();
-    const serviceDate = tripCalendarDateKey(showCompleteModal.date) || localCalendarYmd();
+    const serviceDate = tripCalendarDateKey(completionTrip.date) || localCalendarYmd();
     const departedPickupIso = timeToIsoForTripDate(departedTime, serviceDate) || now;
     const dropoffArrivalIso = timeToIsoForTripDate(arrivalDropoffTime, serviceDate)
-      || showCompleteModal.arrivalDropoffTime
+      || completionTrip.arrivalDropoffTime
       || now;
     const pickupDepartureMs = minuteEpoch(departedPickupIso);
     const dropoffArrivalMs = minuteEpoch(dropoffArrivalIso);
@@ -3761,46 +3775,32 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       return;
     }
     const remaining = driverScopedTrips.filter(t =>
-      isTripDateToday(t.date) && !isWorkflowTerminalTrip(t) && t.id !== showCompleteModal.id
+      isTripDateToday(t.date) && !isWorkflowTerminalTrip(t) && t.id !== completionTrip.id
     );
     const isFinalTrip = remaining.length === 0;
     const homeLocation = Number.isFinite(Number(me?.homeLat)) && Number.isFinite(Number(me?.homeLng))
       ? { lat: Number(me.homeLat), lng: Number(me.homeLng) }
       : null;
-    const dropoffLocation = getTripDropoffLocation(showCompleteModal) || getDriverClockLocation();
-    const dropoffOrigin = dropoffLocation || showCompleteModal.dropoff;
-    const homeTravel = isFinalTrip && timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && homeLocation
-      ? await calculateBoundaryTravel(dropoffOrigin, homeLocation)
-      : null;
-    const estimatedHomeArrivalTime = homeTravel?.minutes > 0
-      ? new Date(new Date(dropoffArrivalIso).getTime() + homeTravel.minutes * 60000).toISOString()
-      : null;
-    const saved = await advanceWorkflow(showCompleteModal, 'Completed', {
+    const dropoffLocation = getTripDropoffLocation(completionTrip) || getDriverClockLocation();
+    const dropoffOrigin = dropoffLocation || completionTrip.dropoff;
+    const homeTravelPromise = isFinalTrip && timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && homeLocation
+      ? startBoundaryTravelLookup(dropoffOrigin, homeLocation)
+      : Promise.resolve(null);
+    const saved = await advanceWorkflow(completionTrip, 'Completed', {
       pickupOdometer: pickupOdo,
       dropoffOdometer: odo,
       completedAt: now,
       departedPickupTime: departedPickupIso,
       arrivalDropoffTime: dropoffArrivalIso,
       completedVehicle: me?.vehicle || '',
-      ...(homeTravel?.minutes > 0 ? {
-        dropoffToHomeTravelMinutes: homeTravel.minutes,
-        dropoffToHomeCalculatedAt: now,
-        dropoffToHomeCalculationSource: homeTravel.source,
-        dropoffToHomeConfidence: homeTravel.confidence,
-        dropoffToHomeDistanceMiles: homeTravel.distanceMiles ?? null,
-        estimatedHomeArrivalTime,
-        homeLocationSnapshot: homeLocation,
-        dropoffLocationSnapshot: dropoffLocation || null,
-        timeTrackingBoundaryPolicy: POLICY_MODES.PAY_FROM_HOME,
-      } : {}),
     });
     if (saved === false) {
       setCompleteError('The trip could not be saved. Your entry is preserved; check the connection and retry.');
       return;
     }
-    setUndoable(showCompleteModal, showCompleteModal.status, 'Completed');
+    setUndoable(completionTrip, completionTrip.status, 'Completed');
     if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
-      ttLogTripEvent('TRIP_COMPLETED', showCompleteModal.id, getTripDropoffLocation(showCompleteModal) || getDriverClockLocation());
+      ttLogTripEvent('TRIP_COMPLETED', completionTrip.id, getTripDropoffLocation(completionTrip) || getDriverClockLocation());
     }
     setLastOdometer(odo);
     setShowCompleteModal(null);
@@ -3811,10 +3811,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setCompleteAck(false);
 
     // Reset trip selection and expanded state after completion
-    setSelectedTrips(prev => prev.filter(id => id !== showCompleteModal.id));
+    setSelectedTrips(prev => prev.filter(id => id !== completionTrip.id));
     setExpandedTripId(null);
     setActiveWorkTripId(null);
-    if (String(startedTripNavId || '') === String(showCompleteModal.id)) setStartedTripNavId(null);
+    if (String(startedTripNavId || '') === String(completionTrip.id)) setStartedTripNavId(null);
     if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); }
     setWorkNotesOpen(false);
 
@@ -3824,28 +3824,54 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       if (remaining.length === 0) {
         clockOutOfferedRef.current = true;
         if (timeTrackingPolicyMode === POLICY_MODES.PAY_FROM_HOME && me?.homeLat && me?.homeLng) {
-          onDriverStatusUpdate?.(driverId, true, {
-            pendingClockOut: {
-              status: 'PENDING_HOME_ARRIVAL',
-              createdAt: dropoffArrivalIso,
-              estimatedAt: estimatedHomeArrivalTime,
-              travelMinutes: homeTravel?.minutes || 0,
-              calculationSource: homeTravel?.source || 'NO_ROUTE_EVIDENCE',
-              confidence: homeTravel?.confidence || 'missing',
-              lastTripId: showCompleteModal.id,
-              policyMode: timeTrackingPolicyMode,
-            },
-            statusAuditTitle: 'Pending Clock-Out Created',
-            statusAuditMessage: `${me?.name || driverId} completed the final assigned trip; the shift will close automatically at the verified home geofence unless new work is assigned.`,
-          });
           setShowToast({
             type: 'info',
-            message: homeTravel?.minutes > 0
-              ? `Final trip complete. ${Math.round(homeTravel.minutes)} min home travel is being counted; GPS arrival at home will verify the end time.`
-              : 'Final trip complete. Timekeeping remains active until GPS verifies arrival home.',
+            message: 'Final trip saved. Home travel is syncing while timekeeping remains active.',
           });
+          void (async () => {
+            const homeTravel = await homeTravelPromise;
+            const estimatedHomeArrivalTime = homeTravel?.minutes > 0
+              ? new Date(new Date(dropoffArrivalIso).getTime() + homeTravel.minutes * 60000).toISOString()
+              : null;
+            if (homeTravel?.minutes > 0) {
+              const enriched = await advanceWorkflow(completionTrip, 'Completed', {
+                dropoffToHomeTravelMinutes: homeTravel.minutes,
+                dropoffToHomeCalculatedAt: now,
+                dropoffToHomeCalculationSource: homeTravel.source,
+                dropoffToHomeConfidence: homeTravel.confidence,
+                dropoffToHomeDistanceMiles: homeTravel.distanceMiles ?? null,
+                estimatedHomeArrivalTime,
+                homeLocationSnapshot: homeLocation,
+                dropoffLocationSnapshot: dropoffLocation || null,
+                timeTrackingBoundaryPolicy: POLICY_MODES.PAY_FROM_HOME,
+              });
+              if (!enriched) {
+                setShowToast({ type: 'error', message: 'Trip saved. Home-travel details still need synchronization.' });
+              }
+            }
+            onDriverStatusUpdate?.(driverId, true, {
+              pendingClockOut: {
+                status: 'PENDING_HOME_ARRIVAL',
+                createdAt: dropoffArrivalIso,
+                estimatedAt: estimatedHomeArrivalTime,
+                travelMinutes: homeTravel?.minutes || 0,
+                calculationSource: homeTravel?.source || 'NO_ROUTE_EVIDENCE',
+                confidence: homeTravel?.confidence || 'missing',
+                lastTripId: completionTrip.id,
+                policyMode: timeTrackingPolicyMode,
+              },
+              statusAuditTitle: 'Pending Clock-Out Created',
+              statusAuditMessage: `${me?.name || driverId} completed the final assigned trip; the shift will close automatically at the verified home geofence unless new work is assigned.`,
+            });
+            if (homeTravel?.minutes > 0) {
+              setShowToast({
+                type: 'info',
+                message: `${Math.round(homeTravel.minutes)} min home travel is being counted; GPS arrival at home will verify the end time.`,
+              });
+            }
+          })();
         } else {
-          const clockLocation = getTripDropoffLocation(showCompleteModal) || getDriverClockLocation();
+          const clockLocation = getTripDropoffLocation(completionTrip) || getDriverClockLocation();
           onDriverStatusUpdate?.(driverId, false, {
             clockTimestamp: dropoffArrivalIso,
             clockEventType: 'auto_out',

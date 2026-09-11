@@ -13,7 +13,8 @@ describe('driver workspace premium redesign contract', () => {
     expect(driverSource).toContain('<OfflineIndicator compact />');
     expect(driverSource).toContain("isGpsTracking ? 'GPS active' : 'GPS paused'");
     expect(indicatorSource).toContain('hidden shrink-0 z-[9997] md:block');
-    expect(indicatorSource).toContain("recentlyRestored ? 'Back online' : 'Online'");
+    expect(indicatorSource).toContain("recentlyRestored ? 'Back online' : 'Synced'");
+    expect(indicatorSource).toContain("window.addEventListener('agape:sync-queue-changed'");
   });
 
   it('presents Tools as one focused route workspace', () => {

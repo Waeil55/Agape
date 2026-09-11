@@ -20,10 +20,15 @@ import {
 } from '../utils/firestorePersistence';
 import { attachTenantScope, normalizeTenantId, recordBelongsToTenant } from '../utils/tenantScope';
 import { hydrateTripDriverIdentities } from '../utils/driverIdentity';
-import { readAppData, saveField as saveLocalField, saveFieldWithSyncOperations } from '../utils/localDB';
+import {
+  readAppData,
+  saveField as saveLocalField,
+  saveFieldWithSyncOperations,
+  saveRecordWithSyncOperations,
+} from '../utils/localDB';
 import { createSerializedOperationQueue } from '../utils/serializedOperationQueue';
 import { buildAssignmentMutations } from '../utils/assignmentPersistence';
-import { isPermanentSyncFailure } from '../services/syncQueueProcessor';
+import { isPermanentSyncFailure, syncQueueProcessor } from '../services/syncQueueProcessor';
 import { sanitizeFirestorePayload } from '../utils/firestorePayload';
 import { buildTripWorkflowPersistenceRecords } from '../utils/tripWorkflowPersistence';
 
@@ -247,8 +252,6 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
   });
 
   const dataRef = useRef(DEFAULT_DATA);
-  const tripProgressRef = useRef({});
-  const liveTripsRef = useRef([]);
   const pendingWritesRef = useRef(0);
   const prevTripCountRef = useRef(0);
   const pendingTripImportsRef = useRef(new Set());
@@ -274,7 +277,6 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     const unsubscribers = [];
     const collectionRecords = new Map();
     let remoteTripRecords = [];
-    let remoteProgressRecords = [];
     let tripsSnapshotInitialized = false;
 
     const persistLocalSnapshot = (field, value, previousValue) => {
@@ -315,11 +317,10 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
 
     // Render the last authoritative snapshot immediately, including after an
     // offline reload. Realtime listeners replace it when Firebase is reachable.
-    readAppData(activeTenantId).then((cached) => {
+    readAppData(activeTenantId, auth.currentUser?.uid || '').then((cached) => {
       if (cancelled || remoteSnapshotReceived || !cached) return;
       const normalized = normalizeData(cached);
       dataRef.current = normalized;
-      liveTripsRef.current = normalized.trips || [];
       setState(prev => ({
         ...prev,
         ...normalized,
@@ -422,17 +423,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       // Using the previous local archive list here suppresses a just-restored
       // trip until some unrelated later snapshot happens to arrive.
       const trashedIds = new Set(archivedTrips.map(t => t.id));
-      liveTripsRef.current = liveTrips.filter((t) => !trashedIds.has(t.id));
-      const mergedTripsBase = cleanTripCollection([
-        ...liveTripsRef.current.map((liveTrip) => {
-          const progress = tripProgressRef.current[liveTrip.id];
-          if (!progress) return liveTrip;
-          const progressTime = Date.parse(progress.workflowUpdatedAt || progress.updatedAt || '');
-          const liveTime = Date.parse(liveTrip.workflowUpdatedAt || liveTrip.updatedAt || '');
-          if (progressTime > liveTime) return { ...liveTrip, ...progress };
-          return { ...progress, ...liveTrip };
-        }),
-      ]);
+      const mergedTripsBase = cleanTripCollection(liveTrips.filter((t) => !trashedIds.has(t.id)));
       const mergedTrips = mergedTripsBase.filter((t) => !trashedIds.has(t.id));
       dataRef.current = { ...baseData, trips: mergedTrips, trashedTrips: archivedTrips };
       setState(prev => ({ ...prev, trips: mergedTrips, trashedTrips: archivedTrips, loading: false, initialized: true, error: null }));
@@ -447,46 +438,6 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       persistLocalSnapshot('trashedTrips', archivedTrips, previousTrashedTrips);
 
     };
-
-    const applyTripProgressSnapshot = (snap) => {
-      if (cancelled) return;
-      remoteSnapshotReceived = true;
-      remoteProgressRecords = applyFirestoreDocumentChanges(
-        remoteProgressRecords,
-        snap.docChanges({ includeMetadataChanges: false }),
-        (progressDoc) => {
-          const data = progressDoc.data();
-          return recordBelongsToTenant(data, activeTenantId) ? { ...data, id: progressDoc.id } : null;
-        },
-      );
-      const progressByTrip = {};
-      remoteProgressRecords.forEach((progress) => {
-        progressByTrip[progress.id] = { ...progress };
-        delete progressByTrip[progress.id].tripId;
-      });
-      tripProgressRef.current = progressByTrip;
-      const baseData = normalizeData(dataRef.current);
-      const previousTrips = baseData.trips;
-      const trashedIds = new Set((baseData.trashedTrips || []).map(t => t.id));
-      const progressSource = (tripsSnapshotInitialized ? liveTripsRef.current : baseData.trips).filter((t) => !trashedIds.has(t.id));
-      const sourceKeys = new Set(progressSource.map((t) => t.id));
-      const mergedTripsBase = cleanTripCollection([
-        ...(baseData.trips || []).filter((t) => !sourceKeys.has(t.id) && !trashedIds.has(t.id)),
-        ...progressSource.map((trip) => {
-          const progress = progressByTrip[trip.id];
-          if (!progress) return trip;
-          const progressTime = Date.parse(progress.workflowUpdatedAt || progress.updatedAt || 0);
-          const tripTime = Date.parse(trip.workflowUpdatedAt || trip.updatedAt || 0);
-          if (progressTime > tripTime) return { ...trip, ...progress };
-          return { ...progress, ...trip };
-        }),
-      ]);
-      const mergedTrips = mergedTripsBase.filter((t) => !trashedIds.has(t.id));
-      dataRef.current = { ...baseData, trips: mergedTrips };
-      setState(prev => ({ ...prev, trips: mergedTrips, loading: false, error: null, initialized: true }));
-      persistLocalSnapshot('trips', mergedTrips, previousTrips);
-    };
-
     const setupListener = (ref, applyFn, label) => {
       let retryCount = 0;
       let retryTimeout = null;
@@ -539,7 +490,6 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     cleanupFns.push(setupListener(collection(db, DRIVER_PROFILE_COLLECTION), (snap) => applyCollectionData('drivers', snap), 'Drivers'));
     cleanupFns.push(setupListener(collection(db, DISPATCHER_PROFILE_COLLECTION), (snap) => applyCollectionData('dispatchers', snap), 'Dispatchers'));
     cleanupFns.push(setupListener(collection(db, VEHICLE_COLLECTION), (snap) => applyCollectionData('vehicles', snap), 'Vehicles'));
-    cleanupFns.push(setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION), applyTripProgressSnapshot, 'TripProgress'));
     cleanupFns.push(setupListener(
       query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(250)),
       (snap) => applyCollectionData('logs', snap),
@@ -904,48 +854,31 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       ],
     }];
     dataRef.current = { ...dataRef.current, trips: nextTrips };
-    setState(prev => ({ ...prev, trips: nextTrips }));
+    pendingWritesRef.current += 1;
+    setState(prev => ({ ...prev, trips: nextTrips, saving: true, error: null }));
 
     try {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await saveFieldWithSyncOperations('trips', nextTrips, workflowOperations, {
-          tenantId: activeTenantId,
-          userId: auth.currentUser?.uid || '',
-        });
-        return true;
-      }
-      await saveLocalField('trips', nextTrips, { previousValue: currentTrips, tenantId: activeTenantId });
-      const batch = writeBatch(db);
-      batch.set(doc(db, TRIPS_COLLECTION, String(tripId)), {
-        ...authoritativePatch,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      batch.set(doc(db, DRIVER_TRIP_PROGRESS_COLLECTION, String(tripId)), {
-        ...progressPatch,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      batch.set(doc(db, TRIP_LEDGER_COLLECTION, String(tripId)), {
-        ...ledgerPatch,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      await batch.commit();
+      // The local record and atomic three-document cloud command enter one
+      // durable transaction. This avoids cloning every trip before the button
+      // can respond, while preserving ordered, retryable global delivery.
+      await saveRecordWithSyncOperations('trips', authoritativeTrip, workflowOperations, {
+        tenantId: activeTenantId,
+        userId: auth.currentUser?.uid || '',
+      });
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      setState(prev => ({
+        ...prev,
+        saving: pendingWritesRef.current > 0,
+        lastSavedAt: new Date().toISOString(),
+      }));
+      void syncQueueProcessor.processNow();
       const events = buildTripEvents([currentTrip], [authoritativeTrip], getCurrentEventActor());
       if (events.length > 0) {
         emitSystemEvents(events).catch((error) => console.error('Driver trip event emit failed:', error));
       }
       return true;
     } catch (err) {
-      if (!isPermanentSyncFailure(err) && auth.currentUser?.uid) {
-        try {
-          await saveFieldWithSyncOperations('trips', nextTrips, workflowOperations, {
-            tenantId: activeTenantId,
-            userId: auth.currentUser.uid,
-          });
-          return true;
-        } catch (queueError) {
-          console.error('Failed to queue driver trip progress:', queueError);
-        }
-      }
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
       const rollbackTrips = rollbackOptimisticValue(
         dataRef.current.trips,
         currentTrips,
@@ -953,7 +886,12 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         planCollectionMutations(currentTrips, nextTrips, { allowDeletes: false }),
       );
       dataRef.current = { ...dataRef.current, trips: rollbackTrips };
-      setState(prev => ({ ...prev, trips: rollbackTrips, error: err.message || 'Trip progress could not be saved' }));
+      setState(prev => ({
+        ...prev,
+        trips: rollbackTrips,
+        saving: pendingWritesRef.current > 0,
+        error: err.message || 'Trip progress could not be saved',
+      }));
       console.error('Failed to upsert driver trip progress:', err);
       return false;
     }
@@ -973,13 +911,20 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       type: 'setDoc', collection: DRIVER_PROFILE_COLLECTION,
       docId: String(driverId), data: nextDriver,
     };
+    pendingWritesRef.current += 1;
+    setState(prev => ({ ...prev, saving: true }));
     try {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await saveFieldWithSyncOperations('drivers', nextDrivers, [profileOperation], { tenantId: activeTenantId, userId: auth.currentUser?.uid || '' });
-        return true;
-      }
-      await saveLocalField('drivers', nextDrivers, { previousValue: currentDrivers, tenantId: activeTenantId });
-      await setDoc(doc(db, DRIVER_PROFILE_COLLECTION, driverId), nextDriver, { merge: true });
+      await saveRecordWithSyncOperations('drivers', nextDriver, [profileOperation], {
+        tenantId: activeTenantId,
+        userId: auth.currentUser?.uid || '',
+      });
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      setState(prev => ({
+        ...prev,
+        saving: pendingWritesRef.current > 0,
+        lastSavedAt: new Date().toISOString(),
+      }));
+      void syncQueueProcessor.processNow();
       if (Object.prototype.hasOwnProperty.call(updates, 'vehicle')) {
         if (nextDriver.vehicle) {
           saveAssignedVehicle(driverId, nextDriver.vehicle);
@@ -992,17 +937,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       emitSystemEvents(buildDriverEvents([existing], [nextDriver], getCurrentEventActor())).catch((err) => console.error('Driver event failed:', err));
       return true;
     } catch (err) {
-      if (!isPermanentSyncFailure(err) && auth.currentUser?.uid) {
-        try {
-          await saveFieldWithSyncOperations('drivers', nextDrivers, [profileOperation], {
-            tenantId: activeTenantId,
-            userId: auth.currentUser.uid,
-          });
-          return true;
-        } catch (queueError) {
-          console.error('Failed to queue driver profile:', queueError);
-        }
-      }
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
       console.error('Failed to upsert driver profile:', err);
       const rollbackDrivers = rollbackOptimisticValue(
         dataRef.current.drivers,
@@ -1014,6 +949,7 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
       setState(prev => ({
         ...prev,
         drivers: rollbackDrivers,
+        saving: pendingWritesRef.current > 0,
         error: err.message || 'Driver profile could not be saved',
       }));
       return false;
@@ -1136,28 +1072,13 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
     dataRef.current = { ...dataRef.current, logs: nextLogs };
     setState(prev => ({ ...prev, logs: nextLogs, error: null }));
     try {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await saveFieldWithSyncOperations('logs', nextLogs, [operation], {
-          tenantId: activeTenantId,
-          userId: auth.currentUser?.uid || '',
-        });
-        return true;
-      }
-      await setDoc(logRef, { ...localLog, timestamp: serverTimestamp() });
-      await saveLocalField('logs', nextLogs, { previousValue: previousLogs, tenantId: activeTenantId });
+      await saveRecordWithSyncOperations('logs', localLog, [operation], {
+        tenantId: activeTenantId,
+        userId: auth.currentUser?.uid || '',
+      });
+      void syncQueueProcessor.processNow();
       return true;
     } catch (error) {
-      if (!isPermanentSyncFailure(error) && auth.currentUser?.uid) {
-        try {
-          await saveFieldWithSyncOperations('logs', nextLogs, [operation], {
-            tenantId: activeTenantId,
-            userId: auth.currentUser.uid,
-          });
-          return true;
-        } catch (queueError) {
-          console.error('Failed to queue activity log:', queueError);
-        }
-      }
       const currentLogs = dataRef.current.logs || [];
       const rollbackLogs = currentLogs.filter((item) => item.id !== logRef.id);
       dataRef.current = { ...dataRef.current, logs: rollbackLogs };

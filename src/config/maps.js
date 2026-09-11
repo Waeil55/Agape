@@ -1,5 +1,59 @@
 import { GOOGLE_MAPS_API_KEY } from './firebase';
 
+export const MAPS_REQUEST_TIMEOUT_MS = 4000;
+const MAPS_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAPS_CACHE_MAX_ENTRIES = 200;
+const distanceMatrixCache = new Map();
+const distanceMatrixRequests = new Map();
+const geocodeCache = new Map();
+const geocodeRequests = new Map();
+
+const fetchJsonWithTimeout = async (url) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), MAPS_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return null;
+    return await response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const readCachedMatrix = (key) => {
+  const cached = distanceMatrixCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.savedAt > MAPS_CACHE_TTL_MS) {
+    distanceMatrixCache.delete(key);
+    return null;
+  }
+  return cached.rows;
+};
+
+const cacheMatrix = (key, rows) => {
+  distanceMatrixCache.set(key, { rows, savedAt: Date.now() });
+  while (distanceMatrixCache.size > MAPS_CACHE_MAX_ENTRIES) {
+    distanceMatrixCache.delete(distanceMatrixCache.keys().next().value);
+  }
+};
+
+const readCachedGeocode = (key) => {
+  const cached = geocodeCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.savedAt > MAPS_CACHE_TTL_MS) {
+    geocodeCache.delete(key);
+    return null;
+  }
+  return cached.result;
+};
+
+const cacheGeocode = (key, result) => {
+  geocodeCache.set(key, { result, savedAt: Date.now() });
+  while (geocodeCache.size > MAPS_CACHE_MAX_ENTRIES) {
+    geocodeCache.delete(geocodeCache.keys().next().value);
+  }
+};
+
 export function hasGoogleMapsConfigured() {
   return Boolean(GOOGLE_MAPS_API_KEY());
 }
@@ -43,32 +97,42 @@ function toLocationQuery(value) {
 
 export async function geocodeAddress(address) {
   if (!hasGoogleMapsConfigured() || !address) return null;
+  const requestKey = String(address).trim().replace(/\s+/g, ' ').toLowerCase();
+  const cached = readCachedGeocode(requestKey);
+  if (cached) return cached;
+  if (geocodeRequests.has(requestKey)) return geocodeRequests.get(requestKey);
 
-  try {
-    const resp = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY()}`
-    );
-    const data = await resp.json();
-    const result = data?.results?.[0];
-    if (!result?.geometry?.location) return null;
+  const request = (async () => {
+    try {
+      const data = await fetchJsonWithTimeout(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY()}`
+      );
+      const result = data?.results?.[0];
+      if (!result?.geometry?.location) return null;
 
-    const postalCode = result.address_components?.find((part) => part.types?.includes('postal_code'))?.long_name || extractZipFromAddress(address);
-    const city = result.address_components?.find((part) => part.types?.includes('locality'))?.long_name || '';
-    const state = result.address_components?.find((part) => part.types?.includes('administrative_area_level_1'))?.short_name || '';
-
-    return {
-      lat: result.geometry.location.lat,
-      lng: result.geometry.location.lng,
-      formattedAddress: result.formatted_address || address,
-      placeId: result.place_id || null,
-      postalCode,
-      city,
-      state,
-    };
-  } catch (err) {
-    console.error('[Google Maps] geocodeAddress failed:', err);
-    return null;
-  }
+      const postalCode = result.address_components?.find((part) => part.types?.includes('postal_code'))?.long_name || extractZipFromAddress(address);
+      const city = result.address_components?.find((part) => part.types?.includes('locality'))?.long_name || '';
+      const state = result.address_components?.find((part) => part.types?.includes('administrative_area_level_1'))?.short_name || '';
+      const resolved = {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+        formattedAddress: result.formatted_address || address,
+        placeId: result.place_id || null,
+        postalCode,
+        city,
+        state,
+      };
+      cacheGeocode(requestKey, resolved);
+      return resolved;
+    } catch (err) {
+      console.warn('[Google Maps] geocodeAddress failed:', err?.name === 'AbortError' ? 'request timed out' : err);
+      return null;
+    } finally {
+      geocodeRequests.delete(requestKey);
+    }
+  })();
+  geocodeRequests.set(requestKey, request);
+  return request;
 }
 
 export async function getDistanceMatrix(origins, destinations) {
@@ -76,24 +140,36 @@ export async function getDistanceMatrix(origins, destinations) {
   const destinationQueries = destinations.map(toLocationQuery).filter(Boolean);
   if (!hasGoogleMapsConfigured() || originQueries.length === 0 || destinationQueries.length === 0) return null;
 
-  try {
-    const params = new URLSearchParams({
-      origins: originQueries.join('|'),
-      destinations: destinationQueries.join('|'),
-      units: 'imperial',
-      key: GOOGLE_MAPS_API_KEY(),
-    });
-    const resp = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`);
-    const data = await resp.json();
-    if (data?.status !== 'OK') {
-      console.warn('[Google Maps] Distance Matrix API error:', data?.status, data?.error_message);
+  const requestKey = `${originQueries.join('|')}=>${destinationQueries.join('|')}`.toLowerCase();
+  const cached = readCachedMatrix(requestKey);
+  if (cached) return cached;
+  if (distanceMatrixRequests.has(requestKey)) return distanceMatrixRequests.get(requestKey);
+
+  const request = (async () => {
+    try {
+      const params = new URLSearchParams({
+        origins: originQueries.join('|'),
+        destinations: destinationQueries.join('|'),
+        units: 'imperial',
+        key: GOOGLE_MAPS_API_KEY(),
+      });
+      const data = await fetchJsonWithTimeout(`https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`);
+      if (data?.status !== 'OK') {
+        console.warn('[Google Maps] Distance Matrix API error:', data?.status, data?.error_message);
+        return null;
+      }
+      const rows = data.rows || null;
+      if (rows) cacheMatrix(requestKey, rows);
+      return rows;
+    } catch (err) {
+      console.warn('[Google Maps] getDistanceMatrix failed:', err?.name === 'AbortError' ? 'request timed out' : err);
       return null;
+    } finally {
+      distanceMatrixRequests.delete(requestKey);
     }
-    return data.rows || null;
-  } catch (err) {
-    console.error('[Google Maps] getDistanceMatrix failed:', err);
-    return null;
-  }
+  })();
+  distanceMatrixRequests.set(requestKey, request);
+  return request;
 }
 
 export async function getTravelDuration(origin, destination) {

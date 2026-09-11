@@ -178,8 +178,33 @@ describe('SyncQueueProcessor ownership and terminal failure handling', () => {
     expect(firebaseMock.writeBatch).toHaveBeenCalledTimes(1);
     const batch = firebaseMock.writeBatch.mock.results[0].value;
     expect(batch.set).toHaveBeenCalledTimes(3);
+    expect(batch.set).toHaveBeenCalledWith(
+      'trips/trip-1',
+      expect.objectContaining({ status: 'Completed', updatedAt: 'server-timestamp' }),
+      { merge: true },
+    );
     expect(batch.commit).toHaveBeenCalledTimes(1);
     expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(1);
+  });
+
+  it('drains a write queued during an active pass without waiting for the timer', async () => {
+    const processor = authenticatedStartedProcessor();
+    let releaseFirstWrite;
+    const firstWrite = new Promise((resolve) => { releaseFirstWrite = resolve; });
+    localDBMock.getPendingSyncOperations
+      .mockResolvedValueOnce([operation({ id: 1 })])
+      .mockResolvedValueOnce([operation({ id: 2 })])
+      .mockResolvedValue([]);
+    firebaseMock.setDoc.mockImplementationOnce(() => firstWrite).mockResolvedValue(undefined);
+
+    const firstPass = processor.processNow();
+    await vi.waitFor(() => expect(firebaseMock.setDoc).toHaveBeenCalledTimes(1));
+    await processor.processNow();
+    releaseFirstWrite();
+    await firstPass;
+
+    await vi.waitFor(() => expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(2));
+    expect(localDBMock.getPendingSyncOperations).toHaveBeenCalledTimes(2);
   });
 
   it('does not replay an outbox concurrently in another browser tab', async () => {

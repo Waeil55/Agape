@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, lazy, Suspense, useEffect, useCallback, useMemo, startTransition } from 'react';
 import { Users, MapPin, Settings, BarChart2, Archive, MessageCircle, Bell, CheckCircle2, BrainCircuit, Upload, Wand2, Search, AlertTriangle, X, Zap, Clock, PanelRight, Eye, Hash, Route, Activity, ClipboardList, CarFront, RefreshCw } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 
@@ -22,6 +22,20 @@ const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
 const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const AgapeCommandCenter = lazy(() => import('./AgapeCommandCenter'));
+
+const DESKTOP_PANEL_PRELOADERS = Object.freeze({
+  operations: () => import('./OperationsCommandCenter'),
+  routePlanner: () => import('./RoutePlannerPage'),
+  admin: () => import('./DesktopAdminPage'),
+  reports: () => Promise.all([import('./ReportsPage'), import('./DesktopReportsPage')]),
+  liveMap: () => import('./LiveMapPage'),
+  chat: () => import('./chat/ChatPage'),
+  settings: () => import('./SettingsPage'),
+});
+const preloadDesktopPanel = (panel) => {
+  const load = DESKTOP_PANEL_PRELOADERS[panel];
+  if (load) void load().catch(() => {});
+};
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -183,6 +197,10 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
   const [driverWorkDriverId, setDriverWorkDriverId] = useState(() => localStorage.getItem('agape_driverWorkDriverId') || '');
   const [driverWorkTripId, setDriverWorkTripId] = useState(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const navigateToPanel = useCallback((panel) => {
+    preloadDesktopPanel(panel);
+    startTransition(() => setActivePanel(panel));
+  }, []);
 
   // Persist navigation state to localStorage (survives refresh)
   useEffect(() => { localStorage.setItem('agape_activePanel', activePanel); }, [activePanel]);
@@ -237,8 +255,11 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
   }, [activeDriverWorkDriver, allDrivers, driverWorkTrips]);
 
   const openReportsWorkspace = useCallback((section = 'trips') => {
-    setReportsSection(section);
-    setActivePanel('reports');
+    preloadDesktopPanel('reports');
+    startTransition(() => {
+      setReportsSection(section);
+      setActivePanel('reports');
+    });
   }, []);
 
   const openDriverWorkspaceForTrip = useCallback((trip) => {
@@ -314,13 +335,17 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'dispatcher'] },
   ].filter(item => item.roles.includes(role));
 
-  const todayTrips = trips.filter(t => tripCalendarDateKey(t.date) === todayStr);
-  const activeTrips = todayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
-  const unassignedTrips = activeTrips.filter(t => t.status === 'Unassigned');
-  const lateTrips = activeTrips.filter(t => isTripLate(t.time || ''));
+  const { todayTrips, unassignedTrips, lateTrips, willCallTrips } = useMemo(() => {
+    const dayTrips = trips.filter(t => tripCalendarDateKey(t.date) === todayStr);
+    const openTrips = dayTrips.filter(t => !['Completed', 'Cancelled', 'No Show'].includes(t.status));
+    return {
+      todayTrips: dayTrips,
+      unassignedTrips: openTrips.filter(t => t.status === 'Unassigned'),
+      lateTrips: openTrips.filter(t => isTripLate(t.time || '')),
+      willCallTrips: openTrips.filter(t => t.time === 'Will Call'),
+    };
+  }, [todayStr, trips]);
   const aiAlertCount = lateTrips.length + unassignedTrips.length;
-
-  const willCallTrips = activeTrips.filter(t => t.time === 'Will Call');
 
   const workspaceMeta = {
     operations: {
@@ -363,22 +388,25 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
   const activeWorkspaceMeta = workspaceMeta[activePanel] || workspaceMeta.operations;
 
   const openOperationsWorkspace = useCallback((tab = 'manifest') => {
-    setActivePanel('operations');
-    setOperationsTab(tab);
+    preloadDesktopPanel('operations');
+    startTransition(() => {
+      setActivePanel('operations');
+      setOperationsTab(tab);
+    });
   }, []);
 
   const topNavItems = useMemo(() => {
     const items = [
-      { id: 'trips', label: 'Trips', icon: ClipboardList, active: activePanel === 'operations' || activePanel === 'drive', action: () => openOperationsWorkspace('manifest') },
-      { id: 'schedule', label: 'Tools', icon: Route, active: activePanel === 'routePlanner' || showSequencerModal, action: () => setActivePanel('routePlanner') },
-      ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => setActivePanel('admin') }] : []),
-      { id: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => openReportsWorkspace('trips') },
-      { id: 'map', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => setActivePanel('liveMap') },
-      { id: 'chat', label: unreadCount ? `Chat (${unreadCount > 99 ? '99+' : unreadCount})` : 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => setActivePanel('chat'), badge: unreadCount },
-      { id: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => setActivePanel('settings') },
+      { id: 'trips', panel: 'operations', label: 'Trips', icon: ClipboardList, active: activePanel === 'operations' || activePanel === 'drive', action: () => openOperationsWorkspace('manifest') },
+      { id: 'schedule', panel: 'routePlanner', label: 'Tools', icon: Route, active: activePanel === 'routePlanner' || showSequencerModal, action: () => navigateToPanel('routePlanner') },
+      ...((role === 'admin' || role === 'dispatcher') ? [{ id: 'admin', panel: 'admin', label: role === 'admin' ? 'Admin' : 'Fleet', icon: Users, active: activePanel === 'admin', action: () => navigateToPanel('admin') }] : []),
+      { id: 'reports', panel: 'reports', label: 'Reports', icon: BarChart2, active: activePanel === 'reports', action: () => openReportsWorkspace('trips') },
+      { id: 'map', panel: 'liveMap', label: 'Map', icon: MapPin, active: activePanel === 'liveMap', action: () => navigateToPanel('liveMap') },
+      { id: 'chat', panel: 'chat', label: unreadCount ? `Chat (${unreadCount > 99 ? '99+' : unreadCount})` : 'Chat', icon: MessageCircle, active: activePanel === 'chat', action: () => navigateToPanel('chat'), badge: unreadCount },
+      { id: 'settings', panel: 'settings', label: 'Settings', icon: Settings, active: activePanel === 'settings', action: () => navigateToPanel('settings') },
     ];
     return items;
-  }, [activePanel, openOperationsWorkspace, openReportsWorkspace, role, setActivePanel, showSequencerModal, unreadCount]);
+  }, [activePanel, navigateToPanel, openOperationsWorkspace, openReportsWorkspace, role, showSequencerModal, unreadCount]);
 
 
 
@@ -404,14 +432,18 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
   const filteredCommands = useMemo(() => commandQuery
     ? commands.filter(c => c.label.toLowerCase().includes(commandQuery.toLowerCase()))
     : commands, [commands, commandQuery]);
-  const entityResults = useMemo(() => buildGlobalSearchResults({
-    query: commandQuery,
-    trips,
-    trashedTrips,
-    drivers,
-    vehicles,
-    limit: 10,
-  }), [commandQuery, drivers, trashedTrips, trips, vehicles]);
+  const entityResults = useMemo(() => (
+    commandPaletteOpen && commandQuery.trim()
+      ? buildGlobalSearchResults({
+          query: commandQuery,
+          trips,
+          trashedTrips,
+          drivers,
+          vehicles,
+          limit: 10,
+        })
+      : []
+  ), [commandPaletteOpen, commandQuery, drivers, trashedTrips, trips, vehicles]);
 
   const openEntityResult = useCallback((result) => {
     const record = result.record;
@@ -473,6 +505,8 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                 key={item.id}
                 type="button"
                 onClick={item.action}
+                onPointerEnter={() => preloadDesktopPanel(item.panel)}
+                onFocus={() => preloadDesktopPanel(item.panel)}
                 aria-label={item.label}
                 className={`inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wide transition-all duration-200 xl:px-3.5 ${
                   item.active
@@ -605,7 +639,9 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
           return (
             <button
               key={item.id}
-              onClick={() => setActivePanel(item.id)}
+              onClick={() => navigateToPanel(item.id)}
+              onPointerEnter={() => preloadDesktopPanel(item.id)}
+              onFocus={() => preloadDesktopPanel(item.id)}
               className={`flex-1 flex flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all relative touch-manipulation min-h-[56px] ${
                 isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
               }`}

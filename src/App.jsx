@@ -111,6 +111,26 @@ const DriverPage = lazyWithRetry(() => import('./components/DriverPage'));
 const EnterpriseDashboard = lazyWithRetry(() => import('./components/EnterpriseDashboard'));
 const AddTripModal = lazyWithRetry(() => import('./components/AddTripModal'));
 
+const preloadWorkspaceForRole = (selectedRole) => {
+  if (selectedRole === 'driver') {
+    void import('./components/DriverPage').catch(() => {});
+    return;
+  }
+  const isMobileViewport = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)')?.matches;
+  const imports = isMobileViewport
+    ? [
+        import('./components/EnterpriseDashboard'),
+        import('./components/MobileEnterpriseDashboard'),
+        import('./components/TripsPage'),
+      ]
+    : [
+        import('./components/EnterpriseDashboard'),
+        import('./components/DesktopEnterpriseDashboard'),
+        import('./components/OperationsCommandCenter'),
+      ];
+  void Promise.allSettled(imports);
+};
+
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
 
@@ -396,19 +416,6 @@ const App = () => {
     setIsLoading(true);
     setAuthBootAttempt((attempt) => attempt + 1);
   }, []);
-
-  // Warm the driver/admin page chunks while the user is on the login screen
-  // so the post-login transition is instant (native-app feel).
-  useEffect(() => {
-    if (isAuthenticated) return undefined;
-    const warm = () => { import('./components/DriverPage').catch(() => {}); };
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(warm, { timeout: 4000 });
-      return () => window.cancelIdleCallback && window.cancelIdleCallback(id);
-    }
-    const t = setTimeout(warm, 1500);
-    return () => clearTimeout(t);
-  }, [isAuthenticated]);
 
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -1093,6 +1100,11 @@ const App = () => {
         return;
       }
 
+      // Cached-session startup has no role-selection click to warm its
+      // workspace. Start the exact role/viewport download before mounting the
+      // heavy page so repeat launches remain responsive.
+      preloadWorkspaceForRole(userRole);
+
       // Cache the role so next boot is instant
       const profile = userDoc && userDoc.exists?.() ? userDoc.data() : {};
       const sessionTenantId = cachedTenantId
@@ -1651,13 +1663,12 @@ const App = () => {
         return;
       }
       const nextStatus = ['Completed', 'Cancelled', 'No Show'].includes(tripToAssign.status) ? tripToAssign.status : 'Unassigned';
-      setTrips(prev => prev.map(t => t.id === tripId ? {
-        ...t,
+      void upsertDriverTrip(tripId, {
         status: nextStatus,
         driverId: '',
         driverEmail: null,
         driverName: null,
-      } : t));
+      });
       addAuditLog('Trip Unassigned', `${currentUser} removed the driver assignment from ${tripToAssign.patient || tripId}.`, 'amber', {
         entity: 'trip', id: tripId, diffs: [
           { field: 'driverId', before: tripToAssign.driverId || null, after: null },
@@ -1672,13 +1683,12 @@ const App = () => {
       return;
     }
     const prevTrip = { ...tripToAssign };
-    setTrips(prev => prev.map(t => t.id === tripId ? {
-      ...t,
+    void upsertDriverTrip(tripId, {
       status: 'Assigned',
       driverId,
       driverEmail: driver?.email || null,
       driverName: driver?.name || null,
-    } : t));
+    });
     setSmartAssignTrip(null);
     setSmartAssignResult(null);
     const changed = [
@@ -1694,7 +1704,7 @@ const App = () => {
         `${tripToAssign.patient} — ${tripToAssign.pickup} → ${tripToAssign.dropoff}`
       );
     }
-  }, [drivers, trips, currentUser, addAuditLog, notificationsEnabled, canControlDriver, canControlTrip, setTrips]);
+  }, [drivers, trips, currentUser, addAuditLog, notificationsEnabled, canControlDriver, canControlTrip, upsertDriverTrip]);
 
   const bulkAssignTrips = useCallback((driverId) => {
     if (selectedTasks.length === 0) return;
@@ -1928,7 +1938,7 @@ const App = () => {
     }
 
     const enrichedTrip = enrichTripMetrics(nextTripState);
-    const persistence = setTrips(prev => prev.map(t => t.id === enrichedTrip.id ? enrichedTrip : t));
+    const persistence = upsertDriverTrip(enrichedTrip.id, enrichedTrip);
     // Keep the vehicle odometer global: a completion raises it to the final
     // reading, and an in-progress pickup reading publishes immediately so
     // shared vehicles never present a stale number to the next driver.
@@ -2691,11 +2701,7 @@ const App = () => {
     };
     const normalizedStatus = STATUS_CANONICAL[lower] || status;
     const previousTrip = trips.find((trip) => trip.id === tripId);
-    const persistence = role === 'driver'
-      ? upsertDriverTrip(tripId, { status: normalizedStatus, ...extraData })
-      : setTrips((previous) => previous.map((trip) => (
-        trip.id === tripId ? { ...trip, status: normalizedStatus, ...extraData } : trip
-      )));
+    const persistence = upsertDriverTrip(tripId, { status: normalizedStatus, ...extraData });
     const saved = await Promise.resolve(persistence);
     if (saved !== true) return false;
     if (!previousTrip) return true;
@@ -2714,10 +2720,11 @@ const App = () => {
       },
     );
     return true;
-  }, [addAuditLog, currentUser, role, setTrips, trips, upsertDriverTrip]);
+  }, [addAuditLog, currentUser, trips, upsertDriverTrip]);
 
   const renderLoginScreen = () => {
     const handleRoleSelect = (roleKey) => {
+      preloadWorkspaceForRole(roleKey);
       loginPortalRoleRef.current = roleKey;
       setPendingRole(roleKey);
       setPassword('');

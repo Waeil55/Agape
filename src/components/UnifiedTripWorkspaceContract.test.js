@@ -9,7 +9,7 @@ describe('unified trip workspace information architecture', () => {
     const operations = readSource('./OperationsCommandCenter.jsx');
     const trips = readSource('./TripsPage.jsx');
 
-    expect(dashboard).toContain("{ id: 'trips', label: 'Trips', icon: ClipboardList, active: activePanel === 'operations' || activePanel === 'drive'");
+    expect(dashboard).toContain("{ id: 'trips', panel: 'operations', label: 'Trips', icon: ClipboardList, active: activePanel === 'operations' || activePanel === 'drive'");
     expect(dashboard).not.toContain("{ id: 'drive', label: 'Drive'");
     expect(dashboard).not.toContain("{ id: 'welltrans', label: 'WellTrans'");
     expect(dashboard).toContain('openDriverWorkspaceForTrip');

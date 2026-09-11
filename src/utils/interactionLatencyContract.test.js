@@ -25,6 +25,14 @@ const appSource = readFileSync(
   new URL('../App.jsx', import.meta.url),
   'utf8',
 );
+const localDbSource = readFileSync(
+  new URL('./localDB.js', import.meta.url),
+  'utf8',
+);
+const driverPageSource = readFileSync(
+  new URL('../components/DriverPage.jsx', import.meta.url),
+  'utf8',
+);
 
 describe('interaction latency regression contract', () => {
   it('paints optimistic field state before collection-wide persistence preparation', () => {
@@ -90,5 +98,31 @@ describe('interaction latency regression contract', () => {
     expect(appSource).toContain('startTransition(() => setDriverTelemetry(filtered))');
     expect(appSource).toContain('startTransition(() => setTimeTrackingDeclarations(recentDeclarations))');
     expect(appSource).toContain('startTransition(() => setDriverTelemetry((prev) => {');
+  });
+
+  it('keeps single-record workflow saves proportional to the changed record', () => {
+    const upsertStart = appDataSource.indexOf('const upsertDriverTrip = useCallback');
+    const upsertEnd = appDataSource.indexOf('const upsertDriverProfile', upsertStart);
+    const upsert = appDataSource.slice(upsertStart, upsertEnd);
+
+    expect(localDbSource).toContain('export async function saveRecordWithSyncOperations');
+    expect(upsert).toContain("saveRecordWithSyncOperations('trips', authoritativeTrip");
+    expect(upsert).not.toContain("saveLocalField('trips', nextTrips");
+    expect(upsert).toContain('void syncQueueProcessor.processNow()');
+  });
+
+  it('keeps trip workflow mirrors write-only and route enrichment off the save path', () => {
+    expect(appDataSource).not.toContain('setupListener(collection(db, DRIVER_TRIP_PROGRESS_COLLECTION)');
+    expect(driverPageSource).toContain('const startBoundaryTravelLookup');
+    const pickupStart = driverPageSource.indexOf('const submitOdometer = async () =>');
+    const pickupEnd = driverPageSource.indexOf('const handleArriveDropoff', pickupStart);
+    expect(driverPageSource.slice(pickupStart, pickupEnd)).not.toContain('await calculateBoundaryTravel');
+  });
+
+  it('preloads only the authenticated role workspace before mounting it', () => {
+    expect(appSource).toContain('const preloadWorkspaceForRole');
+    expect(appSource).toContain('preloadWorkspaceForRole(userRole)');
+    expect(appSource).toContain('preloadWorkspaceForRole(roleKey)');
+    expect(appSource).not.toContain('// Warm the driver/admin page chunks while the user is on the login screen');
   });
 });

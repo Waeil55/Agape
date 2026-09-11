@@ -136,3 +136,31 @@ must stop the affected trip or batch visibly.
 - Never commit `.env` files, downloaded service-account JSON, encrypted
   session files, runtime credentials, screenshots containing sensitive data,
   or generated local runtime state.
+
+## Performance and native-feel invariants
+
+These are permanent product contracts, not optional cleanup work:
+
+- Interactive trip, odometer, profile, and log saves must optimistically update
+  the UI and atomically persist only the changed record plus its durable outbox
+  command. Never serialize or rewrite a complete collection on an interactive
+  single-record save path.
+- A successful button response means the mutation is durably staged locally.
+  Cloud delivery must start immediately, remain ordered and retryable, and show
+  pending or blocked status visibly. Never silently discard or falsely confirm
+  an unsynced mutation.
+- `trips` is the sole realtime trip authority. `driverTripProgress` and
+  `tripLedger` are atomic workflow mirrors; do not add parallel listeners that
+  merge either mirror back into the main trip list.
+- Network enrichment such as maps, routes, notifications, and audit expansion
+  must not block the odometer or trip-status save critical path. Bound external
+  requests with a short timeout and deduplicate identical in-flight requests.
+- Lazy workspace modules should preload on authenticated role resolution and
+  navigation intent. Expensive derived collections must be memoized or indexed;
+  do not rescan all historical trips because unrelated navigation state changed.
+- Preserve the protected mobile viewport baseline. Performance fixes must not
+  change the app-shell height, global overflow contract, keyboard geometry, or
+  bottom-navigation clearance.
+- Every change to these paths requires the focused durability, workflow-boundary,
+  sync-queue, interaction-latency, and mobile viewport contract tests, followed
+  by a production build and representative mobile runtime inspection.
