@@ -25,6 +25,7 @@ const {
   updateTripConfirmationById,
   verifyTelnyxSignature: verifyTelnyxWebhookSignature,
 } = require("./telnyxWebhook");
+const { evaluateSmsRequestState } = require('./smsRequestState');
 
 function resolveRuntimeProjectId() {
   if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
@@ -646,6 +647,7 @@ async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
     senderOwned: false,
     profileMatches: false,
     campaignAssigned: false,
+    verificationStatus: '',
     reason: '',
   };
   if (!apiKey || !fromNumber || !messagingProfileId) {
@@ -702,9 +704,19 @@ async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
       const verificationRows = Array.isArray(verificationResponse.data?.records)
         ? verificationResponse.data.records
         : telnyxDataRows(verificationResponse);
-      const verified = verificationRows.some((entry) => String(entry.verificationStatus || entry.status || '').toLowerCase() === 'verified');
+      const verificationStatuses = [...new Set(verificationRows
+        .map((entry) => String(entry.verificationStatus || entry.status || '').trim().toLowerCase())
+        .filter(Boolean))];
+      result.verificationStatus = verificationStatuses.join(', ');
+      const verified = verificationStatuses.includes('verified');
       result.campaignAssigned = verified;
-      if (!verified) result.reason = 'The toll-free sender is not verified for this messaging use case.';
+      if (!verified) {
+        result.reason = verificationStatuses.includes('waiting for customer')
+          ? `Toll-Free Verification for ${AGAPE_BUSINESS_SMS_NUMBER} is waiting for customer information in Telnyx. Complete and submit it before sending.`
+          : result.verificationStatus
+            ? `Toll-Free Verification is not ready (${result.verificationStatus}). Complete it in Telnyx before sending.`
+            : `No Toll-Free Verification request was found for ${AGAPE_BUSINESS_SMS_NUMBER}. Create and submit one before sending.`;
+      }
     } else {
       const campaignResponse = await axios.get(`${TELNYX_API_BASE}/10dlc/phoneNumberCampaign`, {
         headers,
@@ -784,20 +796,47 @@ async function sendClientSmsMessage({ actor, context, trip, to, text, requestId 
   const base = smsLogBase({ actor, context, trip, to, text, requestId, participantUserIds });
   const requestDocumentId = crypto.createHash('sha256').update(`${context.auth.uid}:${requestId}`).digest('hex');
   const requestRef = admin.firestore().doc(`smsSendRequests/${requestDocumentId}`);
-  try {
-    await requestRef.create({
-      ...base,
-      status: 'processing',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  } catch (error) {
-    if (error.code !== 6 && error.code !== 'already-exists') throw error;
-    const existing = await requestRef.get();
-    const data = existing.data() || {};
-    if (data.status === 'accepted') {
-      return { success: true, messageId: data.messageId || '', status: data.providerStatus || 'queued', duplicate: true };
+  const reservation = await admin.firestore().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(requestRef);
+    const existing = snapshot.exists ? snapshot.data() || {} : null;
+    const decision = evaluateSmsRequestState(existing, { to, tripId: trip.id, text });
+    if (decision.action === 'reserve') {
+      transaction.set(requestRef, {
+        ...base,
+        status: 'processing',
+        attemptCount: 1,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { action: 'send' };
     }
-    throw new functions.https.HttpsError('aborted', 'This message request is already being processed. Check the conversation before trying again.');
+    if (decision.action === 'content_mismatch') {
+      throw new functions.https.HttpsError('invalid-argument', 'This message request ID is already attached to different content.');
+    }
+    if (decision.action === 'retry') {
+      transaction.set(requestRef, {
+        status: 'processing',
+        attemptCount: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { action: 'send' };
+    }
+    return decision;
+  });
+
+  if (reservation.action === 'accepted') {
+    return {
+      success: true,
+      messageId: reservation.messageId,
+      status: reservation.providerStatus,
+      duplicate: true,
+    };
+  }
+  if (reservation.action === 'untracked') {
+    throw new functions.https.HttpsError('data-loss', 'Telnyx accepted this message without a tracking ID. Do not resend; ask dispatch to verify delivery.');
+  }
+  if (reservation.action === 'processing') {
+    throw new functions.https.HttpsError('aborted', 'This exact message is already being processed. Check the conversation before trying again.');
   }
 
   let response;
@@ -909,21 +948,45 @@ async function sendClientSmsMessage({ actor, context, trip, to, text, requestId 
 }
 
 async function sendClientSmsHandler(data, context) {
-  const actor = await requireAdminOrDispatcher(context);
-  const to = normalizePhone(data?.to);
-  const text = normalizeClientSmsText(data?.text);
-  const requestId = String(data?.requestId || '').trim();
-  if (!to || !text) {
-    throw new functions.https.HttpsError('invalid-argument', 'A valid client phone and message are required.');
+  const errorReference = crypto.randomUUID().slice(0, 8);
+  try {
+    const actor = await requireAdminOrDispatcher(context);
+    const to = normalizePhone(data?.to);
+    const text = normalizeClientSmsText(data?.text);
+    const requestId = String(data?.requestId || '').trim();
+    if (!to || !text) {
+      throw new functions.https.HttpsError('invalid-argument', 'A valid client phone and message are required.');
+    }
+    if (text.length > 1_000) {
+      throw new functions.https.HttpsError('invalid-argument', 'Client SMS messages cannot exceed 1,000 characters.');
+    }
+    if (!/^[A-Za-z0-9-]{8,120}$/.test(requestId)) {
+      throw new functions.https.HttpsError('invalid-argument', 'A valid message request ID is required.');
+    }
+    const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor });
+    return await sendClientSmsMessage({ actor, context, trip, to, text, requestId });
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    functions.logger.error('Unexpected business SMS failure.', {
+      reference: errorReference,
+      code: String(error?.code || 'unknown'),
+    });
+    throw new functions.https.HttpsError(
+      'internal',
+      `Business SMS could not complete the request. Run Business SMS diagnostics in Settings. Reference ${errorReference}.`,
+    );
   }
-  if (text.length > 1_000) {
-    throw new functions.https.HttpsError('invalid-argument', 'Client SMS messages cannot exceed 1,000 characters.');
-  }
-  if (!/^[A-Za-z0-9-]{8,120}$/.test(requestId)) {
-    throw new functions.https.HttpsError('invalid-argument', 'A valid message request ID is required.');
-  }
-  const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor });
-  return sendClientSmsMessage({ actor, context, trip, to, text, requestId });
+}
+
+function safeBulkSmsErrorMessage(error, tripId) {
+  if (error instanceof functions.https.HttpsError) return String(error.message || 'Message failed.');
+  const reference = crypto.randomUUID().slice(0, 8);
+  functions.logger.error('Unexpected bulk business SMS failure.', {
+    reference,
+    tripId: String(tripId || ''),
+    code: String(error?.code || 'unknown'),
+  });
+  return `Business SMS could not complete the request. Run Business SMS diagnostics in Settings. Reference ${reference}.`;
 }
 
 exports.sendClientSms = functions
@@ -964,12 +1027,14 @@ exports.sendBulkSms = functions
     const requestId = String(message.requestId || `${Date.now()}-${index}-${tripId}`).trim();
     try {
       if (!to || !text) throw new functions.https.HttpsError('invalid-argument', 'A valid client phone and message are required.');
+      if (text.length > 1_000) throw new functions.https.HttpsError('invalid-argument', 'Client SMS messages cannot exceed 1,000 characters.');
+      if (!/^[A-Za-z0-9-]{8,120}$/.test(requestId)) throw new functions.https.HttpsError('invalid-argument', 'A valid message request ID is required.');
       const trip = await requireSmsTrip({ tripId, to, actor });
       const result = await sendClientSmsMessage({ actor, context, trip, to, text, requestId });
       results.push({ tripId, success: true, messageId: result.messageId, status: result.status });
       sent++;
     } catch (error) {
-      const errorMessage = String(error.message || 'Message failed.');
+      const errorMessage = safeBulkSmsErrorMessage(error, tripId);
       results.push({ tripId, success: false, error: errorMessage });
       failed++;
       if (!firstError) firstError = errorMessage;
@@ -1334,7 +1399,7 @@ exports.diagnoseTelnyx = functions
   const readiness = await checkTelnyxSenderReadiness(telnyx, { force: true });
   addCheck('Sender active in Telnyx', readiness.senderOwned ? 'pass' : 'fail', readiness.senderOwned ? `Active ${readiness.senderType.replace('_', ' ')} sender found.` : 'The configured sender is not active in this Telnyx account.');
   addCheck('Sender assigned to profile', readiness.profileMatches ? 'pass' : 'fail', readiness.profileMatches ? 'The sender uses the configured messaging profile.' : 'Assign the sender to the configured messaging profile.');
-  addCheck('Carrier registration', readiness.campaignAssigned ? 'pass' : 'fail', readiness.campaignAssigned ? 'The sender has the required carrier registration.' : readiness.senderType === 'toll_free' ? 'Submit and complete Toll-Free Verification.' : 'Assign the sender to an approved 10DLC campaign.');
+  addCheck('Carrier registration', readiness.campaignAssigned ? 'pass' : 'fail', readiness.campaignAssigned ? 'The sender has the required carrier registration.' : readiness.senderType === 'toll_free' ? readiness.reason : 'Assign the sender to an approved 10DLC campaign.');
   addCheck('Business SMS ready', readiness.ready ? 'pass' : 'fail', readiness.ready ? 'Outbound messages and inbound replies are ready.' : readiness.reason);
   return results;
 });

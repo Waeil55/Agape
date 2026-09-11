@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { AlertCircle, MessageCircle, Send, Smartphone, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, MessageCircle, Send, Smartphone, UserPlus, X } from 'lucide-react';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import {
   buildDriverQuickSmsText,
   QUICK_SMS_TEMPLATES,
   suggestedQuickSmsTemplateId,
 } from '../utils/clientSms';
+import { openClientContactCard } from '../utils/clientContactCard';
 import { sendSMSWithBody } from '../utils/nativeActions';
 
 const normalizePhone = (value) => {
@@ -25,11 +26,22 @@ const formatPhone = (value) => {
 const DriverQuickSmsSheet = ({ trip, allTrips = [], onClose }) => {
   const [openingTemplateId, setOpeningTemplateId] = useState('');
   const [error, setError] = useState('');
+  const [contactOpened, setContactOpened] = useState(false);
   const phone = useMemo(
     () => normalizePhone(resolveClientPhoneForTrip(trip, allTrips)),
     [allTrips, trip],
   );
   const suggestedTemplateId = useMemo(() => suggestedQuickSmsTemplateId(trip), [trip]);
+  const clientName = trip.patient || trip.clientName || 'Agape Care Client';
+
+  const saveClientContact = () => {
+    setError('');
+    if (!phone || !openClientContactCard(clientName, phone)) {
+      setError('The client contact card could not be opened on this device.');
+      return;
+    }
+    setContactOpened(true);
+  };
 
   const openMessages = async (template = null) => {
     if (!phone || openingTemplateId) return;
@@ -38,7 +50,7 @@ const DriverQuickSmsSheet = ({ trip, allTrips = [], onClose }) => {
     setError('');
     try {
       const body = template ? buildDriverQuickSmsText(template, trip) : '';
-      const opened = await sendSMSWithBody(phone, body, trip.patient || 'Client');
+      const opened = await sendSMSWithBody(phone, body, clientName);
       if (!opened) throw new Error('The verified client phone number is unavailable.');
       onClose();
     } catch (openError) {
@@ -69,7 +81,7 @@ const DriverQuickSmsSheet = ({ trip, allTrips = [], onClose }) => {
           </div>
           <div className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
             <MessageCircle size={14} className="shrink-0" />
-            <span>Opens your phone's Messages app. Review and tap Send there from your phone line.</span>
+            <span>Messages open in your phone's Messages app and send from your own phone line—not Telnyx.</span>
           </div>
         </header>
 
@@ -77,6 +89,25 @@ const DriverQuickSmsSheet = ({ trip, allTrips = [], onClose }) => {
           {!phone && (
             <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
               <AlertCircle size={15} className="mt-0.5 shrink-0" /> The client phone number is missing or needs dispatcher review.
+            </div>
+          )}
+          {phone && (
+            <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div className="flex items-start gap-2 text-amber-900">
+                <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold">Keep this client's replies out of iPhone Unknown Senders</p>
+                  <p className="mt-1 text-[11px] font-medium leading-relaxed text-amber-800">Before texting a new client, save this contact. On iPhone, finish Add to Contacts; an unknown number can otherwise be filtered even after you message it.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={saveClientContact}
+                className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-3 text-xs font-bold text-amber-900 hover:bg-amber-100"
+              >
+                {contactOpened ? <CheckCircle2 size={15} /> : <UserPlus size={15} />}
+                {contactOpened ? 'Contact card opened—finish saving it' : 'Save client contact first'}
+              </button>
             </div>
           )}
           {QUICK_SMS_TEMPLATES.map((template) => {

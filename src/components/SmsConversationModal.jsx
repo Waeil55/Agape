@@ -27,6 +27,8 @@ import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import {
   AGAPE_BUSINESS_SMS_NUMBER,
   buildQuickSmsText,
+  businessSmsErrorMessage,
+  createSmsRequestId,
   prepareClientSmsText,
   QUICK_SMS_TEMPLATES,
   suggestedQuickSmsTemplateId,
@@ -77,30 +79,27 @@ function belongsToConversation(message, phone, tripId) {
 }
 
 const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
-  const [messages, setMessages] = useState([]);
-  const [replyText, setReplyText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [sendError, setSendError] = useState('');
-  const [showTemplates, setShowTemplates] = useState(true);
-  const bottomRef = useRef(null);
   const phone = useMemo(
     () => normalizePhone(resolveClientPhoneForTrip(trip, allTrips)),
     [allTrips, trip],
   );
   const canUseBusinessSms = ['admin', 'dispatcher'].includes(String(role || '').toLowerCase());
+  const [messages, setMessages] = useState([]);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(Boolean(phone && canUseBusinessSms));
+  const [loadError, setLoadError] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [retryPayload, setRetryPayload] = useState(null);
+  const [showTemplates, setShowTemplates] = useState(true);
+  const bottomRef = useRef(null);
   const suggestedTemplateId = useMemo(() => suggestedQuickSmsTemplateId(trip), [trip]);
 
   useEffect(() => {
     if (!phone || !canUseBusinessSms) {
-      setMessages([]);
-      setLoading(false);
       return undefined;
     }
 
-    setLoading(true);
-    setLoadError('');
     const snapshots = new Map();
     const sources = [
       query(collection(db, 'smsLogs'), where('conversationKey', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
@@ -142,29 +141,35 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
     bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth', block: 'end' });
   }, [loading, messages]);
 
-  const handleSend = async (message) => {
-    const preparedText = prepareClientSmsText(message ?? replyText, trip);
-    if (!canUseBusinessSms || !preparedText || sending || !phone) return;
+  const sendPreparedMessage = async ({ text, requestId }) => {
+    if (!canUseBusinessSms || !text || !requestId || sending || !phone) return;
     setSending(true);
     setSendError('');
     try {
       const sendClientSms = httpsCallable(getFunctions(), 'sendClientSms');
-      const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const response = await sendClientSms({
         to: phone,
-        text: preparedText,
+        text,
         tripId: trip.id,
         requestId,
       });
       if (!response.data?.success) throw new Error('The message was not accepted by the business SMS service.');
       setReplyText('');
+      setRetryPayload(null);
       setShowTemplates(false);
     } catch (error) {
-      const messageText = String(error?.message || 'The message could not be sent.').replace(/^Firebase:\s*/i, '');
-      setSendError(messageText);
+      setRetryPayload({ text, requestId });
+      setSendError(businessSmsErrorMessage(error));
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSend = async (message) => {
+    const preparedText = prepareClientSmsText(message ?? replyText, trip);
+    if (!preparedText) return;
+    const requestId = createSmsRequestId();
+    await sendPreparedMessage({ text: preparedText, requestId });
   };
 
   const handleKeyDown = (event) => {
@@ -280,13 +285,29 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
           {sendError && (
             <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
               <AlertCircle size={14} className="mt-0.5 shrink-0" />
-              <span>{sendError} No personal-SMS fallback was opened.</span>
+              <div className="min-w-0 flex-1">
+                <p>{sendError}</p>
+                {retryPayload && (
+                  <button
+                    type="button"
+                    onClick={() => void sendPreparedMessage(retryPayload)}
+                    disabled={sending}
+                    className="mt-2 min-h-9 rounded-xl border border-rose-300 bg-white px-3 text-[11px] font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-50"
+                  >
+                    Retry same message
+                  </button>
+                )}
+              </div>
             </div>
           )}
           <div className="flex items-end gap-2">
             <textarea
               value={replyText}
-              onChange={(event) => setReplyText(event.target.value)}
+              onChange={(event) => {
+                setReplyText(event.target.value);
+                setRetryPayload(null);
+                setSendError('');
+              }}
               onKeyDown={handleKeyDown}
               disabled={!phone || sending}
               placeholder={phone ? 'Write a message…' : 'Verified client phone required'}

@@ -5,7 +5,7 @@ import { auth, db, doc, functions, httpsCallable, setDoc, onSnapshot, updatePass
 import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 import OverrideHomeAddressEditor, { verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
 import OverrideExclusionRulesEditor from './OverrideExclusionRulesEditor';
-import { AGAPE_BUSINESS_SMS_NUMBER } from '../utils/clientSms';
+import { AGAPE_BUSINESS_SMS_NUMBER, businessSmsErrorMessage } from '../utils/clientSms';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
 const LazyAutomatedAlerts = lazy(() => import('./AutomatedAlertsPanel'));
@@ -189,7 +189,7 @@ const SettingsPage = ({
       setSmsDiagnostics(response.data || { checks: [], failed: 1 });
     } catch (error) {
       setSmsDiagnostics({
-        checks: [{ name: 'Business SMS diagnostics', status: 'fail', detail: error?.message || 'Diagnostics could not run.' }],
+        checks: [{ name: 'Business SMS diagnostics', status: 'fail', detail: businessSmsErrorMessage(error) }],
         failed: 1,
         passed: 0,
         warnings: 0,

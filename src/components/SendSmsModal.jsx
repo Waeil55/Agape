@@ -2,7 +2,11 @@ import { useState, useMemo } from 'react';
 import { X, Send, CheckCircle, AlertCircle, Loader2, MessageSquare } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
-import { prepareClientSmsText } from '../utils/clientSms';
+import {
+  businessSmsErrorMessage,
+  createSmsRequestId,
+  prepareClientSmsText,
+} from '../utils/clientSms';
 
 const DEFAULT_TEMPLATE = 'confirming your transportation on {date} at {time}. Please reply YES or NO. Call 317-777-7707 if you have questions.';
 
@@ -20,6 +24,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState(null);
+  const [retryMessages, setRetryMessages] = useState([]);
 
   const previews = useMemo(() => {
     return trips.slice(0, 5).map(t => ({
@@ -32,28 +37,36 @@ const SendSmsModal = ({ trips = [], onClose }) => {
 
   const canSend = trips.every(t => getClientPhone(t));
 
-  const handleSend = async () => {
-    if (!canSend || sending) return;
+  const submitMessages = async (messages) => {
+    if (!messages.length || sending) return;
     setSending(true);
     setResults(null);
     try {
       const functions = getFunctions();
       const sendBulkSms = httpsCallable(functions, 'sendBulkSms');
-      const messages = trips.map(t => ({
-        to: getClientPhone(t),
-        text: fillTemplate(template, t),
-        requestId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${t.id}`,
-        metadata: {
-          tripId: t.id,
-        },
-      }));
       const res = await sendBulkSms({ messages });
-      setResults(res.data);
+      const responseResults = Array.isArray(res.data?.results) ? res.data.results : [];
+      setRetryMessages(messages.filter((_message, index) => responseResults[index]?.success === false));
+      setResults(res.data || { success: false, error: 'Business SMS returned no result.' });
     } catch (err) {
-      setResults({ success: false, error: err.message || 'Failed to send messages.' });
+      // The server may have accepted one or more messages before the response
+      // was interrupted. Reuse these exact IDs so a retry cannot duplicate them.
+      setRetryMessages(messages);
+      setResults({ success: false, error: businessSmsErrorMessage(err) });
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSend = async () => {
+    if (!canSend || sending) return;
+    const messages = trips.map(t => ({
+      to: getClientPhone(t),
+      text: fillTemplate(template, t),
+      requestId: createSmsRequestId(),
+      metadata: { tripId: t.id },
+    }));
+    await submitMessages(messages);
   };
 
   if (results) {
@@ -62,10 +75,17 @@ const SendSmsModal = ({ trips = [], onClose }) => {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
         <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 p-6 text-center" onClick={e => e.stopPropagation()}>
           {results.error ? <AlertCircle size={40} className="mx-auto text-rose-500 mb-3" /> : <CheckCircle size={40} className="mx-auto text-emerald-500 mb-3" />}
-          <h3 className="text-lg font-semibold text-slate-900 mb-1">{results.error ? 'Failed' : 'Messages Sent'}</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-1">{results.error || results.failed ? 'Messages need attention' : 'Messages Sent'}</h3>
           {results.sent !== undefined && <p className="text-sm text-slate-600 mb-4">{results.sent} sent, {results.failed} failed</p>}
           {results.error && <p className="text-sm text-rose-600 mb-4">{results.error}</p>}
-          <button onClick={onClose} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl text-sm hover:bg-blue-700 transition-colors">Done</button>
+          <div className="flex items-center justify-center gap-2">
+            {retryMessages.length > 0 && (
+              <button onClick={() => void submitMessages(retryMessages)} disabled={sending} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl text-sm hover:bg-blue-700 disabled:opacity-50">
+                {sending ? 'Retrying…' : `Retry ${retryMessages.length} safely`}
+              </button>
+            )}
+            <button onClick={onClose} className="px-6 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-200">Done</button>
+          </div>
         </div>
       </div>
     );

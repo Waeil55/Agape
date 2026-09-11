@@ -42,6 +42,31 @@ export function buildDriverQuickSmsText(template, trip = {}) {
   return `Hi ${clientFirstName(trip)}, this is your Agape Care driver. ${body}`;
 }
 
+export function businessSmsErrorMessage(error = {}) {
+  const code = String(error?.code || '').replace(/^functions\//i, '').toLowerCase();
+  const raw = String(error?.message || '')
+    .replace(/^Firebase(?:Error)?:\s*/i, '')
+    .replace(/^\[functions\/[^\]]+\]\s*/i, '')
+    .replace(/^Error:\s*/i, '')
+    .trim();
+
+  if (code === 'unauthenticated') return 'Your session expired. Sign in again before sending business SMS.';
+  if (code === 'permission-denied') return 'Business SMS is available only to administrators and dispatchers.';
+  if (code === 'aborted') return raw || 'This exact message is still processing. Check the conversation before retrying.';
+  if (code === 'invalid-argument' || code === 'not-found' || code === 'failed-precondition' || code === 'data-loss') {
+    return raw || 'Business SMS is blocked until its required data is corrected.';
+  }
+  if (code === 'unavailable') return raw || 'Business SMS is temporarily unavailable. Retry the same message once.';
+  if (code === 'internal' || /^internal(?:\s*\[\d+\])?$/i.test(raw) || /internal\s*\[\d+\]/i.test(raw)) {
+    return 'Business SMS could not complete the request. Run Business SMS diagnostics in Settings, then retry the same message.';
+  }
+  return raw || 'Business SMS could not complete the request. Run Business SMS diagnostics in Settings.';
+}
+
+export function createSmsRequestId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export function suggestedQuickSmsTemplateId(trip = {}, now = new Date()) {
   const tripDate = tripCalendarDateKey(trip.date || trip.scheduleDate || trip.scheduledPickupAt);
   const today = localCalendarYmd(now);

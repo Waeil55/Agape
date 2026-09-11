@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDriverQuickSmsText,
   buildQuickSmsText,
+  businessSmsErrorMessage,
   prepareClientSmsText,
   QUICK_SMS_TEMPLATES,
   suggestedQuickSmsTemplateId,
@@ -41,5 +42,15 @@ describe('client SMS policy', () => {
       expect(message).toMatch(/^Hi Dana, this is your Agape Care driver\./);
       expect(message).not.toMatch(/Reply STOP/i);
     });
+  });
+
+  it('turns opaque callable failures into an actionable business-SMS error', () => {
+    expect(businessSmsErrorMessage({ code: 'functions/internal', message: 'internal [0]' })).toBe(
+      'Business SMS could not complete the request. Run Business SMS diagnostics in Settings, then retry the same message.',
+    );
+    expect(businessSmsErrorMessage({
+      code: 'functions/failed-precondition',
+      message: 'The toll-free verification is waiting for customer information.',
+    })).toBe('The toll-free verification is waiting for customer information.');
   });
 });
