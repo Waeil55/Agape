@@ -2,6 +2,31 @@ export const AUTH_PROFILE_SERVER_TIMEOUT_MS = 12000;
 export const AUTH_PROFILE_CACHE_TIMEOUT_MS = 1200;
 export const AUTH_LOADING_RECOVERY_DELAY_MS = 8000;
 export const AUTH_WATCHDOG_TIMEOUT_MS = 30000;
+export const AUTH_OBSERVER_ACK_TIMEOUT_MS = 750;
+
+/**
+ * Firebase can resolve a repeated sign-in for an already-restored user without
+ * emitting another auth-state event. Bound the normal observer handoff so the
+ * caller can re-subscribe deterministically instead of requiring a page reload.
+ */
+export async function waitForMatchingAuthObserver(
+  observerPromise,
+  expectedUid,
+  timeoutMs = AUTH_OBSERVER_ACK_TIMEOUT_MS,
+) {
+  let timeoutId;
+  try {
+    const observedUid = await Promise.race([
+      Promise.resolve(observerPromise),
+      new Promise((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+    return Boolean(expectedUid) && String(observedUid || '') === String(expectedUid);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
 
 const normalizedErrorCode = (result) => String(result?.error?.code || result?.error?.name || '')
   .trim()

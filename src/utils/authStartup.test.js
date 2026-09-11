@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   AUTH_LOADING_RECOVERY_DELAY_MS,
+  AUTH_OBSERVER_ACK_TIMEOUT_MS,
   AUTH_PROFILE_SERVER_TIMEOUT_MS,
   getAuthVerificationIssue,
   getLoginFailurePresentation,
   isRecoverableAuthVerificationFailure,
+  waitForMatchingAuthObserver,
 } from './authStartup';
 
 describe('authentication startup recovery', () => {
@@ -58,5 +60,25 @@ describe('authentication startup recovery', () => {
     expect(app).toContain('if (loginInProgressRef.current) return;');
     expect(app).not.toContain('Session went null after boot — waiting 5s');
     expect(app).toContain('disabled={loginSubmitting}');
+  });
+
+  it('acknowledges the matching Firebase auth event and times out a missing event', async () => {
+    await expect(waitForMatchingAuthObserver(
+      Promise.resolve('user-1'),
+      'user-1',
+      AUTH_OBSERVER_ACK_TIMEOUT_MS,
+    )).resolves.toBe(true);
+    await expect(waitForMatchingAuthObserver(Promise.resolve('user-2'), 'user-1', 5))
+      .resolves.toBe(false);
+    await expect(waitForMatchingAuthObserver(new Promise(() => {}), 'user-1', 5))
+      .resolves.toBe(false);
+  });
+
+  it('re-subscribes after a successful login when Firebase omits a repeated-user event', () => {
+    const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+
+    expect(app).toContain('waitForMatchingAuthObserver(');
+    expect(app).toContain('!observerHandledLogin && auth.currentUser?.uid === credential.user.uid');
+    expect(app).toContain('setAuthBootAttempt((attempt) => attempt + 1)');
   });
 });

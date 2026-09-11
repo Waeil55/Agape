@@ -36,12 +36,14 @@ import { hydrateTripDriverIdentity } from './utils/driverIdentity';
 import { DEFAULT_OVERRIDE_POLICY, isOverridePolicyDocumentValid, normalizeOverridePolicy } from './utils/tripCostOverrides';
 import {
   AUTH_LOADING_RECOVERY_DELAY_MS,
+  AUTH_OBSERVER_ACK_TIMEOUT_MS,
   AUTH_PROFILE_CACHE_TIMEOUT_MS,
   AUTH_PROFILE_SERVER_TIMEOUT_MS,
   AUTH_WATCHDOG_TIMEOUT_MS,
   getAuthVerificationIssue,
   getLoginFailurePresentation,
   isRecoverableAuthVerificationFailure,
+  waitForMatchingAuthObserver,
 } from './utils/authStartup';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
@@ -405,6 +407,7 @@ const App = () => {
   const authBootResolvedRef = useRef(false);
   const loginPortalRoleRef = useRef(null);
   const loginInProgressRef = useRef(false);
+  const loginObserverAckRef = useRef(null);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
 
@@ -1207,12 +1210,17 @@ const App = () => {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
-      // If a login is actively being processed and we got a null event,
-      // Firebase may be toggling state. Let the login resolve instead of signing out.
-      if (!user && loginInProgressRef.current) {
-        console.warn('[Auth] Null event during active login — ignoring (race guard)');
-        return;
-      }
+        if (user && loginObserverAckRef.current) {
+          const acknowledgeLogin = loginObserverAckRef.current;
+          loginObserverAckRef.current = null;
+          acknowledgeLogin(user.uid);
+        }
+        // If a login is actively being processed and we got a null event,
+        // Firebase may be toggling state. Let the login resolve instead of signing out.
+        if (!user && loginInProgressRef.current) {
+          console.warn('[Auth] Null event during active login — ignoring (race guard)');
+          return;
+        }
       if (user) {
         setIsLoading(true);
         const requestedPortalRole = loginPortalRoleRef.current;
@@ -1580,9 +1588,29 @@ const App = () => {
     setLoginError('');
     loginInProgressRef.current = true;
     setLoginSubmitting(true);
+    let acknowledgeLogin;
+    const observerAcknowledgement = new Promise((resolve) => {
+      acknowledgeLogin = resolve;
+      loginObserverAckRef.current = resolve;
+    });
     try {
       const credential = await signInWithEmailAndPassword(auth, authEmail, password);
       beginSecuritySession(credential.user.uid);
+      const observerHandledLogin = await waitForMatchingAuthObserver(
+        observerAcknowledgement,
+        credential.user.uid,
+        AUTH_OBSERVER_ACK_TIMEOUT_MS,
+      );
+      if (!observerHandledLogin && auth.currentUser?.uid === credential.user.uid) {
+        // A successful credential must never depend on a manual refresh. This
+        // re-subscribes to Firebase Auth, whose initial callback always reports
+        // the currently restored user, while preserving the selected portal.
+        authBootResolvedRef.current = false;
+        setStartupIssue('');
+        setShowLoadingRecovery(false);
+        setIsLoading(true);
+        setAuthBootAttempt((attempt) => attempt + 1);
+      }
     } catch (err) {
       loginInProgressRef.current = false;
       setLoginSubmitting(false);
@@ -1591,6 +1619,10 @@ const App = () => {
       const failure = getLoginFailurePresentation(err);
       if (failure.clearPassword) setPassword('');
       setLoginError(failure.message);
+    } finally {
+      if (loginObserverAckRef.current === acknowledgeLogin) {
+        loginObserverAckRef.current = null;
+      }
     }
   };
 
