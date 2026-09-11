@@ -20,7 +20,7 @@ const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
-import { Truck, MapPin, Phone, MessageCircle, PenLine, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
+import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { tripMatchesSearch } from '../utils/search';
 import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, classifyGap, buildTimeEvents } from '../utils/timeTracking';
@@ -44,6 +44,7 @@ import { queueSyncOperation } from '../utils/localDB';
 import { normalizeTenantId } from '../utils/tenantScope';
 import { sanitizeOdometerInput } from '../utils/odometerInput';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
+import SmsConversationModal from './SmsConversationModal';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
@@ -927,8 +928,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return null;
   });
   const [showMoreOptions, setShowMoreOptions] = useState(null);
-  const [quickSmsMenuTrip, setQuickSmsMenuTrip] = useState(null);
-  const [sendingSms, setSendingSms] = useState(false);
+  const [smsConversationTrip, setSmsConversationTrip] = useState(null);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const toastTimeoutRef = useRef(null);
   useEffect(() => {
@@ -1349,6 +1349,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [driverScopedTrips, trips, phoneNumbers]);
 
   const getPrimaryContactForTrip = (trip) => getPrimaryContact(trip, trips, phoneNumbers);
+  const hasUnreadClientSms = (trip) => Array.isArray(trip?.clientSmsUnreadFor)
+    && trip.clientSmsUnreadFor.includes(auth.currentUser?.uid);
 
   const getContactsForTrip = (trip) => tripContacts[trip?.id] || [];
 
@@ -1729,7 +1731,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     || showCompleteModal
     || scheduleEditorTrip
     || showContactSelector
-    || quickSmsMenuTrip
+    || smsConversationTrip
     || showMoreOptions
     || transferPrompt
     || passwordPrompt
@@ -1747,7 +1749,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       setActiveNativeOdometer(null);
       setScheduleEditorTrip(null);
       setShowContactSelector(null);
-      setQuickSmsMenuTrip(null);
+      setSmsConversationTrip(null);
       setShowMoreOptions(null);
       setTransferPrompt(null);
       setPasswordPrompt(null);
@@ -3015,9 +3017,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   };
 
   // Single messaging entry point: every "SMS" button opens the Quick SMS
-  // menu (Write Manually + 7 templates). No second SMS button exists.
+  // conversation (manual composer + templates + replies). No native-SMS
+  // fallback exists because it splits client conversations across senders.
   const handleSmartSMS = (trip) => {
-    setQuickSmsMenuTrip(trip);
+    setSmsConversationTrip(trip);
   };
 
   const openContactSelector = (trip) => {
@@ -3950,56 +3953,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return null;
   };
 
-  const sendSMSWithBody = async (phone, body) => {
-    if (!phone || !body) return;
-    await impact('medium');
-    const cleaned = (phone || '').replace(/[^0-9+]/g, '');
-    if (!cleaned) return;
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile || isNativeShell()) {
-      const encoded = encodeURIComponent(body);
-      const url = /Android/i.test(navigator.userAgent) ? `sms:${cleaned}?body=${encoded}` : `sms:${cleaned}&body=${encoded}`;
-      window.location.href = url;
-    } else {
-      try { await navigator.clipboard.writeText(body); } catch (e) { console.warn('[clipboard]', e); }
-      setShowToast({ message: 'Message copied to clipboard' });
-    }
-  };
-
-  // ── QUICK SMS TEMPLATES ────────────────────────────────────────────────
-  // Exact wording per fleet messaging standard. [Client Name] is filled
-  // automatically; the company introduction is inserted only for the first
-  // message to a client (tracked per device in localStorage).
-  const buildQuickSmsText = (template, patientName, isFirstContact) => {
-    const firstName = String(patientName || '').trim().split(/\s+/)[0] || 'there';
-    return `Hi ${firstName},${isFirstContact ? ' this is Agape Care Medical Transportation.' : ''} ${template.body}`;
-  };
-
-  const smsContactStorageKey = (phone) => `agape_sms_contact_${String(phone || '').replace(/[^0-9+]/g, '')}`;
-  const hasMessagedClientBefore = (phone) => {
-    try { return !!window.localStorage.getItem(smsContactStorageKey(phone)); } catch { return false; }
-  };
-  const markClientAsMessaged = (phone) => {
-    try { window.localStorage.setItem(smsContactStorageKey(phone), new Date().toISOString()); } catch { /* storage unavailable */ }
-  };
-
-  const sendQuickSmsViaTelnyx = async (phone, text, tripId) => {
-    if (!phone || !text) return;
-    setSendingSms(true);
-    try {
-      const sendDriverSms = httpsCallable(functions, 'sendDriverSms');
-      await sendDriverSms({ to: phone, text, tripId });
-      setQuickSmsMenuTrip(null);
-      setShowToast({ message: 'Message sent' });
-    } catch (err) {
-      console.warn('[sendDriverSms]', err);
-      setShowToast({ message: 'Failed to send. Opening SMS app instead.' });
-      sendSMSWithBody(phone, text);
-    } finally {
-      setSendingSms(false);
-    }
-  };
-
   const renderTripWorkPage = (trip) => {
     const pickupAddress = typeof trip.pickup === 'object' ? trip.pickup?.address || '' : trip.pickup || '';
     const dropoffAddress = typeof trip.dropoff === 'object' ? trip.dropoff?.address || '' : trip.dropoff || '';
@@ -4114,8 +4067,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
                   <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-emerald-600"><Phone size={17} /> Call</span>
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="relative h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
                   <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-blue-600"><MessageCircle size={17} /> SMS</span>
+                  {hasUnreadClientSms(trip) && <span className="absolute right-1 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-rose-500" aria-label="Unread client reply" />}
                 </button>
                 <button type="button" onClick={() => openContactSelector(trip)} className="h-11 text-white text-xs font-semibold cursor-pointer">
                   <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-violet-600"><PhoneForwarded size={17} /> Contacts</span>
@@ -4855,7 +4809,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                             </button>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); handleSMS(stopPhone, stop.name || `Stop ${index + 1}`); }}
+                              onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }}
                               className="h-8 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-blue-700 text-xs font-medium flex items-center justify-center gap-2 hover:bg-blue-100 transition-all"
                               title="SMS client"
                               aria-label="SMS client"
@@ -5065,7 +5019,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <div className="flex items-center gap-2 mt-3 mb-4">
                             <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-1.5 rounded-xl flex items-center justify-center gap-2 transition-all" aria-label="Navigate"><Navigation size={16}/> Navigate</button>
                            <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-100" aria-label="Call"><Phone size={16}/></button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label="Send SMS"><MessageCircle size={16}/></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="relative w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label={hasUnreadClientSms(trip) ? 'Open unread client SMS reply' : 'Open client SMS'}><MessageCircle size={16}/>{hasUnreadClientSms(trip) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-rose-500" />}</button>
                           </div>
 
                           {(() => {
@@ -6073,7 +6027,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                                 <div className="flex items-center gap-1.5 shrink-0 ml-2">
                                   <button type="button" onClick={() => handleCall(contact.phone, `${contact.label}: ${contact.name}`)} className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.callLabel}><Phone size={16} /></button>
                                   {roleActions.smsLabel && (
-                                    <button type="button" onClick={() => handleSMS(contact.phone, contact.name)} className="w-8 h-8 rounded-lg bg-white text-blue-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.smsLabel}><MessageCircle size={16} /></button>
+                                    <button type="button" onClick={() => contact.isPrimary ? handleSmartSMS(showTripDetails) : handleSMS(contact.phone, contact.name)} className="w-8 h-8 rounded-lg bg-white text-blue-600 flex items-center justify-center active:scale-90 shadow-sm cursor-pointer" title={roleActions.smsLabel}><MessageCircle size={16} /></button>
                                   )}
                                 </div>
                               </div>
@@ -7320,92 +7274,15 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         </div>
       )}
 
-      {/* ===== QUICK SMS MENU ===== */}
-      {quickSmsMenuTrip && (() => {
-        const smsTrip = quickSmsMenuTrip;
-        const smsPrimary = getPrimaryContactForTrip(smsTrip);
-        const smsFirstContact = smsPrimary ? !hasMessagedClientBefore(smsPrimary.phone) : false;
-        const smsTripKey = tripCalendarDateKey(smsTrip.date);
-        const todayKey = localCalendarYmd();
-        const tomorrowKey = localCalendarYmd(new Date(Date.now() + 86400000));
-        const suggestedId = smsTripKey && smsTripKey === todayKey ? 'today' : smsTripKey === tomorrowKey ? 'tomorrow' : null;
-        const quickSmsTemplates = [
-          { id: 'tomorrow', label: 'Tomorrow Trip', body: "just checking if we're still on for your trip tomorrow." },
-          { id: 'today', label: 'Today Trip', body: "just checking if we're still on for your trip today." },
-          { id: 'soon', label: 'On My Way Soon', body: "I'll be on my way shortly. Please confirm that we're still on." },
-          { id: 'way', label: 'On My Way', body: "I'm on my way." },
-          { id: 'ready', label: 'Pickup / Ready Time', body: "do you know what time you'll be done and ready for pickup?" },
-          { id: 'checkin', label: 'Checking In', body: 'just checking in regarding your trip. Please let me know if everything is still good for today.' },
-          { id: 'arrived', label: "I've Arrived", body: "I've arrived. Please let me know when you're ready." },
-        ];
-        const closeQuickSms = () => setQuickSmsMenuTrip(null);
-        return (
-          <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden" onClick={closeQuickSms}>
-            <div className="absolute inset-0 bg-black/40" />
-            <div className="relative flex max-h-[85dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-3xl rounded-b-none bg-white pt-2 animate-slide-up" onClick={e => e.stopPropagation()}>
-              <div className="flex shrink-0 justify-center mb-3 px-4">
-                <span className="w-10 h-1 rounded-full bg-slate-300" />
-              </div>
-              <div className="flex shrink-0 items-center justify-between mb-1 px-4">
-                <h3 className="text-base font-bold text-slate-900">SMS</h3>
-                <button type="button" onClick={closeQuickSms} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
-                  <X size={16} />
-                </button>
-              </div>
-              <p className="shrink-0 px-4 text-xs font-semibold text-slate-500 mb-3">
-                To: {smsPrimary ? `${smsPrimary.label}: ${smsPrimary.name}` : 'No primary contact'}
-              </p>
-              <div data-scroll-region="driver-quick-sms" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {!smsPrimary ? (
-                <p className="text-sm font-medium text-rose-600 py-4 text-center">This trip has no contact number.</p>
-              ) : (
-                <>
-                   <button
-                    type="button"
-                    onClick={() => { closeQuickSms(); sendSMS(smsPrimary.phone, smsPrimary.name); }}
-                    disabled={sendingSms}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all text-sm font-semibold cursor-pointer mb-3 disabled:opacity-50"
-                  >
-                    <PenLine size={16} /> Write Manually
-                  </button>
-                  <div className="space-y-1">
-                    {quickSmsTemplates.map((tpl) => {
-                      const preview = buildQuickSmsText(tpl, smsTrip.patient, smsFirstContact);
-                      const suggested = suggestedId === tpl.id;
-                      return (
-                        <button
-                          key={tpl.id}
-                          type="button"
-                          onClick={() => {
-                            markClientAsMessaged(smsPrimary.phone);
-                            sendQuickSmsViaTelnyx(smsPrimary.phone, preview, smsTrip.id);
-                          }}
-                          disabled={sendingSms}
-                          className="w-full flex items-start gap-3 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition-all text-left cursor-pointer disabled:opacity-50"
-                        >
-                          <MessageCircle size={16} className="text-blue-600 shrink-0 mt-0.5" />
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-slate-900">{tpl.label}</span>
-                              {suggested && (
-                                <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-[10px] font-bold uppercase tracking-wide text-amber-700">Suggested</span>
-                              )}
-                            </span>
-                            <span className="block text-xs font-medium text-slate-500 mt-0.5 break-words">{preview}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {sendingSms && <p className="text-xs font-medium text-blue-600 mt-3 text-center">Sending...</p>}
-                  {!sendingSms && <p className="text-[11px] font-medium text-slate-400 mt-3 text-center">Messages are sent from the Agape Care business line.</p>}
-                </>
-              )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* ===== CLIENT SMS CONVERSATION ===== */}
+      {smsConversationTrip && (
+        <SmsConversationModal
+          trip={smsConversationTrip}
+          role={role}
+          allTrips={trips}
+          onClose={() => setSmsConversationTrip(null)}
+        />
+      )}
 
       {/* ===== SMART CONTACT SELECTOR ===== */}
       {showContactSelector && (() => {
@@ -7481,7 +7358,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                         {actions.smsLabel && (
                           <button
                             type="button"
-                            onClick={() => { handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
+                            onClick={() => { if (contact.isPrimary) handleSmartSMS(showContactSelector); else handleSMS(contact.phone, contact.name); setShowContactSelector(null); }}
                             className="flex-1 h-7 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
                             <MessageCircle size={16} /> {actions.smsLabel}
                           </button>

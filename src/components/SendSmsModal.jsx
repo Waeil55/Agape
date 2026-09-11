@@ -2,8 +2,19 @@ import { useState, useMemo } from 'react';
 import { X, Send, CheckCircle, AlertCircle, Loader2, MessageSquare } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
+import { prepareClientSmsText } from '../utils/clientSms';
 
-const DEFAULT_TEMPLATE = `Hi {patient}, this is Agape Care confirming your trip on {date} at {time}. Reply YES to confirm or NO to cancel. Call 317-777-7707 if you have questions.`;
+const DEFAULT_TEMPLATE = 'confirming your transportation on {date} at {time}. Please reply YES or NO. Call 317-777-7707 if you have questions.';
+
+const fillTemplate = (template, trip) => prepareClientSmsText(
+  template
+    .replace(/\{patient\}/g, trip.patient || 'Client')
+    .replace(/\{time\}/g, trip.time || '')
+    .replace(/\{date\}/g, trip.date || '')
+    .replace(/\{pickup\}/g, trip.pickup || '')
+    .replace(/\{dropoff\}/g, trip.dropoff || ''),
+  trip,
+);
 
 const SendSmsModal = ({ trips = [], onClose }) => {
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
@@ -13,12 +24,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
   const previews = useMemo(() => {
     return trips.slice(0, 5).map(t => ({
       ...t,
-      preview: template
-        .replace(/\{patient\}/g, t.patient || 'Client')
-        .replace(/\{time\}/g, t.time || '')
-        .replace(/\{date\}/g, t.date || '')
-        .replace(/\{pickup\}/g, t.pickup || '')
-        .replace(/\{dropoff\}/g, t.dropoff || ''),
+      preview: fillTemplate(template, t),
     }));
   }, [trips, template]);
 
@@ -35,13 +41,11 @@ const SendSmsModal = ({ trips = [], onClose }) => {
       const sendBulkSms = httpsCallable(functions, 'sendBulkSms');
       const messages = trips.map(t => ({
         to: getClientPhone(t),
-        text: template
-          .replace(/\{patient\}/g, t.patient || 'Client')
-          .replace(/\{time\}/g, t.time || '')
-          .replace(/\{date\}/g, t.date || '')
-          .replace(/\{pickup\}/g, t.pickup || '')
-          .replace(/\{dropoff\}/g, t.dropoff || ''),
-        metadata: { tripId: t.id },
+        text: fillTemplate(template, t),
+        requestId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${t.id}`,
+        metadata: {
+          tripId: t.id,
+        },
       }));
       const res = await sendBulkSms({ messages });
       setResults(res.data);
@@ -79,7 +83,7 @@ const SendSmsModal = ({ trips = [], onClose }) => {
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Message Template</p>
             <textarea value={template} onChange={e => setTemplate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" rows={4} />
-            <p className="text-[10px] text-slate-400 mt-1">Use {'{patient}'}, {'{time}'}, {'{date}'}, {'{pickup}'}, {'{dropoff}'}</p>
+            <p className="text-[10px] text-slate-400 mt-1">Use {'{patient}'}, {'{time}'}, {'{date}'}, {'{pickup}'}, {'{dropoff}'}. Agape Care identification and opt-out text are added automatically.</p>
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Recipients ({trips.length})</p>

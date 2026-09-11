@@ -16,8 +16,12 @@ const {
 const {
   buildInboundSmsLog,
   maskPhone,
+  normalizeClientSmsText,
   normalizePhone,
   parseConfirmation,
+  parseSmsConsentAction,
+  resolveCanonicalClientPhone,
+  smsConversationId,
   updateTripConfirmationById,
   validateDriverSmsAccess,
   verifyTelnyxSignature: verifyTelnyxWebhookSignature,
@@ -616,209 +620,406 @@ exports.enterpriseAiGenerate = functions
     }
   });
 
-exports.sendSms = functions
-  .runWith({ secrets: [runtimeConfigSecret] })
-  .https.onCall(async (data, context) => {
-  await requireAdminOrDispatcher(context);
-  const { to: rawTo, text, tripId } = data;
-  const to = normalizePhone(rawTo);
-  if (!to || !text) {
-    throw new functions.https.HttpsError("invalid-argument", "Both 'to' and 'text' are required.");
+let smsSenderReadinessCache = null;
+
+function telnyxDataRows(response) {
+  const value = response?.data?.data;
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
+}
+
+async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
+  const apiKey = String(telnyx.api_key || '').trim();
+  const fromNumber = normalizePhone(telnyx.from);
+  const messagingProfileId = String(telnyx.messaging_profile_id || '').trim();
+  const cacheKey = `${fromNumber}|${messagingProfileId}`;
+  const cacheTtl = smsSenderReadinessCache?.ready ? 5 * 60_000 : 30_000;
+  if (!force && smsSenderReadinessCache?.key === cacheKey && Date.now() - smsSenderReadinessCache.checkedAt < cacheTtl) {
+    return smsSenderReadinessCache;
   }
+
+  const result = {
+    key: cacheKey,
+    checkedAt: Date.now(),
+    ready: false,
+    senderType: 'unknown',
+    senderOwned: false,
+    profileMatches: false,
+    campaignAssigned: false,
+    reason: '',
+  };
+  if (!apiKey || !fromNumber || !messagingProfileId) {
+    result.reason = 'The business SMS sender, API key, and messaging profile must all be configured.';
+    smsSenderReadinessCache = result;
+    return result;
+  }
+
+  const headers = { Authorization: `Bearer ${apiKey}` };
   try {
-    const telnyx = getTelnyxConfig();
-    const apiKey = telnyx.api_key;
-    const fromNumber = telnyx.from || "+18552223330";
-    const messagingProfileId = telnyx.messaging_profile_id || null;
-    if (!apiKey) {
-      throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
+    const ownedResponse = await axios.get(`${TELNYX_API_BASE}/phone_numbers`, {
+      headers,
+      params: { 'filter[phone_number]': fromNumber, 'page[size]': 10 },
+      timeout: 10_000,
+    });
+    let numberRecord = telnyxDataRows(ownedResponse)[0] || null;
+    if (!numberRecord) {
+      const hostedResponse = await axios.get(`${TELNYX_API_BASE}/messaging_hosted_numbers`, {
+        headers,
+        params: { 'filter[phone_number]': fromNumber, 'page[size]': 10 },
+        timeout: 10_000,
+      });
+      numberRecord = telnyxDataRows(hostedResponse)[0] || null;
     }
-    const body = { from: fromNumber, to, text, type: "SMS" };
-    if (messagingProfileId) {
-      body.messaging_profile_id = messagingProfileId;
+    if (!numberRecord) {
+      result.reason = 'The configured sender is not active in this Telnyx account.';
+      smsSenderReadinessCache = result;
+      return result;
     }
-    const res = await axios.post(
-      `${TELNYX_API_BASE}/messages`,
-      body,
-      { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } }
-    );
-    const telnyxData = res.data?.data || {};
-    const messageId = telnyxData.id;
-    const status = telnyxData.to?.[0]?.status || "queued";
-    functions.logger.info("Telnyx send response:", {
+
+    result.senderOwned = true;
+    const areaCode = fromNumber.slice(2, 5);
+    const tollFree = ['800', '833', '844', '855', '866', '877', '888'].includes(areaCode);
+    result.senderType = tollFree ? 'toll_free' : 'us_long_code';
+    const assignedProfile = String(numberRecord.messaging_profile_id || numberRecord.messaging?.messaging_profile_id || '').trim();
+    result.profileMatches = assignedProfile === messagingProfileId;
+    if (!result.profileMatches) {
+      result.reason = 'The configured sender is not assigned to the configured messaging profile.';
+      smsSenderReadinessCache = result;
+      return result;
+    }
+
+    if (tollFree) {
+      const verificationResponse = await axios.get(`${TELNYX_API_BASE}/messaging_tollfree/verification/requests`, {
+        headers,
+        params: { phone_number: fromNumber, page: 1, page_size: 25 },
+        timeout: 10_000,
+      });
+      const verificationRows = Array.isArray(verificationResponse.data?.records)
+        ? verificationResponse.data.records
+        : telnyxDataRows(verificationResponse);
+      const verified = verificationRows.some((entry) => String(entry.verificationStatus || entry.status || '').toLowerCase() === 'verified');
+      result.campaignAssigned = verified;
+      if (!verified) result.reason = 'The toll-free sender is not verified for this messaging use case.';
+    } else {
+      const campaignResponse = await axios.get(`${TELNYX_API_BASE}/10dlc/phoneNumberCampaign`, {
+        headers,
+        params: { phoneNumber: fromNumber },
+        timeout: 10_000,
+      });
+      result.campaignAssigned = telnyxDataRows(campaignResponse).length > 0;
+      if (!result.campaignAssigned) result.reason = 'The local sender is not assigned to an approved 10DLC campaign.';
+    }
+    result.ready = result.senderOwned && result.profileMatches && result.campaignAssigned;
+  } catch (error) {
+    functions.logger.error('Telnyx sender readiness check failed.', {
+      status: error.response?.status || null,
+      code: error.response?.data?.errors?.[0]?.code || null,
+    });
+    result.reason = 'The business SMS sender could not be verified with Telnyx.';
+  }
+  smsSenderReadinessCache = result;
+  return result;
+}
+
+async function requireSmsTrip({ tripId, to, actor, context }) {
+  const safeTripId = String(tripId || '').trim();
+  if (!safeTripId) {
+    throw new functions.https.HttpsError('failed-precondition', 'Choose a trip before messaging a client.');
+  }
+  const tripSnapshot = await admin.firestore().doc(`trips/${safeTripId}`).get();
+  if (!tripSnapshot.exists) {
+    throw new functions.https.HttpsError('not-found', 'The selected trip could not be found.');
+  }
+  const trip = { id: tripSnapshot.id, ...tripSnapshot.data() };
+  if (actor.tenantId && trip.tenantId && actor.tenantId !== trip.tenantId) {
+    throw new functions.https.HttpsError('permission-denied', 'This trip belongs to another organization.');
+  }
+  if (actor.role === 'driver') {
+    const access = validateDriverSmsAccess({
+      trip,
+      actor,
+      uid: context.auth.uid,
+      tokenEmail: context.auth.token?.email || '',
+      recipient: to,
+    });
+    if (access.reason === 'client_phone_unverified') {
+      throw new functions.https.HttpsError('failed-precondition', 'The client phone needs dispatcher review before messaging.');
+    }
+    if (!access.allowed) {
+      throw new functions.https.HttpsError('permission-denied', 'This trip or client phone is not assigned to your account.');
+    }
+  } else {
+    const clientPhone = resolveCanonicalClientPhone(trip);
+    if (!clientPhone) {
+      throw new functions.https.HttpsError('failed-precondition', 'The client phone needs review before messaging.');
+    }
+    if (clientPhone !== to) {
+      throw new functions.https.HttpsError('failed-precondition', 'The recipient does not match the verified client phone for this trip.');
+    }
+  }
+  return trip;
+}
+
+async function assertSmsConsent(to) {
+  const conversationId = smsConversationId(to);
+  const snapshot = await admin.firestore().doc(`smsOptOuts/${conversationId}`).get();
+  if (snapshot.exists && snapshot.data()?.optedOut === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'This client opted out of SMS. Do not send another message unless the client texts START.');
+  }
+}
+
+async function resolveSmsParticipantUserIds(trip, actorUid) {
+  const participantUserIds = new Set([String(actorUid || '').trim()].filter(Boolean));
+  const tenantId = String(trip.tenantId || 'agape-care');
+  const driverProfileIds = [...new Set([
+    trip.driverId,
+    trip.assignedDriverId,
+    trip.driverProfileId,
+  ].map((value) => String(value || '').trim()).filter(Boolean))].slice(0, 10);
+  const driverEmails = [...new Set([
+    trip.driverEmail,
+    trip.assignedDriverEmail,
+  ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))].slice(0, 10);
+
+  const lookups = driverProfileIds.map((id) => admin.firestore().doc(`users/${id}`).get());
+  if (driverProfileIds.length) {
+    lookups.push(admin.firestore().collection('users').where('profileId', 'in', driverProfileIds).limit(10).get());
+  }
+  if (driverEmails.length) {
+    lookups.push(admin.firestore().collection('users').where('email', 'in', driverEmails).limit(10).get());
+  }
+
+  const snapshots = await Promise.all(lookups);
+  const addUser = (snapshot) => {
+    if (!snapshot?.exists) return;
+    const user = snapshot.data() || {};
+    const userTenantId = String(user.tenantId || 'agape-care');
+    if (String(user.role || '').toLowerCase() === 'driver' && userTenantId === tenantId) {
+      participantUserIds.add(snapshot.id);
+    }
+  };
+  snapshots.forEach((snapshot) => {
+    if (Array.isArray(snapshot?.docs)) snapshot.docs.forEach(addUser);
+    else addUser(snapshot);
+  });
+  return [...participantUserIds];
+}
+
+function smsLogBase({ actor, context, trip, to, text, requestId, participantUserIds }) {
+  return {
+    tripId: trip.id,
+    tenantId: trip.tenantId || actor.tenantId || 'agape-care',
+    direction: 'outbound',
+    to,
+    conversationKey: to,
+    text,
+    requestId,
+    senderUserId: context.auth.uid,
+    participantUserIds,
+  };
+}
+
+async function sendClientSmsMessage({ actor, context, trip, to, text, requestId }) {
+  await assertSmsConsent(to);
+  const telnyx = getTelnyxConfig();
+  const readiness = await checkTelnyxSenderReadiness(telnyx);
+  if (!readiness.ready) {
+    throw new functions.https.HttpsError('failed-precondition', `${readiness.reason} Ask an administrator to run Business SMS diagnostics.`);
+  }
+
+  const fromNumber = normalizePhone(telnyx.from);
+  const participantUserIds = await resolveSmsParticipantUserIds(trip, context.auth.uid);
+  const base = smsLogBase({ actor, context, trip, to, text, requestId, participantUserIds });
+  const requestDocumentId = crypto.createHash('sha256').update(`${context.auth.uid}:${requestId}`).digest('hex');
+  const requestRef = admin.firestore().doc(`smsSendRequests/${requestDocumentId}`);
+  try {
+    await requestRef.create({
+      ...base,
+      status: 'processing',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    if (error.code !== 6 && error.code !== 'already-exists') throw error;
+    const existing = await requestRef.get();
+    const data = existing.data() || {};
+    if (data.status === 'accepted') {
+      return { success: true, messageId: data.messageId || '', status: data.providerStatus || 'queued', duplicate: true };
+    }
+    throw new functions.https.HttpsError('aborted', 'This message request is already being processed. Check the conversation before trying again.');
+  }
+
+  let response;
+  try {
+    response = await axios.post(`${TELNYX_API_BASE}/messages`, {
+      from: fromNumber,
+      to,
+      text,
+      type: 'SMS',
+      messaging_profile_id: String(telnyx.messaging_profile_id),
+      auto_detect: true,
+      use_profile_webhooks: true,
+      client_state: Buffer.from(JSON.stringify({ requestDocumentId })).toString('base64'),
+    }, {
+      headers: { Authorization: `Bearer ${telnyx.api_key}`, 'Content-Type': 'application/json' },
+      timeout: 15_000,
+    });
+  } catch (error) {
+    const providerCode = String(error.response?.data?.errors?.[0]?.code || 'provider_error');
+    functions.logger.error('Business SMS send failed.', {
+      code: providerCode,
+      status: error.response?.status || null,
+      to: maskPhone(to),
+      tripId: trip.id,
+    });
+    await requestRef.set({
+      status: 'failed',
+      providerCode,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true }).catch(() => null);
+    await admin.firestore().collection('smsLogs').add({
+      ...base,
+      from: fromNumber,
+      status: 'failed',
+      failureCode: providerCode,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => null);
+    throw new functions.https.HttpsError('unavailable', 'The business SMS was not delivered. No message was sent from your personal iPhone.');
+  }
+
+  const providerData = response.data?.data || {};
+  const messageId = String(providerData.id || '').trim();
+  const status = String(providerData.to?.[0]?.status || 'queued');
+  if (!messageId) {
+    await requestRef.set({
+      status: 'provider_accepted_untracked',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    throw new functions.https.HttpsError('data-loss', 'Telnyx accepted the message but returned no tracking ID. Do not resend; ask dispatch to verify delivery.');
+  }
+
+  try {
+    const batch = admin.firestore().batch();
+    const logRef = admin.firestore().doc(`smsLogs/outbound_${messageId}`);
+    const conversationRef = admin.firestore().doc(`smsConversations/${smsConversationId(to)}`);
+    batch.set(logRef, {
+      ...base,
+      from: fromNumber,
+      messageId,
+      status,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    batch.set(conversationRef, {
+      phone: to,
+      tripId: trip.id,
+      tenantId: base.tenantId,
+      participantUserIds: admin.firestore.FieldValue.arrayUnion(...base.participantUserIds),
+      lastOutboundMessageId: messageId,
+      lastOutboundAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    batch.set(requestRef, {
+      status: 'accepted',
+      messageId,
+      providerStatus: status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await batch.commit();
+    functions.logger.info('Business SMS accepted.', {
       messageId,
       status,
       to: maskPhone(to),
       from: maskPhone(fromNumber),
+      actorId: context.auth.uid,
+      tripId: trip.id,
     });
-    if (tripId) {
-      await admin.firestore().collection("smsLogs").add({
-        tripId,
-        direction: "outbound",
-        to,
-        from: fromNumber,
-        text,
-        status,
-        messageId,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
     return { success: true, messageId, status };
-  } catch (err) {
-    const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
-    const errCode = err.response?.data?.errors?.[0]?.code || "";
-    functions.logger.error("Telnyx send error:", {
-      code: errCode,
-      status: err.response?.status || null,
-      hasProviderDetail: Boolean(errDetail),
+  } catch (error) {
+    functions.logger.error('Business SMS was accepted but conversation persistence failed.', {
+      code: error.code || 'unknown',
+      to: maskPhone(to),
+      tripId: trip.id,
+      messageId,
     });
-    throw new functions.https.HttpsError("internal", errDetail || "Failed to send SMS.");
+    await requestRef.set({
+      status: 'accepted',
+      messageId,
+      providerStatus: status,
+      conversationWritePending: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true }).catch(() => null);
+    return {
+      success: true,
+      messageId,
+      status,
+      warning: 'The provider accepted the message. Conversation tracking will reconcile from its delivery receipt.',
+    };
   }
-});
+}
+
+async function sendClientSmsHandler(data, context) {
+  const actor = await requireRole(context, ['admin', 'dispatcher', 'driver']);
+  const to = normalizePhone(data?.to);
+  const text = normalizeClientSmsText(data?.text);
+  const requestId = String(data?.requestId || '').trim();
+  if (!to || !text) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid client phone and message are required.');
+  }
+  if (text.length > 1_000) {
+    throw new functions.https.HttpsError('invalid-argument', 'Client SMS messages cannot exceed 1,000 characters.');
+  }
+  if (!/^[A-Za-z0-9-]{8,120}$/.test(requestId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid message request ID is required.');
+  }
+  const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor, context });
+  return sendClientSmsMessage({ actor, context, trip, to, text, requestId });
+}
+
+exports.sendClientSms = functions
+  .runWith({ secrets: [runtimeConfigSecret] })
+  .https.onCall(sendClientSmsHandler);
+
+// Compatibility aliases for installed clients. All three names execute the
+// single authoritative sender above; no native/personal-SMS fallback exists.
+exports.sendSms = functions
+  .runWith({ secrets: [runtimeConfigSecret] })
+  .https.onCall(sendClientSmsHandler);
 
 exports.sendDriverSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
-  .https.onCall(async (data, context) => {
-  const actor = await requireRole(context, ["admin", "dispatcher", "driver"]);
-  const { to: rawTo, text, tripId } = data;
-  const to = normalizePhone(rawTo);
-  if (!to || !text) {
-    throw new functions.https.HttpsError("invalid-argument", "Both 'to' and 'text' are required.");
-  }
-  if (actor.role === "driver") {
-    const safeTripId = String(tripId || "").trim();
-    if (!safeTripId) {
-      throw new functions.https.HttpsError("failed-precondition", "A trip is required before messaging a client.");
-    }
-    const tripSnapshot = await admin.firestore().doc(`trips/${safeTripId}`).get();
-    if (!tripSnapshot.exists) {
-      throw new functions.https.HttpsError("not-found", "The assigned trip could not be found.");
-    }
-    const access = validateDriverSmsAccess({
-      trip: tripSnapshot.data(),
-      actor,
-      uid: context.auth.uid,
-      tokenEmail: context.auth.token?.email || "",
-      recipient: to,
-    });
-    if (access.reason === "client_phone_unverified") {
-      throw new functions.https.HttpsError("failed-precondition", "The client phone needs dispatcher review before messaging.");
-    }
-    if (!access.allowed) {
-      throw new functions.https.HttpsError("permission-denied", "This trip or client phone is not assigned to your account.");
-    }
-  }
-  try {
-    const telnyx = getTelnyxConfig();
-    const apiKey = telnyx.api_key;
-    const fromNumber = telnyx.from || "+18552223330";
-    const messagingProfileId = telnyx.messaging_profile_id || null;
-    if (!apiKey) {
-      throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
-    }
-    const body = { from: fromNumber, to, text, type: "SMS" };
-    if (messagingProfileId) {
-      body.messaging_profile_id = messagingProfileId;
-    }
-    const res = await axios.post(
-      `${TELNYX_API_BASE}/messages`,
-      body,
-      { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } }
-    );
-    const telnyxData = res.data?.data || {};
-    const messageId = telnyxData.id;
-    const status = telnyxData.to?.[0]?.status || "queued";
-    functions.logger.info("Telnyx driver SMS:", {
-      messageId,
-      status,
-      to: maskPhone(to),
-      from: maskPhone(fromNumber),
-      driverId: context.auth.uid,
-    });
-    if (tripId) {
-      await admin.firestore().collection("smsLogs").add({
-        tripId,
-        driverId: context.auth.uid,
-        direction: "outbound",
-        to,
-        from: fromNumber,
-        text,
-        status,
-        messageId,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-    return { success: true, messageId, status };
-  } catch (err) {
-    const errCode = err.response?.data?.errors?.[0]?.code || "";
-    functions.logger.error("Telnyx driver SMS error:", {
-      code: errCode,
-      status: err.response?.status || null,
-      to: maskPhone(to),
-      tripId: String(tripId || "").slice(0, 80),
-    });
-    throw new functions.https.HttpsError("unavailable", "The message service is temporarily unavailable.");
-  }
-});
+  .https.onCall(sendClientSmsHandler);
 
 exports.sendBulkSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
   .https.onCall(async (data, context) => {
-  await requireAdminOrDispatcher(context);
+  const actor = await requireAdminOrDispatcher(context);
   const { messages } = data;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     throw new functions.https.HttpsError("invalid-argument", "'messages' must be a non-empty array.");
   }
-  const telnyx = getTelnyxConfig();
-  const apiKey = telnyx.api_key;
-  const fromNumber = telnyx.from || "+18552223330";
-  const messagingProfileId = telnyx.messaging_profile_id || null;
-  if (!apiKey) {
-    throw new functions.https.HttpsError("failed-precondition", "Telnyx API key not configured.");
+  if (messages.length > 100) {
+    throw new functions.https.HttpsError('invalid-argument', 'Send no more than 100 client messages at one time.');
   }
   const results = [];
   let sent = 0;
   let failed = 0;
   let firstError = null;
-  for (const { to: rawTo, text, metadata } of messages) {
-    const to = normalizePhone(rawTo);
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index] || {};
+    const to = normalizePhone(message.to);
+    const text = normalizeClientSmsText(message.text);
+    const tripId = String(message.metadata?.tripId || '').trim();
+    const requestId = String(message.requestId || `${Date.now()}-${index}-${tripId}`).trim();
     try {
-      const body = { from: fromNumber, to, text, type: "SMS" };
-      if (messagingProfileId) {
-        body.messaging_profile_id = messagingProfileId;
-      }
-      const res = await axios.post(
-        `${TELNYX_API_BASE}/messages`,
-        body,
-        { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } }
-      );
-      const telnyxData = res.data?.data || {};
-      const messageId = telnyxData.id;
-      const status = telnyxData.to?.[0]?.status || "queued";
-      results.push({ to, success: true, messageId });
+      if (!to || !text) throw new functions.https.HttpsError('invalid-argument', 'A valid client phone and message are required.');
+      const trip = await requireSmsTrip({ tripId, to, actor, context });
+      const result = await sendClientSmsMessage({ actor, context, trip, to, text, requestId });
+      results.push({ tripId, success: true, messageId: result.messageId, status: result.status });
       sent++;
-      if (metadata?.tripId) {
-        await admin.firestore().collection("smsLogs").add({
-          tripId: metadata.tripId,
-          direction: "outbound",
-          to,
-          from: fromNumber,
-          text,
-          status,
-          messageId,
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.errors?.[0]?.detail || err.message;
-      functions.logger.error("Bulk SMS send failed.", {
-        to: maskPhone(to),
-        status: err.response?.status || null,
-        code: err.response?.data?.errors?.[0]?.code || null,
-      });
-      results.push({ to, success: false, error: errorMsg });
+    } catch (error) {
+      const errorMessage = String(error.message || 'Message failed.');
+      results.push({ tripId, success: false, error: errorMessage });
       failed++;
-      if (!firstError) firstError = errorMsg;
+      if (!firstError) firstError = errorMessage;
     }
   }
   return {
@@ -842,6 +1043,58 @@ function verifyTelnyxSignature(req) {
   return verifyTelnyxWebhookSignature({ publicKey, signature, timestamp, payload });
 }
 
+async function notifySmsParticipants(participantUserIds, tripId) {
+  const userIds = [...new Set((participantUserIds || []).map(String).filter(Boolean))];
+  if (!userIds.length) return;
+  const users = await Promise.all(userIds.map((uid) => admin.firestore().doc(`users/${uid}`).get()));
+  const recipients = users.filter((snapshot) => snapshot.exists && snapshot.data()?.fcmToken);
+  const tokens = recipients.map((snapshot) => snapshot.data().fcmToken);
+  if (!tokens.length) return;
+  const response = await admin.messaging().sendEachForMulticast({
+    tokens,
+    data: {
+      type: 'client_sms_reply',
+      title: 'New client SMS reply',
+      body: 'Open Agape Care to review the client message.',
+      tripId: String(tripId || ''),
+    },
+    webpush: {
+      headers: { Urgency: 'high' },
+      notification: {
+        title: 'New client SMS reply',
+        body: 'Open Agape Care to review the client message.',
+        icon: '/agape.png',
+        badge: '/agape.png',
+        tag: `client-sms-${tripId || 'inbox'}`,
+        renotify: true,
+      },
+      fcmOptions: { link: '/' },
+    },
+  });
+  const invalidTokens = [];
+  response.responses.forEach((entry, index) => {
+    if (!entry.success && ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(entry.error?.code)) {
+      invalidTokens.push(tokens[index]);
+    }
+  });
+  await Promise.all(recipients.map((snapshot) => (
+    invalidTokens.includes(snapshot.data()?.fcmToken)
+      ? snapshot.ref.update({ fcmToken: admin.firestore.FieldValue.delete() })
+      : null
+  )));
+}
+
+exports.markClientSmsRead = functions.https.onCall(async (data, context) => {
+  const actor = await requireRole(context, ['admin', 'dispatcher', 'driver']);
+  const to = normalizePhone(data?.phone);
+  const trip = await requireSmsTrip({ tripId: data?.tripId, to, actor, context });
+  await admin.firestore().doc(`trips/${trip.id}`).set({
+    clientSmsUnreadFor: admin.firestore.FieldValue.arrayRemove(context.auth.uid),
+    clientSmsLastReadAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return { success: true };
+});
+
 exports.handleInboundSms = functions
   .runWith({ secrets: [runtimeConfigSecret] })
   .https.onRequest(async (req, res) => {
@@ -858,21 +1111,64 @@ exports.handleInboundSms = functions
 
     // Handle delivery receipts (message.finalized / message.sent)
     if (eventType === "message.finalized" || eventType === "message.sent") {
-      const messageId = payload?.id || "";
-      const status = payload?.to?.[0]?.status || payload?.status || "";
+      const messageId = String(payload?.id || '');
+      const status = String(payload?.to?.[0]?.status || payload?.status || '');
       const toNumber = typeof payload?.to === "string" ? payload.to :
                        payload?.to?.[0]?.phone_number || payload?.to?.phone_number || "";
       functions.logger.info("Delivery receipt:", { messageId, status, to: maskPhone(toNumber) });
       if (messageId && status) {
-        const smsSnapshot = await admin.firestore()
-          .collection("smsLogs")
-          .where("messageId", "==", messageId)
-          .limit(1)
-          .get();
-        if (!smsSnapshot.empty) {
-          await smsSnapshot.docs[0].ref.update({ status, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-          functions.logger.info("Updated smsLog status:", { messageId, status });
+        const directLogRef = admin.firestore().doc(`smsLogs/outbound_${messageId}`);
+        const directLog = await directLogRef.get();
+        if (directLog.exists) {
+          await directLogRef.set({ status, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        } else {
+          let requestDocumentId = '';
+          try {
+            const decoded = JSON.parse(Buffer.from(String(payload?.client_state || ''), 'base64').toString('utf8'));
+            requestDocumentId = String(decoded.requestDocumentId || '');
+          } catch (_error) {
+            requestDocumentId = '';
+          }
+          const requestRef = requestDocumentId ? admin.firestore().doc(`smsSendRequests/${requestDocumentId}`) : null;
+          const requestSnapshot = requestRef ? await requestRef.get() : null;
+          if (requestSnapshot?.exists) {
+            const requestData = requestSnapshot.data() || {};
+            const batch = admin.firestore().batch();
+            batch.set(directLogRef, {
+              ...requestData,
+              from: normalizePhone(typeof payload?.from === 'string' ? payload.from : payload?.from?.phone_number),
+              messageId,
+              status,
+              timestamp: requestData.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            if (requestData.to) {
+              batch.set(admin.firestore().doc(`smsConversations/${smsConversationId(requestData.to)}`), {
+                phone: requestData.to,
+                tripId: requestData.tripId,
+                tenantId: requestData.tenantId,
+                participantUserIds: requestData.participantUserIds || [],
+                lastOutboundMessageId: messageId,
+                lastOutboundAt: requestData.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, { merge: true });
+            }
+            batch.set(requestRef, {
+              status: 'accepted',
+              providerStatus: status,
+              messageId,
+              conversationWritePending: false,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            await batch.commit();
+          } else {
+            const legacyLog = await admin.firestore().collection('smsLogs').where('messageId', '==', messageId).limit(1).get();
+            if (!legacyLog.empty) {
+              await legacyLog.docs[0].ref.set({ status, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            }
+          }
         }
+        functions.logger.info("Updated smsLog status:", { messageId, status });
       }
       res.status(200).json({ ok: true });
       return;
@@ -891,59 +1187,114 @@ exports.handleInboundSms = functions
       if (Array.isArray(val)) return val[0]?.phone_number || val[0] || "";
       return val.phone_number || val.phone || "";
     };
-    const from = extractPhone(payload.from);
-    const to = extractPhone(payload.to);
-    const text = payload.text || payload.body || "";
-    const messageId = payload.id || payload.message_id || "";
+    const from = normalizePhone(extractPhone(payload.from));
+    const to = normalizePhone(extractPhone(payload.to));
+    const text = String(payload.text || payload.body || '').trim();
+    const messageId = String(payload.id || payload.message_id || '').trim();
+    const webhookEventId = String(req.body?.data?.id || messageId).trim();
 
-    if (!from || !text) {
+    if (!from || !to || !text || !webhookEventId) {
       functions.logger.warn("Inbound SMS skipped — missing required fields", {
         hasFrom: Boolean(from),
+        hasTo: Boolean(to),
         hasText: Boolean(text),
+        hasEventId: Boolean(webhookEventId),
       });
       res.status(200).json({ ok: true, skipped: "missing fields" });
       return;
     }
 
-    await admin.firestore().collection("smsLogs").add(buildInboundSmsLog({
+    const configuredSender = normalizePhone(getTelnyxConfig().from);
+    if (!configuredSender || to !== configuredSender) {
+      functions.logger.warn('Inbound SMS ignored because it targets an unconfigured sender.', { to: maskPhone(to) });
+      res.status(200).json({ ok: true, skipped: 'unconfigured sender' });
+      return;
+    }
+
+    const inboundRef = admin.firestore().doc(`smsLogs/inbound_${crypto.createHash('sha256').update(webhookEventId).digest('hex')}`);
+    if ((await inboundRef.get()).exists) {
+      res.status(200).json({ ok: true, duplicate: true });
+      return;
+    }
+
+    const conversationKey = from;
+    const conversationRef = admin.firestore().doc(`smsConversations/${smsConversationId(from)}`);
+    let conversation = (await conversationRef.get()).data() || {};
+    if (!conversation.tripId) {
+      const legacyOutbound = await admin.firestore()
+        .collection('smsLogs')
+        .where('to', '==', from)
+        .where('direction', '==', 'outbound')
+        .orderBy('timestamp', 'desc')
+        .limit(1)
+        .get();
+      if (!legacyOutbound.empty) conversation = legacyOutbound.docs[0].data() || {};
+    }
+    const tripId = String(conversation.tripId || conversation.metadata?.tripId || '').trim();
+    const tenantId = String(conversation.tenantId || 'agape-care');
+    const participantUserIds = [...new Set((conversation.participantUserIds || [conversation.driverId, conversation.senderUserId]).map(String).filter(Boolean))];
+    const consentAction = parseSmsConsentAction(text);
+    const batch = admin.firestore().batch();
+    batch.create(inboundRef, buildInboundSmsLog({
       from,
       to,
       text,
       messageId,
       eventType,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      conversationKey,
+      tripId,
+      tenantId,
+      participantUserIds,
+      consentAction,
     }));
+    batch.set(conversationRef, {
+      phone: from,
+      tripId: tripId || null,
+      tenantId,
+      participantUserIds,
+      lastInboundMessageId: messageId,
+      lastInboundAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    if (consentAction) {
+      batch.set(admin.firestore().doc(`smsOptOuts/${smsConversationId(from)}`), {
+        phone: from,
+        optedOut: consentAction === 'opt_out',
+        source: 'telnyx_inbound_sms',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    if (tripId && participantUserIds.length) {
+      batch.set(admin.firestore().doc(`trips/${tripId}`), {
+        clientSmsLastInboundAt: admin.firestore.FieldValue.serverTimestamp(),
+        clientSmsUnreadFor: admin.firestore.FieldValue.arrayUnion(...participantUserIds),
+      }, { merge: true });
+    }
+    await batch.commit();
     functions.logger.info("Inbound SMS logged:", {
       from: maskPhone(from),
       to: maskPhone(to),
       messageId,
+      tripId: tripId || null,
+      linked: Boolean(tripId),
     });
 
     const confirmation = parseConfirmation(text);
-    if (confirmation && from) {
-      const smsSnapshot = await admin.firestore()
-        .collection("smsLogs")
-        .where("to", "==", from)
-        .where("direction", "==", "outbound")
-        .orderBy("timestamp", "desc")
-        .limit(1)
-        .get();
-
-      if (!smsSnapshot.empty) {
-        const smsData = smsSnapshot.docs[0].data();
-        const tripId = smsData.metadata?.tripId || smsData.tripId;
-        if (tripId) {
-          const updated = await updateTripConfirmationById({
-            db: admin.firestore(),
-            tripId,
-            confirmation,
-            serverTimestamp: admin.firestore.FieldValue.serverTimestamp(),
-          });
-          if (updated) functions.logger.info("Trip confirmation updated:", { tripId, confirmation });
-          else functions.logger.warn("Trip confirmation was not applied because the exact trip ID was not found.", { tripId });
-        }
-      }
+    if (!consentAction && confirmation && tripId) {
+      const updated = await updateTripConfirmationById({
+        db: admin.firestore(),
+        tripId,
+        confirmation,
+        serverTimestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      if (updated) functions.logger.info("Trip confirmation updated:", { tripId, confirmation });
+      else functions.logger.warn("Trip confirmation was not applied because the exact trip ID was not found.", { tripId });
     }
+
+    await notifySmsParticipants(participantUserIds, tripId).catch((error) => {
+      functions.logger.error('Client SMS push notification failed.', { code: error.code || 'unknown' });
+    });
 
     res.status(200).json({ ok: true });
   } catch (err) {
@@ -965,102 +1316,35 @@ exports.diagnoseTelnyx = functions
     else results.warnings++;
   };
 
+  const telnyx = getTelnyxConfig();
+  const apiKey = String(telnyx.api_key || '').trim();
+  const fromNumber = normalizePhone(telnyx.from);
+  const messagingProfileId = String(telnyx.messaging_profile_id || '').trim();
+  addCheck('Telnyx API key configured', apiKey ? 'pass' : 'fail', apiKey ? 'Secure API key is set.' : 'The secure runtime configuration has no Telnyx API key.');
+  addCheck('Business sender configured', fromNumber ? 'pass' : 'fail', fromNumber ? `Sender ${maskPhone(fromNumber)} is configured.` : 'No valid E.164 business sender is configured.');
+  addCheck('Messaging profile configured', messagingProfileId ? 'pass' : 'fail', messagingProfileId ? 'A messaging profile is configured.' : 'No messaging profile is configured.');
+  if (!apiKey || !fromNumber || !messagingProfileId) return results;
+
   try {
-    const telnyx = getTelnyxConfig();
-    const apiKey = telnyx.api_key;
-    const fromNumber = telnyx.from;
-    const messagingProfileId = telnyx.messaging_profile_id;
-
-    // 1. Check config
-    if (!apiKey) {
-      addCheck("Telnyx API key configured", "fail", "The secure AGAPE_RUNTIME_CONFIG secret does not contain a Telnyx API key.");
-    } else {
-      addCheck("Telnyx API key configured", "pass", "API key is set");
-    }
-
-    if (!fromNumber) {
-      addCheck("Telnyx from number configured", "warn", "No Telnyx sender number is configured. Using default +18552223330.");
-    } else {
-      addCheck("Telnyx from number configured", "pass", `From number: ${fromNumber}`);
-    }
-
-    if (messagingProfileId) {
-      addCheck("Messaging profile ID configured", "pass", `Profile ID: ${messagingProfileId}`);
-    } else {
-      addCheck("Messaging profile ID configured", "warn", "Not set — Telnyx will auto-detect.");
-    }
-
-    if (!apiKey) {
-      return results;
-    }
-
-    // 2. Test Telnyx API authentication
-    try {
-      const meRes = await axios.get(`${TELNYX_API_BASE}/messaging_profiles`, {
-        headers: { Authorization: `Bearer ${apiKey}` }
-      });
-      const profiles = meRes.data?.data || [];
-      addCheck("Telnyx API authentication", "pass", `Authenticated successfully. Found ${profiles.length} messaging profile(s)`);
-
-      // 3. Check messaging profiles
-      if (profiles.length === 0) {
-        addCheck("Messaging profiles exist", "fail", "No messaging profiles found. Create one in Telnyx Portal → Messaging → Messaging Profiles");
-      } else {
-        addCheck("Messaging profiles exist", "pass", `${profiles.length} profile(s) found`);
-        const hasWebhook = profiles.some(p => p.webhook_url || p.webhook_failover_url);
-        if (hasWebhook) {
-          addCheck("Webhook URL configured", "pass", "At least one profile has a webhook URL");
-        } else {
-          addCheck("Webhook URL configured", "warn", "No webhook URL set on any profile. Set to: https://us-central1-agape-95c9f.cloudfunctions.net/handleInboundSms");
-        }
-        if (messagingProfileId) {
-          const match = profiles.find(p => p.id === messagingProfileId);
-          if (match) {
-            addCheck("Configured profile ID matches", "pass", `Profile "${match.name || match.id}" found`);
-          } else {
-            addCheck("Configured profile ID matches", "warn", `Profile ID "${messagingProfileId}" not found among ${profiles.length} profiles. Check the UUID.`);
-          }
-        }
-      }
-    } catch (err) {
-      const errDetail = err.response?.data?.errors?.[0]?.detail || err.message;
-      addCheck("Telnyx API authentication", "fail", `API call failed: ${errDetail}`);
-    }
-
-    // 4. Check phone number
-    try {
-      const numParams = {};
-      numParams['filter[phone_number]'] = fromNumber;
-      const numRes = await axios.get(`${TELNYX_API_BASE}/phone_numbers`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        params: numParams
-      });
-      const numbers = numRes.data?.data || [];
-      if (numbers.length === 0) {
-        addCheck(`Number ${fromNumber} exists on account`, "fail", `Number ${fromNumber} not found in your Telnyx account. Check the number in Telnyx Portal → Numbers → My Numbers`);
-      } else {
-        const num = numbers[0];
-        const smsEnabled = num.messaging?.product === "SMS" || num.messaging?.enabled === true;
-        if (smsEnabled) {
-          addCheck(`Number ${fromNumber} SMS enabled`, "pass", "SMS is enabled on this number");
-        } else {
-          addCheck(`Number ${fromNumber} SMS enabled`, "fail", "SMS is NOT enabled on this number. In Telnyx Portal, go to Numbers → My Numbers → click the number → enable Messaging");
-        }
-        const status = num.status || "unknown";
-        addCheck(`Number status`, "pass", `Status: ${status}`);
-      }
-    } catch (err) {
-      addCheck("Phone number check", "warn", `Could not check number: ${err.response?.data?.errors?.[0]?.detail || err.message}`);
-    }
-
-    // 5. Test sending a diagnostic message
-    addCheck("TCR / Campaign status", "warn", "Cannot check TCR status via API. Go to Telnyx Portal → Messaging → Toll-Free and verify Brand + Campaign are both APPROVED. This is the #1 reason toll-free messages are queued but never delivered.");
-
-    return results;
-  } catch (err) {
-    functions.logger.error("Telnyx diagnosis error:", err);
-    throw new functions.https.HttpsError("internal", err.message || "Diagnosis failed");
+    const profileResponse = await axios.get(`${TELNYX_API_BASE}/messaging_profiles/${messagingProfileId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      timeout: 10_000,
+    });
+    const profile = profileResponse.data?.data || {};
+    addCheck('Messaging profile exists', profile.id ? 'pass' : 'fail', profile.id ? 'The configured profile exists.' : 'The configured profile was not found.');
+    const requiredWebhook = 'handleInboundSms';
+    const webhookConfigured = [profile.webhook_url, profile.webhook_failover_url].some((url) => String(url || '').includes(requiredWebhook));
+    addCheck('Inbound reply webhook', webhookConfigured ? 'pass' : 'fail', webhookConfigured ? 'Client replies are routed back to Agape Care.' : 'Set the messaging profile webhook to the deployed handleInboundSms function.');
+  } catch (error) {
+    addCheck('Messaging profile exists', 'fail', 'The configured messaging profile could not be read with this API key.');
   }
+
+  const readiness = await checkTelnyxSenderReadiness(telnyx, { force: true });
+  addCheck('Sender active in Telnyx', readiness.senderOwned ? 'pass' : 'fail', readiness.senderOwned ? `Active ${readiness.senderType.replace('_', ' ')} sender found.` : 'The configured sender is not active in this Telnyx account.');
+  addCheck('Sender assigned to profile', readiness.profileMatches ? 'pass' : 'fail', readiness.profileMatches ? 'The sender uses the configured messaging profile.' : 'Assign the sender to the configured messaging profile.');
+  addCheck('Carrier registration', readiness.campaignAssigned ? 'pass' : 'fail', readiness.campaignAssigned ? 'The sender has the required carrier registration.' : readiness.senderType === 'toll_free' ? 'Submit and complete Toll-Free Verification.' : 'Assign the sender to an approved 10DLC campaign.');
+  addCheck('Business SMS ready', readiness.ready ? 'pass' : 'fail', readiness.ready ? 'Outbound messages and inbound replies are ready.' : readiness.reason);
+  return results;
 });
 
 exports.createAssignments = functions.https.onCall(async (data, context) => {

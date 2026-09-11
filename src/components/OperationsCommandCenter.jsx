@@ -2675,6 +2675,8 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       {smsConversationTrip && (
         <SmsConversationModal
           trip={smsConversationTrip}
+          role={role}
+          allTrips={trips}
           onClose={() => setSmsConversationTrip(null)}
         />
       )}

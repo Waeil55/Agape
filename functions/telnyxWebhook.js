@@ -1,13 +1,22 @@
 const crypto = require('crypto');
 
 const CONFIRM_WORDS = ['yes', 'yea', 'yep', 'sure', 'confirm', 'confirmed', 'coming', '1', 'ok', 'okay'];
-const DENY_WORDS = ['no', 'nah', 'nope', 'cancel', 'not coming', 'not', '0', 'stop'];
+const DENY_WORDS = ['no', 'nah', 'nope', 'cancel', 'not coming', 'not', '0'];
 const CONFIRMATION_VALUES = new Set(['confirmed', 'not_coming']);
+const OPT_OUT_WORDS = new Set(['stop', 'unsubscribe', 'end', 'quit']);
+const OPT_IN_WORDS = new Set(['start', 'unstop']);
 
 function parseConfirmation(text) {
   const normalized = String(text || '').trim().toLowerCase().replace(/[^a-z0-9 ]/g, '');
   if (CONFIRM_WORDS.some((word) => normalized === word || normalized.startsWith(`${word} `))) return 'confirmed';
   if (DENY_WORDS.some((word) => normalized === word || normalized.startsWith(`${word} `))) return 'not_coming';
+  return null;
+}
+
+function parseSmsConsentAction(text) {
+  const normalized = String(text || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+  if (OPT_OUT_WORDS.has(normalized)) return 'opt_out';
+  if (OPT_IN_WORDS.has(normalized)) return 'opt_in';
   return null;
 }
 
@@ -58,6 +67,26 @@ function normalizePhone(value) {
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
   return '';
+}
+
+function smsConversationId(phone) {
+  const normalized = normalizePhone(phone);
+  return normalized ? crypto.createHash('sha256').update(normalized).digest('hex') : '';
+}
+
+function normalizeClientSmsText(value) {
+  let text = Array.from(String(value || ''), (character) => {
+    const code = character.charCodeAt(0);
+    return (code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 127
+      ? ' '
+      : character;
+  }).join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  if (!/^agape care\b/i.test(text)) text = `Agape Care: ${text}`;
+  if (!/\breply\s+stop\b/i.test(text)) text = `${text} Reply STOP to opt out.`;
+  return text;
 }
 
 function resolveCanonicalClientPhone(trip = {}) {
@@ -119,8 +148,20 @@ function validateDriverSmsAccess({ trip = {}, actor = {}, uid = '', tokenEmail =
   return { allowed: true, reason: '', clientPhone };
 }
 
-function buildInboundSmsLog({ from, to, text, messageId, eventType, timestamp }) {
-  return {
+function buildInboundSmsLog({
+  from,
+  to,
+  text,
+  messageId,
+  eventType,
+  timestamp,
+  conversationKey,
+  tripId,
+  tenantId,
+  participantUserIds = [],
+  consentAction,
+}) {
+  const log = {
     direction: 'inbound',
     from,
     to,
@@ -129,6 +170,12 @@ function buildInboundSmsLog({ from, to, text, messageId, eventType, timestamp })
     eventType: eventType || 'message.received',
     timestamp,
   };
+  if (conversationKey) log.conversationKey = conversationKey;
+  if (tripId) log.tripId = tripId;
+  if (tenantId) log.tenantId = tenantId;
+  if (participantUserIds.length) log.participantUserIds = [...new Set(participantUserIds.filter(Boolean))];
+  if (consentAction) log.consentAction = consentAction;
+  return log;
 }
 
 async function updateTripConfirmationById({
@@ -158,8 +205,11 @@ module.exports = {
   driverOwnsTrip,
   maskPhone,
   normalizePhone,
+  normalizeClientSmsText,
   parseConfirmation,
+  parseSmsConsentAction,
   resolveCanonicalClientPhone,
+  smsConversationId,
   updateTripConfirmationById,
   validateDriverSmsAccess,
   verifyTelnyxSignature,

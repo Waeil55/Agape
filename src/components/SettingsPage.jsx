@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge } from 'lucide-react';
+import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge, MessageSquare } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
-import { auth, db, doc, setDoc, onSnapshot, updatePassword } from '../config/firebase';
+import { auth, db, doc, functions, httpsCallable, setDoc, onSnapshot, updatePassword } from '../config/firebase';
 import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 import OverrideHomeAddressEditor, { verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
 import OverrideExclusionRulesEditor from './OverrideExclusionRulesEditor';
@@ -122,7 +122,7 @@ const SettingsPage = ({
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const personalSectionIds = ['profile', 'appearance', 'accessibility', 'navigation', 'notifications', 'security'];
-  if (role === 'admin' || role === 'dispatcher') personalSectionIds.push('overrides');
+  if (role === 'admin' || role === 'dispatcher') personalSectionIds.push('overrides', 'business-sms');
   if (role === 'dispatcher') personalSectionIds.unshift('activity');
   const resolvedInitialSection = personalSectionIds.includes(initialSection) ? initialSection : 'profile';
   const [activeSection, setActiveSection] = useState(() => {
@@ -151,6 +151,8 @@ const SettingsPage = ({
   const [overrideDraft, setOverrideDraft] = useState(() => normalizeOverridePolicy(overridePolicy));
   const [overrideStatus, setOverrideStatus] = useState('');
   const [overrideSaving, setOverrideSaving] = useState(false);
+  const [smsDiagnostics, setSmsDiagnostics] = useState(null);
+  const [smsDiagnosticsLoading, setSmsDiagnosticsLoading] = useState(false);
   const canSaveOverridePolicy = ['ready', 'error'].includes(overridePolicyStatus);
 
   useEffect(() => setOverrideDraft(normalizeOverridePolicy(overridePolicy)), [overridePolicy]);
@@ -175,6 +177,24 @@ const SettingsPage = ({
       setOverrideStatus(error?.message || 'Override policy could not be saved.');
     } finally {
       setOverrideSaving(false);
+    }
+  };
+
+  const runSmsDiagnostics = async () => {
+    setSmsDiagnosticsLoading(true);
+    try {
+      const diagnoseTelnyx = httpsCallable(functions, 'diagnoseTelnyx');
+      const response = await diagnoseTelnyx({});
+      setSmsDiagnostics(response.data || { checks: [], failed: 1 });
+    } catch (error) {
+      setSmsDiagnostics({
+        checks: [{ name: 'Business SMS diagnostics', status: 'fail', detail: error?.message || 'Diagnostics could not run.' }],
+        failed: 1,
+        passed: 0,
+        warnings: 0,
+      });
+    } finally {
+      setSmsDiagnosticsLoading(false);
     }
   };
 
@@ -227,6 +247,7 @@ const SettingsPage = ({
   }
   if ((role === 'admin' || role === 'dispatcher') && !personalNav.find(p => p.id === 'overrides')) {
     personalNav.push({ id: 'overrides', label: 'Override Pricing', icon: Gauge });
+    personalNav.push({ id: 'business-sms', label: 'Business SMS', icon: MessageSquare });
   }
 
   const navItems = [
@@ -236,6 +257,46 @@ const SettingsPage = ({
 
   const sectionContent = () => {
     switch (activeSection) {
+      case 'business-sms':
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-heading font-semibold text-slate-900">Business SMS health</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Verifies the company sender, messaging profile, carrier registration, and inbound reply webhook without sending a test message.</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Agape Care client messaging</p>
+                  <p className="mt-1 text-xs font-medium text-slate-500">Client texts must use one registered business number. Failed sends never fall back to a personal iPhone.</p>
+                </div>
+                <button type="button" onClick={runSmsDiagnostics} disabled={smsDiagnosticsLoading} className="flex min-h-[40px] items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                  <RefreshCw size={15} className={smsDiagnosticsLoading ? 'animate-spin' : ''} />
+                  {smsDiagnosticsLoading ? 'Checking…' : 'Run diagnostics'}
+                </button>
+              </div>
+              {smsDiagnostics && (
+                <div className="mt-4 space-y-2" role="status">
+                  {smsDiagnostics.checks?.map((check) => {
+                    const passed = check.status === 'pass';
+                    const warned = check.status === 'warn';
+                    const Icon = passed ? CheckCircle2 : warned ? AlertCircle : XCircle;
+                    return (
+                      <div key={check.name} className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${passed ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : warned ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}>
+                        <Icon size={16} className="mt-0.5 shrink-0" />
+                        <div><p className="text-xs font-bold">{check.name}</p><p className="mt-0.5 text-[11px] font-semibold opacity-80">{check.detail}</p></div>
+                      </div>
+                    );
+                  })}
+                  <p className={`pt-1 text-xs font-bold ${smsDiagnostics.failed > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {smsDiagnostics.failed > 0 ? `${smsDiagnostics.failed} required check${smsDiagnostics.failed === 1 ? '' : 's'} failed. Business SMS remains blocked until corrected.` : 'All required business SMS checks passed.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       case 'overrides': {
         const updateNumber = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.value }));
         const updateToggle = (key) => (event) => setOverrideDraft((current) => ({ ...current, [key]: event.target.checked }));

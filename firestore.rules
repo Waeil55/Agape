@@ -183,6 +183,26 @@ service cloud.firestore {
         || (document != 'overrideCostPolicy' && isAdmin());
       allow delete: if isAdmin();
     }
+    match /smsLogs/{messageId} {
+      // SMS bodies are server-authored communication records. Dispatchers can
+      // review all conversations; drivers can read only conversations in which
+      // the server recorded their authenticated UID as a participant.
+      allow read: if signedIn() && (
+        isDispatcher()
+        || (resource.data.get('participantUserIds', []) is list
+          && request.auth.uid in resource.data.get('participantUserIds', []))
+      );
+      allow create, update, delete: if false;
+    }
+    match /smsConversations/{conversationId} {
+      allow read, create, update, delete: if false;
+    }
+    match /smsOptOuts/{conversationId} {
+      allow read, create, update, delete: if false;
+    }
+    match /smsSendRequests/{requestId} {
+      allow read, create, update, delete: if false;
+    }
     match /welltrans_settings/{document} {
       allow read: if signedIn() && isDispatcher();
       allow create, update: if signedIn() && isAdmin()

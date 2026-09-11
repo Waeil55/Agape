@@ -5,9 +5,12 @@ const {
   buildInboundSmsLog,
   driverOwnsTrip,
   maskPhone,
+  normalizeClientSmsText,
   normalizePhone,
   parseConfirmation,
+  parseSmsConsentAction,
   resolveCanonicalClientPhone,
+  smsConversationId,
   updateTripConfirmationById,
   validateDriverSmsAccess,
   verifyTelnyxSignature,
@@ -17,6 +20,24 @@ test('confirmation parsing is deterministic', () => {
   assert.equal(parseConfirmation('Yes, I am coming'), 'confirmed');
   assert.equal(parseConfirmation('NO - cancel it'), 'not_coming');
   assert.equal(parseConfirmation('Please call me'), null);
+  assert.equal(parseConfirmation('STOP'), null);
+  assert.equal(parseSmsConsentAction('STOP'), 'opt_out');
+  assert.equal(parseSmsConsentAction('Unstop'), 'opt_in');
+  assert.equal(parseSmsConsentAction('No'), null);
+});
+
+test('outbound client text always identifies Agape Care and includes opt-out instructions', () => {
+  assert.equal(
+    normalizeClientSmsText('Hi Dana, your driver is on the way.'),
+    'Agape Care: Hi Dana, your driver is on the way. Reply STOP to opt out.',
+  );
+  assert.equal(
+    normalizeClientSmsText('Agape Care: Driver arrived. Reply STOP to opt out.'),
+    'Agape Care: Driver arrived. Reply STOP to opt out.',
+  );
+  assert.equal(normalizeClientSmsText('  '), '');
+  assert.equal(smsConversationId('(317) 555-0101'), smsConversationId('+1 317 555 0101'));
+  assert.equal(smsConversationId('bad'), '');
 });
 
 test('Telnyx verification fails closed without configuration and accepts a valid signature', () => {
@@ -49,6 +70,26 @@ test('inbound log stores only the operational fields and omits the raw webhook b
   assert.equal(maskPhone('+1 (317) 555-0101'), '***0101');
   assert.equal(normalizePhone('(317) 555-0101'), '+13175550101');
   assert.equal(normalizePhone('123'), '');
+});
+
+test('linked inbound logs carry only server-resolved conversation access fields', () => {
+  const log = buildInboundSmsLog({
+    from: '+13175550101',
+    to: '+13175550102',
+    text: 'Yes',
+    messageId: 'message-2',
+    eventType: 'message.received',
+    timestamp: 'server-time',
+    conversationKey: '+13175550101',
+    tripId: 'trip-1',
+    tenantId: 'agape-care',
+    participantUserIds: ['driver-auth-1'],
+    consentAction: null,
+  });
+  assert.equal(log.tripId, 'trip-1');
+  assert.deepEqual(log.participantUserIds, ['driver-auth-1']);
+  assert.equal(log.conversationKey, '+13175550101');
+  assert.equal(Object.hasOwn(log, 'consentAction'), false);
 });
 
 test('driver SMS access requires the assigned trip and its canonical client phone', () => {

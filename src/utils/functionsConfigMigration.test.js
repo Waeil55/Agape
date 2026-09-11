@@ -12,7 +12,9 @@ describe('Cloud Functions secure configuration', () => {
   });
 
   it.each([
+    'sendClientSms',
     'sendSms',
+    'sendDriverSms',
     'sendBulkSms',
     'handleInboundSms',
     'diagnoseTelnyx',

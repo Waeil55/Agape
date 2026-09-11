@@ -1,172 +1,316 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Send, Loader2, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  Loader2,
+  MessageCircle,
+  MessageSquare,
+  Send,
+  ShieldCheck,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db, collection, query, where, orderBy, getDocs } from '../config/firebase';
 import { limit } from 'firebase/firestore';
+import {
+  auth,
+  collection,
+  db,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from '../config/firebase';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
+import {
+  buildQuickSmsText,
+  prepareClientSmsText,
+  QUICK_SMS_TEMPLATES,
+  suggestedQuickSmsTemplateId,
+} from '../utils/clientSms';
 
-const DEFAULT_TEMPLATE = `Hi {patient}, this is Agape Care confirming your trip on {date} at {time}. Reply YES to confirm or NO to cancel. Call 317-777-7707 if you have questions.`;
+const MAX_CONVERSATION_MESSAGES = 250;
 
-const SmsConversationModal = ({ trip, onClose }) => {
+function normalizePhone(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  return '';
+}
+
+function timestampMillis(value) {
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  const parsed = new Date(value || 0).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMessageTime(value) {
+  const millis = timestampMillis(value);
+  if (!millis) return '';
+  return new Date(millis).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function deliveryMeta(message) {
+  if (message.direction !== 'outbound') return null;
+  const status = String(message.status || 'queued').toLowerCase();
+  if (['delivered', 'delivery_success'].includes(status)) {
+    return { label: 'Delivered', icon: CheckCircle2, className: 'text-emerald-200' };
+  }
+  if (['failed', 'delivery_failed', 'delivery_unconfirmed', 'expired', 'undeliverable'].includes(status)) {
+    return { label: 'Not delivered', icon: XCircle, className: 'text-rose-200' };
+  }
+  if (status === 'sent') return { label: 'Sent', icon: CheckCircle2, className: 'text-blue-200' };
+  return { label: 'Queued', icon: Clock3, className: 'text-blue-200' };
+}
+
+function belongsToConversation(message, phone, tripId) {
+  return message.conversationKey === phone
+    || normalizePhone(message.from) === phone
+    || normalizePhone(message.to) === phone
+    || String(message.tripId || '') === String(tripId || '');
+}
+
+const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
   const [messages, setMessages] = useState([]);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showTemplate, setShowTemplate] = useState(!messages.length);
+  const [loadError, setLoadError] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [showTemplates, setShowTemplates] = useState(true);
   const bottomRef = useRef(null);
-
-  const normalizePhone = (raw) => {
-    if (!raw) return raw;
-    const digits = raw.replace(/\D/g, "");
-    if (digits.length === 11 && digits.startsWith("1")) return "+" + digits;
-    if (digits.length === 10) return "+1" + digits;
-    return "+" + digits;
-  };
-  const phone = normalizePhone(resolveClientPhoneForTrip(trip));
-
-  const templatePreview = DEFAULT_TEMPLATE
-    .replace(/\{patient\}/g, trip.patient || 'Client')
-    .replace(/\{time\}/g, trip.time || '')
-    .replace(/\{date\}/g, trip.date || '')
-    .replace(/\{pickup\}/g, trip.pickup || '')
-    .replace(/\{dropoff\}/g, trip.dropoff || '');
+  const phone = useMemo(
+    () => normalizePhone(resolveClientPhoneForTrip(trip, allTrips)),
+    [allTrips, trip],
+  );
+  const isDriver = String(role || '').toLowerCase() === 'driver';
+  const currentUid = auth.currentUser?.uid || '';
+  const suggestedTemplateId = useMemo(() => suggestedQuickSmsTemplateId(trip), [trip]);
 
   useEffect(() => {
-    if (!phone) { setLoading(false); return; }
-    const fetch = async () => {
-      try {
-        const q1 = query(collection(db, 'smsLogs'), where('tripId', '==', trip.id), orderBy('timestamp', 'desc'), limit(50));
-        const q2 = query(collection(db, 'smsLogs'), where('to', '==', phone), orderBy('timestamp', 'desc'), limit(50));
-        const q3 = query(collection(db, 'smsLogs'), where('from', '==', phone), orderBy('timestamp', 'desc'), limit(50));
-        const [s1, s2, s3] = await Promise.all([getDocs(q1), getDocs(q2), getDocs(q3)]);
-        const seen = new Set();
-        const all = [...s1.docs, ...s2.docs, ...s3.docs]
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(m => { const k = m.id || m.messageId; if (seen.has(k)) return false; seen.add(k); return true; })
-          .sort((a, b) => {
-            const ta = a.timestamp?.toMillis?.() || a.timestamp || 0;
-            const tb = b.timestamp?.toMillis?.() || b.timestamp || 0;
-            return ta - tb;
-          });
-        setMessages(all);
-        if (all.length) setShowTemplate(false);
-      } catch (e) { console.error('Failed to load SMS history:', e); }
+    if (!phone || (isDriver && !currentUid)) {
+      setMessages([]);
+      setLoading(false);
+      return undefined;
+    }
+
+    setLoading(true);
+    setLoadError('');
+    const snapshots = new Map();
+    const sources = isDriver
+      ? [
+          query(
+            collection(db, 'smsLogs'),
+            where('participantUserIds', 'array-contains', currentUid),
+            where('conversationKey', '==', phone),
+            orderBy('timestamp', 'desc'),
+            limit(MAX_CONVERSATION_MESSAGES),
+          ),
+        ]
+      : [
+          query(collection(db, 'smsLogs'), where('conversationKey', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
+          query(collection(db, 'smsLogs'), where('tripId', '==', trip.id), orderBy('timestamp', 'desc'), limit(100)),
+          query(collection(db, 'smsLogs'), where('to', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
+          query(collection(db, 'smsLogs'), where('from', '==', phone), orderBy('timestamp', 'desc'), limit(100)),
+        ];
+
+    const publish = () => {
+      const unique = new Map();
+      snapshots.forEach((docs) => docs.forEach((message) => {
+        if (belongsToConversation(message, phone, trip.id)) unique.set(message.id, message);
+      }));
+      setMessages([...unique.values()].sort((a, b) => timestampMillis(a.timestamp) - timestampMillis(b.timestamp)));
       setLoading(false);
     };
-    fetch();
-  }, [trip.id, phone]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+    const unsubscribes = sources.map((source, index) => onSnapshot(source, (snapshot) => {
+      snapshots.set(index, snapshot.docs.map((document) => ({ id: document.id, ...document.data() })));
+      publish();
+    }, (error) => {
+      console.error('[clientSms] Conversation listener failed:', error?.code || error?.message || error);
+      setLoadError('Messages could not be loaded. Check your connection and try again.');
+      setLoading(false);
+    }));
 
-  const handleSend = async (text) => {
-    const msg = (text || replyText).trim();
-    if (!msg || sending || !phone) return;
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+  }, [currentUid, isDriver, phone, trip.id]);
+
+  useEffect(() => {
+    if (!phone || !trip.id) return;
+    const markClientSmsRead = httpsCallable(getFunctions(), 'markClientSmsRead');
+    markClientSmsRead({ tripId: trip.id, phone }).catch((error) => {
+      console.warn('[clientSms] Could not mark conversation read:', error?.code || error?.message || error);
+    });
+  }, [messages.length, phone, trip.id]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth', block: 'end' });
+  }, [loading, messages]);
+
+  const handleSend = async (message) => {
+    const preparedText = prepareClientSmsText(message ?? replyText, trip);
+    if (!preparedText || sending || !phone) return;
     setSending(true);
+    setSendError('');
     try {
-      const functions = getFunctions();
-      const sendSms = httpsCallable(functions, 'sendSms');
-      const res = await sendSms({ to: phone, text: msg, tripId: trip.id });
-      if (res.data?.success) {
-        setMessages(prev => [...prev, {
-          id: 'pending-' + Date.now(),
-          direction: 'outbound',
-          to: phone,
-          text: msg,
-          timestamp: new Date().toISOString(),
-          status: 'sent',
-        }]);
-        setReplyText('');
-      }
-    } catch (err) {
-      console.error('Send failed:', err);
+      const sendClientSms = httpsCallable(getFunctions(), 'sendClientSms');
+      const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const response = await sendClientSms({
+        to: phone,
+        text: preparedText,
+        tripId: trip.id,
+        requestId,
+      });
+      if (!response.data?.success) throw new Error('The message was not accepted by the business SMS service.');
+      setReplyText('');
+      setShowTemplates(false);
+    } catch (error) {
+      const messageText = String(error?.message || 'The message could not be sent.').replace(/^Firebase:\s*/i, '');
+      setSendError(messageText);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-  };
-
-  const formatTime = (ts) => {
-    if (!ts) return '';
-    const d = ts?.toMillis ? ts.toDate() : new Date(ts);
-    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      void handleSend();
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-sm relative z-10 border border-slate-200 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <MessageSquare size={16} className="text-blue-600 shrink-0" />
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-slate-900 truncate">{trip.patient || 'Client'}</h3>
-              <p className="text-[10px] text-slate-500">{phone || 'No phone'}</p>
+    <div className="fixed inset-0 z-[200] flex items-end justify-center overflow-hidden md:items-center md:p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <section
+        aria-label={`SMS conversation with ${trip.patient || 'client'}`}
+        className="relative z-10 flex max-h-[88dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-3xl rounded-b-none border border-slate-200 bg-white shadow-xl md:h-[min(82vh,760px)] md:rounded-b-3xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="shrink-0 border-b border-slate-100 bg-white px-4 pb-3 pt-2 md:pt-3">
+          <div className="mb-2 flex justify-center md:hidden"><span className="h-1 w-10 rounded-full bg-slate-300" /></div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><MessageSquare size={18} /></span>
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold text-slate-900">{trip.patient || 'Client'}</h3>
+                <p className="truncate text-xs font-medium text-slate-500">Agape Care business SMS · {phone || 'No verified client phone'}</p>
+              </div>
             </div>
+            <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200" aria-label="Close SMS conversation"><X size={17} /></button>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors shrink-0"><X size={16} className="text-slate-500" /></button>
-        </div>
+          <div className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
+            <ShieldCheck size={14} className="shrink-0" />
+            <span>Messages and client replies stay in this business conversation. Your personal iPhone Messages app is not used.</span>
+          </div>
+        </header>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[200px]">
-          <button onClick={() => setShowTemplate(!showTemplate)} className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors text-xs font-semibold">
-            <span>Send confirmation message</span>
-            {showTemplate ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        <div data-scroll-region="client-sms-conversation" className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <button type="button" onClick={() => setShowTemplates((value) => !value)} className="flex w-full items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 hover:bg-blue-100">
+            <span>Quick messages</span>
+            {showTemplates ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
 
-          {showTemplate && (
-            <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
-              <p className="text-[10px] leading-relaxed text-slate-700 whitespace-pre-wrap">{templatePreview}</p>
-              <button onClick={() => handleSend(templatePreview)} disabled={sending || !phone} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white font-bold rounded-lg text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                Send confirmation
-              </button>
+          {showTemplates && (
+            <div className="space-y-1.5 rounded-xl border border-slate-200 bg-white p-2">
+              {QUICK_SMS_TEMPLATES.map((template) => {
+                const preview = buildQuickSmsText(template, trip);
+                const suggested = suggestedTemplateId === template.id;
+                return (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => void handleSend(preview)}
+                    disabled={sending || !phone}
+                    className="flex w-full items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <MessageCircle size={15} className="mt-0.5 shrink-0 text-blue-600" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-900">{template.label}</span>
+                        {suggested && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">Suggested</span>}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-medium leading-relaxed text-slate-500">{preview}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {loadError && (
+            <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" /> {loadError}
             </div>
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
+            <div className="flex items-center justify-center py-8"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
           ) : messages.length === 0 ? (
-            <div className="text-center py-6">
-              <MessageSquare size={24} className="mx-auto text-slate-300 mb-2" />
-              <p className="text-xs text-slate-400">No messages yet</p>
+            <div className="py-6 text-center">
+              <MessageSquare size={25} className="mx-auto mb-2 text-slate-300" />
+              <p className="text-xs font-semibold text-slate-500">No business messages yet</p>
+              <p className="mt-1 text-[11px] font-medium text-slate-400">Choose a quick message or write one below.</p>
             </div>
           ) : (
             <>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 pt-1">History</p>
-              {messages.map(m => (
-                <div key={m.id || m.messageId} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-xl px-3.5 py-2 ${m.direction === 'outbound' ? 'bg-blue-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.text}</p>
-                    <p className={`text-[9px] mt-1 ${m.direction === 'outbound' ? 'text-blue-200' : 'text-slate-400'}`}>
-                      {formatTime(m.timestamp)}
-                      {m.direction === 'outbound' && (m.status === 'queued' ? ' • queued' : m.status === 'sent' ? ' • sent' : '')}
-                    </p>
+              <p className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Conversation</p>
+              {messages.map((message) => {
+                const delivery = deliveryMeta(message);
+                const DeliveryIcon = delivery?.icon;
+                const outbound = message.direction === 'outbound';
+                return (
+                  <div key={message.id || message.messageId} className={`flex ${outbound ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[84%] rounded-xl px-3.5 py-2 ${outbound ? 'rounded-br-md bg-blue-600 text-white' : 'rounded-bl-md bg-slate-100 text-slate-800'}`}>
+                      <p className="whitespace-pre-wrap text-xs font-medium leading-relaxed">{message.text}</p>
+                      <p className={`mt-1 flex items-center gap-1 text-[9px] font-semibold ${outbound ? delivery?.className || 'text-blue-200' : 'text-slate-400'}`}>
+                        <span>{formatMessageTime(message.timestamp)}</span>
+                        {delivery && <><span>·</span><DeliveryIcon size={10} /><span>{delivery.label}</span></>}
+                      </p>
+                      {outbound && delivery?.label === 'Not delivered' && (
+                        <p className="mt-1 text-[10px] font-semibold text-rose-100">This message did not reach the client.</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
           <div ref={bottomRef} />
         </div>
 
-        {phone && (
-          <div className="border-t border-slate-100 p-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <input
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a custom message..."
-                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-400"
-              />
-              <button onClick={() => handleSend()} disabled={!replyText.trim() || sending} className="p-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0">
-                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-              </button>
+        <footer className="shrink-0 border-t border-slate-100 bg-white p-3 pb-[calc(.75rem+env(safe-area-inset-bottom,0px))]">
+          {sendError && (
+            <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <span>{sendError} No personal-SMS fallback was opened.</span>
             </div>
+          )}
+          <div className="flex items-end gap-2">
+            <textarea
+              value={replyText}
+              onChange={(event) => setReplyText(event.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={!phone || sending}
+              placeholder={phone ? 'Write a message…' : 'Verified client phone required'}
+              rows={2}
+              className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 disabled:bg-slate-100"
+            />
+            <button type="button" onClick={() => void handleSend()} disabled={!replyText.trim() || sending || !phone} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send business SMS">
+              {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+            </button>
           </div>
-        )}
-      </div>
+          <p className="mt-1.5 text-[10px] font-medium text-slate-400">Agape Care identification and opt-out instructions are added automatically.</p>
+        </footer>
+      </section>
     </div>
   );
 };
