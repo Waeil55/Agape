@@ -26,6 +26,7 @@ const {
   verifyTelnyxSignature: verifyTelnyxWebhookSignature,
 } = require("./telnyxWebhook");
 const { evaluateSmsRequestState } = require('./smsRequestState');
+const { parseTollFreeVerification } = require('./telnyxReadiness');
 
 function resolveRuntimeProjectId() {
   if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
@@ -51,6 +52,7 @@ admin.storage = getStorage;
 
 const TELNYX_API_BASE = "https://api.telnyx.com/v2";
 const AGAPE_BUSINESS_SMS_NUMBER = "+18552223330";
+const AGAPE_MESSAGING_PROFILE_NAME = "Agape";
 const runtimeConfigSecret = defineSecret("AGAPE_RUNTIME_CONFIG");
 
 function getRuntimeConfig() {
@@ -646,8 +648,10 @@ async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
     senderType: 'unknown',
     senderOwned: false,
     profileMatches: false,
-    campaignAssigned: false,
+    carrierRegistered: false,
     verificationStatus: '',
+    verificationRequestId: '',
+    verificationReason: '',
     reason: '',
   };
   if (!apiKey || !fromNumber || !messagingProfileId) {
@@ -701,20 +705,19 @@ async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
         params: { phone_number: fromNumber, page: 1, page_size: 25 },
         timeout: 10_000,
       });
-      const verificationRows = Array.isArray(verificationResponse.data?.records)
-        ? verificationResponse.data.records
-        : telnyxDataRows(verificationResponse);
-      const verificationStatuses = [...new Set(verificationRows
-        .map((entry) => String(entry.verificationStatus || entry.status || '').trim().toLowerCase())
-        .filter(Boolean))];
-      result.verificationStatus = verificationStatuses.join(', ');
-      const verified = verificationStatuses.includes('verified');
-      result.campaignAssigned = verified;
+      const verification = parseTollFreeVerification(verificationResponse, fromNumber);
+      result.verificationStatus = verification?.status || '';
+      result.verificationRequestId = verification?.id || '';
+      result.verificationReason = verification?.reason || '';
+      const verified = verification?.normalizedStatus === 'verified';
+      result.carrierRegistered = verified;
       if (!verified) {
-        result.reason = verificationStatuses.includes('waiting for customer')
-          ? `Toll-Free Verification for ${AGAPE_BUSINESS_SMS_NUMBER} is waiting for customer information in Telnyx. Complete and submit it before sending.`
+        const requestLabel = result.verificationRequestId ? ` request ${result.verificationRequestId}` : '';
+        const action = result.verificationReason ? ` Telnyx requires: ${result.verificationReason}` : '';
+        result.reason = verification?.normalizedStatus === 'waiting for customer'
+          ? `Toll-Free Verification${requestLabel} is Waiting For Customer.${action}`
           : result.verificationStatus
-            ? `Toll-Free Verification is not ready (${result.verificationStatus}). Complete it in Telnyx before sending.`
+            ? `Toll-Free Verification${requestLabel} is not ready (${result.verificationStatus}).${action}`
             : `No Toll-Free Verification request was found for ${AGAPE_BUSINESS_SMS_NUMBER}. Create and submit one before sending.`;
       }
     } else {
@@ -723,10 +726,10 @@ async function checkTelnyxSenderReadiness(telnyx, { force = false } = {}) {
         params: { phoneNumber: fromNumber },
         timeout: 10_000,
       });
-      result.campaignAssigned = telnyxDataRows(campaignResponse).length > 0;
-      if (!result.campaignAssigned) result.reason = 'The local sender is not assigned to an approved 10DLC campaign.';
+      result.carrierRegistered = telnyxDataRows(campaignResponse).length > 0;
+      if (!result.carrierRegistered) result.reason = 'The local sender is not assigned to an approved 10DLC campaign.';
     }
-    result.ready = result.senderOwned && result.profileMatches && result.campaignAssigned;
+    result.ready = result.senderOwned && result.profileMatches && result.carrierRegistered;
   } catch (error) {
     functions.logger.error('Telnyx sender readiness check failed.', {
       status: error.response?.status || null,
@@ -1364,7 +1367,19 @@ exports.diagnoseTelnyx = functions
   .runWith({ secrets: [runtimeConfigSecret] })
   .https.onCall(async (data, context) => {
   await requireAdminOrDispatcher(context);
-  const results = { checks: [], passed: 0, failed: 0, warnings: 0 };
+  const results = {
+    checks: [],
+    passed: 0,
+    failed: 0,
+    warnings: 0,
+    ready: false,
+    blockingReason: '',
+    senderType: '',
+    profileName: '',
+    verificationRequestId: '',
+    verificationStatus: '',
+    verificationReason: '',
+  };
 
   const addCheck = (name, status, detail) => {
     results.checks.push({ name, status, detail });
@@ -1373,35 +1388,83 @@ exports.diagnoseTelnyx = functions
     else results.warnings++;
   };
 
-  const telnyx = getTelnyxConfig();
-  const apiKey = String(telnyx.api_key || '').trim();
-  const fromNumber = normalizePhone(telnyx.from);
-  const messagingProfileId = String(telnyx.messaging_profile_id || '').trim();
-  addCheck('Telnyx API key configured', apiKey ? 'pass' : 'fail', apiKey ? 'Secure API key is set.' : 'The secure runtime configuration has no Telnyx API key.');
-  addCheck('Business sender configured', fromNumber ? 'pass' : 'fail', fromNumber ? `Sender ${maskPhone(fromNumber)} is configured.` : 'No valid E.164 business sender is configured.');
-  addCheck('Messaging profile configured', messagingProfileId ? 'pass' : 'fail', messagingProfileId ? 'A messaging profile is configured.' : 'No messaging profile is configured.');
-  if (!apiKey || !fromNumber || !messagingProfileId) return results;
-
   try {
+    const telnyx = getTelnyxConfig();
+    const apiKey = String(telnyx.api_key || '').trim();
+    const fromNumber = normalizePhone(telnyx.from);
+    const messagingProfileId = String(telnyx.messaging_profile_id || '').trim();
+    const configurationReady = Boolean(apiKey && fromNumber && messagingProfileId);
+    addCheck(
+      'Secure Telnyx configuration',
+      configurationReady ? 'pass' : 'fail',
+      configurationReady
+        ? `Sender ${maskPhone(fromNumber)} and its messaging profile are configured securely.`
+        : 'The secure runtime configuration must include the Telnyx API key, business sender, and messaging profile.',
+    );
+    if (!configurationReady) {
+      results.blockingReason = 'Secure Telnyx configuration is incomplete.';
+      return results;
+    }
+
     const profileResponse = await axios.get(`${TELNYX_API_BASE}/messaging_profiles/${messagingProfileId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       timeout: 10_000,
     });
     const profile = profileResponse.data?.data || {};
-    addCheck('Messaging profile exists', profile.id ? 'pass' : 'fail', profile.id ? 'The configured profile exists.' : 'The configured profile was not found.');
+    results.profileName = String(profile.name || '').trim();
+    const correctProfile = Boolean(profile.id) && results.profileName === AGAPE_MESSAGING_PROFILE_NAME;
+    addCheck(
+      'Messaging profile',
+      correctProfile ? 'pass' : 'fail',
+      correctProfile
+        ? `Using the selected Telnyx profile “${AGAPE_MESSAGING_PROFILE_NAME}”.`
+        : profile.id
+          ? `The configured profile is “${results.profileName || 'unnamed'}”; change it to “${AGAPE_MESSAGING_PROFILE_NAME}”.`
+          : 'The configured messaging profile was not found.',
+    );
     const requiredWebhook = 'handleInboundSms';
     const webhookConfigured = [profile.webhook_url, profile.webhook_failover_url].some((url) => String(url || '').includes(requiredWebhook));
     addCheck('Inbound reply webhook', webhookConfigured ? 'pass' : 'fail', webhookConfigured ? 'Client replies are routed back to Agape Care.' : 'Set the messaging profile webhook to the deployed handleInboundSms function.');
-  } catch (error) {
-    addCheck('Messaging profile exists', 'fail', 'The configured messaging profile could not be read with this API key.');
-  }
 
-  const readiness = await checkTelnyxSenderReadiness(telnyx, { force: true });
-  addCheck('Sender active in Telnyx', readiness.senderOwned ? 'pass' : 'fail', readiness.senderOwned ? `Active ${readiness.senderType.replace('_', ' ')} sender found.` : 'The configured sender is not active in this Telnyx account.');
-  addCheck('Sender assigned to profile', readiness.profileMatches ? 'pass' : 'fail', readiness.profileMatches ? 'The sender uses the configured messaging profile.' : 'Assign the sender to the configured messaging profile.');
-  addCheck('Carrier registration', readiness.campaignAssigned ? 'pass' : 'fail', readiness.campaignAssigned ? 'The sender has the required carrier registration.' : readiness.senderType === 'toll_free' ? readiness.reason : 'Assign the sender to an approved 10DLC campaign.');
-  addCheck('Business SMS ready', readiness.ready ? 'pass' : 'fail', readiness.ready ? 'Outbound messages and inbound replies are ready.' : readiness.reason);
-  return results;
+    const readiness = await checkTelnyxSenderReadiness(telnyx, { force: true });
+    results.senderType = readiness.senderType;
+    results.verificationRequestId = readiness.verificationRequestId;
+    results.verificationStatus = readiness.verificationStatus;
+    results.verificationReason = readiness.verificationReason;
+    addCheck(
+      'Business sender assignment',
+      readiness.senderOwned && readiness.profileMatches ? 'pass' : 'fail',
+      readiness.senderOwned && readiness.profileMatches
+        ? `The active ${String(readiness.senderType || 'business').replaceAll('_', ' ')} sender is assigned to “${AGAPE_MESSAGING_PROFILE_NAME}”.`
+        : readiness.reason || 'The configured sender is not active on the selected messaging profile.',
+    );
+    addCheck(
+      readiness.senderType === 'toll_free' ? 'Toll-Free Verification' : '10DLC campaign',
+      readiness.carrierRegistered ? 'pass' : 'fail',
+      readiness.carrierRegistered
+        ? 'The sender has the required carrier approval.'
+        : readiness.reason || 'Carrier registration is incomplete.',
+    );
+
+    results.ready = correctProfile && webhookConfigured && readiness.ready;
+    results.blockingReason = results.ready
+      ? ''
+      : readiness.reason
+        || (!correctProfile ? `Select the Telnyx messaging profile “${AGAPE_MESSAGING_PROFILE_NAME}”.` : '')
+        || (!webhookConfigured ? 'Configure the inbound reply webhook.' : '')
+        || 'Business SMS has a required check that needs attention.';
+    return results;
+  } catch (error) {
+    const reference = `SMS-DIAG-${Date.now().toString(36).toUpperCase()}`;
+    functions.logger.error('Business SMS diagnostic request failed.', {
+      reference,
+      status: error.response?.status || null,
+      code: error.response?.data?.errors?.[0]?.code || error.code || null,
+    });
+    addCheck('Telnyx account access', 'fail', `Telnyx could not complete the diagnostic request. Reference: ${reference}.`);
+    results.blockingReason = 'Telnyx account access could not be verified. Retry diagnostics; if it repeats, use the reference shown for support.';
+    return results;
+  }
 });
 
 exports.createAssignments = functions.https.onCall(async (data, context) => {

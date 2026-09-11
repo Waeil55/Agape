@@ -193,6 +193,8 @@ const SettingsPage = ({
         failed: 1,
         passed: 0,
         warnings: 0,
+        ready: false,
+        blockingReason: businessSmsErrorMessage(error),
       });
     } finally {
       setSmsDiagnosticsLoading(false);
@@ -263,13 +265,13 @@ const SettingsPage = ({
           <div className="space-y-4">
             <div>
               <h3 className="text-heading font-semibold text-slate-900">Business SMS health</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500">Verifies the company sender, messaging profile, carrier registration, and inbound reply webhook without sending a test message.</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Verifies the company sender, selected Telnyx profile, Toll-Free Verification, and inbound reply webhook without sending a test message.</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-900">Agape Care client messaging · {AGAPE_BUSINESS_SMS_NUMBER}</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Telnyx business conversations are restricted to administrators and dispatchers. Driver quick messages open the driver's native phone Messages app instead.</p>
+                  <p className="mt-1 text-xs font-medium text-slate-500">Telnyx profile: <span className="font-bold text-slate-700">Agape</span>. Business conversations are restricted to administrators and dispatchers; driver quick messages open the driver's native phone Messages app.</p>
                 </div>
                 <button type="button" onClick={runSmsDiagnostics} disabled={smsDiagnosticsLoading} className="flex min-h-[40px] items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
                   <RefreshCw size={15} className={smsDiagnosticsLoading ? 'animate-spin' : ''} />
@@ -278,6 +280,26 @@ const SettingsPage = ({
               </div>
               {smsDiagnostics && (
                 <div className="mt-4 space-y-2" role="status">
+                  <div className={`rounded-xl border px-3 py-3 ${smsDiagnostics.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+                    <p className="text-xs font-bold">{smsDiagnostics.ready ? 'Business SMS is ready' : 'Action required before Business SMS can send'}</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-relaxed opacity-85">
+                      {smsDiagnostics.ready
+                        ? 'The sender, profile, carrier approval, and reply webhook passed diagnostics.'
+                        : smsDiagnostics.blockingReason || 'Correct the failed check below, then run diagnostics again.'}
+                    </p>
+                    {(smsDiagnostics.verificationRequestId || smsDiagnostics.verificationStatus) && (
+                      <p className="mt-2 text-[11px] font-semibold">
+                        {smsDiagnostics.verificationRequestId && <>Request: <span className="font-mono">{smsDiagnostics.verificationRequestId}</span></>}
+                        {smsDiagnostics.verificationRequestId && smsDiagnostics.verificationStatus && <span> · </span>}
+                        {smsDiagnostics.verificationStatus && <>Status: {smsDiagnostics.verificationStatus}</>}
+                      </p>
+                    )}
+                    {!smsDiagnostics.ready && smsDiagnostics.senderType === 'toll_free' && (
+                      <a href="https://portal.telnyx.com/#/messaging/toll-free/verification" target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 items-center rounded-xl border border-amber-300 bg-white px-3 text-[11px] font-bold text-amber-900 hover:bg-amber-100">
+                        Open Toll-Free Verification
+                      </a>
+                    )}
+                  </div>
                   {smsDiagnostics.checks?.map((check) => {
                     const passed = check.status === 'pass';
                     const warned = check.status === 'warn';
@@ -290,7 +312,7 @@ const SettingsPage = ({
                     );
                   })}
                   <p className={`pt-1 text-xs font-bold ${smsDiagnostics.failed > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                    {smsDiagnostics.failed > 0 ? `${smsDiagnostics.failed} required check${smsDiagnostics.failed === 1 ? '' : 's'} failed. Business SMS remains blocked until corrected.` : 'All required business SMS checks passed.'}
+                    {smsDiagnostics.failed > 0 ? `${smsDiagnostics.failed} required check${smsDiagnostics.failed === 1 ? '' : 's'} needs attention.` : 'All required business SMS checks passed.'}
                   </p>
                 </div>
               )}

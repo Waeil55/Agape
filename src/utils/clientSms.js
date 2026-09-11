@@ -42,7 +42,7 @@ export function buildDriverQuickSmsText(template, trip = {}) {
   return `Hi ${clientFirstName(trip)}, this is your Agape Care driver. ${body}`;
 }
 
-export function businessSmsErrorMessage(error = {}) {
+export function businessSmsErrorPresentation(error = {}) {
   const code = String(error?.code || '').replace(/^functions\//i, '').toLowerCase();
   const raw = String(error?.message || '')
     .replace(/^Firebase(?:Error)?:\s*/i, '')
@@ -50,17 +50,21 @@ export function businessSmsErrorMessage(error = {}) {
     .replace(/^Error:\s*/i, '')
     .trim();
 
-  if (code === 'unauthenticated') return 'Your session expired. Sign in again before sending business SMS.';
-  if (code === 'permission-denied') return 'Business SMS is available only to administrators and dispatchers.';
-  if (code === 'aborted') return raw || 'This exact message is still processing. Check the conversation before retrying.';
+  if (code === 'unauthenticated') return { message: 'Your session expired. Sign in again before sending business SMS.', retryable: false };
+  if (code === 'permission-denied') return { message: 'Business SMS is available only to administrators and dispatchers.', retryable: false };
+  if (code === 'aborted') return { message: raw || 'This exact message is still processing. Check the conversation before retrying.', retryable: true };
   if (code === 'invalid-argument' || code === 'not-found' || code === 'failed-precondition' || code === 'data-loss') {
-    return raw || 'Business SMS is blocked until its required data is corrected.';
+    return { message: raw || 'Business SMS is blocked until its required data is corrected.', retryable: false };
   }
-  if (code === 'unavailable') return raw || 'Business SMS is temporarily unavailable. Retry the same message once.';
+  if (code === 'unavailable') return { message: raw || 'Business SMS is temporarily unavailable. Retry the same message once.', retryable: true };
   if (code === 'internal' || /^internal(?:\s*\[\d+\])?$/i.test(raw) || /internal\s*\[\d+\]/i.test(raw)) {
-    return 'Business SMS could not complete the request. Run Business SMS diagnostics in Settings, then retry the same message.';
+    return { message: 'Business SMS could not complete the request. Run Business SMS diagnostics in Settings before trying again.', retryable: false };
   }
-  return raw || 'Business SMS could not complete the request. Run Business SMS diagnostics in Settings.';
+  return { message: raw || 'Business SMS could not complete the request. Run Business SMS diagnostics in Settings.', retryable: false };
+}
+
+export function businessSmsErrorMessage(error = {}) {
+  return businessSmsErrorPresentation(error).message;
 }
 
 export function createSmsRequestId() {

@@ -27,7 +27,7 @@ import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import {
   AGAPE_BUSINESS_SMS_NUMBER,
   buildQuickSmsText,
-  businessSmsErrorMessage,
+  businessSmsErrorPresentation,
   createSmsRequestId,
   prepareClientSmsText,
   QUICK_SMS_TEMPLATES,
@@ -158,8 +158,9 @@ const SmsConversationModal = ({ trip, role, allTrips = [], onClose }) => {
       setRetryPayload(null);
       setShowTemplates(false);
     } catch (error) {
-      setRetryPayload({ text, requestId });
-      setSendError(businessSmsErrorMessage(error));
+      const failure = businessSmsErrorPresentation(error);
+      setRetryPayload(failure.retryable ? { text, requestId } : null);
+      setSendError(failure.message);
     } finally {
       setSending(false);
     }

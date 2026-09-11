@@ -35,13 +35,14 @@ describe('client SMS safety contract', () => {
     expect(smsRules).toContain('allow create, update, delete: if false;');
     expect(rules).toContain('match /smsOptOuts/{conversationId}');
     expect(functions).toContain('async function checkTelnyxSenderReadiness');
-    expect(functions).toContain("verificationStatuses.includes('waiting for customer')");
+    expect(functions).toContain("verification?.normalizedStatus === 'waiting for customer'");
     expect(functions).toContain("Unexpected business SMS failure.");
     expect(functions).toContain("exports.sendClientSms = functions");
     expect(functions).toContain("exports.markClientSmsRead = functions");
     expect(functions).toContain('const actor = await requireAdminOrDispatcher(context);');
     expect(functions).toContain('const AGAPE_BUSINESS_SMS_NUMBER = "+18552223330";');
     expect(conversation).not.toContain('No personal-SMS fallback was opened.');
+    expect(conversation).toContain('failure.retryable ? { text, requestId } : null');
     expect(conversation).toContain('Retry same message');
     expect(bulkModal).toContain('Retry ${retryMessages.length} safely');
     expect(bulkModal).toContain('setRetryMessages(messages)');

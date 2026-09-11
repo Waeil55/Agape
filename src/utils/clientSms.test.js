@@ -3,6 +3,7 @@ import {
   buildDriverQuickSmsText,
   buildQuickSmsText,
   businessSmsErrorMessage,
+  businessSmsErrorPresentation,
   prepareClientSmsText,
   QUICK_SMS_TEMPLATES,
   suggestedQuickSmsTemplateId,
@@ -46,11 +47,21 @@ describe('client SMS policy', () => {
 
   it('turns opaque callable failures into an actionable business-SMS error', () => {
     expect(businessSmsErrorMessage({ code: 'functions/internal', message: 'internal [0]' })).toBe(
-      'Business SMS could not complete the request. Run Business SMS diagnostics in Settings, then retry the same message.',
+      'Business SMS could not complete the request. Run Business SMS diagnostics in Settings before trying again.',
     );
     expect(businessSmsErrorMessage({
       code: 'functions/failed-precondition',
       message: 'The toll-free verification is waiting for customer information.',
     })).toBe('The toll-free verification is waiting for customer information.');
+  });
+
+  it('offers an idempotent retry only for temporary callable failures', () => {
+    expect(businessSmsErrorPresentation({ code: 'functions/unavailable' }).retryable).toBe(true);
+    expect(businessSmsErrorPresentation({ code: 'functions/aborted' }).retryable).toBe(true);
+    expect(businessSmsErrorPresentation({ code: 'functions/internal', message: 'internal [0]' }).retryable).toBe(false);
+    expect(businessSmsErrorPresentation({
+      code: 'functions/failed-precondition',
+      message: 'Toll-Free Verification is Waiting For Customer.',
+    }).retryable).toBe(false);
   });
 });
