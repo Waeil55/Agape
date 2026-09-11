@@ -4,6 +4,7 @@ const firebaseMock = vi.hoisted(() => ({
   db: {},
   deleteDoc: vi.fn(),
   doc: vi.fn((_db, collectionName, docId) => `${collectionName}/${docId}`),
+  getDoc: vi.fn(),
   serverTimestamp: vi.fn(() => 'server-timestamp'),
   setDoc: vi.fn(),
   writeBatch: vi.fn(),
@@ -23,6 +24,7 @@ const localDBMock = vi.hoisted(() => {
     getPendingSyncOperations: vi.fn(),
     getSyncQueueStatus: vi.fn(),
     normalizeSyncOwnership,
+    restoreRepairableDeadLetterSyncOperations: vi.fn(),
     syncOperationBelongsTo: vi.fn((operation, ownership) => {
       try {
         const actual = normalizeSyncOwnership(operation);
@@ -81,6 +83,7 @@ beforeEach(() => {
     set: vi.fn(),
     commit: vi.fn().mockResolvedValue(undefined),
   }));
+  firebaseMock.getDoc.mockResolvedValue({ exists: () => false, data: () => ({}) });
   vi.stubGlobal('navigator', { onLine: true });
   localDBMock.getPendingSyncOperations.mockResolvedValue([]);
   localDBMock.getSyncQueueStatus.mockResolvedValue({
@@ -90,6 +93,7 @@ beforeEach(() => {
     oldestPendingAt: null,
     lastDeadLetterAt: null,
   });
+  localDBMock.restoreRepairableDeadLetterSyncOperations.mockResolvedValue(0);
 });
 
 describe('SyncQueueProcessor ownership and terminal failure handling', () => {
@@ -155,6 +159,59 @@ describe('SyncQueueProcessor ownership and terminal failure handling', () => {
     const savedPayload = firebaseMock.setDoc.mock.calls[0][1];
     expect(Object.prototype.hasOwnProperty.call(savedPayload, 'cancellationReason')).toBe(false);
     expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(1);
+  });
+
+  it('restores the known repairable dead-letter class for the verified account', async () => {
+    const processor = authenticatedStartedProcessor();
+    localDBMock.restoreRepairableDeadLetterSyncOperations.mockResolvedValue(1);
+
+    await expect(processor.recoverRepairableWrites()).resolves.toBe(1);
+
+    expect(localDBMock.restoreRepairableDeadLetterSyncOperations).toHaveBeenCalledWith(OWNER);
+  });
+
+  it('does not let a recovered historical write overwrite a newer server record', async () => {
+    const processor = authenticatedStartedProcessor();
+    localDBMock.getPendingSyncOperations.mockResolvedValue([
+      operation({
+        recoveredFromDeadLetter: true,
+        createdAt: '2026-09-10T10:00:00.000Z',
+        data: { status: 'Cancelled', updatedAtLocal: '2026-09-10T10:00:00.000Z' },
+      }),
+    ]);
+    firebaseMock.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ updatedAtLocal: '2026-09-10T11:00:00.000Z' }),
+    });
+
+    await processor.processNow();
+
+    expect(firebaseMock.setDoc).not.toHaveBeenCalled();
+    expect(localDBMock.completeSyncOperation).toHaveBeenCalledWith(1, 'superseded_by_newer_server_record');
+  });
+
+  it('keeps an ambiguous recovered write blocked when the server version cannot be ordered', async () => {
+    const processor = authenticatedStartedProcessor();
+    localDBMock.getPendingSyncOperations.mockResolvedValue([
+      operation({
+        recoveredFromDeadLetter: true,
+        createdAt: 'not-a-date',
+        data: { status: 'Cancelled' },
+      }),
+    ]);
+    firebaseMock.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ status: 'Completed' }),
+    });
+
+    await processor.processNow();
+
+    expect(firebaseMock.setDoc).not.toHaveBeenCalled();
+    expect(localDBMock.deadLetterSyncOperation).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ code: 'recovery-conflict' }),
+      'permanent_validation_or_permission',
+    );
   });
 
   it('replays a multi-document workflow operation as one atomic batch', async () => {

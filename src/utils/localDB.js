@@ -484,10 +484,19 @@ export async function getPendingSyncOperations(ownership) {
 /**
  * Mark a sync operation as completed (remove from queue).
  */
-export async function completeSyncOperation(id) {
+export async function completeSyncOperation(id, resolution = 'synced_after_payload_repair') {
   const db = await getDB();
-  const tx = db.transaction(STORES.SYNC_QUEUE, 'readwrite');
+  const tx = db.transaction([STORES.SYNC_QUEUE, STORES.DEAD_LETTER_QUEUE], 'readwrite');
+  const recoveredRecord = await tx.objectStore(STORES.DEAD_LETTER_QUEUE).get(id);
   await tx.objectStore(STORES.SYNC_QUEUE).delete(id);
+  if (recoveredRecord?.status === 'retrying') {
+    await tx.objectStore(STORES.DEAD_LETTER_QUEUE).put({
+      ...recoveredRecord,
+      status: resolution === 'superseded_by_newer_server_record' ? 'superseded' : 'recovered',
+      resolvedAt: new Date().toISOString(),
+      resolution,
+    });
+  }
   await tx.done;
   notifySyncQueueChanged();
 }
@@ -538,6 +547,66 @@ export async function deadLetterSyncOperation(id, error, reason = 'permanent_fai
   notifySyncQueueChanged();
 }
 
+export function isRepairableDeadLetterOperation(operation = {}) {
+  // The reported historical failure was a single-document merge. Multi-write
+  // batches need document-by-document reconciliation and must remain blocked
+  // instead of risking a partial or stale workflow replay.
+  if (operation.type !== 'setDoc') return false;
+  if (operation.status !== 'dead_letter') return false;
+  if (Number(operation.recoveryAttempts || 0) >= 1) return false;
+  const code = String(operation.errorCode || '').replace(/^firestore\//, '').toLowerCase();
+  const message = String(operation.error || '').toLowerCase();
+  return code === 'invalid-argument'
+    && message.includes('unsupported field value: undefined');
+}
+
+/**
+ * Recover only the historical Firestore-undefined failure that the current
+ * payload sanitizer can deterministically repair. The original dead-letter
+ * record remains as a local audit entry while its idempotent merge is retried.
+ * Other validation, ownership, deletion, and permission failures stay blocked.
+ */
+export async function restoreRepairableDeadLetterSyncOperations(ownership) {
+  const normalizedOwnership = normalizeSyncOwnership(ownership);
+  const db = await getDB();
+  const deadLetters = await db.getAll(STORES.DEAD_LETTER_QUEUE);
+  const repairable = deadLetters.filter((operation) => (
+    syncOperationBelongsTo(operation, normalizedOwnership)
+    && isRepairableDeadLetterOperation(operation)
+  ));
+  if (repairable.length === 0) return 0;
+
+  const tx = db.transaction([STORES.SYNC_QUEUE, STORES.DEAD_LETTER_QUEUE], 'readwrite');
+  const queueStore = tx.objectStore(STORES.SYNC_QUEUE);
+  const deadLetterStore = tx.objectStore(STORES.DEAD_LETTER_QUEUE);
+  const recoveredAt = new Date().toISOString();
+  for (const operation of repairable) {
+    const safeOperation = sanitizeFirestorePayload(operation);
+    const queuedOperation = { ...safeOperation };
+    delete queuedOperation.error;
+    delete queuedOperation.errorCode;
+    delete queuedOperation.deadLetterReason;
+    delete queuedOperation.failedAt;
+    queuedOperation.status = 'pending';
+    queuedOperation.attempts = 0;
+    queuedOperation.lastAttemptAt = null;
+    queuedOperation.nextRetryAt = recoveredAt;
+    queuedOperation.recoveredFromDeadLetter = true;
+    queuedOperation.recoveryAttempts = Number(operation.recoveryAttempts || 0) + 1;
+    queuedOperation.recoveredAt = recoveredAt;
+    await queueStore.put(queuedOperation);
+    await deadLetterStore.put({
+      ...operation,
+      status: 'retrying',
+      recoveryAttempts: queuedOperation.recoveryAttempts,
+      recoveryStartedAt: recoveredAt,
+    });
+  }
+  await tx.done;
+  notifySyncQueueChanged();
+  return repairable.length;
+}
+
 export async function getSyncQueueStatus(ownership) {
   const normalizedOwnership = normalizeSyncOwnership(ownership);
   const db = await getDB();
@@ -546,7 +615,9 @@ export async function getSyncQueueStatus(ownership) {
     db.getAll(STORES.DEAD_LETTER_QUEUE),
   ]);
   const pending = queued.filter((op) => op.status === 'pending' && syncOperationBelongsTo(op, normalizedOwnership));
-  const deadLetter = deadLetters.filter((op) => syncOperationBelongsTo(op, normalizedOwnership));
+  const deadLetter = deadLetters.filter((op) => (
+    op.status === 'dead_letter' && syncOperationBelongsTo(op, normalizedOwnership)
+  ));
   const oldestPendingAt = pending
     .map((op) => op.createdAt).filter(Boolean).sort()[0] || null;
   const lastDeadLetterAt = deadLetter
@@ -779,6 +850,8 @@ export default {
   completeSyncOperation,
   failSyncOperation,
   deadLetterSyncOperation,
+  isRepairableDeadLetterOperation,
+  restoreRepairableDeadLetterSyncOperations,
   normalizeSyncOwnership,
   syncOperationBelongsTo,
   clearSyncQueue,

@@ -524,7 +524,12 @@ const App = () => {
       return undefined;
     }
     syncQueueProcessor.setAuthContext({ tenantId, userId });
-    void syncQueueProcessor.processNow();
+    // Repair the one known historical payload failure (Firestore rejected an
+    // undefined field) before draining. All other dead letters remain blocked,
+    // and a newer server record always wins during recovery.
+    void syncQueueProcessor.recoverRepairableWrites()
+      .catch((error) => console.error('[sync] Local recovery check failed:', error))
+      .finally(() => void syncQueueProcessor.processNow());
     return () => syncQueueProcessor.setAuthContext(null);
   }, [isAuthenticated, tenantId]);
 

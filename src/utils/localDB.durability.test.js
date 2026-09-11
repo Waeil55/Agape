@@ -357,4 +357,63 @@ describe('localDB durable outbox contract', () => {
       userId: 'another-user',
     })).resolves.toMatchObject({ pending: 1, deadLetter: 0, total: 1 });
   });
+
+  it('restores only undefined-field failures and preserves their local audit record', async () => {
+    database.stores.get('deadLetterQueue').set(7, {
+      id: 7,
+      type: 'setDoc',
+      collection: 'driverTripProgress',
+      docId: 'trip-1',
+      data: { status: 'Cancelled', cancellationReason: undefined },
+      tenantId: 'agape-care',
+      userId: 'user-1',
+      status: 'dead_letter',
+      errorCode: 'invalid-argument',
+      error: 'Function setDoc() called with invalid data. Unsupported field value: undefined',
+    });
+    database.stores.get('deadLetterQueue').set(8, {
+      id: 8,
+      type: 'deleteDoc',
+      collection: 'trips',
+      docId: 'trip-2',
+      tenantId: 'agape-care',
+      userId: 'user-1',
+      status: 'dead_letter',
+      errorCode: 'permission-denied',
+      error: 'Missing or insufficient permissions.',
+    });
+    database.stores.get('deadLetterQueue').set(9, {
+      id: 9,
+      type: 'setDocs',
+      writes: [{ collection: 'trips', docId: 'trip-3', data: { note: undefined } }],
+      tenantId: 'agape-care',
+      userId: 'user-1',
+      status: 'dead_letter',
+      errorCode: 'invalid-argument',
+      error: 'Function setDocs() called with invalid data. Unsupported field value: undefined',
+    });
+
+    const restored = await localDB.restoreRepairableDeadLetterSyncOperations({
+      tenantId: 'agape-care',
+      userId: 'user-1',
+    });
+
+    expect(restored).toBe(1);
+    expect(database.stores.get('syncQueue').get(7)).toMatchObject({
+      status: 'pending',
+      recoveredFromDeadLetter: true,
+      recoveryAttempts: 1,
+    });
+    expect(database.stores.get('deadLetterQueue').get(7)).toMatchObject({ status: 'retrying' });
+    expect(database.stores.get('deadLetterQueue').get(8)).toMatchObject({ status: 'dead_letter' });
+    expect(database.stores.get('deadLetterQueue').get(9)).toMatchObject({ status: 'dead_letter' });
+
+    await localDB.completeSyncOperation(7);
+    expect(database.stores.get('deadLetterQueue').get(7)).toMatchObject({
+      status: 'recovered',
+      resolution: 'synced_after_payload_repair',
+    });
+    await expect(localDB.getSyncQueueStatus({ tenantId: 'agape-care', userId: 'user-1' }))
+      .resolves.toMatchObject({ pending: 0, deadLetter: 2, total: 2 });
+  });
 });

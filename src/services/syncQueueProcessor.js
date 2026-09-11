@@ -1,4 +1,4 @@
-import { db, doc, setDoc, serverTimestamp, deleteDoc, writeBatch } from '../config/firebase';
+import { db, doc, getDoc, setDoc, serverTimestamp, deleteDoc, writeBatch } from '../config/firebase';
 import {
   completeSyncOperation,
   deadLetterSyncOperation,
@@ -6,6 +6,7 @@ import {
   getPendingSyncOperations,
   getSyncQueueStatus,
   normalizeSyncOwnership,
+  restoreRepairableDeadLetterSyncOperations,
   syncOperationBelongsTo,
 } from '../utils/localDB';
 import { sanitizeFirestorePayload } from '../utils/firestorePayload';
@@ -114,6 +115,14 @@ export class SyncQueueProcessor {
     };
   }
 
+  async recoverRepairableWrites() {
+    if (!this._authContext) return 0;
+    const ownership = { ...this._authContext };
+    const restored = await restoreRepairableDeadLetterSyncOperations(ownership);
+    if (restored > 0) this._onProcess?.({ type: 'recovery_started', count: restored });
+    return restored;
+  }
+
   async _processQueue(ownership) {
     if (this._processing) return;
     this._processing = true;
@@ -137,6 +146,11 @@ export class SyncQueueProcessor {
           if (!Number.isNaN(retryAt.getTime()) && retryAt > new Date()) continue;
         }
         try {
+          if (operation.recoveredFromDeadLetter && await this._isSupersededByServer(operation)) {
+            await completeSyncOperation(operation.id, 'superseded_by_newer_server_record');
+            this._onProcess?.({ type: 'superseded', op: operation });
+            continue;
+          }
           await this._executeOperation(operation);
           await completeSyncOperation(operation.id);
           this._onProcess?.({ type: 'completed', op: operation });
@@ -159,6 +173,34 @@ export class SyncQueueProcessor {
         queueMicrotask(() => void this.processNow());
       }
     }
+  }
+
+  async _isSupersededByServer(operation) {
+    const write = operation;
+    if (!write?.collection || !write?.docId || !write?.data) return false;
+    const localValue = write.data.workflowUpdatedAt || write.data.updatedAtLocal || operation.createdAt;
+    const localMillis = Date.parse(String(localValue || ''));
+    const snapshot = await getDoc(doc(db, write.collection, write.docId));
+    if (!snapshot.exists()) return false;
+    const serverData = snapshot.data() || {};
+    const serverValue = serverData.workflowUpdatedAt || serverData.updatedAtLocal || serverData.syncedAt;
+    const serverMillis = typeof serverValue?.toMillis === 'function'
+      ? serverValue.toMillis()
+      : Date.parse(String(serverValue || ''));
+    if (Number.isFinite(localMillis) && Number.isFinite(serverMillis)) {
+      return serverMillis > localMillis;
+    }
+
+    const repairedData = sanitizeFirestorePayload(write.data);
+    const alreadyPresent = Object.entries(repairedData).every(([key, value]) => (
+      JSON.stringify(serverData[key]) === JSON.stringify(value)
+    ));
+    if (alreadyPresent) return true;
+
+    throw new PermanentSyncError(
+      `Recovered write ${write.collection}/${write.docId} needs review because its server version cannot be ordered safely.`,
+      'recovery-conflict',
+    );
   }
 
   async _executeOperation(operation) {
