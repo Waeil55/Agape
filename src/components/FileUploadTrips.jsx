@@ -1,9 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, Truck, X, Calendar, FileSpreadsheet } from 'lucide-react';
-import { generateAiText } from '../services/secureAi';
+import { Upload, AlertCircle, Loader, CheckCircle2, FileText, Zap, BrainCircuit, AlertTriangle, Info, Truck, X, Calendar, FileSpreadsheet, Camera, Images } from 'lucide-react';
+import { generateAiText, generateAiTextWithImage } from '../services/secureAi';
 import { annotateInOutPairs, hasInOutMarker, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
+import {
+  PHOTO_MAX_COUNT,
+  PHOTO_EXTRACTION_PROMPT,
+  compressTripPhoto,
+  parsePhotoTripJson,
+} from '../utils/photoTripExtraction';
 
 import { normalizeDateValue } from '../utils/normalizeDate';
 import { tripCalendarDateKey } from '../utils/tripDate';
@@ -592,6 +598,23 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const forceCompleted = uploadContext === 'reports';
   const dropRef = useRef(null);
   const fileInputRef = useRef(null);
+  // Photo intake ("Scan photo" = camera, "Upload from photos" = gallery).
+  // Photos are extraction sources ONLY — never persisted anywhere. Each entry:
+  // { id, name, previewUrl, dataUrl, status, error }. Status: compressing |
+  // ready | processing | done | error. Fail closed: only status==='ready'
+  // photos with a dataUrl are sent for extraction.
+  const [photoFiles, setPhotoFiles] = useState([]);
+  const cameraInputRef = useRef(null);
+  const photoLibraryInputRef = useRef(null);
+  // Ref mirror so the unmount cleanup can revoke blob URLs without setState.
+  const photoFilesRef = useRef([]);
+  useEffect(() => { photoFilesRef.current = photoFiles; }, [photoFiles]);
+  // Partial-batch accounting for photo extraction (which photos/rows were
+  // skipped and why). Shown as a banner in the review step — extraction
+  // results are never imported without the user seeing this first.
+  const [photoNotice, setPhotoNotice] = useState('');
+  // Drives the parsing-step title: 'file' | 'photos'.
+  const [processingKind, setProcessingKind] = useState('file');
   const mountedRef = useRef(true);
   const processingRef = useRef(false);
 
@@ -600,6 +623,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
     return () => {
       mountedRef.current = false;
       requestAiSkip();
+      // Revoke thumbnail object URLs so batches don't leak blob memory.
+      photoFilesRef.current.forEach(p => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
     };
   }, []);
 
@@ -623,43 +648,97 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
     if (e.target.files?.length) handleFileSelect(e.target.files[0]);
   };
 
-  const processFile = async () => {
-    if (!file) { setError('Please select a file first.'); return; }
-    if (processingRef.current) return;
-    processingRef.current = true;
-
-    setStep('parsing');
-    setProgressPct(5);
-    setProgressMsg('Reading file...');
-    setParsedRows([]);
-    setMappedTrips([]);
-    setAiResults([]);
-
-    try {
-      let rows;
-      const ext = file.name.split('.').pop().toLowerCase();
-
-      if (ext === 'csv') {
-        setProgressMsg('Parsing CSV data...');
-        const text = await file.text();
-        rows = parseCSV(text);
-      } else {
-        setProgressMsg('Parsing spreadsheet...');
-        const buffer = await file.arrayBuffer();
-        rows = parseExcel(buffer);
+  // ===========================================================================
+  // PHOTO INTAKE — "Scan photo" (camera) and "Upload from photos" (gallery)
+  // share this handler. Non-image files are filtered with a visible notice;
+  // the per-batch cap (PHOTO_MAX_COUNT) is enforced with an explicit message
+  // naming what was left out — never silently dropped.
+  // Compression runs per photo; a compression failure marks ONLY that photo
+  // as error and leaves the rest of the batch usable.
+  // ===========================================================================
+  const handlePhotoSelect = async (fileList, source) => {
+    setError('');
+    const picked = Array.from(fileList || []);
+    const images = picked.filter(f => f?.type?.startsWith('image/'));
+    if (picked.length > images.length) {
+      setError(`Ignored ${picked.length - images.length} non-image file(s). Photos only — use the file box above for CSV/Excel.`);
+    }
+    if (!images.length) {
+      if (!picked.length) setError(source === 'camera' ? 'No photo captured.' : 'No photo selected.');
+      return;
+    }
+    const remaining = PHOTO_MAX_COUNT - photoFiles.length;
+    if (remaining <= 0) {
+      setError(`Photo limit reached (${PHOTO_MAX_COUNT} per batch). Extract these first, then add more.`);
+      return;
+    }
+    const batch = images.slice(0, remaining);
+    if (images.length > remaining) {
+      setError(`Only ${remaining} more photo(s) fit this batch (${PHOTO_MAX_COUNT} max). The other ${images.length - remaining} were left out — add them in a next batch.`);
+    }
+    for (const f of batch) {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const previewUrl = URL.createObjectURL(f);
+      const fallbackName = source === 'camera' ? 'scan.jpg' : 'photo.jpg';
+      setPhotoFiles(prev => [...prev, {
+        id,
+        name: f.name || fallbackName,
+        previewUrl,
+        dataUrl: '',
+        status: 'compressing',
+        error: '',
+      }]);
+      try {
+        const dataUrl = await compressTripPhoto(f);
+        if (!mountedRef.current) { URL.revokeObjectURL(previewUrl); return; }
+        setPhotoFiles(prev => prev.map(p => (p.id === id ? { ...p, dataUrl, status: 'ready' } : p)));
+      } catch (err) {
+        if (!mountedRef.current) return;
+        setPhotoFiles(prev => prev.map(p => (
+          p.id === id ? { ...p, status: 'error', error: err?.message || 'Photo compression failed.' } : p
+        )));
       }
+    }
+  };
 
-      // ALWAYS try to merge paired rows, regardless of file format
-      rows = mergePairedActivityRows(rows);
+  const removePhoto = (id) => {
+    setPhotoFiles(prev => {
+      const target = prev.find(p => p.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter(p => p.id !== id);
+    });
+  };
+
+  const clearPhotoFiles = () => {
+    setPhotoFiles(prev => {
+      prev.forEach(p => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
+      return [];
+    });
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (photoLibraryInputRef.current) photoLibraryInputRef.current.value = '';
+  };
+
+  // ===========================================================================
+  // finalizeRows — shared row → review-table pipeline for BOTH spreadsheet
+  // files and photo extractions. Photo rows carry _photoLabel and are flagged
+  // below so the review step banners them for mandatory human verification.
+  // Returns true when the review step was reached, false when it failed
+  // closed (empty rows). Throws on unexpected errors for the caller to report.
+  // ===========================================================================
+  const finalizeRows = async (inputRows) => {
+      // ALWAYS try to merge paired rows, regardless of source
+      const rows = mergePairedActivityRows(inputRows);
 
       if (rows.length === 0) {
-        setError('No data rows found in the file. Make sure it has a header row followed by trip data.');
+        setError('No data rows found. For files, make sure there is a header row followed by trip data. For photos, retake with the sheet flat, well-lit, and filling the frame.');
         setStep('upload');
-        return;
+        return false;
       }
 
       setProgressPct(10);
-      setAllColumnNames(Object.keys(rows[0]));
+      // _photoLabel is pipeline metadata, not a spreadsheet column — keep it
+      // out of the detected/all-column displays.
+      setAllColumnNames(Object.keys(rows[0]).filter(k => k !== '_photoLabel'));
 
       const colMap = {};
       Object.keys(COLUMN_ALIASES).forEach(field => {
@@ -878,6 +957,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
           // --- RAW DATA (always preserved) ---
           _originalRow: row,
+          // --- PHOTO PROVENANCE — extraction source, never auto-imported ---
+          // _photoExtracted rows must pass the review table below before
+          // confirmImport can run. The review step banners them explicitly.
+          _photoExtracted: !!row._photoLabel,
+          _photoLabel: row._photoLabel || '',
+          _needsHumanReview: !!row._photoLabel,
           _hasIssues: importedFare.status === 'invalid',
           _issues: importedFare.status === 'invalid' ? [`${importedFare.header || 'Original trip cost'}: ${importedFare.reason}. The trip can be imported, but cost totals will remain incomplete until corrected.`] : [],
           _confidence: 100,
@@ -984,9 +1069,133 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       }
 
       setStep('review');
+      return true;
+  };
+
+  const processFile = async () => {
+    if (!file) { setError('Please select a file first.'); return; }
+    if (processingRef.current) return;
+    processingRef.current = true;
+
+    setStep('parsing');
+    setProcessingKind('file');
+    setProgressPct(5);
+    setProgressMsg('Reading file...');
+    setParsedRows([]);
+    setMappedTrips([]);
+    setAiResults([]);
+    setPhotoNotice('');
+
+    try {
+      let rows;
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'csv') {
+        setProgressMsg('Parsing CSV data...');
+        const text = await file.text();
+        rows = parseCSV(text);
+      } else {
+        setProgressMsg('Parsing spreadsheet...');
+        const buffer = await file.arrayBuffer();
+        rows = parseExcel(buffer);
+      }
+
+      await finalizeRows(rows);
     } catch (err) {
       if (!mountedRef.current) return;
       setError(`Processing error: ${err.message}`);
+      setStep('upload');
+    } finally {
+      processingRef.current = false;
+    }
+  };
+
+  // ===========================================================================
+  // processPhotos — vision extraction for "Scan photo" / "Upload from photos".
+  //
+  // Each ready photo is sent to the secure AI backend (compressed JPEG, never
+  // the original) with a strict JSON-only prompt. Extracted rows feed the SAME
+  // finalizeRows pipeline as spreadsheets — same column mapping, same phone
+  // ownership analysis, same AI validation, same mandatory review table.
+  //
+  // Fail-closed rules:
+  // - Only status==='ready' photos with a dataUrl are sent. Compressing,
+  //   errored, and already-failed photos are never sent or retried silently.
+  // - A photo whose extraction fails is marked error WITH its reason and the
+  //   batch continues; nothing from that photo is guessed or imported.
+  // - Zero extracted rows across the batch → back to upload with a precise
+  //   reason. Partial batches set photoNotice so the review step shows exactly
+  //   what was skipped — never silently dropped.
+  // ===========================================================================
+  const processPhotos = async () => {
+    const ready = photoFiles.filter(p => p.status === 'ready' && p.dataUrl);
+    if (!ready.length) {
+      setError(
+        photoFiles.some(p => p.status === 'compressing')
+          ? 'Photos are still being prepared. Wait a moment, then try again.'
+          : 'Add a photo first — use Scan photo or Upload from photos below.'
+      );
+      return;
+    }
+    if (processingRef.current) return;
+    processingRef.current = true;
+
+    setStep('parsing');
+    setProcessingKind('photos');
+    setProgressPct(5);
+    setProgressMsg('Reading trip photos...');
+    setParsedRows([]);
+    setMappedTrips([]);
+    setAiResults([]);
+    setPhotoNotice('');
+
+    try {
+      const allRows = [];
+      let skippedRows = 0;
+      const failedLabels = [];
+      for (let i = 0; i < ready.length; i++) {
+        if (!mountedRef.current) return;
+        const label = `photo ${i + 1} (${ready[i].name})`;
+        setProgressMsg(`Extracting trips from ${label}...`);
+        setProgressPct(5 + Math.round((i / ready.length) * 40));
+        setPhotoFiles(prev => prev.map(p => (p.id === ready[i].id ? { ...p, status: 'processing' } : p)));
+        try {
+          const text = await generateAiTextWithImage(PHOTO_EXTRACTION_PROMPT, ready[i].dataUrl, { maxOutputTokens: 8192 });
+          if (!mountedRef.current) return;
+          const { rows, skipped } = parsePhotoTripJson(text, label);
+          skippedRows += skipped;
+          rows.forEach(r => { r._photoLabel = label; });
+          allRows.push(...rows);
+          setPhotoFiles(prev => prev.map(p => (p.id === ready[i].id ? { ...p, status: 'done' } : p)));
+        } catch (err) {
+          failedLabels.push(`${label}: ${err?.message || 'extraction failed'}`);
+          if (!mountedRef.current) return;
+          setPhotoFiles(prev => prev.map(p => (
+            p.id === ready[i].id ? { ...p, status: 'error', error: err?.message || 'Extraction failed.' } : p
+          )));
+        }
+      }
+
+      if (!allRows.length) {
+        setError(
+          failedLabels.length
+            ? `No trips extracted. ${failedLabels.join(' ')}`
+            : 'No legible trips found in these photos. Retake with the sheet flat, well-lit, and filling the frame.'
+        );
+        setStep('upload');
+        return;
+      }
+      if (failedLabels.length || skippedRows > 0) {
+        setPhotoNotice(
+          `${failedLabels.length ? `Skipped ${failedLabels.length} unreadable photo(s): ${failedLabels.join(' ')} ` : ''}` +
+          `${skippedRows ? `Dropped ${skippedRows} empty row(s) with no client or addresses. ` : ''}` +
+          `Verify every row below before importing.`
+        );
+      }
+      await finalizeRows(allRows);
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setError(`Photo processing error: ${err.message}`);
       setStep('upload');
     } finally {
       processingRef.current = false;
@@ -1055,6 +1264,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
   const totalSelected = mappedTrips.length;
   const withIssues = mappedTrips.filter(t => t._hasIssues).length;
+  // Photo provenance count for the review banner. Photo-extracted rows were
+  // read by AI vision and MUST be human-verified in the table below — the
+  // banner renders whenever this is non-zero.
+  const photoExtractedCount = mappedTrips.filter(t => t._photoExtracted).length;
+  // Photos ready for extraction (compression finished). Only these are sent.
+  const readyPhotoCount = photoFiles.filter(p => p.status === 'ready' && p.dataUrl).length;
   const avgConfidence = mappedTrips.length > 0
     ? Math.round(mappedTrips.reduce((s, t) => s + (t._confidence || 100), 0) / mappedTrips.length)
     : 100;
@@ -1095,6 +1310,88 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               </div>
             )}
 
+            {/* ── Photo intake: Scan photo (camera) + Upload from photos (gallery).
+                Photos are extraction sources ONLY — thumbnails are local blob
+                URLs, compressed copies live in memory for one extraction call,
+                and nothing is ever uploaded to Storage or saved to Firestore. */}
+            <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:p-4">
+              <p className="text-xs sm:text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Camera size={14} className="text-indigo-600 shrink-0" /> No file? Scan a trip sheet
+              </p>
+              <p className="text-xs text-slate-500 mb-3">
+                Take a photo or pick one from your gallery. Trips are read from the image and shown for review — photos are never stored.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="py-2.5 px-3 rounded-xl bg-indigo-600 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-700 active:scale-95 transition shadow-sm"
+                >
+                  <Camera size={16} /> Scan photo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => photoLibraryInputRef.current?.click()}
+                  className="py-2.5 px-3 rounded-xl bg-white border border-slate-300 text-slate-700 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-slate-50 active:scale-95 transition"
+                >
+                  <Images size={16} /> From photos
+                </button>
+              </div>
+              {/* capture="environment" opens the rear camera on mobile; without
+                  it the gallery picker opens. accept="image/*" filters both. */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => { handlePhotoSelect(e.target.files, 'camera'); e.target.value = ''; }}
+              />
+              <input
+                ref={photoLibraryInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => { handlePhotoSelect(e.target.files, 'gallery'); e.target.value = ''; }}
+              />
+              {photoFiles.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {photoFiles.map(p => (
+                    <div key={p.id} className="relative rounded-lg overflow-hidden border border-slate-200 bg-white">
+                      <img src={p.previewUrl} alt={p.name} title={p.status === 'error' && p.error ? `${p.name}: ${p.error}` : p.name} className="h-20 w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(p.id)}
+                        aria-label={`Remove ${p.name}`}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-rose-600 active:scale-95 transition"
+                      >
+                        <X size={12} />
+                      </button>
+                      <div className="absolute bottom-1 left-1">
+                        {p.status === 'ready' && <span className="rounded-full bg-emerald-600/90 px-1.5 py-px text-xs font-bold text-white">ready</span>}
+                        {p.status === 'done' && <span className="rounded-full bg-emerald-600/90 px-1.5 py-px text-xs font-bold text-white">done</span>}
+                        {p.status === 'compressing' && <span className="rounded-full bg-amber-500/90 px-1.5 py-px text-xs font-bold text-white flex items-center gap-1"><Loader size={8} className="animate-spin" /> prepping</span>}
+                        {p.status === 'processing' && <span className="rounded-full bg-blue-600/90 px-1.5 py-px text-xs font-bold text-white flex items-center gap-1"><Loader size={8} className="animate-spin" /> reading</span>}
+                        {p.status === 'error' && <span className="rounded-full bg-rose-600/90 px-1.5 py-px text-xs font-bold text-white">failed</span>}
+                      </div>
+                      {p.status === 'error' && p.error && (
+                        <p className="px-1.5 py-1 text-xs font-medium text-rose-600 leading-tight truncate" title={p.error}>{p.error}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {readyPhotoCount > 0 && (
+                <button
+                  onClick={processPhotos}
+                  className="mt-3 w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-sm text-sm active:scale-[0.99]"
+                >
+                  <Zap size={18} /> Extract Trips From {readyPhotoCount} Photo{readyPhotoCount !== 1 ? 's' : ''}
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-3 mb-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} className="w-4 h-4 accent-indigo-600" />
@@ -1126,7 +1423,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
               <FileText className="absolute inset-0 m-auto text-blue-600 animate-pulse" size={24} />
             </div>
-            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">Processing File</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">{processingKind === 'photos' ? 'Extracting From Photos' : 'Processing File'}</h3>
             <p className="text-slate-500 text-xs sm:text-sm mb-4">{progressMsg}</p>
             <div className="w-full bg-slate-100 rounded-full h-2 mb-4">
               <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }}></div>
@@ -1169,11 +1466,28 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               </div>
             </div>
 
+            {/* Photo-extraction verification banner. Rendered whenever ANY row
+                came from AI vision: extraction can misread handwriting, so each
+                field below must be eyeballed before Import. photoNotice adds
+                the exact skip accounting for partial batches. */}
+            {(photoExtractedCount > 0 || photoNotice) && (
+              <div role="alert" className="mb-4 sm:mb-6 p-3 sm:p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+                <p className="text-xs sm:text-sm font-bold text-indigo-800 flex items-center gap-1.5">
+                  <Camera size={14} className="shrink-0" />
+                  {photoExtractedCount > 0
+                    ? `${photoExtractedCount} trip${photoExtractedCount !== 1 ? 's were' : ' was'} read from photos — verify every field before importing.`
+                    : 'Photo batch notes — read before importing.'}
+                </p>
+                {photoNotice && <p className="text-xs text-indigo-700 mt-1.5 font-medium">{photoNotice}</p>}
+                <p className="text-xs text-indigo-500 mt-1">Photos were used for extraction only and are not stored.</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
               <div className="bg-blue-50 p-3 sm:p-4 rounded-xl">
                 <p className="text-xs sm:text-xs text-blue-600 font-semibold mb-1">Total</p>
                 <p className="text-lg sm:text-2xl font-semibold text-blue-700">{mappedTrips.length}</p>
-                <p className="text-xs sm:text-xs text-blue-500">from file</p>
+                <p className="text-xs sm:text-xs text-blue-500">from {photoExtractedCount > 0 ? 'photos' : 'file'}</p>
               </div>
               <div className="bg-emerald-50 p-3 sm:p-4 rounded-xl">
                 <p className="text-xs sm:text-xs text-emerald-600 font-semibold mb-1">Clean</p>
@@ -1235,7 +1549,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   {mappedTrips.map((trip, idx) => (
                     <tr key={idx} className={`border-b border-slate-100 hover:bg-slate-50 ${trip._hasIssues ? 'bg-amber-50/50' : ''}`}>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 font-mono text-slate-500">{idx + 1}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs font-semibold text-slate-900 whitespace-nowrap">{trip.patient}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs font-semibold text-slate-900 whitespace-nowrap">
+                        {trip.patient}
+                        {trip._photoExtracted && (
+                          <span title={`Extracted from ${trip._photoLabel || 'photo'} — verify`} className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-1.5 py-px text-xs font-bold text-indigo-700 uppercase tracking-wider">
+                            <Camera size={8} /> photo
+                          </span>
+                        )}
+                      </td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 whitespace-nowrap">{trip.date || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.pickup}>{trip.pickup || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
@@ -1380,7 +1701,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             )}
 
             <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
+              <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); setPhotoNotice(''); clearPhotoFiles(); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
                 Cancel
               </button>
               <button onClick={confirmImport} className="w-full sm:flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm text-sm">

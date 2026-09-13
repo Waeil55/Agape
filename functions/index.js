@@ -568,6 +568,28 @@ exports.enterpriseAiGenerate = functions
       throw new functions.https.HttpsError("invalid-argument", "AI input must contain between 1 and 30,000 characters.");
     }
 
+    // Optional vision input for trip-sheet photo extraction (FileUploadTrips).
+    // The image is sent as a separate param — never concatenated into the
+    // prompt — so the 30k prompt limit above does not count image bytes.
+    // Fail closed: reject non-image mime types and oversized payloads here
+    // rather than forwarding them to the provider.
+    let imagePart = null;
+    const rawImage = data?.image;
+    if (rawImage !== undefined && rawImage !== null) {
+      const mimeType = String(rawImage?.mimeType || "").toLowerCase().trim();
+      const b64 = String(rawImage?.data || "").replace(/^data:[^;]+;base64,/, "").trim();
+      const allowed = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowed.includes(mimeType)) {
+        throw new functions.https.HttpsError("invalid-argument", "AI image must be JPEG, PNG, or WebP.");
+      }
+      // ~3MB base64 ≈ 2.2MB binary. Client compresses to ~1600px JPEG first,
+      // so anything larger is unexpected — reject rather than truncate.
+      if (!b64 || b64.length > 4_000_000 || !/^[A-Za-z0-9+/=]+$/.test(b64)) {
+        throw new functions.https.HttpsError("invalid-argument", "AI image payload is missing, oversized, or malformed.");
+      }
+      imagePart = { inlineData: { mimeType, data: b64 } };
+    }
+
     const now = Date.now();
     const rateRef = admin.firestore().doc(`security_rate_limits/ai_${context.auth.uid}`);
     const rateLimit = actor.role === "driver" ? 10 : 30;
@@ -597,10 +619,15 @@ exports.enterpriseAiGenerate = functions
     const temperature = Math.max(0, Math.min(1, Number(data?.temperature ?? 0.1)));
     const maxOutputTokens = Math.max(64, Math.min(8192, Number(data?.maxOutputTokens || 4096)));
     try {
+      const parts = [{ text: prompt }];
+      // Vision part second: Gemini 2.5 Flash accepts text + inlineData parts.
+      // Extraction results are NEVER auto-saved — the client must show them
+      // in the FileUploadTrips review table for human verification first.
+      if (imagePart) parts.push(imagePart);
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          contents: [{ role: "user", parts }],
           generationConfig: { temperature, maxOutputTokens },
         },
         {
