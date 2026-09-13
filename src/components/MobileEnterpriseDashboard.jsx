@@ -701,6 +701,8 @@ const MobileEnterpriseDashboard = (props) => {
               <Suspense fallback={<MobileFallback />}>
                 <FileUploadTrips
                   {...props}
+                  allowedDrivers={props.uploadDrivers}
+                  lockedDriverId={props.uploadLockedDriverId || ''}
                   onClose={() => setShowUploadModal(false)}
                 />
               </Suspense>

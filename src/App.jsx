@@ -6,7 +6,8 @@ import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 import { hasPermission } from './constants/roles';
 import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd, isoToLocalDateKey } from './utils/tripDate';
 import { resolveClientPhoneForTrip } from './utils/clientPhoneResolution';
-import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, isDriverAssignedToDispatcher, isTripInDispatcherScope, normalizeEmail } from './utils/accessControl';
+import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, getUploadScopeForRole, isDriverAssignedToDispatcher, isTripInDispatcherScope, isTripInUploadScope, normalizeEmail } from './utils/accessControl';
+import { tripImportKey } from './utils/tripLifecycle';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playNotificationSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS } from './utils/nativeActions';
@@ -656,6 +657,21 @@ const App = () => {
   const currentDispatcherRecord = useMemo(
     () => getDispatcherForUser(dispatchers, currentUser),
     [dispatchers, currentUser]
+  );
+  // Upload scope — single computation for every portal (bulk file, photo
+  // scan, manual add review). Admin: all drivers. Dispatcher: assigned
+  // drivers. Driver: self only (locked). Anything else: empty (blocked).
+  // FileUploadTrips enforces this in UI; handleUploadedTrips re-validates
+  // every trip before any write (UI lists are not trust).
+  const uploadScope = useMemo(
+    () => getUploadScopeForRole({
+      role,
+      currentUser,
+      drivers,
+      dispatchers,
+      selfDriver: role === 'driver' ? currentUserDriverProfile : null,
+    }),
+    [role, currentUser, drivers, dispatchers, currentUserDriverProfile]
   );
   const canControlDriver = useCallback((driver) => {
     if (role === 'admin') return true;
@@ -2129,6 +2145,47 @@ const App = () => {
 
   const handleUploadedTrips = useCallback(async (newTrips) => {
     try {
+      // Scope gate — runs BEFORE any write. Admin may file for anyone;
+      // dispatchers only for assigned drivers (or Unassigned); drivers only
+      // for themselves. Violations write NOTHING (fail closed, audited).
+      const outOfScope = (Array.isArray(newTrips) ? newTrips : []).filter(trip => !isTripInUploadScope(trip, uploadScope));
+      if (outOfScope.length > 0) {
+        const reason = role === 'driver'
+          ? 'Drivers can only upload trips for themselves.'
+          : role === 'dispatcher'
+            ? 'Dispatchers can only upload trips for their assigned drivers (or leave Unassigned).'
+            : 'Your role cannot import trips for these drivers.';
+        addAuditLog('Scope Blocked', `${currentUser} attempted to import ${outOfScope.length} out-of-scope trip(s). Nothing was written.`, 'rose');
+        throw new Error(`${reason} Blocked ${outOfScope.length} trip(s); nothing was imported.`);
+      }
+      // Merge-target ownership — an upload that MATCHES an existing trip would
+      // silently re-tag someone else's record (same booking key, forced to
+      // self). Non-admin imports may only merge trips they already own.
+      // Keys come from the shared tripImportKey (same function persist uses).
+      if (role !== 'admin') {
+        const selfEmail = normalizeEmail(currentUser);
+        const ownIds = new Set([
+          ...(currentUserDriverProfile?.id ? [currentUserDriverProfile.id] : []),
+          ...getDriverProfilesForEmail(drivers, selfEmail).map(driver => driver.id),
+        ].filter(Boolean));
+        const existingByKey = new Map();
+        [...trips, ...trashedTrips].forEach(trip => {
+          const key = tripImportKey(trip);
+          if (key && !existingByKey.has(key)) existingByKey.set(key, trip);
+        });
+        const hijacks = (Array.isArray(newTrips) ? newTrips : []).filter(incoming => {
+          const match = existingByKey.get(tripImportKey(incoming));
+          if (!match) return false;
+          if (role === 'driver') {
+            return !(ownIds.has(match.driverId) || normalizeEmail(match.driverEmail) === selfEmail);
+          }
+          return !isTripInDispatcherScope(match, scopedDrivers);
+        });
+        if (hijacks.length > 0) {
+          addAuditLog('Scope Blocked', `${currentUser} attempted to import ${hijacks.length} trip(s) matching records outside their scope. Nothing was written.`, 'rose');
+          throw new Error(`Blocked ${hijacks.length} trip(s) matching another driver's records; nothing was imported. Re-upload only your own trips.`);
+        }
+      }
       const result = await persistUploadedTrips(newTrips);
       addAuditLog('Trips Imported', `${currentUser} imported ${result.importedCount} trip(s).`, 'emerald');
       addToast('Trips Imported', `${result.importedCount} trip(s) imported successfully.`, 'success');
@@ -2138,7 +2195,7 @@ const App = () => {
       addToast('Import Not Saved', error.message || 'The import could not be confirmed.', 'danger');
       throw error;
     }
-  }, [addAuditLog, addToast, currentUser, persistUploadedTrips]);
+  }, [addAuditLog, addToast, currentUser, persistUploadedTrips, role, uploadScope, trips, trashedTrips, scopedDrivers, currentUserDriverProfile, drivers]);
 
   const executeDeleteTrip = async (tripId) => {
     try {
@@ -3098,6 +3155,8 @@ const App = () => {
               showUploadModal={showUploadModal}
               setShowUploadModal={setShowUploadModal}
               onTripsCreated={handleUploadedTrips}
+              uploadDrivers={uploadScope.allowedDrivers}
+              uploadLockedDriverId={uploadScope.lockedDriverId}
             /></Suspense>;
           })() : (
             <Suspense fallback={<LazyFallback />}><EnterpriseDashboard
@@ -3145,6 +3204,8 @@ const App = () => {
               setShowUploadModal={setShowUploadModal}
               uploadAssignDriver={uploadAssignDriver}
               setUploadAssignDriver={setUploadAssignDriver}
+              uploadDrivers={uploadScope.allowedDrivers}
+              uploadLockedDriverId={uploadScope.lockedDriverId}
               onTripsCreated={handleUploadedTrips}
               bulkAssignModal={bulkAssignModal}
               setBulkAssignModal={setBulkAssignModal}

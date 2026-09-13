@@ -32,6 +32,57 @@ service cloud.firestore {
     function userEmail() {
       return request.auth.token.email;
     }
+    // Upload/assignment scope for trip writes (least privilege).
+    // Admins and dispatchers (server-known roles) keep full write access;
+    // dispatcher-to-driver scoping is enforced client-side (App.jsx
+    // uploadScope + handleUploadedTrips gate) because the dispatcher identity
+    // is email-matched and not resolvable to a profile ID inside rules.
+    // Drivers may only write trips tagged to themselves: the write must carry
+    // their own auth email, and any assigned driverId must resolve to a driver
+    // profile with that same email (or not exist yet for syncing profiles).
+    // Legacy updates without driverEmail still pass when the stored driverId
+    // resolves to the writer's own email.
+    function tripWriterEmail() {
+      return request.auth.token.email;
+    }
+    function tripDriverIdMatchesWriter(driverId) {
+      return driverId == null
+        || driverId == ''
+        || !exists(/databases/$(database)/documents/drivers/$(driverId))
+        || get(/databases/$(database)/documents/drivers/$(driverId)).data.email == tripWriterEmail();
+    }
+    function tripSelfCreate() {
+      let data = request.resource.data;
+      return data.get('driverEmail', null) == tripWriterEmail()
+        && tripDriverIdMatchesWriter(data.get('driverId', null));
+    }
+    function tripSelfUpdate() {
+      let data = request.resource.data;
+      let old = resource.data;
+      return data.get('driverEmail', null) == tripWriterEmail()
+        || old.get('driverEmail', null) == tripWriterEmail()
+        || (old.get('driverId', null) != null
+          && old.get('driverId', null) != ''
+          && exists(/databases/$(database)/documents/drivers/$(old.driverId))
+          && get(/databases/$(database)/documents/drivers/$(old.driverId)).data.email == tripWriterEmail())
+        || tripTransferRecipientUpdate();
+    }
+    // Transfer decisions (accept/decline) touch trips owned by the SENDING
+    // driver, so the clauses above would block the recipient. A pending
+    // transfer explicitly addressed to the writer (by email, or by a driverId
+    // resolving to the writer) may update that trip — but the trip may only
+    // stay unassigned or resolve to the writer, never be redirected elsewhere.
+    function tripTransferRecipientUpdate() {
+      let data = request.resource.data;
+      let req = resource.data.get('transferRequest', {});
+      return req is map
+        && req.get('status', '') == 'pending'
+        && (req.get('toDriverEmail', '') == tripWriterEmail()
+          || (req.get('toDriverId', '') != '' && tripDriverIdMatchesWriter(req.get('toDriverId', ''))))
+        && (data.get('driverId', null) == null
+          || data.get('driverId', '') == ''
+          || tripDriverIdMatchesWriter(data.get('driverId', null)));
+    }
     function validOverrideCostPolicy() {
       let data = request.resource.data;
       return data.keys().hasAll([
@@ -96,8 +147,8 @@ service cloud.firestore {
     }
     match /trips/{tripId} {
       allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if signedIn();
+      allow create: if signedIn() && (isDispatcher() || tripSelfCreate());
+      allow update: if signedIn() && (isDispatcher() || tripSelfUpdate());
       allow delete: if signedIn() && isAdmin();
     }
     match /clientProfiles/{profileId} {

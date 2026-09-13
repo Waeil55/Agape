@@ -572,7 +572,7 @@ const Badge = ({ children, variant = 'info' }) => {
   return <span className={`px-2 py-0.5 rounded-full text-xs font-black border uppercase tracking-widest whitespace-nowrap ${variants[variant]}`}>{children}</span>;
 };
 
-const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', uploadContext = 'operations' }) => {
+const FileUploadTrips = ({ onTripsCreated, drivers = [], allowedDrivers, lockedDriverId = '', preSelectDriver = '', uploadContext = 'operations' }) => {
   const [file, setFile] = useState(null);
   const [step, setStep] = useState('upload');
   const [, setParsedRows] = useState([]);
@@ -588,6 +588,35 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
   const [, setSelectedCount] = useState(0);
   const [assignToDriver, setAssignToDriver] = useState(preSelectDriver || '');
   const [showAssignPrompt, setShowAssignPrompt] = useState(true);
+  // ===========================================================================
+  // UPLOAD SCOPE — who may file for whom. allowedDrivers is the authoritative
+  // list from App.jsx uploadScope (admin: all, dispatcher: assigned, driver:
+  // self, others: empty = blocked). `allowedDrivers ?? drivers` keeps legacy
+  // callers working; an explicitly EMPTY list blocks everything (fail closed).
+  // lockedDriverId (driver role) force-tags every trip to self and hides all
+  // assignment controls — drivers can never file for another driver.
+  // handleUploadedTrips re-validates every trip before any write (UI lists
+  // are not trust).
+  // ===========================================================================
+  const effectiveDrivers = allowedDrivers ?? drivers;
+  const scopeIds = new Set((effectiveDrivers || []).map(d => d?.id).filter(Boolean));
+  const isSelfLocked = !!lockedDriverId;
+  const scopeBlocked = (effectiveDrivers || []).length === 0;
+  const lockedProfile = isSelfLocked
+    ? ((effectiveDrivers || []).find(d => d?.id === lockedDriverId)
+      || (drivers || []).find(d => d?.id === lockedDriverId)
+      || null)
+    : null;
+  // Coerce stale/out-of-scope selections into scope (bulk selector, and the
+  // preSelectDriver context-menu value). Locked mode pins to self.
+  useEffect(() => {
+    if (isSelfLocked) {
+      if (lockedDriverId) setAssignToDriver(lockedDriverId);
+      return;
+    }
+    setAssignToDriver(prev => (prev && scopeIds.has(prev) ? prev : ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedDriverId, allowedDrivers]);
   // Date override: 'file' = use dates from file, 'manual' = use a single date for all trips
   const [dateMode, setDateMode] = useState('file'); // 'file' | 'manual'
   const [manualDate, setManualDate] = useState(() => {
@@ -1212,7 +1241,30 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
     }
 
     const cleanTrips = mappedTrips.map(({ _originalRow, ...trip }) => {
-      const finalDriverId = trip.driverId || assignToDriver || _originalRow['Driver ID'] || null;
+      // Scope enforcement (fail closed, before any write):
+      // - Self-locked (driver role): every trip is force-tagged to self,
+      //   including profile email/name so server rules can verify ownership.
+      // - Otherwise: an explicit driverId (CSV column, per-trip selector, or
+      //   bulk selector) must be inside the allow-list; Unassigned is allowed
+      //   only when the scope permits it (admin/dispatcher). Violations are
+      //   collected below and block the WHOLE import — never partially saved.
+      let finalDriverId = trip.driverId || assignToDriver || _originalRow?.['Driver ID'] || null;
+      let finalDriverEmail = trip.driverEmail || '';
+      let finalDriverName = trip.driverName || '';
+      let scopeViolation = '';
+      if (isSelfLocked) {
+        if (!lockedProfile?.id) {
+          scopeViolation = 'Your driver profile is still syncing. Wait a moment and retry; nothing was imported.';
+        } else {
+          finalDriverId = lockedProfile.id;
+          finalDriverEmail = lockedProfile.email || finalDriverEmail;
+          finalDriverName = lockedProfile.name || finalDriverName;
+        }
+      } else if (finalDriverId && !scopeIds.has(finalDriverId)) {
+        scopeViolation = `Trip for ${trip.patient || 'a client'} targets a driver outside your scope. Dispatchers may only file for assigned drivers.`;
+      } else if (!finalDriverId && scopeBlocked) {
+        scopeViolation = 'No drivers are in scope for your account. Nothing was imported.';
+      }
       let newStatus = trip.status;
 
       if (forceCompleted) {
@@ -1247,7 +1299,10 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
         pickup: trip.pickup || trip.pickupAddress || trip.originAddress || '',
         dropoff: trip.dropoff || trip.dropoffAddress || trip.destinationAddress || '',
         time: trip.time || trip.scheduledTime || '',
+        driverEmail: finalDriverEmail || trip.driverEmail || '',
+        driverName: finalDriverName || trip.driverName || '',
         updatedAtLocal: new Date().toISOString(),
+        _scopeViolation: scopeViolation,
       };
 
       if (finalDriverId) {
@@ -1255,7 +1310,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       }
       return baseTrip;
     }).filter((trip) => (trip.patient && trip.patient !== 'Unknown Client') || trip.pickup || trip.dropoff);
-    if (cleanTrips.length === 0) {
+    const scopeViolations = cleanTrips.filter(trip => trip._scopeViolation);
+    if (scopeViolations.length > 0) {
+      setError(`${scopeViolations[0]._scopeViolation} Blocked ${scopeViolations.length} trip(s); nothing was imported.`);
+      return;
+    }
+    const importTrips = cleanTrips.map(({ _scopeViolation, ...trip }) => trip);
+    if (importTrips.length === 0) {
       setError('No valid trips found. Each trip needs a real client name, service date, and pickup or dropoff address.');
       return;
     }
@@ -1265,7 +1326,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       setError('Trip import is unavailable: no save handler is connected. Close and retry.');
       return;
     }
-    onTripsCreated(cleanTrips);
+    onTripsCreated(importTrips);
   };
 
   const totalSelected = mappedTrips.length;
@@ -1287,11 +1348,29 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             <h2 className="text-xl sm:text-2xl font-semibold text-slate-900 mb-2">Upload Trips</h2>
             <p className="text-sm sm:text-base text-slate-600 mb-2">Import from CSV (.csv) or Excel (.xlsx / .xls).</p>
             <p className="text-xs sm:text-xs text-slate-500 mb-6 flex items-center gap-1"><BrainCircuit size={12} className="text-indigo-500 shrink-0" /> AI auto-validates addresses, times, and fields for accuracy.</p>
+            {isSelfLocked && (
+              <p className="text-xs sm:text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-6">
+                Uploading to yourself{lockedProfile?.name ? ` (${lockedProfile.name})` : ''} — drivers can only file trips for themselves.
+              </p>
+            )}
 
             {error && (
               <div className="p-3 sm:p-4 bg-rose-50 border border-rose-200 rounded-lg flex gap-3 items-start mb-6">
                 <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
                 <p className="text-rose-700 text-xs sm:text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Scope block — empty allow-list (unknown role, dispatcher with no
+                assigned drivers, driver profile still syncing). Everything
+                below stays disabled until scope exists. */}
+            {scopeBlocked && (
+              <div role="alert" className="p-3 sm:p-4 bg-rose-50 border border-rose-200 rounded-lg flex gap-3 items-start mb-6">
+                <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                <p className="text-rose-700 text-xs sm:text-sm font-medium">
+                  Uploading is unavailable for your account right now — no drivers are in scope.
+                  Drivers file for themselves; dispatchers file for assigned drivers.
+                </p>
               </div>
             )}
 
@@ -1405,7 +1484,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   ))}
                 </div>
               )}
-              {readyPhotoCount > 0 && (
+              {readyPhotoCount > 0 && !scopeBlocked && (
                 <button
                   onClick={processPhotos}
                   className="mt-3 w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-sm text-sm active:scale-[0.99]"
@@ -1422,7 +1501,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
               </label>
             </div>
 
-            <button onClick={processFile} disabled={!file} className="w-full py-3 sm:py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm text-sm">
+            <button onClick={processFile} disabled={!file || scopeBlocked} className="w-full py-3 sm:py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm text-sm">
               <Zap size={18} /> Process &amp; Validate
             </button>
 
@@ -1569,8 +1648,13 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   </tr>
                 </thead>
                 <tbody>
-                  {mappedTrips.map((trip, idx) => (
-                    <tr key={idx} className={`border-b border-slate-100 hover:bg-slate-50 ${trip._hasIssues ? 'bg-amber-50/50' : ''}`}>
+                  {mappedTrips.map((trip, idx) => {
+                    // Scope flag for the review table: a CSV-matched driverId
+                    // outside the allow-list blocks the whole import at
+                    // confirmImport — surface it HERE so the user sees why.
+                    const tripOutOfScope = !isSelfLocked && !!trip.driverId && !scopeIds.has(trip.driverId);
+                    return (
+                    <tr key={idx} className={`border-b border-slate-100 hover:bg-slate-50 ${trip._hasIssues || tripOutOfScope ? 'bg-amber-50/50' : ''}`}>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 font-mono text-slate-500">{idx + 1}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs font-semibold text-slate-900 whitespace-nowrap">
                         {trip.patient}
@@ -1585,6 +1669,11 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 max-w-[80px] sm:max-w-[160px] truncate" title={trip.dropoff}>{trip.dropoff || <span className="text-rose-400 italic">missing</span>}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5 text-xs sm:text-xs text-slate-600 hidden sm:table-cell">{trip.time}</td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
+                        {isSelfLocked ? (
+                          <span className="text-xs sm:text-xs font-bold text-emerald-700 whitespace-nowrap" title="Drivers can only file for themselves">
+                            {lockedProfile?.name || 'Self'}
+                          </span>
+                        ) : (
                         <select
                           value={trip.driverId || ''}
                           onChange={(e) => {
@@ -1593,12 +1682,16 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                           className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
                         >
                           <option value="">Auto/Unassigned</option>
-                          {drivers.map(d => (
+                          {effectiveDrivers.map(d => (
                             <option key={d.id} value={d.id}>{d.name}</option>
                           ))}
                         </select>
+                        )}
                       </td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
+                        {tripOutOfScope && (
+                          <span className="text-xs sm:text-xs text-rose-700 font-bold flex items-center gap-1"><AlertTriangle size={8} /> Out of scope — blocks import</span>
+                        )}
                         {trip._hasIssues ? (
                           <div className="flex flex-col gap-0.5">
                             {trip._issues.slice(0, 1).map((issue, i) => (
@@ -1606,13 +1699,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                             ))}
                             {trip._issues.length > 1 && <span className="text-xs sm:text-xs text-amber-500">+{trip._issues.length - 1} more</span>}
                           </div>
-                        ) : <span className="text-emerald-500 text-xs sm:text-xs">&mdash;</span>}
+                        ) : !tripOutOfScope && <span className="text-emerald-500 text-xs sm:text-xs">&mdash;</span>}
                       </td>
                       <td className="px-2 sm:px-3 py-1.5 sm:py-2.5">
                         <Badge variant={trip._confidence >= 90 ? 'success' : trip._confidence >= 70 ? 'warning' : 'danger'}>{trip._confidence}%</Badge>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1676,6 +1770,14 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             </div>
 
             {uploadContext !== 'reports' && (
+            isSelfLocked ? (
+              <div className="mt-4 sm:mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <p className="text-xs sm:text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="shrink-0" />
+                  Uploading to yourself{lockedProfile?.name ? ` (${lockedProfile.name})` : ''} — drivers can only file trips for themselves.
+                </p>
+              </div>
+            ) : (
             <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-black text-slate-900 flex items-center gap-2">
@@ -1693,8 +1795,8 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                   <div className="flex gap-2">
                     <select value={assignToDriver} onChange={(e) => setAssignToDriver(e.target.value)} className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-white font-semibold shadow-sm">
                       <option value="">Leave Most as {forceCompleted ? 'Unassigned (Driver Unknown)' : 'Unassigned'} (Or use per-trip selector below)</option>
-                      {drivers.map(d => (
-                         <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} (Active)</option>
+                      {effectiveDrivers.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} — {d.vehicle || 'No vehicle'} (Active)</option>
                       ))}
                     </select>
                     {assignToDriver && (
@@ -1706,7 +1808,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
 
                   {assignToDriver && (
                     <p className="text-xs text-emerald-700 font-black flex items-center gap-1.5 uppercase tracking-wider">
-                      <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {drivers.find(d => d.id === assignToDriver)?.name}
+                      <CheckCircle2 size={12} /> All {mappedTrips.length} trips will default to {(effectiveDrivers.find(d => d.id === assignToDriver) || drivers.find(d => d.id === assignToDriver))?.name}
                     </p>
                   )}
                   <p className="text-xs text-slate-500 font-semibold italic">Tip: You can still override individual trips in the table below.</p>
@@ -1721,6 +1823,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                 </div>
               )}
             </div>
+            )
             )}
 
             <div className="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-3">

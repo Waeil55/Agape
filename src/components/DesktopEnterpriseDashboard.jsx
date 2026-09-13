@@ -159,7 +159,7 @@ const findTripLocations = (trip, trips, trashedTrips, logs) => {
   return locations;
 };
 
-const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers, vehicles = [], setVehicles, trashedTrips = [], setTrashedTrips, restoreTrip, logs = [], phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings, overridePolicy, overridePolicyStatus, overridePolicyError, updateOverridePolicy, selectedTasks = [], setSelectedTasks, searchQuery, setSearchQuery, smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip, smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing, showOptimizeModal, setShowOptimizeModal, showUploadModal, setShowUploadModal, uploadAssignDriver, onTripsCreated, bulkAssignModal, setBulkAssignModal, addToast, addAuditLog, persistState, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, assignTripToDriver, bulkAssignTrips, requestDeleteTrip, requestBulkDelete, updateTrip, updateTrashedTrip, makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal, driverTelemetry = [], timeTrackingDeclarations = [], onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [], onUpdateDriverTrip, onDriverStatusUpdate, onLogout }) => {
+const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, drivers = [], setDrivers, upsertDriverProfile, assignVehicleToDriver, dispatchers = [], setDispatchers, vehicles = [], setVehicles, trashedTrips = [], setTrashedTrips, restoreTrip, logs = [], phoneNumbers, setPhoneNumbers, appSettings, updateAppSettings, overridePolicy, overridePolicyStatus, overridePolicyError, updateOverridePolicy, selectedTasks = [], setSelectedTasks, searchQuery, setSearchQuery, smartAssignTrip, setSmartAssignTrip, manualAssignTrip, setManualAssignTrip, smartAssignResult, setSmartAssignResult, aiAnalyzing, setAiAnalyzing, showOptimizeModal, setShowOptimizeModal, showUploadModal, setShowUploadModal, uploadAssignDriver, uploadDrivers, uploadLockedDriverId = '', onTripsCreated, bulkAssignModal, setBulkAssignModal, addToast, addAuditLog, persistState, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, assignTripToDriver, bulkAssignTrips, requestDeleteTrip, requestBulkDelete, updateTrip, updateTrashedTrip, makeCall, sendSMS, handleUpdateDriverLocation, addTrip, showAddTripModal, setShowAddTripModal, driverTelemetry = [], timeTrackingDeclarations = [], onDispatcherStatusUpdate, driverWorkDrivers = [], driverWorkTrips = [], allDrivers = [], onUpdateDriverTrip, onDriverStatusUpdate, onLogout }) => {
   const { unreadCount } = useChat({ alerts: true });
   const displayLoginId = String(currentUser || '').replace(/@auth\.agapecare\.local$/i, '');
   const VALID_PANELS = ['operations', 'liveMap', 'reports', 'admin', 'settings', 'drive', 'routePlanner', 'dispatch', 'chat'];
@@ -1347,6 +1347,8 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                 <FileUploadTrips
                   uploadContext={activePanel}
                   drivers={drivers}
+                  allowedDrivers={uploadDrivers}
+                  lockedDriverId={uploadLockedDriverId}
                   preSelectDriver={uploadAssignDriver}
                   onTripsCreated={onTripsCreated}
                 />

@@ -628,7 +628,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const phoneNumbers = phoneNumbersProp;
   const me = useMemo(
@@ -7740,6 +7740,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <LazyFileUploadTrips
                   onTripsCreated={onTripsCreated}
                   drivers={allDrivers}
+                  allowedDrivers={uploadDrivers}
+                  lockedDriverId={uploadLockedDriverId}
                   preSelectDriver={drivers[0]?.id || ''}
                   uploadContext="driver"
                 />

@@ -77,6 +77,7 @@ export const buildOperationalTripRecord = (trip = {}) => {
 };
 
 export const mergeTripCollections = (baseTrips = [], liveTrips = [], progressByTrip = {}) => {
+
   const byId = new Map();
   (baseTrips || []).filter(Boolean).forEach((trip) => {
     if (!trip.id) return;
@@ -94,4 +95,22 @@ export const mergeTripCollections = (baseTrips = [], liveTrips = [], progressByT
     const progress = progressByTrip?.[trip.id];
     return progress ? { ...trip, ...progress } : trip;
   });
+};
+
+// =============================================================================
+// tripImportKey — deterministic dedup/merge key for bulk imports.
+//
+// SINGLE SOURCE OF TRUTH shared by:
+//   useFirestoreAppData.persistUploadedTrips (merge + reactivation), and
+//   App.jsx handleUploadedTrips (pre-write scope gate: an upload that MERGES
+//   into an existing trip must already own that trip, or the import would
+//   silently re-tag someone else's record).
+// Do NOT fork this logic — change it here and both paths stay in sync.
+// =============================================================================
+export const tripImportKey = (trip) => {
+  const bookingId = String(trip?.bookingId || '').trim();
+  if (bookingId && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bookingId)) return `booking::${bookingId}`;
+  return ['patient', 'date', 'time', 'pickup', 'dropoff']
+    .map((field) => String(trip?.[field] || '').trim().toLowerCase().replace(/\s+/g, ' '))
+    .join('|');
 };

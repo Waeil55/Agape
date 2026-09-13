@@ -6,7 +6,7 @@ import {
   buildTripEvents,
   emitSystemEvents,
 } from '../services/firestoreEventEngine';
-import { buildOperationalTripRecord, isOperationalTrip } from '../utils/tripLifecycle';
+import { buildOperationalTripRecord, isOperationalTrip, tripImportKey } from '../utils/tripLifecycle';
 import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import {
   filterValidTripRecords,
@@ -772,13 +772,9 @@ export function useFirestoreAppData({ tenantId, resubscribeKey = 0, enabled = tr
         throw new Error('Trip import requires a verified connection. Reconnect and retry; no trips were changed.');
       }
       const baseData = normalizeData(dataRef.current);
-      const makeKey = (trip) => {
-        const bookingId = String(trip?.bookingId || '').trim();
-        if (bookingId && !/^(BK-\d+-\d+|TRP-\d+|TRIP-\d{10,}-\d+)$/i.test(bookingId)) return `booking::${bookingId}`;
-        return ['patient', 'date', 'time', 'pickup', 'dropoff']
-          .map((field) => String(trip?.[field] || '').trim().toLowerCase().replace(/\s+/g, ' '))
-          .join('|');
-      };
+      // Merge keys come from the shared tripImportKey (see tripLifecycle.js) —
+      // App.jsx runs the same keys for its pre-write scope gate.
+      const makeKey = (trip) => tripImportKey(trip);
       const activeByKey = new Map(baseData.trips.map((trip) => [makeKey(trip), trip]));
       const archivedByKey = new Map(baseData.trashedTrips.map((trip) => [makeKey(trip), trip]));
       const importedTrips = newTrips.map((incoming) => {
