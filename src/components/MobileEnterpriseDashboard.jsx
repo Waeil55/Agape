@@ -310,7 +310,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (subView === 'admin') {
       return (
         <SubViewWrapper title="User Management" renderTopBar={renderTopBar}>
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileAdminPage {...props} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><MobileAdminPage {...props} onShowUploadModal={setShowUploadModal} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }
@@ -542,6 +542,7 @@ const MobileEnterpriseDashboard = (props) => {
               onAddTrip={props.addTrip}
               onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
               onDeleteTrip={props.requestDeleteTrip}
+              onShowUploadModal={setShowUploadModal}
             /></Suspense></ErrorBoundary>
           </div>
         </div>

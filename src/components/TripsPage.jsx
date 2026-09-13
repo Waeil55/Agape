@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { AlertCircle, Users, UserCheck, X, Plus, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal } from 'lucide-react';
+import { AlertCircle, Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal } from 'lucide-react';
 
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { saveClientProfile } from '../utils/clientProfileUtils';
@@ -43,7 +43,7 @@ const toTimeInput = (value) => {
 
 const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', patientPhone: '', clientPhone: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
 
-const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip }) => {
+const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip, onShowUploadModal }) => {
   const getClientPhone = (trip) => resolveClientPhoneForTrip(trip, trips);
   const today = useMemo(() => getTodayStr(), []);
   const [sortBy, setSortBy] = useState('time');
@@ -505,7 +505,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       />
       {/* HEADER CONTROLS */}
       <div className="card p-4 sm:p-6 space-y-4">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:hidden">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 sm:hidden">
           <button
             type="button"
             aria-expanded={mobileFiltersOpen}
@@ -520,10 +520,20 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             </span>
             <ChevronDown size={16} className={`shrink-0 transition-transform ${mobileFiltersOpen ? 'rotate-180' : ''}`} />
           </button>
+          {onShowUploadModal && (
+            <button
+              type="button"
+              onClick={() => onShowUploadModal(true)}
+              className="rounded-xl bg-blue-500 px-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 active:scale-95 transition-transform"
+              title="Upload CSV or scan trips"
+            >
+              <Upload size={16} className="inline" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowCreateForm(true)}
-            className="rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white shadow-sm shadow-emerald-500/20"
+            className="rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-transform"
           >
             <Plus size={16} className="inline" /> New
           </button>

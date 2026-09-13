@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useMemo, useState, useRef, useEffect } from 'react';
-import { Activity, BellRing, Briefcase, CheckCircle2, CircleDot, Clock3, KeyRound, LayoutDashboard, Mail, Phone, RadioTower, Search, ShieldCheck, TrendingUp, Truck, Users, Wrench, ServerCog } from 'lucide-react';
+import { Activity, BellRing, Briefcase, CheckCircle2, CircleDot, Clock3, KeyRound, LayoutDashboard, Mail, Phone, RadioTower, Search, ShieldCheck, TrendingUp, Truck, Users, Wrench, ServerCog, Upload } from 'lucide-react';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { auth, sendPasswordResetEmail } from '../config/firebase';
 import { recordMatchesSearch } from '../utils/search';
@@ -218,6 +218,7 @@ const MobileAdminPage = ({
   assignVehicleToDriver,
   onAssignTrip,
   onUploadForDriver,
+  onShowUploadModal,
   appSettings = {},
   onUpdateAppSettings,
   updateAppSettings,
@@ -376,9 +377,21 @@ const MobileAdminPage = ({
       hideBrand
       navInline
       actions={
-        <AdminBadge tone={unassignedTrips.length ? 'danger' : 'online'} dot>
-          {unassignedTrips.length ? `${unassignedTrips.length} open` : 'Live'}
-        </AdminBadge>
+        <div className="flex items-center gap-2">
+          {onShowUploadModal && (
+            <button
+              type="button"
+              onClick={() => onShowUploadModal(true)}
+              className="min-h-9 w-9 rounded-lg bg-blue-500 text-white flex items-center justify-center active:scale-95 transition-transform shadow-sm"
+              title="Upload CSV or scan trips"
+            >
+              <Upload size={15} />
+            </button>
+          )}
+          <AdminBadge tone={unassignedTrips.length ? 'danger' : 'online'} dot>
+            {unassignedTrips.length ? `${unassignedTrips.length} open` : 'Live'}
+          </AdminBadge>
+        </div>
       }
     >
       <div className="mobile-admin-page bg-slate-50 pb-24">

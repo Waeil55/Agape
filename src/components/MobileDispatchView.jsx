@@ -620,6 +620,15 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
               >
                 <SlidersHorizontal size={16} />
               </button>
+              {/* Upload trips button */}
+              <button
+                type="button"
+                onClick={() => setShowUploadModal?.(true)}
+                className="min-h-11 w-11 rounded-xl bg-blue-500 text-white flex items-center justify-center active:scale-95 transition-colors shadow-sm shrink-0"
+                title="Upload CSV or scan trips"
+              >
+                <Upload size={16} />
+              </button>
               {/* Add trip button */}
               <button
                 type="button"
