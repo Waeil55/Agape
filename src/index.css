@@ -5488,11 +5488,12 @@ textarea:focus,
   overscroll-behavior: contain;
   transform: translate3d(0, var(--login-keyboard-counter-pan, 0px), 0);
   transform-origin: top left;
+  transition: transform 0.12s linear;
   background: var(--brand-primary);
 }
 
 html.login-keyboard-open .agape-login {
-  transition: none !important;
+  transition: transform 0.08s linear !important;
   overscroll-behavior: none;
 }
 
@@ -5585,7 +5586,8 @@ html.login-keyboard-open .agape-login {
     flex-direction: column;
     min-height: 100%;
     align-items: center;
-    justify-content: safe center;
+    justify-content: flex-start;
+    padding-top: clamp(1rem, 8vh, 3rem);
     gap: 1rem;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }

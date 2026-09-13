@@ -54,8 +54,10 @@ export default function useLoginKeyboardStability(enabled) {
       if (!login || !event.target?.matches?.('input, textarea, select')) return;
       if (!activeLogin) {
         activeLogin = login;
-        baselinePageTop = getVisualPageTop();
+        // Set will-change BEFORE capturing baseline so the browser optimizes
+        // the layer before any scroll/viewport change occurs.
         login.style.willChange = 'transform';
+        baselinePageTop = getVisualPageTop();
         root.classList.add('login-keyboard-open');
       }
       scheduleLock();
