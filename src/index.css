@@ -5486,14 +5486,11 @@ textarea:focus,
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  transform: translate3d(0, var(--login-keyboard-counter-pan, 0px), 0);
   transform-origin: top left;
-  transition: transform 0.12s linear;
   background: var(--brand-primary);
 }
 
 html.login-keyboard-open .agape-login {
-  transition: transform 0.08s linear !important;
   overscroll-behavior: none;
 }
 
