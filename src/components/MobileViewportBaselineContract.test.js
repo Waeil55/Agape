@@ -35,7 +35,8 @@ describe('protected mobile viewport baseline from 839030d', () => {
       /@media \(max-width: 1023px\)[\s\S]*?\.agape-login-stage\s*\{([^}]*)\}/,
     );
     expect(mobileLogin).not.toBeNull();
-    expect(mobileLogin[1]).toContain('min-height: 100%');
+    expect(mobileLogin[1]).toContain('height: 100%');
+    expect(mobileLogin[1]).toContain('overflow-y: auto');
     expect(mobileLogin[1]).not.toContain('min-height: 0');
   });
 

@@ -6,20 +6,23 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 describe('login keyboard stability contract', () => {
-  it('keeps the login container fixed and does not use dynamic viewport units', () => {
+  it('locks the login container so the keyboard never shifts content', () => {
     const css = read('src/index.css');
-    expect(css).toContain('position: fixed !important');
-    expect(css).toContain('height: 100vh');
-    expect(css).not.toContain('.agape-login {\n  height: 100dvh');
+    const loginBlock = css.substring(css.indexOf('.agape-login {'), css.indexOf('.agape-login-backdrop'));
+    expect(loginBlock).toContain('position: fixed !important');
+    expect(loginBlock).toContain('height: 100%');
+    expect(loginBlock).toContain('overflow: hidden !important');
+    expect(loginBlock).toContain('touch-action: none');
+    expect(loginBlock).toContain('overscroll-behavior: none');
+    expect(loginBlock).not.toContain('100vh');
+    expect(loginBlock).not.toContain('translate3d');
   });
 
-  it('applies KeyboardResize.None on native shell without counter-pan transforms', () => {
+  it('uses visualViewport resize detection and scroll lock', () => {
     const hook = read('src/hooks/useLoginKeyboardStability.js');
-    const css = read('src/index.css');
+    expect(hook).toContain('visualViewport');
+    expect(hook).toContain('resize');
+    expect(hook).toContain('scrollTo(0, 0)');
     expect(hook).toContain('Keyboard.setResizeMode({ mode: KeyboardResize.None })');
-    expect(hook).toContain('isNativeShell()');
-    expect(css).not.toContain('--login-keyboard-counter-pan');
-    const loginBlock = css.substring(css.indexOf('.agape-login {'), css.indexOf('.agape-login-backdrop'));
-    expect(loginBlock).not.toContain('translate3d');
   });
 });
