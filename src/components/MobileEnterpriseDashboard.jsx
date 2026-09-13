@@ -691,7 +691,7 @@ const MobileEnterpriseDashboard = (props) => {
       {showUploadModal && (
         <div className="fixed inset-0 z-[250] bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-900">Upload & OCR Trips</h3>
+            <h3 className="text-sm font-bold text-slate-900">Upload Trips</h3>
             <button onClick={() => setShowUploadModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
               <X size={16} />
             </button>

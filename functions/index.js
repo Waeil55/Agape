@@ -637,9 +637,21 @@ exports.enterpriseAiGenerate = functions
         }
       );
       const text = String(response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
-      if (!text) throw new Error("AI provider returned no content.");
+      // Empty content on a vision call means the photo had nothing readable
+      // (blank/blurry/blocked) — report THAT, not a generic outage, so the
+      // user retakes the photo instead of waiting on a healthy service.
+      if (!text) {
+        throw new functions.https.HttpsError(
+          "unavailable",
+          imagePart
+            ? "The scan found no readable trips in that photo. Retake with the sheet flat, well-lit, and filling the frame."
+            : "AI provider returned no content."
+        );
+      }
       return { text, model, serverProcessed: true };
     } catch (error) {
+      // Preserve precise HttpsErrors thrown above (validation, empty scan).
+      if (error instanceof functions.https.HttpsError) throw error;
       functions.logger.warn("Secure enterprise AI request failed.", {
         uid: context.auth.uid,
         role: actor.role,

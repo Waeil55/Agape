@@ -3097,6 +3097,7 @@ const App = () => {
               setShowAddTripModal={setShowAddTripModal}
               showUploadModal={showUploadModal}
               setShowUploadModal={setShowUploadModal}
+              onTripsCreated={handleUploadedTrips}
             /></Suspense>;
           })() : (
             <Suspense fallback={<LazyFallback />}><EnterpriseDashboard

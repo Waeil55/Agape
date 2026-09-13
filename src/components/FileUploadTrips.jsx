@@ -1259,6 +1259,12 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
       setError('No valid trips found. Each trip needs a real client name, service date, and pickup or dropoff address.');
       return;
     }
+    // Fail closed: a missing save handler must block with a reason — never
+    // silently drop a reviewed import (this bit the driver portal once).
+    if (typeof onTripsCreated !== 'function') {
+      setError('Trip import is unavailable: no save handler is connected. Close and retry.');
+      return;
+    }
     onTripsCreated(cleanTrips);
   };
 
@@ -1376,7 +1382,24 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                         {p.status === 'error' && <span className="rounded-full bg-rose-600/90 px-1.5 py-px text-xs font-bold text-white">failed</span>}
                       </div>
                       {p.status === 'error' && p.error && (
-                        <p className="px-1.5 py-1 text-xs font-medium text-rose-600 leading-tight truncate" title={p.error}>{p.error}</p>
+                        <div className="px-1.5 py-1">
+                          {/* Full message is always visible on tap — mobile has
+                              no hover tooltips, so truncation alone hides the
+                              reason a scan failed. */}
+                          <details>
+                            <summary className="text-xs font-bold text-rose-600 leading-tight cursor-pointer">Failed — tap for reason</summary>
+                            <p className="text-xs font-medium text-rose-600 leading-snug mt-0.5 break-words">{p.error}</p>
+                            {p.dataUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setPhotoFiles(prev => prev.map(q => (q.id === p.id ? { ...q, status: 'ready', error: '' } : q)))}
+                                className="mt-1 rounded-lg bg-rose-600 px-2 py-1 text-xs font-bold text-white active:scale-95 transition"
+                              >
+                                Retry this photo
+                              </button>
+                            )}
+                          </details>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -1700,7 +1723,17 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
             </div>
             )}
 
-            <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-3">
+              {/* Review-step errors (blocked import, missing date/saver) must be
+                  visible HERE — the upload-step banner above does not render in
+                  review, so without this the Import button fails silently. */}
+              {error && (
+                <div className="w-full p-3 sm:p-4 bg-rose-50 border border-rose-200 rounded-xl flex gap-3 items-start">
+                  <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                  <p className="text-rose-700 text-xs sm:text-sm font-medium">{error}</p>
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button onClick={() => { setStep('upload'); setFile(null); setMappedTrips([]); setParsedRows([]); setError(''); setPhotoNotice(''); clearPhotoFiles(); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="w-full sm:flex-1 py-3 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition text-sm">
                 Cancel
               </button>
@@ -1708,6 +1741,7 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], preSelectDriver = '', u
                 <CheckCircle2 size={18} />
                 Import {totalSelected} {forceCompleted ? 'Completed ' : ''}Trips
               </button>
+              </div>
             </div>
           </div>
         </div>
