@@ -918,12 +918,13 @@ const App = () => {
     });
   }, [resetSessionState]);
 
-  const handleSecurityTermination = useCallback(({ message }) => {
+  const handleSecurityTermination = useCallback(async ({ message }) => {
     const uid = auth.currentUser?.uid;
+    loginInProgressRef.current = false;
     skipNextSignedOutResetRef.current = true;
     clearRoleCache();
     clearSecuritySession(uid);
-    signOut(auth).catch(() => {});
+    await signOut(auth).catch(() => {});
     resetSessionState({
       loginErrorMessage: message || 'Your secure session ended. Please sign in again.',
     });
@@ -1090,15 +1091,17 @@ const App = () => {
     }, AUTH_WATCHDOG_TIMEOUT_MS);
 
     // Helper: apply authenticated session state and clear loading immediately
-    const applySession = (userRole, userEmail, userDoc, capturedUser, cachedTenantId = null) => {
+    const applySession = async (userRole, userEmail, userDoc, capturedUser, cachedTenantId = null) => {
       if (cancelled || !capturedUser?.uid || auth.currentUser?.uid !== capturedUser.uid) return;
       const requestedPortalRole = loginPortalRoleRef.current;
 
       // Role gate check
       if (requestedPortalRole && requestedPortalRole !== userRole) {
         const preferredLoginId = String(userDoc?.data?.()?.username || authEmailToUsername(userEmail || '') || userEmail || '').trim();
+        loginInProgressRef.current = false;
         skipNextSignedOutResetRef.current = true;
-        signOut(auth).catch(() => {});
+        await signOut(auth).catch(() => {});
+        clearRoleCache();
         resetSessionState({
           loginErrorMessage: getRoleGateMessage(requestedPortalRole, userRole),
           preserveEmail: true,
@@ -1589,6 +1592,18 @@ const App = () => {
     setLoginError('');
     loginInProgressRef.current = true;
     setLoginSubmitting(true);
+    // Safety timeout: if the auth observer / Firestore lookup / role gate chain
+    // doesn't resolve within 15 seconds, force-unstick the login UI so the user
+    // is never trapped behind a permanently disabled button.
+    const SAFETY_TIMEOUT_MS = 15_000;
+    const safetyTimer = setTimeout(() => {
+      if (loginInProgressRef.current) {
+        loginInProgressRef.current = false;
+        setLoginSubmitting(false);
+        setIsLoading(false);
+        setLoginError('Login is taking longer than expected. Please try again.');
+      }
+    }, SAFETY_TIMEOUT_MS);
     let acknowledgeLogin;
     const observerAcknowledgement = new Promise((resolve) => {
       acknowledgeLogin = resolve;
@@ -1623,6 +1638,7 @@ const App = () => {
       if (failure.clearPassword) setPassword('');
       setLoginError(failure.message);
     } finally {
+      clearTimeout(safetyTimer);
       if (loginObserverAckRef.current === acknowledgeLogin) {
         loginObserverAckRef.current = null;
       }
