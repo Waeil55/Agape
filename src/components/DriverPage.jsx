@@ -20,7 +20,7 @@ const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
-import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair } from 'lucide-react';
+import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Upload } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { tripMatchesSearch } from '../utils/search';
 import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, classifyGap, buildTimeEvents } from '../utils/timeTracking';
@@ -48,6 +48,7 @@ import DriverQuickSmsSheet from './DriverQuickSmsSheet';
 
 const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
 const LazyTimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
+const LazyFileUploadTrips = lazy(() => import('./FileUploadTrips'));
 const LazyFallback = () => <div className="flex items-center justify-center p-12"><div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" /></div>;
 
 const isWillCall = (trip) => {
@@ -627,7 +628,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const phoneNumbers = phoneNumbersProp;
   const me = useMemo(
@@ -4609,6 +4610,15 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           <div className="flex w-full items-center justify-between gap-2 px-1 pt-1">
             <span className="shrink-0 text-xs font-semibold text-slate-500">{todayTrips.length} trip{todayTrips.length !== 1 ? 's' : ''}</span>
             <div className="flex min-w-0 items-center justify-end gap-1.5">
+              {setShowUploadModal && (
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="h-7 w-7 text-white font-medium flex items-center justify-center active:scale-95 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg shadow-sm"
+                  title="Upload CSV or scan trips"
+                >
+                  <Upload size={13} />
+                </button>
+              )}
               {onAddTrip && (
                 <button
                   onClick={() => setShowAddTripModal && setShowAddTripModal(true)}
@@ -7711,6 +7721,29 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <span className="text-white">{driverLocStream?.intervalMs || '—'}ms</span>
               <span className="text-slate-500">Err</span>
               <span className={`truncate ${driverLocStream?.error ? 'text-rose-400' : 'text-slate-500'}`}>{driverLocStream?.error || 'none'}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== FILE UPLOAD MODAL ===== */}
+      {showUploadModal && setShowUploadModal && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
+          <div className="relative flex flex-col w-full max-w-2xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <h3 className="text-sm font-bold text-slate-800">Upload Trips</h3>
+              <button onClick={() => setShowUploadModal(false)} className="p-1.5 rounded-xl hover:bg-slate-50 transition-colors"><X size={16} className="text-slate-600" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <Suspense fallback={<div className="flex items-center justify-center py-12 text-xs text-slate-400">Loading upload tool...</div>}>
+                <LazyFileUploadTrips
+                  onTripsCreated={() => { setShowUploadModal(false); }}
+                  drivers={allDrivers}
+                  preSelectDriver={drivers[0]?.id || ''}
+                  uploadContext="driver"
+                />
+              </Suspense>
             </div>
           </div>
         </div>

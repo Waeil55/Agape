@@ -3095,6 +3095,8 @@ const App = () => {
               requestAuthAction={requestAuthAction}
               showAddTripModal={showAddTripModal}
               setShowAddTripModal={setShowAddTripModal}
+              showUploadModal={showUploadModal}
+              setShowUploadModal={setShowUploadModal}
             /></Suspense>;
           })() : (
             <Suspense fallback={<LazyFallback />}><EnterpriseDashboard
