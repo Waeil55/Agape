@@ -243,7 +243,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   {task.legs}
                 </button>
               )}
-              {isExpanded && <StatusBadge status={task.status} />}
+              {/* Status always visible — the card must answer state at a glance */}
+              <StatusBadge status={task.status} />
               {!isExpanded && !isTerminal && actions && (actions.onNoShow || actions.onCancel || actions.onReroute || actions.onTransfer) && (
                 <div className="relative" ref={menuRef}>
                   <button onClick={(e) => { e.stopPropagation(); setMenuOpen(prev => !prev); }} className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
@@ -306,21 +307,35 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
           </div>
 
           {!isExpanded && (
-            <div className="flex items-stretch gap-2.5">
-              <div className="flex flex-col items-center justify-center pt-0.5 pb-0.5">
-                <div className="w-[6px] h-[6px] rounded-full bg-blue-500 ring-[2px] ring-blue-100"></div>
-                <div className="w-[1.5px] h-3 bg-slate-200/80 my-0.5 rounded-full"></div>
-                <div className="w-[6px] h-[6px] rounded-full bg-emerald-500 ring-[2px] ring-emerald-100"></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg border border-emerald-100/70 bg-emerald-50/60 p-1.5 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 leading-none">Pickup</p>
+                <p className="mt-1 truncate text-[13px] font-semibold leading-tight text-slate-800" title={pickupAddress}>{pickupAddress || '—'}</p>
               </div>
-              <div className="flex flex-col justify-between flex-1 gap-0.5 min-w-0">
-                <div className="flex items-center gap-1 min-w-0">
-                  <p className="text-[12px] font-medium text-slate-600 truncate">{pickupAddress}</p>
+              <div className="rounded-lg border border-rose-100/70 bg-rose-50/60 p-1.5 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-rose-700 leading-none">Dropoff</p>
+                  {task.details?.distance && (
+                    <span className="rounded border border-slate-200/70 bg-white/90 px-1.5 py-px text-[11px] font-bold tabular-nums text-slate-700 shadow-sm">{task.details.distance}</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 min-w-0">
-                  <p className="text-[12px] font-medium text-slate-600 truncate">{dropoffAddress}</p>
-                </div>
+                <p className="mt-1 truncate text-[13px] font-semibold leading-tight text-slate-800" title={dropoffAddress}>{dropoffAddress || '—'}</p>
               </div>
             </div>
+          )}
+
+          {/* Drive — opens the trip work page (current progress: start trip,
+              navigate, arrived, odometer, complete). Tapping the card does the
+              same; this button makes the workflow entry explicit. */}
+          {!isExpanded && !isTerminal && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
+              className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm active:scale-[0.99] transition-transform hover:bg-blue-700"
+              aria-label={`${task.activeTrip ? 'Continue' : 'Drive'} trip for ${task.patient || task.patientName || 'client'}`}
+            >
+              <Navigation size={13} /> {task.activeTrip ? 'Continue' : 'Drive'}
+            </button>
           )}
         </div>
       </div>

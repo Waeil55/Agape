@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { AlertCircle, Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal } from 'lucide-react';
+import { AlertCircle, Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, User } from 'lucide-react';
 
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { saveClientProfile } from '../utils/clientProfileUtils';
@@ -10,18 +10,16 @@ import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
 import TripActionCenter from './trips/TripActionCenter';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
-
-
-
-const getManifestStatusClass = (status) => {
-  if (status === 'Unassigned') return 'bg-rose-100 text-rose-700';
-  if (status === 'Assigned') return 'bg-blue-100 text-blue-700';
-  if (['In Progress', 'In Mission', 'At Pickup', 'In Transit', 'At Dropoff', 'En Route', 'Navigating Pickup', 'Navigating Dropoff', 'Arrived'].includes(status)) return 'bg-amber-100 text-amber-700';
-  if (status === 'Completed') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'Cancelled') return 'bg-rose-100 text-rose-700';
-  if (status === 'No Show') return 'bg-amber-100 text-amber-700';
-  return 'bg-slate-100 text-slate-700';
-};
+// Shared mobile manifest language (single card + KPI strip for all mobile
+// portals). getManifestStatusBadge replaces the former local copy below.
+import {
+  ACTIVE_MANIFEST_STATUSES,
+  ManifestKpiStrip,
+  ManifestTripCard,
+  buildInlineTripActions,
+  getManifestStatusBadge,
+  getTripCountdown,
+} from './trips/MobileTripManifest';
 
 const getTodayStr = () => {
   const d = new Date();
@@ -171,19 +169,28 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       return 0;
     }), [trips, showAllDates, manifestDate, statusFilter, driverFilter, serviceFilter, attentionOnly, searchTerm, sortBy]);
 
-  const visibleTrips = useMemo(() => filteredTrips.slice(0, renderLimit), [filteredTrips, renderLimit]);
+  const visibleTrips = useMemo(() => kpiFilteredTrips.slice(0, renderLimit), [kpiFilteredTrips, renderLimit]);
 
   React.useEffect(() => {
     setRenderLimit(150);
-  }, [showAllDates, manifestDate, searchTerm, statusFilter, driverFilter, serviceFilter, attentionOnly, sortBy, layoutMode, groupBy]);
+  }, [showAllDates, manifestDate, searchTerm, statusFilter, driverFilter, serviceFilter, attentionOnly, sortBy, layoutMode, groupBy, kpiFilter]);
 
-  const manifestSummary = useMemo(() => ({
+  // KPI layer — tappable summary driving an extra filter pass over the
+  // existing filters (states above are untouched). Counts always come from
+  // real filtered trips; the strip replaces the old static summary below.
+  const [kpiFilter, setKpiFilter] = useState('all');
+  const kpiCounts = useMemo(() => ({
     total: filteredTrips.length,
-    late: filteredTrips.filter((trip) => getManifestUrgency(trip) === 'late').length,
-    soon: filteredTrips.filter((trip) => getManifestUrgency(trip) === 'soon').length,
-    unassigned: filteredTrips.filter((trip) => !trip.driverId || trip.status === 'Unassigned').length,
-    assigned: filteredTrips.filter((trip) => trip.driverId).length,
+    active: filteredTrips.filter((trip) => ACTIVE_MANIFEST_STATUSES.has(trip.status)).length,
+    done: filteredTrips.filter((trip) => trip.status === 'Completed').length,
+    pending: filteredTrips.filter((trip) => !trip.driverId || trip.status === 'Unassigned').length,
   }), [filteredTrips]);
+  const kpiFilteredTrips = useMemo(() => {
+    if (kpiFilter === 'active') return filteredTrips.filter((trip) => ACTIVE_MANIFEST_STATUSES.has(trip.status));
+    if (kpiFilter === 'done') return filteredTrips.filter((trip) => trip.status === 'Completed');
+    if (kpiFilter === 'pending') return filteredTrips.filter((trip) => !trip.driverId || trip.status === 'Unassigned');
+    return filteredTrips;
+  }, [filteredTrips, kpiFilter]);
 
   const groupedTrips = useMemo(() => {
     const sections = new Map();
@@ -318,8 +325,6 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const renderManifestTripCard = (trip) => {
     const driver = drivers.find((entry) => entry.id === trip.driverId);
     const isSelected = selectedTasks.includes(trip.id);
-    const urgency = getManifestUrgency(trip);
-    const isLate = urgency === 'late';
     const isEditing = editTrip?.id === trip.id;
 
     const handleAssignClick = () => {
@@ -380,45 +385,40 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       );
     }
 
+    // Role-gated inline bar — mirrors TripActionCenter gates (canOperate,
+    // terminal statuses). Drivers never see assign/reassign/remove; those stay
+    // dispatcher/admin-only. Everything else lives in the ⋯ sheet.
+    const canOperate = role === 'admin' || role === 'dispatcher' || role === 'fleet_manager';
+    const countdown = getTripCountdown(trip);
+    const legsCount = filteredTrips.filter((entry) => (entry.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
+    const inline = buildInlineTripActions({
+      trip,
+      driver,
+      role,
+      callbacks: {
+        phone: getClientPhone(trip),
+        onDrive: (t) => { if (driver) onDriveTrip?.(t); else handleAssignClick(); },
+        onAssign: () => handleAssignClick(),
+        onNavigate: (t) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.pickup || '')}`, '_blank', 'noopener,noreferrer'),
+        onCall: (t) => makeCall(getClientPhone(t), t.patient),
+        onMessage: (t) => sendSMS(getClientPhone(t), t.patient),
+      },
+    });
+    const ICONS = { navigate: Navigation, call: Phone, message: MessageSquare };
+
     return (
-      <div key={trip.id} className={`rounded-xl border bg-white p-3 transition-all ${isSelected ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : isLate ? 'border-rose-200 bg-rose-50' : 'border-slate-200 hover:border-slate-300'}`}>
-        <div className="flex items-start gap-2">
-          <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-          <div className="min-w-0 flex-1">
-            {/* Header Row: Time, Status, Badges */}
-            <div className="mb-2 flex items-center gap-2 flex-wrap">
-              <span className={`text-lg font-black leading-none ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-600' : 'text-slate-700'}`}>{trip.time}</span>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getManifestStatusClass(trip.status)}`}>{trip.status}</span>
-              {trip.type && <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{trip.type}</span>}
-              {trip.bookingId && <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{trip.bookingId}</span>}
-            </div>
-
-            {/* Patient Name */}
-            <div className="mb-2 flex items-center gap-2 flex-wrap">
-              <p className="break-words text-sm font-semibold text-slate-900">{trip.patient}</p>
-              {(() => {
-                const legs = filteredTrips.filter((entry) => (entry.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
-                return legs > 1 ? (
-                  <button onClick={(e) => { e.stopPropagation(); setLegsDetailPatient(trip.patient); }} className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full hover:bg-blue-100 cursor-pointer">
-                    {legs} legs
-                  </button>
-                ) : null;
-              })()}
-            </div>
-
-            {/* Addresses */}
-            <div className="mb-2 grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2">
-                <div className="text-[9px] font-semibold uppercase text-emerald-700">Pickup</div>
-                <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.pickup}</p>
-              </div>
-              <div className="rounded-lg border border-rose-100 bg-rose-50 p-2">
-                <div className="text-[9px] font-semibold uppercase text-rose-700">Dropoff</div>
-                <p className="mt-0.5 break-words text-xs font-semibold text-slate-700 line-clamp-2">{trip.dropoff}</p>
-              </div>
-            </div>
-
-            {/* Assignment Buttons - PROMINENT */}
+      <div key={trip.id} className={`rounded-xl transition-all ${isSelected ? 'ring-2 ring-blue-300' : countdown.level === 'overdue' ? 'ring-1 ring-rose-200' : ''}`}>
+      <ManifestTripCard
+        trip={trip}
+        countdown={countdown}
+        legs={legsCount}
+        onLegsClick={() => setLegsDetailPatient(trip.patient)}
+        mileage={trip.distance ? `${trip.distance} mi` : null}
+        selectSlot={(
+          <input type="checkbox" checked={isSelected} onChange={() => toggleTaskSelection(trip.id)} aria-label={`Select trip for ${trip.patient || trip.bookingId || 'trip'}`} className="h-5 w-5 shrink-0 cursor-pointer self-center rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+        )}
+        assignSlot={canOperate ? (
+          <div className="px-3 pb-2">
             <div className="flex gap-2 flex-wrap items-center">
               {driver ? (
                 <>
@@ -427,48 +427,40 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                       <UserCheck size={12} /> {driver.name} {driver.vehicle ? `• ${driver.vehicle}` : ''}
                     </span>
                   </div>
-                  <button onClick={handleReassignClick} className="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs uppercase hover:bg-amber-600 transition whitespace-nowrap">Reassign</button>
-                  <button onClick={() => onAssignTrip(trip.id, '')} className="px-3 py-1.5 rounded-lg bg-slate-500 text-white font-bold text-xs uppercase hover:bg-slate-600 transition whitespace-nowrap">Remove</button>
+                  <button onClick={handleReassignClick} className="min-h-9 px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs uppercase hover:bg-amber-600 transition whitespace-nowrap">Reassign</button>
+                  <button onClick={() => onAssignTrip(trip.id, '')} className="min-h-9 px-3 py-1.5 rounded-lg bg-slate-500 text-white font-bold text-xs uppercase hover:bg-slate-600 transition whitespace-nowrap">Remove</button>
                 </>
               ) : (
-                <button onClick={handleAssignClick} className="w-full px-4 py-2.5 rounded-lg bg-emerald-500 text-white font-bold text-sm uppercase hover:bg-emerald-600 transition flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30 border-2 border-emerald-600">
-                  <Users size={16} /> ASSIGN DRIVER
+                <button onClick={handleAssignClick} className="w-full min-h-11 px-4 py-2.5 rounded-xl bg-emerald-500 text-white font-bold text-sm uppercase hover:bg-emerald-600 transition flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30 border-2 border-emerald-600">
+                  <Users size={16} /> Assign driver
                 </button>
               )}
             </div>
-
-            {/* Contact Info - Compact */}
-            {(role === 'admin' || role === 'dispatcher') && (getClientPhone(trip) || trip.notes) && (
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {getClientPhone(trip) && (
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => makeCall(getClientPhone(trip), trip.patient)} className="text-blue-600 hover:underline font-bold">{getClientPhone(trip)}</button>
-                    <button onClick={() => sendSMS(getClientPhone(trip), trip.patient)} className="text-blue-600 hover:text-blue-700" aria-label="SMS"><MessageSquare size={12} /></button>
-                  </div>
-                )}
-                {trip.notes && (
-                  <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded">📌 {trip.notes}</span>
-                )}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (driver) onDriveTrip?.(trip);
-                  else handleAssignClick();
-                }}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700"
-              >
-                <Navigation size={14} /> {driver ? 'Drive trip' : 'Assign to drive'}
-              </button>
-              <button type="button" onClick={(e) => { e.stopPropagation(); setActionTrip(trip); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50" aria-label={`More actions for ${trip.patient || trip.bookingId || 'trip'}`}><MoreHorizontal size={15} /> Actions</button>
+          </div>
+        ) : null}
+        noteSlot={(role === 'admin' || role === 'dispatcher') && (getClientPhone(trip) || trip.notes) ? (
+          <div className="px-3 pb-2">
+            <div className="flex flex-wrap gap-2 text-xs">
+              {getClientPhone(trip) && (
+                <button onClick={() => makeCall(getClientPhone(trip), trip.patient)} className="min-h-9 font-bold text-blue-600 hover:underline">{getClientPhone(trip)}</button>
+              )}
+              {trip.notes && (
+                <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded">Note: {trip.notes}</span>
+              )}
             </div>
           </div>
-        </div>
+        ) : null}
+        primaryAction={inline.primary ? { label: inline.primary.id === 'assign-drive' ? 'Assign to drive' : 'Drive trip', onClick: () => inline.primary.onSelect() } : null}
+        iconActions={inline.icons.map((action) => ({ ...action, icon: ICONS[action.id], onClick: () => action.onSelect() }))}
+        moreIcon={MoreHorizontal}
+        onMore={() => setActionTrip(trip)}
+        moreLabel={`More actions for ${trip.patient || trip.bookingId || 'trip'}`}
+        footerSlot={driver ? (
+          <span className="inline-flex min-w-0 items-center gap-1 truncate text-xs font-semibold text-slate-500"><User size={12} className="shrink-0" /> <span className="truncate">{driver.name}</span></span>
+        ) : (
+          <span className="text-xs font-semibold text-slate-400">Unassigned</span>
+        )}
+      />
       </div>
     );
   };
@@ -667,20 +659,18 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         )}
       </div>
 
-      <div className="app-summary-strip" aria-label="Trip manifest summary" data-testid="trip-manifest-summary">
-        <div className="app-summary-metrics">
-        {[
-          { label: 'Trips', value: manifestSummary.total },
-          { label: 'Late', value: manifestSummary.late },
-          { label: 'Soon', value: manifestSummary.soon },
-          { label: 'Open', value: manifestSummary.unassigned },
-          { label: 'Assigned', value: manifestSummary.assigned },
-        ].filter((metric) => metric.label === 'Trips' || metric.value > 0).map((metric) => (
-          <span key={metric.label} className={`app-summary-item ${metric.label === 'Late' || metric.label === 'Open' ? 'app-summary-item--danger' : metric.label === 'Soon' ? 'app-summary-item--warning' : ''}`}>
-            <strong>{metric.value}</strong> {metric.label.toLowerCase()}
-          </span>
-        ))}
-        </div>
+      {/* KPI strip — tappable queue summary wired to the kpiFilter layer.
+          Replaces the former static summary; counts are real filtered trips.
+          The data-testid is pinned by GlobalPageTableContract — keep it. */}
+      <div data-testid="trip-manifest-summary" aria-label="Trip manifest summary">
+      <ManifestKpiStrip
+        items={[
+          { id: 'all', label: 'All', value: kpiCounts.total, active: kpiFilter === 'all', activeClass: 'border-slate-800 bg-slate-800 text-white', onSelect: () => setKpiFilter('all') },
+          { id: 'active', label: 'Active', value: kpiCounts.active, active: kpiFilter === 'active', activeClass: 'border-blue-400 bg-blue-50 text-blue-700', onSelect: () => setKpiFilter(kpiFilter === 'active' ? 'all' : 'active') },
+          { id: 'done', label: 'Done', value: kpiCounts.done, active: kpiFilter === 'done', activeClass: 'border-emerald-400 bg-emerald-50 text-emerald-700', onSelect: () => setKpiFilter(kpiFilter === 'done' ? 'all' : 'done') },
+          { id: 'pending', label: 'Pending', value: kpiCounts.pending, active: kpiFilter === 'pending', activeClass: 'border-rose-400 bg-rose-50 text-rose-700', onSelect: () => setKpiFilter(kpiFilter === 'pending' ? 'all' : 'pending') },
+        ]}
+      />
       </div>
 
       {/* TABLE / LIST */}
