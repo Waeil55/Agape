@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
@@ -91,10 +91,124 @@ const getDriverLabel = (trip, drivers) => {
   return driver?.name || trip.driverName || '—';
 };
 
+// ============================================================================
+// Enterprise: Compliance, Retention, Legal Hold, Audit Trail, Export
+// ============================================================================
 
+const RETENTION_POLICIES = Object.freeze([
+  { id: 'standard', label: 'Standard (3 years)', days: 1095, color: 'bg-slate-100 text-slate-600' },
+  { id: 'extended', label: 'Extended (7 years)', days: 2555, color: 'bg-blue-50 text-blue-700' },
+  { id: 'medical', label: 'Medical (10 years)', days: 3650, color: 'bg-indigo-50 text-indigo-700' },
+  { id: 'legal', label: 'Legal Hold', days: null, color: 'bg-rose-50 text-rose-700' },
+]);
 
+const COMPLIANCE_TAGS = Object.freeze([
+  { id: 'hipaa', label: 'HIPAA', color: 'bg-red-50 text-red-700 border-red-200' },
+  { id: 'dot', label: 'DOT', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { id: 'ada', label: 'ADA', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { id: 'medicaid', label: 'Medicaid', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { id: 'medicare', label: 'Medicare', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+]);
 
+function getRetentionStatus(trip) {
+  const archivedDate = trip.archivedAt || trip.completedAt;
+  if (!archivedDate) return { policy: RETENTION_POLICIES[0], daysLeft: null, expired: false };
+  const elapsed = Math.floor((Date.now() - new Date(archivedDate).getTime()) / 86400000);
+  const policy = trip.legalHold ? RETENTION_POLICIES[3] : RETENTION_POLICIES[0];
+  if (policy.days === null) return { policy, daysLeft: null, expired: false };
+  const daysLeft = Math.max(0, policy.days - elapsed);
+  return { policy, daysLeft, expired: daysLeft <= 0 };
+}
 
+function exportArchiveTrips(trips, format = 'csv') {
+  if (format === 'json') {
+    const blob = new Blob([JSON.stringify(trips, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `agape-archive-${new Date().toISOString().slice(0, 10)}.json`);
+    return;
+  }
+  const headers = ['Date', 'Time', 'Patient', 'Booking ID', 'Status', 'Driver', 'Pickup', 'Dropoff', 'Miles', 'Vehicle', 'Signature', 'Archived At'];
+  const rows = trips.map(t => {
+    const miles = t.pickupOdometer && t.dropoffOdometer ? (Number(t.dropoffOdometer) - Number(t.pickupOdometer)).toFixed(1) : '';
+    return [t.date || '', t.time || '', t.patient || '', t.bookingId || t.id || '', t.status || '', t.driverName || '', t.pickup || '', t.dropoff || '', miles, t.completedVehicle || '', t.paperSignatureConfirmed ? 'Yes' : 'No', t.archivedAt || ''];
+  });
+  const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  downloadBlob(blob, `agape-archive-${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function ArchiveKPIStrip({ trips }) {
+  const total = trips.length;
+  const withSignature = trips.filter(t => t.paperSignatureConfirmed).length;
+  const uniqueDrivers = new Set(trips.map(t => t.driverId || t.driverEmail || t.driverName)).size;
+  const uniquePatients = new Set(trips.map(t => t.patient)).size;
+  const withMiles = trips.filter(t => t.pickupOdometer && t.dropoffOdometer);
+  const totalMiles = withMiles.reduce((sum, t) => sum + Math.max(0, Number(t.dropoffOdometer) - Number(t.pickupOdometer)), 0);
+  return (
+    <div className="grid grid-cols-4 gap-1.5">
+      <div className="bg-white border border-slate-200 rounded-xl p-2 text-center">
+        <div className="text-lg font-black text-slate-700">{total}</div>
+        <div className="text-[9px] font-bold text-slate-500 uppercase">Total</div>
+      </div>
+      <div className="bg-white border border-slate-200 rounded-xl p-2 text-center">
+        <div className="text-lg font-black text-blue-700">{uniquePatients}</div>
+        <div className="text-[9px] font-bold text-slate-500 uppercase">Patients</div>
+      </div>
+      <div className="bg-white border border-slate-200 rounded-xl p-2 text-center">
+        <div className="text-lg font-black text-indigo-700">{uniqueDrivers}</div>
+        <div className="text-[9px] font-bold text-slate-500 uppercase">Drivers</div>
+      </div>
+      <div className="bg-white border border-slate-200 rounded-xl p-2 text-center">
+        <div className="text-lg font-black text-emerald-700">{totalMiles.toFixed(0)}</div>
+        <div className="text-[9px] font-bold text-slate-500 uppercase">Miles</div>
+      </div>
+    </div>
+  );
+}
+
+function ComplianceTagBar({ trip }) {
+  const tags = [];
+  if (trip.patient && trip.pickup && trip.dropoff) tags.push(COMPLIANCE_TAGS[0]);
+  if (trip.completedVehicle) tags.push(COMPLIANCE_TAGS[1]);
+  if (trip.inOutTrip) tags.push(COMPLIANCE_TAGS[2]);
+  if (tags.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1.5">
+      {tags.map(t => (
+        <span key={t.id} className={`inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[8px] font-bold ${t.color}`}>
+          <Tag size={7} /> {t.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function RetentionBadge({ trip }) {
+  const status = getRetentionStatus(trip);
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5">
+      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${status.policy.color}`}>
+        <Shield size={8} /> {status.policy.label}
+      </span>
+      {status.daysLeft !== null && (
+        <span className={`text-[9px] font-bold ${status.expired ? 'text-rose-600' : status.daysLeft < 90 ? 'text-amber-600' : 'text-slate-500'}`}>
+          {status.expired ? 'Expired' : `${status.daysLeft}d left`}
+        </span>
+      )}
+      {trip.legalHold && (
+        <span className="inline-flex items-center gap-0.5 rounded-full bg-rose-100 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">
+          <Lock size={8} /> Legal Hold
+        </span>
+      )}
+    </div>
+  );
+}
 const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDriveTrip }) => {
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_archiveSearch') || '');
   const [sortColumn] = useState(() => localStorage.getItem('agape_archiveSortCol') || 'time');
@@ -107,6 +221,16 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
     try {
       return JSON.parse(localStorage.getItem('agape_archiveExpandedGroups') || '{}');
     } catch { return {}; }
+  });
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [selectedTrips, setSelectedTrips] = useState(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [exportFormat, setExportFormat] = useState('csv');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [retentionFilter, setRetentionFilter] = useState('all');
+  const [legalHoldFilter, setLegalHoldFilter] = useState('all');
+  const [savedSearches, setSavedSearches] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('agape_archiveSavedSearches') || '[]'); } catch { return []; }
   });
 
   useEffect(() => {
@@ -269,6 +393,8 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
           <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'signature' })}</p>
         </div>
       </div>
+      <ComplianceTagBar trip={trip} />
+      <RetentionBadge trip={trip} />
       <div className="mt-3 flex gap-2">
         {role === 'admin' && restoreTrip && (
           <button onClick={() => restoreTrip(trip.id)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200 transition-colors hover:bg-emerald-100">
@@ -289,7 +415,9 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
 
   return (
     <div aria-label="Archived trips" className="flex flex-col flex-1 min-h-0 bg-slate-100 overflow-hidden">
-      <div role="toolbar" aria-label="Archived trip controls" data-testid="archives-toolbar" className="app-filter-bar !flex-nowrap gap-1.5 border-b border-slate-200 bg-white px-3 py-1.5 shrink-0 sticky top-0 z-20">
+      {/* ENHANCED TOOLBAR */}
+      <div role="toolbar" aria-label="Archived trip controls" data-testid="archives-toolbar" className="shrink-0 sticky top-0 z-20 border-b border-slate-200 bg-white">
+        <div className="app-filter-bar !flex-nowrap gap-1.5 px-3 py-1.5">
           <label className="flex h-8 !min-w-[100px] max-w-[260px] flex-1 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2">
             <Search size={11} className="text-slate-500 shrink-0" />
             <input aria-label="Search archived trips" type="text" placeholder="Search archived trips…" value={searchQuery}
@@ -305,6 +433,42 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
               aria-label="Archive end date" className="h-7 w-[100px] border-0 px-1 text-[10px] font-semibold outline-none focus:border-blue-500 2xl:w-[112px]" />
           </div>
+          <button onClick={() => setShowExportModal(true)} className="h-8 px-2 rounded-xl bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 transition-colors" title="Export">
+            <Download size={13} />
+          </button>
+        </div>
+
+        {/* Enterprise: Analytics + Filters Row */}
+        <div className="px-3 pb-1.5 flex items-center gap-1.5 flex-wrap">
+          <button onClick={() => setShowAnalytics(!showAnalytics)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${showAnalytics ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-400'}`}>
+            <BarChart3 size={10} /> Analytics
+          </button>
+          <select value={retentionFilter} onChange={(e) => setRetentionFilter(e.target.value)}
+            className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-[10px] font-bold text-slate-600 outline-none">
+            <option value="all">All Retention</option>
+            {RETENTION_POLICIES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          <select value={legalHoldFilter} onChange={(e) => setLegalHoldFilter(e.target.value)}
+            className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-[10px] font-bold text-slate-600 outline-none">
+            <option value="all">All Hold Status</option>
+            <option value="hold">Legal Hold Only</option>
+            <option value="no-hold">No Hold</option>
+          </select>
+          {selectedTrips.size > 0 && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[10px] font-bold text-indigo-700">{selectedTrips.size} selected</span>
+              <button onClick={() => setSelectedTrips(new Set())} className="text-[10px] font-bold text-indigo-600 underline">Clear</button>
+            </div>
+          )}
+        </div>
+
+        {/* Analytics Dashboard */}
+        {showAnalytics && (
+          <div className="px-3 pb-2 animate-in fade-in duration-150">
+            <ArchiveKPIStrip trips={filtered} />
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto overscroll-contain">
@@ -430,6 +594,33 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
           onRestore: restoreTrip ? (trip) => restoreTrip(trip.id) : undefined,
         }}
       />
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5"><Download size={13} className="text-indigo-600" /> Export Archive</h3>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-700 p-1"><X size={16} /></button>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold text-slate-600">Export {filtered.length} archived trips</p>
+              <div className="space-y-1.5">
+                {[{ id: 'csv', label: 'CSV Spreadsheet', desc: 'Compatible with Excel, Google Sheets', icon: FileText }, { id: 'json', label: 'JSON Data', desc: 'Full data with metadata', icon: FileText }].map(f => (
+                  <button key={f.id} onClick={() => { setExportFormat(f.id); exportArchiveTrips(filtered, f.id); setShowExportModal(false); }}
+                    className="w-full text-left rounded-xl border border-slate-200 bg-white p-3 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all flex items-center gap-3">
+                    <f.icon size={16} className="text-indigo-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{f.label}</p>
+                      <p className="text-[10px] font-semibold text-slate-500">{f.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Navigation, User } from 'lucide-react';
+import { Layers, Navigation, User, AlertTriangle, Clock, CheckCircle2, Zap, Shield, Timer, ChevronRight } from 'lucide-react';
 import { timeToMinutes, tripCalendarDateKey } from '../../utils/tripDate';
 import { getTripActionCapabilities, isTripActionTerminal, TRIP_TERMINAL_STATUSES } from './tripActionPolicy';
 
@@ -80,6 +80,128 @@ const STATUS_STYLES = {
 };
 export function getManifestStatusBadge(status) {
   return STATUS_STYLES[String(status || '').trim().toLowerCase()] || 'bg-slate-100 text-slate-700';
+}
+
+// ---------------------------------------------------------------------------
+// Enterprise: SLA tracking, priority badges, risk indicators, workflow viz
+// ---------------------------------------------------------------------------
+
+const SLA_THRESHOLDS = Object.freeze({
+  excellent: { maxMinutes: 0, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', label: 'On Time' },
+  good: { maxMinutes: 15, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', label: 'Within SLA' },
+  warning: { maxMinutes: 30, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', label: 'At Risk' },
+  critical: { maxMinutes: 60, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', label: 'Critical' },
+  breach: { maxMinutes: Infinity, color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200', label: 'SLA Breach' },
+});
+
+export function getSLAStatus(trip, now = new Date()) {
+  if (isTripActionTerminal(trip)) return { level: 'done', ...SLA_THRESHOLDS.excellent, label: 'Completed' };
+  const scheduled = timeToMinutes(trip?.time);
+  if (!Number.isFinite(scheduled) || scheduled < 0 || scheduled >= 1440) return { level: 'unknown', ...SLA_THRESHOLDS.good, label: 'No SLA' };
+  const serviceDate = tripCalendarDateKey(trip?.date);
+  if (!serviceDate) return { level: 'unknown', ...SLA_THRESHOLDS.good, label: 'No Date' };
+  const scheduledDate = new Date(`${serviceDate}T00:00:00`);
+  scheduledDate.setHours(Math.floor(scheduled / 60), scheduled % 60, 0, 0);
+  const diffMin = Math.round((now.getTime() - scheduledDate.getTime()) / 60000);
+  if (diffMin <= SLA_THRESHOLDS.good.maxMinutes) return { level: 'excellent', ...SLA_THRESHOLDS.excellent, minutes: diffMin };
+  if (diffMin <= SLA_THRESHOLDS.warning.maxMinutes) return { level: 'good', ...SLA_THRESHOLDS.good, minutes: diffMin };
+  if (diffMin <= SLA_THRESHOLDS.critical.maxMinutes) return { level: 'warning', ...SLA_THRESHOLDS.warning, minutes: diffMin };
+  if (diffMin <= SLA_THRESHOLDS.breach.maxMinutes) return { level: 'critical', ...SLA_THRESHOLDS.critical, minutes: diffMin };
+  return { level: 'breach', ...SLA_THRESHOLDS.breach, minutes: diffMin };
+}
+
+const PRIORITY_STYLES = Object.freeze({
+  urgent: { color: 'text-rose-700', bg: 'bg-rose-100 border-rose-200', icon: Zap, label: 'URGENT' },
+  high: { color: 'text-amber-700', bg: 'bg-amber-100 border-amber-200', icon: AlertTriangle, label: 'HIGH' },
+  normal: { color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', icon: null, label: 'NORMAL' },
+  low: { color: 'text-slate-500', bg: 'bg-slate-100 border-slate-200', icon: null, label: 'LOW' },
+});
+
+export function getPriorityBadge(trip) {
+  const priority = String(trip?.priority || 'normal').toLowerCase();
+  return PRIORITY_STYLES[priority] || PRIORITY_STYLES.normal;
+}
+
+const WORKFLOW_STEPS = [
+  { key: 'Assigned', label: 'Assigned', order: 0 },
+  { key: 'Navigating Pickup', label: 'Navigate', order: 1 },
+  { key: 'At Pickup', label: 'At PU', order: 2 },
+  { key: 'In Transit', label: 'Transit', order: 3 },
+  { key: 'At Dropoff', label: 'At DO', order: 4 },
+  { key: 'Completed', label: 'Done', order: 5 },
+];
+
+export function getWorkflowStep(trip) {
+  const status = String(trip?.status || '').trim();
+  const idx = WORKFLOW_STEPS.findIndex(s => s.key === status);
+  if (idx >= 0) return { ...WORKFLOW_STEPS[idx], index: idx, total: WORKFLOW_STEPS.length };
+  if (isTripActionTerminal(trip)) return { ...WORKFLOW_STEPS[5], index: 5, total: 6 };
+  return { ...WORKFLOW_STEPS[0], index: 0, total: 6 };
+}
+
+export function WorkflowProgressBar({ trip }) {
+  const step = getWorkflowStep(trip);
+  const pct = step.total > 0 ? Math.round((step.index / (step.total - 1)) * 100) : 0;
+  const isComplete = step.index >= step.total - 1;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Workflow</span>
+        <span className={`text-[9px] font-bold ${isComplete ? 'text-emerald-600' : 'text-blue-600'}`}>{step.label}</span>
+      </div>
+      <div className="w-full bg-slate-100 rounded-full h-1.5">
+        <div className={`h-1.5 rounded-full transition-all duration-500 ${isComplete ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex justify-between">
+        {WORKFLOW_STEPS.map((s, i) => (
+          <span key={s.key} className={`text-[7px] font-bold ${i <= step.index ? 'text-blue-600' : 'text-slate-300'}`}>{s.label}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SLABadge({ trip }) {
+  const sla = getSLAStatus(trip);
+  if (sla.level === 'done' || sla.level === 'unknown') return null;
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${sla.bg} ${sla.color}`}>
+      <Timer size={8} />
+      {sla.label}
+    </span>
+  );
+}
+
+export function PriorityBadge({ trip }) {
+  const p = getPriorityBadge(trip);
+  if (p.label === 'NORMAL') return null;
+  const Icon = p.icon;
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9px] font-black tracking-wider ${p.bg} ${p.color}`}>
+      {Icon && <Icon size={8} />}
+      {p.label}
+    </span>
+  );
+}
+
+export function BatchOperationBar({ selectedCount, totalCount, onSelectAll, onDeselectAll, onBatchAction }) {
+  if (selectedCount === 0) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-2 animate-in fade-in duration-150">
+      <div className="flex items-center gap-1.5 flex-1">
+        <span className="text-[11px] font-bold text-indigo-700">{selectedCount}/{totalCount} selected</span>
+        <button onClick={selectedCount === totalCount ? onDeselectAll : onSelectAll}
+          className="text-[10px] font-bold text-indigo-600 underline">
+          {selectedCount === totalCount ? 'Deselect all' : 'Select all'}
+        </button>
+      </div>
+      <div className="flex items-center gap-1">
+        <button onClick={() => onBatchAction('reassign')} className="px-2 py-1 rounded-lg bg-white border border-indigo-200 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors">Reassign</button>
+        <button onClick={() => onBatchAction('archive')} className="px-2 py-1 rounded-lg bg-white border border-indigo-200 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors">Archive</button>
+        <button onClick={() => onBatchAction('reschedule')} className="px-2 py-1 rounded-lg bg-indigo-600 text-[10px] font-bold text-white hover:bg-indigo-700 transition-colors">Reschedule</button>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -334,10 +456,21 @@ export function ManifestTripCard({
       {/* Client + trip ID */}
       <div className="px-2 py-0 flex justify-between items-center gap-2">
         <span className="min-w-0 truncate text-[13px] font-semibold text-slate-700">{trip?.patient || 'Unknown client'}</span>
-        {(trip?.bookingId || trip?.id) && (
-          <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-400">#{trip.bookingId || trip.id}</span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          <PriorityBadge trip={trip} />
+          <SLABadge trip={trip} />
+          {(trip?.bookingId || trip?.id) && (
+            <span className="text-[11px] font-medium tabular-nums text-slate-400">#{trip.bookingId || trip.id}</span>
+          )}
+        </div>
       </div>
+
+      {/* Workflow Progress — compact 1-line bar */}
+      {!isTripActionTerminal(trip) && trip?.status && (
+        <div className="px-2 pb-0.5">
+          <WorkflowProgressBar trip={trip} />
+        </div>
+      )}
 
       {/* Pickup / Dropoff grid — compact cells */}
       <div className="px-2 pb-0.5">

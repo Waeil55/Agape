@@ -1,5 +1,5 @@
-import { useDeferredValue, useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload } from 'lucide-react';
+import { useDeferredValue, useState, useMemo, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw } from 'lucide-react';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
@@ -8,6 +8,118 @@ import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
 
 const MOBILE_REPORT_PAGE_SIZE = 40;
+
+const FILTER_PRESETS = Object.freeze([
+  { id: 'today-completed', label: 'Today Completed', status: 'completed', allDates: false },
+  { id: 'today-all', label: 'Today All', status: 'all', allDates: false },
+  { id: 'week-completed', label: 'Week Completed', status: 'completed', allDates: true },
+  { id: 'week-all', label: 'Week All', status: 'all', allDates: true },
+  { id: 'cancelled-only', label: 'Cancelled Only', status: 'cancelled', allDates: true },
+  { id: 'pending-review', label: 'Pending Review', status: 'other', allDates: true, reviewed: false },
+]);
+
+const EXPORT_FORMATS = Object.freeze([
+  { id: 'csv', label: 'CSV', icon: FileText, mimeType: 'text/csv' },
+  { id: 'json', label: 'JSON', icon: FileText, mimeType: 'application/json' },
+]);
+
+function computeKPIs(trips, filteredTrips) {
+  const total = filteredTrips.length;
+  const completed = filteredTrips.filter(t => t.status === 'Completed' || t.reviewed).length;
+  const cancelled = filteredTrips.filter(t => {
+    const s = String(t.status || '').toLowerCase();
+    return s.includes('cancel') || s.includes('no show') || s.includes('reroute');
+  }).length;
+  const pending = total - completed - cancelled;
+  const reviewed = filteredTrips.filter(t => t.reviewed).length;
+  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const reviewRate = total > 0 ? Math.round((reviewed / total) * 100) : 0;
+  const cancellationRate = total > 0 ? Math.round((cancelled / total) * 100) : 0;
+  const withOdometer = filteredTrips.filter(t => t.pickupOdometer && t.dropoffOdometer);
+  const totalMiles = withOdometer.reduce((sum, t) => {
+    const diff = Number(t.dropoffOdometer) - Number(t.pickupOdometer);
+    return sum + (diff > 0 ? diff : 0);
+  }, 0);
+  const avgMiles = withOdometer.length > 0 ? (totalMiles / withOdometer.length).toFixed(1) : '0';
+  const uniqueDrivers = new Set(filteredTrips.map(t => t.driverId || t.driverEmail || t.driverName)).size;
+  const unassigned = filteredTrips.filter(t => !t.driverId && !t.driverEmail && !t.driverName).length;
+  return { total, completed, cancelled, pending, reviewed, completionRate, reviewRate, cancellationRate, totalMiles: totalMiles.toFixed(0), avgMiles, uniqueDrivers, unassigned };
+}
+
+function exportTrips(trips, format = 'csv') {
+  if (format === 'json') {
+    const blob = new Blob([JSON.stringify(trips, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `agape-reports-${localCalendarYmd()}.json`);
+    return;
+  }
+  const headers = ['Date', 'Time', 'Patient', 'Booking ID', 'Status', 'Driver', 'Pickup', 'Dropoff', 'Miles', 'Reviewed'];
+  const rows = trips.map(t => {
+    const miles = t.pickupOdometer && t.dropoffOdometer ? (Number(t.dropoffOdometer) - Number(t.pickupOdometer)).toFixed(1) : '';
+    return [t.date || '', t.time || '', t.patient || '', t.bookingId || t.id || '', t.status || '', t.driverName || '', t.pickup || '', t.dropoff || '', miles, t.reviewed ? 'Yes' : 'No'];
+  });
+  const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  downloadBlob(blob, `agape-reports-${localCalendarYmd()}.csv`);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function KPICard({ label, value, icon: Icon, color, sub, trend }) {
+  return (
+    <div className={`flex-1 min-w-[70px] rounded-xl border p-2 text-center space-y-0.5 ${color}`}>
+      <Icon size={13} className="mx-auto opacity-60" />
+      <div className="text-base font-black tabular-nums">{value}</div>
+      <div className="text-[9px] font-bold uppercase tracking-wider opacity-70">{label}</div>
+      {trend !== undefined && (
+        <div className={`flex items-center justify-center gap-0.5 text-[9px] font-bold ${trend > 0 ? 'text-emerald-600' : trend < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
+          {trend > 0 ? <TrendingUp size={9} /> : trend < 0 ? <TrendingDown size={9} /> : <Minus size={9} />}
+          {Math.abs(trend)}%
+        </div>
+      )}
+      {sub && <div className="text-[9px] font-semibold opacity-60">{sub}</div>}
+    </div>
+  );
+}
+
+function AnalyticsDashboard({ kpis, onExport, onApplyPreset, activePreset }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1.5">
+        <KPICard label="Total" value={kpis.total} icon={BarChart3} color="bg-white border-slate-200 text-slate-700" />
+        <KPICard label="Done" value={kpis.completed} icon={CheckCircle2} color="bg-emerald-50 border-emerald-200 text-emerald-700" sub={`${kpis.completionRate}%`} />
+        <KPICard label="Cancelled" value={kpis.cancelled} icon={XCircle} color="bg-rose-50 border-rose-200 text-rose-700" sub={`${kpis.cancellationRate}%`} />
+        <KPICard label="Pending" value={kpis.pending} icon={Clock} color="bg-amber-50 border-amber-200 text-amber-700" />
+      </div>
+      <div className="flex gap-1.5">
+        <KPICard label="Miles" value={kpis.totalMiles} icon={MapPin} color="bg-blue-50 border-blue-200 text-blue-700" sub={`avg ${kpis.avgMiles}`} />
+        <KPICard label="Drivers" value={kpis.uniqueDrivers} icon={Users} color="bg-indigo-50 border-indigo-200 text-indigo-700" />
+        <KPICard label="Reviewed" value={`${kpis.reviewRate}%`} icon={Target} color="bg-violet-50 border-violet-200 text-violet-700" />
+        <KPICard label="Unassigned" value={kpis.unassigned} icon={AlertTriangle} color={kpis.unassigned > 0 ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-slate-50 border-slate-200 text-slate-500'} />
+      </div>
+      <div className="flex items-center gap-1 flex-wrap pb-1">
+        {FILTER_PRESETS.map(p => (
+          <button key={p.id} onClick={() => onApplyPreset(p)}
+            className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${activePreset === p.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'}`}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        <button onClick={() => onExport('csv')} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:border-indigo-400 transition-all">
+          <Download size={10} /> CSV
+        </button>
+        <button onClick={() => onExport('json')} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:border-indigo-400 transition-all">
+          <Download size={10} /> JSON
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const DetailRow = ({ label, value, valueColor = "text-slate-900" }) => (
   <div className="grid grid-cols-[112px_1fr] gap-3 py-1.5 items-start">
@@ -98,6 +210,9 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [statusFilter, setStatusFilter] = useState('completed');
   const [driverFilter, setDriverFilter] = useState('All Drivers');
   const [renderLimit, setRenderLimit] = useState(MOBILE_REPORT_PAGE_SIZE);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [activePreset, setActivePreset] = useState(null);
+  const [showExportPanel, setShowExportPanel] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const driverIndex = useMemo(() => buildDriverIndex(drivers), [drivers]);
 
@@ -133,6 +248,19 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     return filtered.sort((a, b) => compareTripsByCompletionAscending(a, b, sortKeyOverrides));
   }, [trips, dateStr, allDates, deferredSearchQuery, statusFilter, driverFilter, driverIndex, sortKeyOverrides]);
   const visibleTrips = useMemo(() => filteredTrips.slice(0, renderLimit), [filteredTrips, renderLimit]);
+  const kpis = useMemo(() => computeKPIs(trips, filteredTrips), [trips, filteredTrips]);
+
+  const applyPreset = useCallback((preset) => {
+    setActivePreset(preset.id);
+    setStatusFilter(preset.status);
+    setAllDates(preset.allDates);
+    setExpandedTripId(null);
+  }, []);
+
+  const handleExport = useCallback((format) => {
+    exportTrips(filteredTrips, format);
+    setShowExportPanel(false);
+  }, [filteredTrips]);
 
   useEffect(() => setRenderLimit(MOBILE_REPORT_PAGE_SIZE), [dateStr, allDates, deferredSearchQuery, statusFilter, driverFilter]);
 
@@ -329,6 +457,27 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
 
       {/* MAIN SCROLLABLE CONTENT */}
       <div className="agape-mobile-scroll flex-1 overflow-y-auto overscroll-contain relative">
+
+        {/* ANALYTICS DASHBOARD TOGGLE */}
+        <div className="px-3 py-2 border-b border-slate-200 bg-white">
+          <button onClick={() => setShowAnalytics(!showAnalytics)}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all ${showAnalytics ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+            <div className="flex items-center gap-2">
+              <BarChart3 size={14} className={showAnalytics ? 'text-indigo-600' : 'text-slate-500'} />
+              <span className="text-xs font-bold text-slate-700">Analytics Dashboard</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-500">{kpis.total} trips</span>
+              <ChevronUp size={12} className={`text-slate-400 transition-transform ${showAnalytics ? '' : 'rotate-180'}`} />
+            </div>
+          </button>
+          {showAnalytics && (
+            <div className="mt-2 space-y-2 animate-in fade-in duration-150">
+              <AnalyticsDashboard kpis={kpis} onExport={handleExport} onApplyPreset={applyPreset} activePreset={activePreset} />
+            </div>
+          )}
+        </div>
+
         {/* DAILY SUMMARY BAR */}
         <div className="agape-mobile-summary-bar sticky top-0 z-10">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
