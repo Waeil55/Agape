@@ -175,6 +175,7 @@ const MobileEnterpriseDashboard = (props) => {
 
   const handleNavClick = (view) => {
     preloadMobileView(view);
+    closeTripDetails();
     startTransition(() => {
       setCurrentView(view);
       setSubView(null);
@@ -451,6 +452,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'tools') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
+          {renderTopBar('Route Planner & Tools', true, () => handleNavClick('trips'))}
           <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom,0px))' }}>
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>

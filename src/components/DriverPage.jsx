@@ -33,6 +33,7 @@ import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES }
 import { SkeletonTripCard } from './ui/Skeleton';
 import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
+import ScheduleEditorModal from './trips/ScheduleEditorModal';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
@@ -3508,7 +3509,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       _dropoffTime: isoToTimeInput(original.arrivalDropoffTime || original.dropoffArrival || original.dropoffTime),
       _dropoffOdometer: original.dropoffOdometer || '',
       _clientSigned: original.paperSignatureConfirmed || false,
-      _password: '',
+      editScope: 'one-time',
       notes: original.notes || '',
     });
     const frozenKey = getHistoryFinishedSortMs(original);
@@ -3560,16 +3561,23 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       dropoffOdometer: parseOdometerInput(d._dropoffOdometer),
       paperSignatureConfirmed: d._clientSigned,
       notes: d.notes || '',
+      editScope: d.editScope || 'one-time',
+      saveAsProfile: d.editScope === 'permanent',
+      permanentEdit: d.editScope === 'permanent',
+      oneTimeEdit: d.editScope !== 'permanent',
     };
-    const isAdminOrDispatcher = role === 'admin' || role === 'dispatcher';
     setInlineEditError('');
     setInlineEditSaving(true);
     try {
-      if (!isAdminOrDispatcher) {
-        if (!d._password) throw new Error('Enter your password to save this trip.');
-        if (!auth.currentUser?.email) throw new Error('Your sign-in session is unavailable. Sign in again.');
-        const credential = EmailAuthProvider.credential(auth.currentUser.email, d._password);
-        await reauthenticateWithCredential(auth.currentUser, credential);
+      if (d.editScope === 'permanent' && cleanData.patient) {
+        saveClientProfile({
+          patient: cleanData.patient,
+          pickup: cleanData.pickup,
+          dropoff: cleanData.dropoff,
+          pickupPhone: cleanData.pickupPhone,
+          dropoffPhone: cleanData.dropoffPhone,
+          notes: cleanData.notes,
+        }).catch((err) => console.warn('Profile save non-blocking error:', err));
       }
       const saved = await advanceWorkflow(original, cleanData.status || original.status, cleanData);
       if (!saved) throw new Error('Trip changes could not be saved. Check the connection and retry.');
@@ -3688,8 +3696,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       payload.urgentRequiredWithinHours = Number(scheduleEditDraft.requiredWithinHours || 0) || null;
     }
 
-    setPasswordPrompt({ type: 'edittrip', trip: scheduleEditorTrip, editedData: payload });
+    advanceWorkflow(scheduleEditorTrip, payload.status || scheduleEditorTrip.status, payload);
     closeScheduleEditor();
+    setShowToast({ message: 'Schedule updated' });
   };
 
   const verifyPasswordAndProceed = async () => {
@@ -4101,9 +4110,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             </button>
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
-              <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
+              <button
+                type="button"
+                onClick={() => openScheduleEditor(trip)}
+                className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                title="Update trip time / schedule"
+              >
                 <Clock size={16} /> {scheduledTime}
-              </p>
+              </button>
             </div>
             <button type="button" onClick={() => copyText(trip.bookingId || trip.id, 'Trip ID')} className="flex min-h-11 shrink-0 items-center rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-left">
               <span className="text-sm font-semibold leading-tight text-blue-700">Trip: {trip.bookingId || trip.id || '--'}</span>
@@ -4246,7 +4260,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           </div>
         </div>
 
-        <div className="fixed left-4 right-4 z-40 rounded-xl border-0 bg-transparent p-0 shadow-none" style={{ bottom: isEmbedded ? 'calc(16px + env(safe-area-inset-bottom, 0px))' : 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="fixed left-4 right-4 z-40 rounded-xl border-0 bg-transparent p-0 shadow-none" style={{ bottom: isEmbedded ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mb-2 flex items-center gap-1">
             {getWorkflowSteps(trip).map((step, idx) => {
               const currentStep = getCurrentWorkflowStep(trip);
@@ -5272,8 +5286,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                         tripIsInOut ? `STAY ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} MIN` : null,
                         isSequenced ? 'Route Plan' : null,
                       ].filter(Boolean),
-                      pickup: { address: trip.pickup, phone: trip.pickupPhone },
-                      dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
+                      pickup: { address: trip.pickup, phone: trip.pickupPhone, city: trip.pickupCity || trip.pickup?.city || '' },
+                      dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, city: trip.dropoffCity || trip.dropoff?.city || '', time: null },
+                      pickupCity: trip.pickupCity || trip.pickup?.city || '',
+                      dropoffCity: trip.dropoffCity || trip.dropoff?.city || '',
                       workflowPhase,
                       activeTrip: isActiveTrip,
                       driverName: me?.name || displayLoginId,
@@ -5294,6 +5310,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       onShowLegs: handleShowLegs,
                       onEditTrip: !workflowReadOnly ? handleStartInlineEdit : undefined,
                       onScheduleEdit: !workflowReadOnly ? () => openScheduleEditor(trip) : undefined,
+                      onTimeEdit: !workflowReadOnly ? () => openScheduleEditor(trip) : undefined,
                       onClearActiveTrip: workflowReadOnly ? undefined : clearActiveTrip,
                       onNoShow: workflowReadOnly || isTerminal ? undefined : handleNoShow,
                       onCancel: workflowReadOnly || isTerminal ? undefined : handleCancel,
@@ -5475,8 +5492,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                                 tripIsInOut ? `STAY ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} MIN` : null,
                                 isSequenced ? 'Route Plan' : null,
                               ].filter(Boolean),
-                              pickup: { address: trip.pickup, phone: trip.pickupPhone },
-                              dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
+                              pickup: { address: trip.pickup, phone: trip.pickupPhone, city: trip.pickupCity || trip.pickup?.city || '' },
+                              dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, city: trip.dropoffCity || trip.dropoff?.city || '', time: null },
+                              pickupCity: trip.pickupCity || trip.pickup?.city || '',
+                              dropoffCity: trip.dropoffCity || trip.dropoff?.city || '',
                               workflowPhase,
                               activeTrip: isActiveTrip,
                               driverName: me?.name || displayLoginId,
@@ -5495,8 +5514,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                               onContacts: (t) => openContactSelector(t),
                               onRevert: workflowReadOnly ? undefined : revertTripStatus,
                               onShowLegs: handleShowLegs,
-                              onEditTrip: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? handleStartInlineEdit : undefined,
-                              onScheduleEdit: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? () => openScheduleEditor(trip) : undefined,
+                              onEditTrip: !workflowReadOnly ? handleStartInlineEdit : undefined,
+                              onScheduleEdit: !workflowReadOnly ? () => openScheduleEditor(trip) : undefined,
+                              onTimeEdit: !workflowReadOnly ? () => openScheduleEditor(trip) : undefined,
                               onClearActiveTrip: workflowReadOnly ? undefined : clearActiveTrip,
                               onNoShow: workflowReadOnly || isTerminal ? undefined : handleNoShow,
                               onCancel: workflowReadOnly || isTerminal ? undefined : handleCancel,
@@ -5574,131 +5594,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       )}
 
       {/* ===== SCHEDULE / TYPE EDITOR ===== */}
-      {scheduleEditorTrip && scheduleEditDraft && (
-        <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
-          <div className="trip-window-panel">
-            <button type="button" onClick={closeScheduleEditor} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
-            <div className="trip-window-body p-5 space-y-4">
-              <div className="text-center mb-4">
-                <h3 className="text-lg font-bold text-slate-900">Update Trip Time</h3>
-                <p className="text-sm text-slate-500 mt-0.5">{scheduleEditorTrip.patient} #{scheduleEditorTrip.bookingId || scheduleEditorTrip.id}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'time', label: 'Set Time', hint: 'Exact pickup time' },
-                  { id: 'willcall', label: 'Will Call', hint: 'No fixed time' },
-                  { id: 'inout', label: 'IN/OUT', hint: `Stay ${IN_OUT_WAIT_MINUTES} min` },
-                  { id: 'urgent', label: 'Urgent', hint: 'Deadline countdown' },
-                ].map((mode) => {
-                  const active = scheduleEditDraft.mode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => updateScheduleDraft('mode', mode.id)}
-                      className={`rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer ${active ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-wide">{mode.label}</p>
-                      <p className="text-[10px] font-semibold opacity-70 mt-0.5">{mode.hint}</p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {(scheduleEditDraft.mode === 'time' || scheduleEditDraft.mode === 'inout' || scheduleEditDraft.mode === 'urgent') && (
-                <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Pickup Time</label>
-                  <input
-                    type="time"
-                    value={scheduleEditDraft.time || ''}
-                    onChange={(e) => updateScheduleDraft('time', e.target.value)}
-                    className="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
-                  />
-                  {scheduleEditDraft.mode === 'inout' && (
-                    <p className="mt-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-700">
-                      IN/OUT keeps the related B leg stacked under A leg and tells the driver to stay with the client about {IN_OUT_WAIT_MINUTES} minutes.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {scheduleEditDraft.mode === 'willcall' && (
-                <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
-                  <p className="text-sm font-semibold text-slate-900">This trip will show as Will Call.</p>
-                  <p className="text-xs font-semibold text-slate-500 mt-1">It will stay separate from timed trips and can be changed back later.</p>
-                </div>
-              )}
-
-              {scheduleEditDraft.mode === 'urgent' && (
-                <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Deadline Date</label>
-                      <input
-                        type="date"
-                        value={scheduleEditDraft.deadlineDate || ''}
-                        onChange={(e) => updateScheduleDraft('deadlineDate', e.target.value)}
-                        className="mt-1 w-full h-10 rounded-xl border border-rose-100 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-rose-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Deadline Time</label>
-                      <input
-                        type="time"
-                        value={scheduleEditDraft.deadlineTime || ''}
-                        onChange={(e) => updateScheduleDraft('deadlineTime', e.target.value)}
-                        className="mt-1 w-full h-10 rounded-xl border border-rose-100 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-rose-400"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
-                    <div>
-                      <label className="text-xs font-medium uppercase tracking-wide text-rose-600">Required Within Hours</label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="0.5"
-                        value={scheduleEditDraft.requiredWithinHours || ''}
-                        onChange={(e) => updateScheduleDraft('requiredWithinHours', e.target.value)}
-                        className="mt-1 w-full h-10 rounded-xl border border-rose-100 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-rose-400"
-                        placeholder="3"
-                      />
-                    </div>
-                    <button type="button" onClick={applyWithinHoursToDeadline} className="h-8 px-4 rounded-xl bg-rose-600 text-white text-xs font-semibold cursor-pointer">Apply</button>
-                  </div>
-                  {(() => {
-                    const deadline = scheduleEditDraft.deadlineDate && scheduleEditDraft.deadlineTime
-                      ? new Date(`${scheduleEditDraft.deadlineDate}T${scheduleEditDraft.deadlineTime}`)
-                      : null;
-                    if (!deadline || Number.isNaN(deadline.getTime())) return null;
-                    const diff = Math.ceil((deadline.getTime() - Date.now()) / 60000);
-                    const h = Math.floor(Math.abs(diff) / 60);
-                    const m = Math.abs(diff) % 60;
-                    const text = `${h ? `${h}h ` : ''}${m}m`;
-                    return (
-                      <p className="rounded-xl bg-white border border-rose-100 px-3 py-2 text-xs font-semibold text-rose-700">
-                        Countdown: {diff < 0 ? `${text} late` : `${text} left`} - deadline {to12hrFromTimeInput(scheduleEditDraft.deadlineTime)}
-                      </p>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {scheduleEditError && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{scheduleEditError}</p>
-              )}
-
-              <p className="text-xs font-semibold text-slate-500">
-                Saving requires the driver password and syncs live with Firebase, admin, and dispatch.
-              </p>
-            </div>
-
-            <div className="trip-window-footer px-4 pb-4">
-              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, closeScheduleEditor)} onClick={closeScheduleEditor} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">Cancel</button>
-              <button type="button" onPointerDown={(event) => runTripActionOnFirstPress(event, saveScheduleEdit)} onClick={saveScheduleEdit} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all cursor-pointer">Save</button>
-            </div>
-          </div>
-        </div>
+      {scheduleEditorTrip && (
+        <ScheduleEditorModal
+          trip={scheduleEditorTrip}
+          onSave={(payload) => {
+            advanceWorkflow(scheduleEditorTrip, payload.status || scheduleEditorTrip.status, payload);
+            closeScheduleEditor();
+            setShowToast({ message: 'Schedule updated' });
+          }}
+          onClose={closeScheduleEditor}
+        />
       )}
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
@@ -6541,12 +6446,33 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                               <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Notes</label>
                               <textarea value={ie.notes} onChange={(e) => setEditingTripData(p => ({ ...p, notes: e.target.value }))} className={inputCls} rows="2" placeholder="Update notes..." />
                             </div>
-                            {role !== 'admin' && role !== 'dispatcher' && (
-                              <div>
-                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5 block">Password confirmation</label>
-                                <input type="password" value={ie._password || ''} onChange={(e) => setEditingTripData(p => ({ ...p, _password: e.target.value }))} className={inputCls} autoComplete="current-password" placeholder="Required to save" />
+                            <div>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1 block">Edit Scope</label>
+                              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTripData(p => ({ ...p, editScope: 'one-time' }))}
+                                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                                    (ie.editScope || 'one-time') === 'one-time'
+                                      ? 'bg-white text-blue-700 shadow-sm'
+                                      : 'text-slate-600 hover:text-slate-900'
+                                  }`}
+                                >
+                                  One-Time Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTripData(p => ({ ...p, editScope: 'permanent' }))}
+                                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                                    ie.editScope === 'permanent'
+                                      ? 'bg-white text-blue-700 shadow-sm'
+                                      : 'text-slate-600 hover:text-slate-900'
+                                  }`}
+                                >
+                                  Permanent (Profile)
+                                </button>
                               </div>
-                            )}
+                            </div>
                             {inlineEditError && <p className="rounded-lg bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700">{inlineEditError}</p>}
                           </div>
                         ) : (

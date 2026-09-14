@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw } from 'lucide-react';
+import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Upload, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
 import { resolveTripDriver } from '../utils/driverIdentity';
+import ScheduleEditorModal from './trips/ScheduleEditorModal';
 
 const formatClock24 = (value) => {
   if (!value) return '—';
@@ -209,8 +210,10 @@ function RetentionBadge({ trip }) {
     </div>
   );
 }
-const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDriveTrip }) => {
+const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDriveTrip, updateTrashedTrip, onUpdateTrip, setShowUploadModal }) => {
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_archiveSearch') || '');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
   const [sortColumn] = useState(() => localStorage.getItem('agape_archiveSortCol') || 'time');
   const [sortDirection] = useState(() => localStorage.getItem('agape_archiveSortDir') || 'asc');
   const [startDate, setStartDate] = useState(() => localStorage.getItem('agape_archiveStartDate') || '');
@@ -331,6 +334,18 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
       ]));
     }
 
+    if (statusFilter === 'completed') {
+      list = list.filter(t => {
+        const s = String(t.status || '').toLowerCase();
+        return s === 'completed' || t.reviewed;
+      });
+    } else if (statusFilter === 'cancelled') {
+      list = list.filter(t => {
+        const s = String(t.status || '').toLowerCase();
+        return s.includes('cancel') || s.includes('no show') || s.includes('reroute') || s.includes('transfer');
+      });
+    }
+
     list.sort((a, b) => {
       let cmp = 0;
       const aVal = getSortValue(a, sortColumn);
@@ -342,7 +357,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
     });
 
     return list;
-  }, [trashedTrips, searchQuery, sortColumn, sortDirection, startDate, endDate, drivers]);
+  }, [trashedTrips, searchQuery, statusFilter, sortColumn, sortDirection, startDate, endDate, drivers]);
 
   const grouped = useMemo(() => {
     const groups = filtered.reduce((acc, trip) => {
@@ -369,7 +384,14 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
           <p className="truncate text-sm font-semibold text-slate-900">{renderCellValue(trip, { key: 'patient' })}</p>
           <p className="mt-0.5 text-xs font-mono font-semibold text-blue-600">{renderCellValue(trip, { key: 'bookingId' })}</p>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{renderCellValue(trip, { key: 'time' })}</span>
+        <button
+          type="button"
+          onClick={() => setScheduleEditTrip(trip)}
+          className="shrink-0 rounded-md bg-slate-100 hover:bg-blue-100 hover:text-blue-700 px-2 py-0.5 text-xs font-semibold text-slate-700 transition-colors"
+          title="Click to edit schedule"
+        >
+          {renderCellValue(trip, { key: 'time' })}
+        </button>
       </div>
       <div className="mt-3 space-y-2 text-xs font-medium text-slate-600">
         <p className="flex items-start gap-2"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><span className="break-words text-emerald-700">{renderCellValue(trip, { key: 'pickup' })}</span></p>
@@ -396,16 +418,17 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
       <ComplianceTagBar trip={trip} />
       <RetentionBadge trip={trip} />
       <div className="mt-3 flex gap-2">
-        {role === 'admin' && restoreTrip && (
+        {(role === 'admin' || role === 'dispatcher') && restoreTrip && (
           <button onClick={() => restoreTrip(trip.id)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200 transition-colors hover:bg-emerald-100">
             <RotateCcw size={13} /> Restore
           </button>
         )}
-        {onDriveTrip && (
-          <button onClick={() => onDriveTrip(trip)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 transition-colors hover:bg-blue-100">
-            <Edit2 size={13} /> Edit
-          </button>
-        )}
+        <button
+          onClick={() => onDriveTrip ? onDriveTrip(trip) : setScheduleEditTrip(trip)}
+          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 transition-colors hover:bg-blue-100"
+        >
+          <Edit2 size={13} /> Edit
+        </button>
         <button onClick={() => setActionTrip(trip)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 border border-slate-200 transition-colors hover:bg-slate-100">
           <MoreHorizontal size={13} /> More
         </button>
@@ -433,6 +456,33 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
               aria-label="Archive end date" className="h-7 w-[100px] border-0 px-1 text-[10px] font-semibold outline-none focus:border-blue-500 2xl:w-[112px]" />
           </div>
+
+          <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl border border-slate-200 shrink-0">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setStatusFilter('completed')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'completed' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Completed
+            </button>
+            <button
+              onClick={() => setStatusFilter('cancelled')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'cancelled' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Cancelled
+            </button>
+          </div>
+
+          {setShowUploadModal && (
+            <button onClick={() => setShowUploadModal(true)} className="h-8 px-2 rounded-xl bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 transition-colors" title="Upload">
+              <Upload size={13} />
+            </button>
+          )}
           <button onClick={() => setShowExportModal(true)} className="h-8 px-2 rounded-xl bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 transition-colors" title="Export">
             <Download size={13} />
           </button>
@@ -557,7 +607,16 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
                         <tr key={trip.id} className={`${activeRow === trip.id ? 'bg-blue-100' : ''} hover:bg-blue-50/50 transition-colors`}>
                           <td className="px-3 py-1.5 text-slate-900">{keyVal('date')}</td>
                           <td className="px-3 py-1.5 text-slate-700">{keyVal('driver')}</td>
-                          <td className="px-3 py-1.5 font-mono text-slate-900">{keyVal('time')}</td>
+                          <td className="px-3 py-1.5 font-mono text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() => setScheduleEditTrip(trip)}
+                              className="font-mono text-xs hover:text-blue-600 hover:underline text-left cursor-pointer"
+                              title="Click to edit schedule"
+                            >
+                              {keyVal('time')}
+                            </button>
+                          </td>
                           <td className="px-3 py-1.5 font-mono text-blue-600">{keyVal('bookingId')}</td>
                           <td className="px-3 py-1.5 text-slate-900">{keyVal('patient')}</td>
                           <td className="px-3 py-1.5 font-mono text-emerald-700 truncate" title={trip.pickup}>{keyVal('pickup')}</td>
@@ -568,7 +627,34 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
                           <td className="px-3 py-1.5 font-mono text-rose-600">{keyVal('dropoffOdometer')}</td>
                           <td className="px-3 py-1.5 font-mono text-slate-500 text-[11px] uppercase">{keyVal('vehicle')}</td>
                           <td className="px-3 py-1.5 whitespace-nowrap">
-                            <button onClick={() => setActionTrip(trip)} className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-800 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors"><MoreHorizontal size={12} /> Actions</button>
+                            <div className="flex items-center gap-1.5">
+                              {(role === 'admin' || role === 'dispatcher') && restoreTrip && (
+                                <button
+                                  type="button"
+                                  onClick={() => restoreTrip(trip.id)}
+                                  className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors"
+                                  title="Restore Trip"
+                                >
+                                  <RotateCcw size={12} /> Restore
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setScheduleEditTrip(trip)}
+                                className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                                title="Edit Trip"
+                              >
+                                <Edit2 size={12} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActionTrip(trip)}
+                                className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition-colors"
+                                title="More Actions"
+                              >
+                                <MoreHorizontal size={12} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -620,6 +706,21 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
             </div>
           </div>
         </div>
+      )}
+
+      {scheduleEditTrip && (
+        <ScheduleEditorModal
+          trip={scheduleEditTrip}
+          onSave={(payload) => {
+            if (updateTrashedTrip) {
+              updateTrashedTrip(scheduleEditTrip.id, payload);
+            } else if (onUpdateTrip) {
+              onUpdateTrip(scheduleEditTrip.id, payload);
+            }
+            setScheduleEditTrip(null);
+          }}
+          onClose={() => setScheduleEditTrip(null)}
+        />
       )}
     </div>
   );

@@ -61,6 +61,8 @@ const ReportsPage = (props) => {
           drivers={props.drivers}
           role={props.role}
           updateTrashedTrip={props.updateTrashedTrip}
+          onUpdateTrip={props.onUpdateTrip}
+          setShowUploadModal={props.setShowUploadModal}
           onDriveTrip={props.onDriveTrip}
         />
       );

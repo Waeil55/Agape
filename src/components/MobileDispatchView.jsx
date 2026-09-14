@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Search, Plus, Upload, Route, Users, Truck, MapPin, Phone, X, Edit2, Ban, Repeat, MessageSquare, SlidersHorizontal, ChevronRight, XCircle, Play, UserCheck, MoreHorizontal } from "lucide-react";
+import { Search, Plus, Upload, Route, Users, Truck, MapPin, Phone, X, Edit2, Ban, Repeat, MessageSquare, SlidersHorizontal, ChevronRight, XCircle, Play, UserCheck, MoreHorizontal, Navigation } from "lucide-react";
 import { getDriverLiveStatus } from "../constants/statuses";
 import { tripCalendarDateKey, localCalendarYmd } from "../utils/tripDate";
 import { tripMatchesSearch } from "../utils/search";
 import { resolveClientPhoneForTrip } from "../utils/clientPhoneResolution";
 import { saveClientProfile } from "../utils/clientProfileUtils";
+import { openNavigation } from "../utils/nativeActions";
+import AdminQuickSmsSheet from "./trips/AdminQuickSmsSheet";
+import ScheduleEditorModal from "./trips/ScheduleEditorModal";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 const timeToMinutes = (t) => {
@@ -61,7 +64,7 @@ const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str 
 const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
 /* ─── Admin Trip Card ─────────────────────────────────────────────── */
-const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role }) => {
+const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role, onTimeEdit, onQuickSms }) => {
   const [showActions, setShowActions] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -199,11 +202,16 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
           {/* Row 1: Time + Patient + Status */}
           <div className="flex items-start gap-2.5">
             {/* Time badge */}
-            <div className={`shrink-0 text-center px-2 py-1.5 rounded-xl min-w-[52px] ${
-              urgency === "Late" ? "bg-rose-600 text-white" :
-              urgency ? "bg-amber-50 border border-amber-200" :
-              "bg-slate-50 border border-slate-200"
-            }`}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onTimeEdit?.(trip); }}
+              className={`shrink-0 text-center px-2 py-1.5 rounded-xl min-w-[52px] hover:ring-2 hover:ring-blue-300 transition-colors cursor-pointer ${
+                urgency === "Late" ? "bg-rose-600 text-white" :
+                urgency ? "bg-amber-50 border border-amber-200" :
+                "bg-slate-50 border border-slate-200"
+              }`}
+              title="Edit schedule"
+            >
               <p className={`text-[13px] font-black leading-none ${
                 urgency === "Late" ? "text-white" :
                 urgency ? "text-amber-700" : "text-slate-800"
@@ -213,7 +221,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
                   {urgency}
                 </p>
               )}
-            </div>
+            </button>
 
             {/* Patient + booking */}
             <div className="flex-1 min-w-0 pt-0.5">
@@ -290,6 +298,16 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
                   {driver ? "Reassign" : "Assign"}
                 </button>
               )}
+              {trip.pickup && (
+                <button
+                  type="button"
+                  onClick={() => openNavigation(trip.pickup || '')}
+                  className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center active:scale-95 transition-colors"
+                  title="Navigate GPS"
+                >
+                  <Navigation size={12} />
+                </button>
+              )}
               {clientPhone && (
                 <>
                   <button
@@ -302,7 +320,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
                   </button>
                   <button
                     type="button"
-                    onClick={() => sendSMS?.(clientPhone, trip.patient)}
+                    onClick={() => onQuickSms ? onQuickSms(trip) : sendSMS?.(clientPhone, trip.patient)}
                     className="w-11 h-11 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center active:scale-95 transition-colors"
                     title="SMS patient"
                   >
@@ -423,11 +441,25 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
                     <Phone size={18} /> Call Patient
                   </button>
               )}
+              {/* Navigate GPS */}
+              {trip.pickup && (
+                <button
+                  type="button"
+                  onClick={() => { openNavigation(trip.pickup || ''); setShowActions(false); }}
+                  className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-sm font-semibold active:scale-95 transition-colors"
+                >
+                  <Navigation size={18} /> Navigate to Pickup
+                </button>
+              )}
               {/* SMS patient */}
               {clientPhone && (
                 <button
                   type="button"
-                  onClick={() => { sendSMS?.(clientPhone, trip.patient); setShowActions(false); }}
+                  onClick={() => {
+                    setShowActions(false);
+                    if (onQuickSms) onQuickSms(trip);
+                    else sendSMS?.(clientPhone, trip.patient);
+                  }}
                   className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold active:scale-95 transition-colors"
                 >
                   <MessageSquare size={18} /> SMS Patient
@@ -503,6 +535,8 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
   const [showTools, setShowTools] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery || "");
   const [showSearch, setShowSearch] = useState(false);
+  const [quickSmsTrip, setQuickSmsTrip] = useState(null);
+  const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
   const searchInputRef = useRef(null);
 
   useEffect(() => { const t = setTimeout(() => setSearchQuery?.(localSearch), 250); return () => clearTimeout(t); }, [localSearch, setSearchQuery]);
@@ -706,6 +740,8 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
                 currentUser={currentUser}
                 addToast={addToast}
                 role={role}
+                onTimeEdit={(t) => setScheduleEditTrip(t)}
+                onQuickSms={(t) => setQuickSmsTrip(t)}
               />
             ))}
           </div>
@@ -766,6 +802,32 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
             </div>
           </div>
         </div>
+      )}
+      {quickSmsTrip && (
+        <AdminQuickSmsSheet
+          trip={quickSmsTrip}
+          onSend={async (text) => {
+            const { getFunctions, httpsCallable } = await import('firebase/functions');
+            const sendClientSms = httpsCallable(getFunctions(), 'sendClientSms');
+            await sendClientSms({
+              to: quickSmsTrip.patientPhone || quickSmsTrip.phone || quickSmsTrip.clientPhone || '',
+              body: text,
+              tripId: quickSmsTrip.id,
+            });
+          }}
+          onClose={() => setQuickSmsTrip(null)}
+        />
+      )}
+      {scheduleEditTrip && (
+        <ScheduleEditorModal
+          trip={scheduleEditTrip}
+          onSave={(payload) => {
+            updateTrip?.(scheduleEditTrip.id, payload);
+            setScheduleEditTrip(null);
+            addToast?.('Schedule updated');
+          }}
+          onClose={() => setScheduleEditTrip(null)}
+        />
       )}
     </div>
   );

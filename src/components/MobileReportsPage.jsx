@@ -1,11 +1,13 @@
 import { useDeferredValue, useState, useMemo, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw, Pencil, RotateCcw } from 'lucide-react';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
+import { ManifestTripCard, getTripCountdown } from './trips/MobileTripManifest';
+import ScheduleEditorModal from './trips/ScheduleEditorModal';
 
 const MOBILE_REPORT_PAGE_SIZE = 40;
 
@@ -202,6 +204,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [allDates, setAllDates] = useState(false);
   const [expandedTripId, setExpandedTripId] = useState(null);
+  const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
   const [editingTripData, setEditingTripData] = useState(null);
   const [savingTripId, setSavingTripId] = useState(null);
@@ -419,10 +422,10 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         <div className="flex items-center gap-1">
           {setShowUploadModal && (
             <>
-              <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Download reports">
+              <button onClick={() => handleExport('csv')} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Download reports" title="Export CSV">
                 <Download className="w-4 h-4" />
               </button>
-              <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports">
+              <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports" title="Upload reports">
                 <Upload className="w-4 h-4" />
               </button>
             </>
@@ -512,61 +515,30 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             const displayStatus = isEditing ? ie.status : (trip.status || (trip.reviewed ? 'Reviewed' : 'Pending'));
 
             return (
-              <div key={trip.id} className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden agape-trip-${tone}`}>
-                <div className="px-2 pt-1 pb-0.5 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
-                  <button
-                    type="button"
-                    className="flex min-h-9 min-w-0 flex-1 items-center gap-1.5 text-left"
-                    aria-expanded={isExpanded}
-                    disabled={isEditing}
-                    onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)}
-                  >
-                    <span className={`text-base font-bold leading-none tabular-nums ${tone === 'danger' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                      {formatClock(isEditing ? ie.time : trip.time)}
-                    </span>
-                    <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${tone === 'danger' ? 'bg-rose-50 text-rose-700' : tone === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                      {displayStatus}
-                    </span>
-                  </button>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {!isEditing && !readOnly && (
-                      <button type="button" onClick={(e) => { e.stopPropagation(); startInlineEdit(trip); }} className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button type="button" onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)} className="flex min-h-9 min-w-9 items-center justify-center rounded-lg text-slate-400">
-                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              <div key={trip.id} className="mb-2">
+                <div onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)} className="cursor-pointer" aria-expanded={isExpanded}>
+                  <ManifestTripCard
+                    trip={trip}
+                    countdown={getTripCountdown(trip)}
+                    driverName={driver ? driver.name : (trip.driverName || 'Unassigned')}
+                    onTimeEdit={(t) => setScheduleEditTrip(t)}
+                    onMore={() => setExpandedTripId(current => current === trip.id ? null : trip.id)}
+                    moreLabel={isExpanded ? 'Hide details' : 'View details'}
+                  />
+                  {!isEditing && !readOnly && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); startInlineEdit(trip); }}
+                      className="sr-only"
+                      aria-label={`Edit ${trip.patient || 'trip'}`}
+                    >
+                      Edit
                     </button>
-                  </div>
-                </div>
-
-                <div className="px-2 py-0.5 flex justify-between items-center gap-2">
-                  <span className="min-w-0 truncate text-[13px] font-semibold text-slate-700">{isEditing ? ie.patient : (trip.patient || 'Unknown')}</span>
-                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-400">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</span>
-                </div>
-
-                <div className="px-2 pb-0.5">
-                  <div className="grid grid-cols-2 gap-1">
-                    <div className="bg-emerald-50/60 p-1 rounded-lg border border-emerald-100/50 min-w-0">
-                      <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider leading-none mb-0.5">Pickup</div>
-                      <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={trip.pickup}>{trip.pickup || '—'}</div>
-                    </div>
-                    <div className="bg-rose-50/60 p-1 rounded-lg border border-rose-100/50 min-w-0">
-                      <div className="text-[9px] font-bold text-rose-600 uppercase tracking-wider leading-none mb-0.5">Dropoff</div>
-                      <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={trip.dropoff}>{trip.dropoff || '—'}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 px-2 pb-1 pt-0 border-t border-slate-100">
-                  <div className="flex-1" />
-                  <div className="flex items-center gap-0.5 text-[11px] font-medium text-slate-400 shrink-0">
-                    <span className="truncate max-w-[80px]">{driver ? driver.name : (trip.driverName || 'Unassigned')}</span>
-                  </div>
+                  )}
                 </div>
 
                 {isExpanded && (
-                  <div className="agape-trip-card-details">
+                  <div className="agape-trip-card-details mt-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     {isEditing ? (
                       <div className="space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
@@ -700,9 +672,27 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                       ) : (
                         <>
                           <button
+                            onClick={() => startInlineEdit(trip)}
+                            disabled={readOnly}
+                            className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-xl py-2.5 font-bold text-xs shadow-sm transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit Trip
+                          </button>
+                          {(trip.status === 'Cancelled' || trip.status === 'No Show' || trip.status === 'Rerouted' || trip.status === 'Cancelled / Rescheduled' || trip.status === 'Transferred') && (
+                            <button
+                              onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { status: 'Assigned', workflowUpdatedAt: new Date().toISOString() })}
+                              disabled={readOnly}
+                              className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 border border-amber-600 text-white rounded-xl py-2.5 font-bold text-xs shadow-sm transition-colors"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Restore Trip
+                            </button>
+                          )}
+                          <button
                             onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { reviewed: !trip.reviewed })}
                             disabled={readOnly}
-                            className={`col-span-2 flex items-center justify-center gap-2 border rounded-xl py-3 shadow-sm font-bold text-sm transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
+                            className={`${(trip.status === 'Cancelled' || trip.status === 'No Show' || trip.status === 'Rerouted' || trip.status === 'Cancelled / Rescheduled' || trip.status === 'Transferred') ? 'col-span-2' : ''} flex items-center justify-center gap-2 border rounded-xl py-2.5 shadow-sm font-bold text-xs transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
                           >
                             <CheckCircle2 className={`w-4 h-4 ${trip.reviewed ? 'text-slate-500' : 'text-white'}`} />
                             {trip.reviewed ? 'Un-Review' : 'Review'}
@@ -731,6 +721,17 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
           )}
         </div>
       </div>
+
+      {scheduleEditTrip && (
+        <ScheduleEditorModal
+          trip={scheduleEditTrip}
+          onSave={(payload) => {
+            onUpdateTrip?.(scheduleEditTrip.id, payload);
+            setScheduleEditTrip(null);
+          }}
+          onClose={() => setScheduleEditTrip(null)}
+        />
+      )}
     </div>
   );
 };

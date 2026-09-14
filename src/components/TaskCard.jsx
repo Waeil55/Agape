@@ -217,6 +217,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
       ...task,
       pickup: pickupAddress,
       dropoff: dropoffAddress,
+      pickupCity: task.pickupCity || task.pickup?.city || '',
+      dropoffCity: task.dropoffCity || task.dropoff?.city || '',
     };
     const mobileAccess = getTaskCardMobileActionAccess({ task: mobileTrip, role, workflowReadOnly });
     const canOpenProgress = mobileAccess.canOpenProgress && typeof onToggle === 'function';
@@ -251,6 +253,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
           moreIcon={MoreVertical}
           onMore={menuActions.length > 0 ? () => setMenuOpen(true) : null}
           moreLabel={`More actions for ${task.patient || task.patientName || 'trip'}`}
+          onTimeEdit={actions?.onTimeEdit || actions?.onScheduleEdit}
         />
         {menuOpen && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={`Trip actions for ${task.patient || task.patientName || 'trip'}`}>
@@ -321,13 +324,18 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                   timeUrgency.type === 'warning' ? 'text-orange-500' :
                   isExpanded ? 'text-blue-600' : 'text-slate-400'
                 }`} strokeWidth={timeUrgency.type === 'normal' ? 2.5 : 3} />
-                <span className={`text-[17px] font-black tracking-tight whitespace-nowrap ${
-                  timeUrgency.type === 'critical' ? 'text-rose-600' :
-                  timeUrgency.type === 'warning' ? 'text-orange-500' :
-                  'text-slate-900'
-                }`}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); (actions?.onTimeEdit || actions?.onScheduleEdit)?.(task); }}
+                  className={`text-[17px] font-black tracking-tight whitespace-nowrap hover:underline cursor-pointer ${
+                    timeUrgency.type === 'critical' ? 'text-rose-600' :
+                    timeUrgency.type === 'warning' ? 'text-orange-500' :
+                    'text-slate-900'
+                  }`}
+                  title="Update schedule"
+                >
                   {task.time || 'TBD'}
-                </span>
+                </button>
                 {actions?.onScheduleEdit && (
                   <button
                     type="button"
@@ -515,14 +523,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                 ))}
               </div>
 
-              {/* Notes */}
-              {(task.notes || task.details?.generalComments) && (
-                <div className="mb-3 bg-amber-50/80 border border-amber-200/60 rounded-xl p-3 flex gap-2 items-start">
-                  <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-amber-800 text-[0.75em] font-medium leading-snug">{task.notes || task.details.generalComments}</p>
-                </div>
-              )}
-
               {/* Pickup / Dropoff */}
               <div className="space-y-0 mb-4">
                 {/* Pickup */}
@@ -544,6 +544,9 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                             </h4>
                           )}
                           <p className="text-slate-600 text-[0.75em] leading-tight">{pickupAddress}</p>
+                          {(task.pickupCity || task.pickup?.city) && (
+                            <p className="text-slate-400 text-[0.6875em] font-medium leading-tight mt-0.5">{task.pickupCity || task.pickup?.city}</p>
+                          )}
                         </div>
                         <div className="flex shrink-0 gap-1 items-center">
                           <button onClick={(e) => { e.stopPropagation(); handleCopy(pickupAddress, 'pickup'); }}
@@ -596,6 +599,9 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                             </h4>
                           )}
                           <p className="text-slate-600 text-[0.75em] leading-tight">{dropoffAddress}</p>
+                          {(task.dropoffCity || task.dropoff?.city) && (
+                            <p className="text-slate-400 text-[0.6875em] font-medium leading-tight mt-0.5">{task.dropoffCity || task.dropoff?.city}</p>
+                          )}
                         </div>
                         <div className="flex shrink-0 gap-1 items-center">
                           <button onClick={(e) => { e.stopPropagation(); handleCopy(dropoffAddress, 'dropoff'); }}

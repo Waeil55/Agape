@@ -20,6 +20,8 @@ import TableCheckbox from './ui/TableCheckbox';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import { compareStableRowOrder, createStableRowOrder } from '../utils/stableTableOrder';
 import { resolveTripDriver } from '../utils/driverIdentity';
+import { openNavigation } from '../utils/nativeActions';
+import AdminQuickSmsSheet from './trips/AdminQuickSmsSheet';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -415,6 +417,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
   const [manifestDensity] = useState(() => 'minimal');
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [smsConversationTrip, setSmsConversationTrip] = useState(null);
+  const [adminQuickSmsTrip, setAdminQuickSmsTrip] = useState(null);
   const openSmsForTrip = (trip) => { setSelectedTasks([trip.id]); setShowSmsModal(true); };
   const [showOnlyAttention, setShowOnlyAttention] = useState(() => localStorage.getItem('agape_opsShowOnlyAttention') === 'true');
   const [routeTemplates, setRouteTemplates] = useState([]);
@@ -1112,13 +1115,6 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
             {mobility.length > 0 && <div><span className="text-slate-500">Mobility: </span><span className="text-slate-700">{mobility.join(', ')}</span></div>}
           </div>
         </div>
-
-        {(generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment) && (
-          <div className="text-sm truncate max-w-full">
-            <span className="font-semibold text-amber-600">Notes: </span>
-            <span className="text-slate-600">{generalComments || manifestMessage || trip.notes || trip.specialInstructions || trip.comment}</span>
-          </div>
-        )}
       </div>
     );
   };
@@ -2681,6 +2677,21 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           onClose={() => setSmsConversationTrip(null)}
         />
       )}
+      {adminQuickSmsTrip && (
+        <AdminQuickSmsSheet
+          trip={adminQuickSmsTrip}
+          onSend={async (text) => {
+            const { getFunctions, httpsCallable } = await import('firebase/functions');
+            const sendClientSms = httpsCallable(getFunctions(), 'sendClientSms');
+            await sendClientSms({
+              to: adminQuickSmsTrip.patientPhone || adminQuickSmsTrip.phone || adminQuickSmsTrip.clientPhone || '',
+              body: text,
+              tripId: adminQuickSmsTrip.id,
+            });
+          }}
+          onClose={() => setAdminQuickSmsTrip(null)}
+        />
+      )}
       <TripActionCenter
         open={Boolean(actionCenterTrip)}
         trip={actionCenterTrip}
@@ -2693,9 +2704,9 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           onDrive: (trip) => resolveTripDriver(trip, drivers) ? onDriveTrip?.(trip) : setManualAssignTrip(trip),
           onAssign: (trip) => setManualAssignTrip(trip),
           onSmartAssign: (trip) => triggerSmartAssign?.(trip),
-          onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
+          onNavigate: (trip) => openNavigation(trip.pickup || ''),
           onCall: (trip) => makeCall?.(getClientPhone(trip), trip.patient),
-          onMessage: (trip) => sendSMS?.(getClientPhone(trip), trip.patient),
+          onMessage: (trip) => setAdminQuickSmsTrip(trip),
           onEdit: startInlineEdit,
           onToggleInOut: (trip) => {
             const nowInOut = !isInOutTrip(trip);

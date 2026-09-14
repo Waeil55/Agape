@@ -3,7 +3,7 @@ import {
   X, Clock, Calendar, AlertTriangle, CheckCircle2, Repeat, Copy,
   ChevronDown, ChevronUp, Timer, MapPin, Users, Layers, Settings,
   Trash2, Plus, Save, ArrowRight, Zap, Shield, Info, AlertCircle,
-  RefreshCw, CalendarDays, MoveRight, Bookmark, Star, History,
+  RefreshCw, CalendarDays, MoveRight, Bookmark, Star, History, Phone,
 } from 'lucide-react';
 import { IN_OUT_WAIT_MINUTES } from '../../utils/inOutTrips';
 import { tripCalendarDateKey, timeToMinutes } from '../../utils/tripDate';
@@ -440,14 +440,6 @@ function ScheduleTemplatePicker({ onSelect, onClose }) {
 // MAIN COMPONENT
 // ============================================================================
 
-function Phone({ size = 16, className = '' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-    </svg>
-  );
-}
-
 export default function ScheduleEditorModal({
   trip,
   allTrips = [],
@@ -489,6 +481,7 @@ export default function ScheduleEditorModal({
     pickupAddress: trip?.pickup || '',
     dropoffAddress: trip?.dropoff || '',
     estimatedTravelMin: trip?.estimatedTravelMinutes || 0,
+    editScope: 'one-time',
   });
 
   const [error, setError] = useState('');
@@ -589,6 +582,10 @@ export default function ScheduleEditorModal({
         customRecurrenceDays: draft.customDays,
         scheduleNotes: draft.notes,
         estimatedTravelMinutes: draft.estimatedTravelMin,
+        saveAsProfile: draft.editScope === 'permanent',
+        editScope: draft.editScope,
+        permanentEdit: draft.editScope === 'permanent',
+        oneTimeEdit: draft.editScope === 'one-time',
       };
 
       let payload = { ...basePayload };
@@ -695,6 +692,37 @@ export default function ScheduleEditorModal({
                 </span>
               </div>
             )}
+          </div>
+
+          {/* EDIT SCOPE: ONE-TIME VS PERMANENT */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Apply Update As</label>
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => updateDraft('editScope', 'one-time')}
+                className={`py-2 px-2.5 rounded-lg text-center font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  draft.editScope === 'one-time'
+                    ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>One-Time</span>
+                <span className="text-[9px] font-medium opacity-70">(This trip)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateDraft('editScope', 'permanent')}
+                className={`py-2 px-2.5 rounded-lg text-center font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  draft.editScope === 'permanent'
+                    ? 'bg-white text-purple-700 shadow-xs border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>Permanent</span>
+                <span className="text-[9px] font-medium opacity-70">(Client & future)</span>
+              </button>
+            </div>
           </div>
 
           {/* MODE SELECTOR */}

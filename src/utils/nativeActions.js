@@ -79,12 +79,16 @@ function showWebFallbackModal(type, phone, name) {
 function buildNavUrls(address, origin) {
   const encoded = encodeURIComponent(address);
   const originParam = origin ? `&origin=${encodeURIComponent(origin)}` : '';
+  const googleWeb = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${encoded}`;
 
   return {
-    apple: `http://maps.apple.com/?daddr=${encoded}`,
-    google: `comgooglemaps://?daddr=${encoded}`,
-    googleWeb: `https://www.google.com/maps/dir/?api=1${originParam}&destination=${encoded}`,
-    waze: `waze://?q=${encoded}&navigate=yes`,
+    appleNative: `maps://maps.apple.com/?daddr=${encoded}&dirflg=d`,
+    apple: `https://maps.apple.com/?daddr=${encoded}&dirflg=d`,
+    googleNative: `google.navigation:q=${encoded}&mode=d`,
+    googleIntent: `intent://maps.google.com/maps/dir/?api=1${originParam}&destination=${encoded}&travelmode=driving#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(googleWeb)};end;`,
+    googleIOS: `comgooglemaps://?daddr=${encoded}&directionsmode=driving`,
+    googleWeb,
+    wazeNative: `waze://?q=${encoded}&navigate=yes`,
     wazeWeb: `https://www.waze.com/ul?q=${encoded}&navigate=yes`,
   };
 }
@@ -121,7 +125,7 @@ async function openUrlWithFallback(url, fallbackUrl, timeout = 2500) {
       if (isIOS() || isAndroid()) {
         window.location.href = fallbackUrl;
       } else {
-        window.open(fallbackUrl, '_blank');
+        window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
       }
     }
   }
@@ -143,27 +147,43 @@ export async function openMapLink(primaryUrl, webFallbackUrl) {
 export async function openNavigation(address, app, origin) {
   await impact('medium');
 
+  if (!address) return;
+
   const urls = buildNavUrls(address, origin);
+  const ios = isIOS();
+  const android = isAndroid();
 
-  let targetUrl = urls.googleWeb;
-  if (app === 'apple') {
-    targetUrl = urls.apple; // Apple Maps universal link is urls.apple
-  } else if (app === 'waze') {
-    targetUrl = urls.wazeWeb; // Waze universal link is urls.wazeWeb
-  } else {
-    targetUrl = urls.googleWeb; // Google Maps universal link is urls.googleWeb
-  }
-
-  if (isNativeShell()) {
-    await openUrlNative(targetUrl);
+  if (android) {
+    if (app === 'waze') {
+      await openUrlWithFallback(urls.wazeNative, urls.wazeWeb);
+    } else {
+      // Android intent directly targets Google Maps app
+      window.location.href = urls.googleIntent;
+    }
     return;
   }
 
-  if (isIOS() || isAndroid()) {
-    window.location.href = targetUrl;
-  } else {
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  if (ios) {
+    if (app === 'google') {
+      await openUrlWithFallback(urls.googleIOS, urls.appleNative);
+    } else if (app === 'waze') {
+      await openUrlWithFallback(urls.wazeNative, urls.wazeWeb);
+    } else {
+      // Default on iOS: Apple Maps native app scheme
+      window.location.href = urls.appleNative;
+    }
+    return;
   }
+
+  if (isNativeShell()) {
+    const nativeTarget = app === 'apple' ? urls.appleNative : app === 'waze' ? urls.wazeNative : urls.googleIntent;
+    await openUrlNative(nativeTarget);
+    return;
+  }
+
+  // Desktop or unrecognized fallback: open standard web maps in new tab
+  const webTarget = app === 'apple' ? urls.apple : app === 'waze' ? urls.wazeWeb : urls.googleWeb;
+  window.open(webTarget, '_blank', 'noopener,noreferrer');
 }
 
 export async function showNavActionSheet(address, origin, preferredApp) {

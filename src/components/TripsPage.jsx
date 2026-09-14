@@ -570,7 +570,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           setModalError('');
         } : null}
         moreLabel={`${isTerminal ? 'Review' : 'Update'} ${trip.patient || trip.bookingId || 'trip'}`}
-        onTimeEdit={(role === 'admin' || role === 'dispatcher') ? (t) => setScheduleEditTrip(t) : null}
+        onTimeEdit={(t) => setScheduleEditTrip(t)}
       />
       </div>
     );
