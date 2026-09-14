@@ -1,5 +1,5 @@
 import { useDeferredValue, useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload } from 'lucide-react';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
@@ -81,9 +81,7 @@ const getReportStatusIcon = (tone) => {
 const normalizeStatus = (status) => {
   const s = String(status || '').trim().toLowerCase();
   if (s === 'completed') return 'completed';
-  if (s.includes('cancel')) return 'cancelled';
-  if (s.includes('no show')) return 'noshow';
-  if (s.includes('reroute')) return 'rerouted';
+  if (s.includes('cancel') || s.includes('no show') || s.includes('reroute') || s.includes('transfer')) return 'cancelled';
   return 'other';
 };
 
@@ -250,84 +248,77 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   return (
     <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain bg-slate-50 pb-24">
       {/* PAGE HEADER */}
-      <div className="shrink-0 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
-        {editMessage && <div role={editMessage.includes('not saved') ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
+      <div className="shrink-0 px-3 pt-2 pb-1.5 bg-white border-b border-slate-200">
+        {editMessage && <div role={editMessage.includes('not saved') ? 'alert' : 'status'} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
       </div>
 
       {/* DATE & FILTERS BAR */}
       <div className="agape-mobile-toolbar shrink-0">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
           <button onClick={() => shiftDate(-1)} className="agape-mobile-icon-btn" aria-label="Previous date">
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
-          <button className="agape-mobile-date-pill">
+          <button className="agape-mobile-date-pill text-[11px]">
             {allDates ? 'All dates' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             <span>({filteredTrips.length})</span>
           </button>
           <button onClick={() => shiftDate(1)} className="agape-mobile-icon-btn" aria-label="Next date">
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
 
-          <label className="flex min-h-[40px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600">
+          <label className="flex min-h-[32px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600">
             <input type="checkbox" checked={allDates} onChange={event => { setAllDates(event.target.checked); setExpandedTripId(null); }} /> All dates
           </label>
 
           {[
-            { id: 'all', label: 'All', Icon: Clock },
-            { id: 'completed', label: 'Completed', Icon: CheckCircle2 },
-            { id: 'cancelled', label: 'Cancelled', Icon: XCircle },
-            { id: 'noshow', label: 'No Show', Icon: AlertTriangle },
-            { id: 'rerouted', label: 'Rerouted', Icon: Repeat },
+            { id: 'all', label: 'All' },
+            { id: 'completed', label: 'Completed' },
+            { id: 'cancelled', label: 'Cancelled' },
           ].map(f => {
-            const FilterIcon = f.Icon;
             const active = statusFilter === f.id;
-            const activeClass = f.id === 'rerouted'
-              ? 'bg-purple-600 text-white border-purple-600'
-              : f.id === 'cancelled'
-                ? 'bg-rose-600 text-white border-rose-600'
-                : f.id === 'noshow'
-                  ? 'bg-amber-500 text-white border-amber-500'
-                  : f.id === 'completed'
-                    ? 'bg-emerald-600 text-white border-emerald-600'
-                    : 'bg-blue-600 text-white border-blue-600';
             return (
               <button
                 key={f.id}
                 type="button"
                 onClick={() => { setStatusFilter(f.id); setExpandedTripId(null); }}
-                className={`agape-mobile-icon-btn relative ${active ? `${activeClass} agape-mobile-icon-active` : ''}`}
-                title={f.label}
-                aria-label={`${f.label} filter`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${active ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
               >
-                <FilterIcon size={13} />
+                {f.label}
               </button>
             );
           })}
         </div>
-        {setShowUploadModal && (
-          <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports">
-            <Download className="w-5 h-5" />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {setShowUploadModal && (
+            <>
+              <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Download reports">
+                <Download className="w-4 h-4" />
+              </button>
+              <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports">
+                <Upload className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* SEARCH BAR & DRIVER FILTER */}
       <div className="agape-mobile-search-section shrink-0">
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <div className="agape-mobile-search flex-1">
-            <Search className="w-5 h-5 text-slate-400 shrink-0" />
+            <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="text"
               placeholder="Patient, trip, phone..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setExpandedTripId(null); }}
-              className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
           <select
             value={driverFilter}
             onChange={(e) => { setDriverFilter(e.target.value); setExpandedTripId(null); }}
-            className="bg-white rounded-xl shadow-sm px-3 py-2 outline-none text-slate-600 text-[13px] font-semibold max-w-[130px] border border-slate-200"
+            className="bg-white rounded-lg px-2 py-1.5 outline-none text-slate-600 text-[11px] font-semibold max-w-[120px] border border-slate-200"
           >
             {uniqueDrivers.map(driver => (
               <option key={driver} value={driver}>{driver}</option>
@@ -372,39 +363,57 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             const displayStatus = isEditing ? ie.status : (trip.status || (trip.reviewed ? 'Reviewed' : 'Pending'));
 
             return (
-              <div key={trip.id} className={`agape-trip-list-card agape-trip-${tone}`}>
-                <div className="agape-trip-card-summary">
+              <div key={trip.id} className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden agape-trip-${tone}`}>
+                <div className="px-2 pt-1 pb-0.5 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
                   <button
                     type="button"
-                    className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left"
+                    className="flex min-h-9 min-w-0 flex-1 items-center gap-1.5 text-left"
                     aria-expanded={isExpanded}
                     disabled={isEditing}
                     onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)}
                   >
-                    <div className="min-w-0 flex-1">
-                      <h2 className="agape-trip-title">{isEditing ? ie.patient : (trip.patient || 'UNKNOWN')}</h2>
-                      <p className="agape-trip-id">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</p>
-                    </div>
-                    <div className="agape-trip-right">
-                      <div className="flex flex-col items-end">
-                        <span className={`text-[15px] font-semibold ${tone === 'danger' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                          {formatClock(isEditing ? ie.time : trip.time)}
-                        </span>
-                        <span className="text-[12px] text-slate-500 mt-0.5 font-medium">
-                          Driver: {driver ? driver.name : (trip.driverName || '-')}
-                        </span>
-                      </div>
-                      <span className={`agape-trip-status-dot agape-trip-status-${tone}`} title={displayStatus} aria-label={displayStatus}>
-                        <StatusIcon className="w-4 h-4" />
-                      </span>
-                      {!isEditing && (isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />)}
-                    </div>
+                    <span className={`text-base font-bold leading-none tabular-nums ${tone === 'danger' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                      {formatClock(isEditing ? ie.time : trip.time)}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${tone === 'danger' ? 'bg-rose-50 text-rose-700' : tone === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {displayStatus}
+                    </span>
                   </button>
-                  {!isEditing && !readOnly && (
-                    <button type="button" onClick={() => startInlineEdit(trip)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
-                      <Edit2 className="h-4 w-4" />
+                  <div className="flex shrink-0 items-center gap-1">
+                    {!isEditing && !readOnly && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); startInlineEdit(trip); }} className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500" aria-label={`Edit ${trip.patient || 'trip'}`}>
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)} className="flex min-h-9 min-w-9 items-center justify-center rounded-lg text-slate-400">
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     </button>
-                  )}
+                  </div>
+                </div>
+
+                <div className="px-2 py-0.5 flex justify-between items-center gap-2">
+                  <span className="min-w-0 truncate text-[13px] font-semibold text-slate-700">{isEditing ? ie.patient : (trip.patient || 'Unknown')}</span>
+                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-400">#{isEditing ? ie.bookingId : (trip.bookingId || trip.id)}</span>
+                </div>
+
+                <div className="px-2 pb-0.5">
+                  <div className="grid grid-cols-2 gap-1">
+                    <div className="bg-emerald-50/60 p-1 rounded-lg border border-emerald-100/50 min-w-0">
+                      <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider leading-none mb-0.5">Pickup</div>
+                      <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={trip.pickup}>{trip.pickup || '—'}</div>
+                    </div>
+                    <div className="bg-rose-50/60 p-1 rounded-lg border border-rose-100/50 min-w-0">
+                      <div className="text-[9px] font-bold text-rose-600 uppercase tracking-wider leading-none mb-0.5">Dropoff</div>
+                      <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={trip.dropoff}>{trip.dropoff || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 px-2 pb-1 pt-0 border-t border-slate-100">
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-0.5 text-[11px] font-medium text-slate-400 shrink-0">
+                    <span className="truncate max-w-[80px]">{driver ? driver.name : (trip.driverName || 'Unassigned')}</span>
+                  </div>
                 </div>
 
                 {isExpanded && (

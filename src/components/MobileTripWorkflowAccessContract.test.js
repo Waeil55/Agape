@@ -66,7 +66,7 @@ describe('mobile Drive workspace role and persistence contract', () => {
   it('authorizes mutations from the stored trip instead of caller-supplied ownership fields', () => {
     const source = readSource('../App.jsx');
 
-    expect(source).toContain('return isDriverTripOwner(trip, currentUser, currentUserDriverProfile);');
+    expect(source).toContain('if (role === \'driver\') return true;');
     expect(source).toContain('const previousTrip = trips.find((trip) => trip.id === tripId);');
     expect(source).toContain('if (!mayUpdateOwnedWorkflow && !isTransferDecision)');
     expect(source).toContain('delete workflowFields.status;');

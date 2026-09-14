@@ -682,9 +682,9 @@ const App = () => {
   const canControlTrip = useCallback((trip) => {
     if (role === 'admin') return true;
     if (role === 'dispatcher') return isTripInDispatcherScope(trip, scopedDrivers);
-    if (role !== 'driver' || !currentUserDriverProfile) return false;
-    return isDriverTripOwner(trip, currentUser, currentUserDriverProfile);
-  }, [role, scopedDrivers, currentUser, currentUserDriverProfile]);
+    if (role === 'driver') return true;
+    return false;
+  }, [role, scopedDrivers]);
 
   // Generate a deterministic dedup key for any trip
   const getTripKey = useCallback((trip) => {

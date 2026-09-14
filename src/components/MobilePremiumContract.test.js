@@ -29,7 +29,7 @@ describe('mobile premium interaction contract', () => {
 
   it('keeps the bottom bar visible across all sub-views including admin', () => {
     const enterpriseSource = readComponent('./MobileEnterpriseDashboard.jsx');
-    expect(enterpriseSource).toContain('showNav = !currentTripDetails && !isChatThreadOpen');
+    expect(enterpriseSource).toContain('showNav = !isChatThreadOpen');
     expect(enterpriseSource).not.toContain("subView !== 'admin'");
   });
 

@@ -13,7 +13,7 @@ describe('mobile trip action policy', () => {
       canArchive: false,
       canCreate: false,
       canUpload: false,
-      canEdit: false,
+      canEdit: true,
       canMarkException: false,
       canReportWorkflowException: true,
       canRequestTransfer: true,

@@ -31,7 +31,7 @@ export function getTripActionCapabilities({ role, trip, hasAssignedDriver = fals
     canCreate: role === 'admin' || role === 'dispatcher',
     canUpload: role === 'admin' || role === 'dispatcher',
     canArchive: role === 'admin' || role === 'dispatcher',
-    canEdit: isOperator && !isTerminal,
+    canEdit: (isOperator || isDriver) && !isTerminal,
     canMarkException: isOperator && !isTerminal,
     // Drivers report operational outcomes only from their own active workflow;
     // these are intentionally distinct from operator manifest mutations.

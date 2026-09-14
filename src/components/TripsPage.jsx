@@ -3,8 +3,10 @@ import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
 import { Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, CheckSquare, Square, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, Zap, Filter } from 'lucide-react';
 
-import { makeCall, sendSMS } from '../utils/nativeActions';
+import { makeCall, sendSMS, openNavigation } from '../utils/nativeActions';
 import { saveClientProfile } from '../utils/clientProfileUtils';
+import ScheduleEditorModal from './trips/ScheduleEditorModal';
+import AdminQuickSmsSheet from './trips/AdminQuickSmsSheet';
 
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
@@ -89,6 +91,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const [modalSaving, setModalSaving] = useState(false);
   const [modalError, setModalError] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
+  const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
+  const [quickSmsTrip, setQuickSmsTrip] = useState(null);
 
   React.useEffect(() => {
     if (!toastMessage) return undefined;
@@ -533,9 +537,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         onAssign: () => handleAssignClick(),
         onReassign: () => handleReassignClick(),
         onArchive: (trip) => onDeleteTrip?.(trip.id),
-        onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
+        onNavigate: (trip) => openNavigation(trip.pickup || ''),
         onCall: (trip) => makeCall(getClientPhone(trip), trip.patient),
-        onMessage: (trip) => sendSMS(getClientPhone(trip), trip.patient),
+        onMessage: (trip) => setQuickSmsTrip(trip),
       },
     });
     const ICONS = { navigate: Navigation, call: Phone, message: MessageSquare };
@@ -553,13 +557,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             {isSelected ? <CheckSquare size={19} /> : <Square size={19} className="text-slate-400" />}
           </button>
         ) : null}
-        noteSlot={(role === 'admin' || role === 'dispatcher') && trip.notes ? (
-          <div className="px-3 pb-2">
-            <div title={trip.notes} className="max-h-12 overflow-hidden rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-800">
-              <span className="uppercase tracking-wide text-amber-700">Driver note:</span> {trip.notes}
-            </div>
-          </div>
-        ) : null}
+        noteSlot={null}
         primaryAction={inline.primary ? { label: inline.primary.label, onClick: () => inline.primary.onSelect() } : null}
         iconActions={inline.icons.map((action) => ({ ...action, icon: ICONS[action.id], onClick: () => action.onSelect() }))}
         driverName={driver ? driver.name : 'Unassigned'}
@@ -572,6 +570,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           setModalError('');
         } : null}
         moreLabel={`${isTerminal ? 'Review' : 'Update'} ${trip.patient || trip.bookingId || 'trip'}`}
+        onTimeEdit={(role === 'admin' || role === 'dispatcher') ? (t) => setScheduleEditTrip(t) : null}
       />
       </div>
     );
@@ -1261,6 +1260,30 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           </div>
         );
       })()}
+
+      {scheduleEditTrip && (
+        <ScheduleEditorModal
+          trip={scheduleEditTrip}
+          onSave={(payload) => {
+            onUpdateTrip?.(scheduleEditTrip.id, payload);
+            setScheduleEditTrip(null);
+            showToast('Schedule updated');
+          }}
+          onClose={() => setScheduleEditTrip(null)}
+        />
+      )}
+
+      {quickSmsTrip && (
+        <AdminQuickSmsSheet
+          trip={quickSmsTrip}
+          onSend={async (text) => {
+            const { getFunctions, httpsCallable } = await import('firebase/functions');
+            const sendClientSms = httpsCallable(getFunctions(), 'sendClientSms');
+            await sendClientSms({ to: quickSmsTrip.patientPhone || quickSmsTrip.phone || quickSmsTrip.clientPhone || '', body: text, tripId: quickSmsTrip.id });
+          }}
+          onClose={() => setQuickSmsTrip(null)}
+        />
+      )}
     </div>
   );
 };

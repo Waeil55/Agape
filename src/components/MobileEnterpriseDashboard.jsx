@@ -32,6 +32,7 @@ const MobileMenuPage = lazy(() => import('./MobileMenuPage'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage'));
 const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
+const EnterpriseRoutePlanner = lazy(() => import('./EnterpriseRoutePlanner'));
 const PayrollReportPage = lazy(() => import('./PayrollReportPage'));
 const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin'));
 
@@ -330,7 +331,7 @@ const MobileEnterpriseDashboard = (props) => {
     if (subView === 'archives') {
       return (
         <SubViewWrapper title="Reports & Records" renderTopBar={renderTopBar}>
-          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} initialSection="archive" onSectionChange={setReportsSection} /></Suspense></ErrorBoundary>
+          <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} initialSection="archive" onSectionChange={setReportsSection} onDriveTrip={(trip) => { setTripWorkflowActive(true); setTripDetails(trip); }} /></Suspense></ErrorBoundary>
         </SubViewWrapper>
       );
     }
@@ -450,72 +451,17 @@ const MobileEnterpriseDashboard = (props) => {
     if (currentView === 'tools') {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
-          {renderTopBar('Route Tools')}
-          <div className="shrink-0 bg-white border-b border-slate-200 px-3 py-2.5">
-            <label className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500 shrink-0">Plan for</span>
-              <select
-                value={toolsDriverId}
-                onChange={e => setToolsDriverId(e.target.value)}
-                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
-              >
-                <option value="">Select a driver…</option>
-                {driverWorkDrivers.map(d => (
-                  <option key={d.id || d.email} value={d.id}>
-                    {d.name || d.email || d.id} {d.vehicle ? `— ${d.vehicle}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
           <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom,0px))' }}>
-            {toolsDriver ? (
-              <ErrorBoundary>
-                <Suspense fallback={<MobileFallback />}>
-                  <DriverToolsPage
-                    trips={toolsTrips}
-                    activeTrips={toolsActiveTrips}
-                    aiSequence={toolAiSequence}
-                    aiSuggestions={toolAiSuggestions}
-                    aiRideShare={[]}
-                    conflicts={[]}
-                    aiOptimizing={toolAiOptimizing}
-                    guidedMode={toolGuidedMode}
-                    guidedStepIndex={toolGuidedStepIndex}
-                    guidedSteps={toolAiSequence || []}
-                    driverPosition={null}
-                    appSettings={props.appSettings}
-                    currentUser={toolsDriver.email || toolsDriver.id || currentUser}
-                    role={role}
-                    onSetGuidedMode={setToolGuidedMode}
-                    onSetGuidedStepIndex={setToolGuidedStepIndex}
-                    onSetAiSequence={setToolAiSequence}
-                    onSetAiSuggestions={setToolAiSuggestions}
-                    onRunAiOptimization={optimizeToolTrips}
-                    onSelectAllTrips={selectAllToolTrips}
-                    selectedTrips={toolSelectedTrips}
-                    onSetSelectedTrips={setToolSelectedTrips}
-                    etas={{}}
-                    onOpenInNav={props.onOpenInNav}
-                    onOpenSequencer={() => setSubView('route_planner')}
-                    requestAuthAction={props.requestAuthAction}
-                    routePlanStops={toolRoutePlanStops}
-                    onSetRoutePlanStops={setToolRoutePlanStops}
-                    onSendToSequencer={(stops) => { setToolRoutePlanStops(stops); setSubView('route_planner'); }}
-                  />
-                </Suspense>
-              </ErrorBoundary>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center mb-4">
-                  <Zap size={28} className="opacity-30" />
-                </div>
-                <p className="text-sm font-semibold text-slate-500">Select a driver above</p>
-                <p className="text-xs text-slate-400 mt-1 text-center max-w-[220px]">
-                  Choose a driver to plan routes, optimize trips, and navigate
-                </p>
-              </div>
-            )}
+            <ErrorBoundary>
+              <Suspense fallback={<MobileFallback />}>
+                <EnterpriseRoutePlanner
+                  trips={driverWorkTrips}
+                  drivers={driverWorkDrivers}
+                  appSettings={props.appSettings}
+                  onOpenInNav={props.onOpenInNav}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       );
@@ -587,9 +533,8 @@ const MobileEnterpriseDashboard = (props) => {
   };
 
   // Show the bottom nav everywhere EXCEPT:
-  // 1. When a trip detail overlay is open (full-screen DriverPage)
-  // 2. When a chat thread is open inside chat view (thread takes full screen)
-  const showNav = !currentTripDetails && !isChatThreadOpen;
+  // 1. When a chat thread is open inside chat view (thread takes full screen)
+  const showNav = !isChatThreadOpen;
 
 
 
@@ -604,7 +549,7 @@ const MobileEnterpriseDashboard = (props) => {
         // Use driver email so DriverPage finds the trip; role stays admin/dispatcher for full feature access
         const driverEmail = driverObj?.email || trip.driverEmail || currentUser;
         return (
-          <div className="fixed inset-0 z-[200] flex flex-col bg-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }} role="dialog" aria-modal="true" aria-label={tripWorkflowActive ? `Trip progress for ${trip.patient || trip.bookingId || 'trip'}` : `Trip record for ${trip.patient || trip.bookingId || 'trip'}`}>
+          <div className="fixed inset-0 z-[50] flex flex-col bg-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }} role="dialog" aria-modal="true" aria-label={tripWorkflowActive ? `Trip progress for ${trip.patient || trip.bookingId || 'trip'}` : `Trip record for ${trip.patient || trip.bookingId || 'trip'}`}>
             {/* Record review keeps the operator context bar. The Drive view
                 already has the shared trip header/back control, so rendering
                 this bar there would create a duplicate mobile header. */}
@@ -629,7 +574,7 @@ const MobileEnterpriseDashboard = (props) => {
             </div>}
             {/* Operators share the real persisted workflow view with full edit capability.
                 Admin/dispatcher can advance workflow, edit trip data, and save changes. */}
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-hidden" style={{ paddingBottom: 'calc(56px + 8px + env(safe-area-inset-bottom, 0px))' }}>
               <ErrorBoundary>
                 <Suspense fallback={<MobileFallback />}>
                   <DriverPage

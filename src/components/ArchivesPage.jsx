@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
@@ -95,7 +95,7 @@ const getDriverLabel = (trip, drivers) => {
 
 
 
-const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) => {
+const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDriveTrip }) => {
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_archiveSearch') || '');
   const [sortColumn] = useState(() => localStorage.getItem('agape_archiveSortCol') || 'time');
   const [sortDirection] = useState(() => localStorage.getItem('agape_archiveSortDir') || 'asc');
@@ -269,7 +269,21 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) =>
           <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'signature' })}</p>
         </div>
       </div>
-      <button onClick={() => setActionTrip(trip)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-800 transition-colors hover:bg-blue-100"><MoreHorizontal size={14} /> Trip actions</button>
+      <div className="mt-3 flex gap-2">
+        {role === 'admin' && restoreTrip && (
+          <button onClick={() => restoreTrip(trip.id)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200 transition-colors hover:bg-emerald-100">
+            <RotateCcw size={13} /> Restore
+          </button>
+        )}
+        {onDriveTrip && (
+          <button onClick={() => onDriveTrip(trip)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 transition-colors hover:bg-blue-100">
+            <Edit2 size={13} /> Edit
+          </button>
+        )}
+        <button onClick={() => setActionTrip(trip)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 border border-slate-200 transition-colors hover:bg-slate-100">
+          <MoreHorizontal size={13} /> More
+        </button>
+      </div>
     </div>
   );
 

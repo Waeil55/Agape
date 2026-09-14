@@ -61,6 +61,7 @@ const ReportsPage = (props) => {
           drivers={props.drivers}
           role={props.role}
           updateTrashedTrip={props.updateTrashedTrip}
+          onDriveTrip={props.onDriveTrip}
         />
       );
     }

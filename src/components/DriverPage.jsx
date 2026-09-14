@@ -633,7 +633,7 @@ const applyWorkflowProgress = (trip, progress) => {
 const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, workflowReadOnly = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const phoneNumbers = phoneNumbersProp;
-  const canManageTripRecords = !workflowReadOnly && (role === 'admin' || role === 'dispatcher');
+  const canManageTripRecords = !workflowReadOnly;
   const me = useMemo(
     () => {
       const rawMe = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
@@ -5292,8 +5292,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       onContacts: (t) => openContactSelector(t),
                       onRevert: workflowReadOnly ? undefined : revertTripStatus,
                       onShowLegs: handleShowLegs,
-                      onEditTrip: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? handleStartInlineEdit : undefined,
-                      onScheduleEdit: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? () => openScheduleEditor(trip) : undefined,
+                      onEditTrip: !workflowReadOnly ? handleStartInlineEdit : undefined,
+                      onScheduleEdit: !workflowReadOnly ? () => openScheduleEditor(trip) : undefined,
                       onClearActiveTrip: workflowReadOnly ? undefined : clearActiveTrip,
                       onNoShow: workflowReadOnly || isTerminal ? undefined : handleNoShow,
                       onCancel: workflowReadOnly || isTerminal ? undefined : handleCancel,

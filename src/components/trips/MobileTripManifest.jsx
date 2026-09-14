@@ -277,6 +277,7 @@ export function ManifestTripCard({
   moreIcon: MoreIcon,
   onMore,
   moreLabel = 'More actions',
+  onTimeEdit,
 }) {
   const cd = countdown || getTripCountdown(trip);
   const displayStatus = getManifestDisplayStatus(trip);
@@ -286,12 +287,23 @@ export function ManifestTripCard({
   return (
     <article className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
       {/* Header — time + countdown + legs + status */}
-      <div className="px-2.5 pt-1.5 pb-1 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
+      <div className="px-2 pt-1 pb-0.5 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {selectSlot}
-          <span className={`text-lg font-bold leading-none tabular-nums ${COUNTDOWN_TIME_TEXT[cd.level]}`}>
-            {trip?.time || '—'}
-          </span>
+          {onTimeEdit ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
+              className={`text-base font-bold leading-none tabular-nums hover:underline decoration-1 underline-offset-2 ${COUNTDOWN_TIME_TEXT[cd.level]}`}
+              title="Edit schedule"
+            >
+              {trip?.time || '—'}
+            </button>
+          ) : (
+            <span className={`text-base font-bold leading-none tabular-nums ${COUNTDOWN_TIME_TEXT[cd.level]}`}>
+              {trip?.time || '—'}
+            </span>
+          )}
           <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${COUNTDOWN_BADGE[cd.level]}`}>
             {cd.label}
           </span>
@@ -302,7 +314,7 @@ export function ManifestTripCard({
               <button
                 type="button"
                 onClick={onLegsClick}
-                className="flex min-h-11 items-center rounded-xl text-[10px] font-semibold text-slate-600"
+                className="flex min-h-9 items-center rounded-xl text-[10px] font-semibold text-slate-600"
                 aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}
               >
                 <span className="flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-px">
@@ -320,7 +332,7 @@ export function ManifestTripCard({
       </div>
 
       {/* Client + trip ID */}
-      <div className="px-2.5 py-0.5 flex justify-between items-center gap-2">
+      <div className="px-2 py-0 flex justify-between items-center gap-2">
         <span className="min-w-0 truncate text-[13px] font-semibold text-slate-700">{trip?.patient || 'Unknown client'}</span>
         {(trip?.bookingId || trip?.id) && (
           <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-400">#{trip.bookingId || trip.id}</span>
@@ -328,14 +340,14 @@ export function ManifestTripCard({
       </div>
 
       {/* Pickup / Dropoff grid — compact cells */}
-      <div className="px-2.5 pb-1">
-        <div className="grid grid-cols-2 gap-1.5">
-          <div className="bg-emerald-50/60 p-1.5 rounded-lg border border-emerald-100/50 min-w-0">
+      <div className="px-2 pb-0.5">
+        <div className="grid grid-cols-2 gap-1">
+          <div className="bg-emerald-50/60 p-1 rounded-lg border border-emerald-100/50 min-w-0">
             <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider leading-none mb-0.5">Pickup</div>
             <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={pickup.street}>{pickup.street}</div>
             {pickup.locality && <div className="mt-0.5 truncate text-[11px] font-medium leading-none text-slate-400" title={pickup.locality}>{pickup.locality}</div>}
           </div>
-          <div className="bg-rose-50/60 p-1.5 rounded-lg border border-rose-100/50 min-w-0">
+          <div className="bg-rose-50/60 p-1 rounded-lg border border-rose-100/50 min-w-0">
             <div className="flex items-center justify-between mb-0.5">
               <div className="text-[9px] font-bold text-rose-600 uppercase tracking-wider leading-none">Dropoff</div>
               {mileage && (
@@ -349,18 +361,17 @@ export function ManifestTripCard({
       </div>
 
       {assignSlot}
-      {noteSlot}
 
       {/* Action bar — compact */}
-      <div className="flex items-center gap-1.5 px-2.5 pb-1.5 pt-0.5 border-t border-slate-100">
+      <div className="flex items-center gap-1.5 px-2 pb-1 pt-0 border-t border-slate-100">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           {reassignAction && (
-            <button type="button" onClick={reassignAction.onClick} className="hidden px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[11px] font-semibold border border-amber-200 shrink-0 min-[340px]:flex min-h-11 items-center">
+            <button type="button" onClick={reassignAction.onClick} className="hidden px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[11px] font-semibold border border-amber-200 shrink-0 min-[340px]:flex min-h-9 items-center">
               Reassign
             </button>
           )}
           {archiveAction && (
-            <button type="button" onClick={archiveAction.onClick} className="hidden px-2 py-0.5 bg-slate-50 text-slate-600 rounded text-[11px] font-semibold border border-slate-200 shrink-0 min-[520px]:flex min-h-11 items-center">
+            <button type="button" onClick={archiveAction.onClick} className="hidden px-2 py-0.5 bg-slate-50 text-slate-600 rounded text-[11px] font-semibold border border-slate-200 shrink-0 min-[520px]:flex min-h-9 items-center">
               Archive
             </button>
           )}
@@ -373,7 +384,7 @@ export function ManifestTripCard({
                 onClick={action.onClick}
                 title={action.label}
                 aria-label={action.ariaLabel || action.label}
-                className="p-0 bg-slate-50 text-slate-600 rounded border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+                className="p-0 bg-slate-50 text-slate-600 rounded border border-slate-200 shrink-0 min-h-9 min-w-9 flex items-center justify-center"
               >
                 <Icon size={13} />
               </button>
@@ -389,7 +400,7 @@ export function ManifestTripCard({
               onClick={onMore}
               aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
               title={typeof moreLabel === 'string' ? moreLabel : undefined}
-              className="p-0 text-slate-400 bg-slate-50 rounded border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+              className="p-0 text-slate-400 bg-slate-50 rounded border border-slate-200 shrink-0 min-h-9 min-w-9 flex items-center justify-center"
             >
               <MoreIcon size={13} />
             </button>
@@ -398,7 +409,7 @@ export function ManifestTripCard({
             <button
               type="button"
               onClick={primaryAction.onClick}
-              className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] font-bold flex items-center gap-1 shrink-0 min-h-11 shadow-sm"
+              className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] font-bold flex items-center gap-1 shrink-0 min-h-9 shadow-sm"
             >
               <Navigation size={11} /> {primaryAction.label}
             </button>

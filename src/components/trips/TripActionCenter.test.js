@@ -18,7 +18,7 @@ describe('trip action center permissions', () => {
 
   it('lets a driver open assigned work without exposing operator controls', () => {
     const actions = buildTripActionModel({ trip: { id: 't1', status: 'Assigned' }, driver: { name: 'Sam' }, role: 'driver', callbacks });
-    expect(actions.map((action) => action.id)).toEqual(['view', 'drive']);
+    expect(actions.map((action) => action.id)).toEqual(['view', 'drive', 'edit', 'toggle-in-out']);
   });
 
   it('opens terminal trips as progress review for assigned work', () => {
