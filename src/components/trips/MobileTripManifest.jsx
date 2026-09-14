@@ -100,6 +100,35 @@ export const COUNTDOWN_BADGE = {
   unscheduled: 'bg-slate-100 text-slate-500',
 };
 
+// Grace window for the on-time metric (arrived ≤ scheduled + grace).
+export const ON_TIME_GRACE_MIN = 15;
+
+// ---------------------------------------------------------------------------
+// getOnTimeStats — HONEST on-time metric from recorded data only: completed
+// trips with BOTH a scheduled time and a pickup arrival time. On-time =
+// arrived within graceMin after scheduled. Trips missing either timestamp are
+// excluded (never guessed). Zero eligible trips → rate null (callers show
+// '—' and explain, instead of inventing a percent).
+// Returns { eligible, lateTrips: [{ trip, lateBy }], rate }.
+// ---------------------------------------------------------------------------
+export function getOnTimeStats(trips = [], graceMin = ON_TIME_GRACE_MIN) {
+  const sched = (t) => timeToMinutes(t?.time);
+  const arrived = (t) => timeToMinutes(t?.arrivalTime);
+  const eligible = (Array.isArray(trips) ? trips : []).filter((t) =>
+    t?.status === 'Completed'
+    && Number.isFinite(sched(t)) && sched(t) < 1440
+    && Number.isFinite(arrived(t)) && arrived(t) < 1440);
+  const lateTrips = eligible
+    .map((trip) => ({ trip, lateBy: arrived(trip) - sched(trip) }))
+    .filter((entry) => entry.lateBy > graceMin)
+    .sort((a, b) => b.lateBy - a.lateBy);
+  return {
+    eligible: eligible.length,
+    lateTrips,
+    rate: eligible.length ? Math.round(((eligible.length - lateTrips.length) / eligible.length) * 100) : null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // buildInlineTripActions — role-gated inline bar model. Mirrors
 // buildTripActionModel gates: canOperate (admin/dispatcher/fleet_manager),
@@ -137,7 +166,7 @@ export function buildInlineTripActions({ trip, driver, role, callbacks = {} }) {
 export function ManifestKpiStrip({ items = [] }) {
   if (!items.length) return null;
   return (
-    <div className="grid shrink-0 grid-cols-4 gap-1.5" role="group" aria-label="Trip queue summary">
+    <div className={`grid shrink-0 gap-1.5 ${items.length > 4 ? 'grid-cols-5' : 'grid-cols-4'}`} role="group" aria-label="Trip queue summary">
       {items.map((item) => {
         const active = !!item.active;
         return (

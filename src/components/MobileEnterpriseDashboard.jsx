@@ -543,6 +543,8 @@ const MobileEnterpriseDashboard = (props) => {
               onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
               onDeleteTrip={props.requestDeleteTrip}
               onShowUploadModal={setShowUploadModal}
+              requestAuthAction={props.requestAuthAction}
+              hasPermission={props.hasPermission}
             /></Suspense></ErrorBoundary>
           </div>
         </div>

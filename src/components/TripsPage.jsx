@@ -16,8 +16,10 @@ import {
   ACTIVE_MANIFEST_STATUSES,
   ManifestKpiStrip,
   ManifestTripCard,
+  ON_TIME_GRACE_MIN,
   buildInlineTripActions,
   getManifestStatusBadge,
+  getOnTimeStats,
   getTripCountdown,
 } from './trips/MobileTripManifest';
 
@@ -41,7 +43,7 @@ const toTimeInput = (value) => {
 
 const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', patientPhone: '', clientPhone: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
 
-const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip, onShowUploadModal }) => {
+const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip, onShowUploadModal, requestAuthAction, hasPermission }) => {
   const getClientPhone = (trip) => resolveClientPhoneForTrip(trip, trips);
   const today = useMemo(() => getTodayStr(), []);
   const [sortBy, setSortBy] = useState('time');
@@ -175,6 +177,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   // NOTE: this block MUST stay above visibleTrips/groupedTrips (TDZ) — moving
   // it below crashes every render (portal outage, Sep 2026).
   const [kpiFilter, setKpiFilter] = useState('all');
+  const [auditOpen, setAuditOpen] = useState(false);
   const kpiCounts = useMemo(() => ({
     total: filteredTrips.length,
     active: filteredTrips.filter((trip) => ACTIVE_MANIFEST_STATUSES.has(trip.status)).length,
@@ -187,6 +190,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     if (kpiFilter === 'pending') return filteredTrips.filter((trip) => !trip.driverId || trip.status === 'Unassigned');
     return filteredTrips;
   }, [filteredTrips, kpiFilter]);
+  // On-time metric — honest definition in getOnTimeStats (recorded data only,
+  // missing timestamps excluded, null rate when nothing eligible).
+  const onTimeStats = useMemo(() => getOnTimeStats(filteredTrips), [filteredTrips]);
 
   const visibleTrips = useMemo(() => kpiFilteredTrips.slice(0, renderLimit), [kpiFilteredTrips, renderLimit]);
 
@@ -322,6 +328,32 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const openEdit = (trip) => {
     setEditTrip({ ...trip, time: toTimeInput(trip.time) });
     setSaveAsProfile(false);
+  };
+
+  // Status exceptions (Rerouted / No Show / Cancelled) for the ⋯ sheet.
+  // Mirrors OperationsCommandCenter.markTripException: destructive statuses go
+  // through password confirmation when available, and all three require the
+  // delete-trip permission (admin/dispatcher). No one-tap Completed here —
+  // completion requires the driver workflow (odometer + times), reached via
+  // Drive. Drivers never see these (TripActionCenter gates by role).
+  const canMarkException = typeof hasPermission === 'function' ? hasPermission(role, 'canDeleteTrip') : (role === 'admin' || role === 'dispatcher');
+  const markTripException = (trip, status) => {
+    if (!trip || !onUpdateTrip) return;
+    const apply = () => {
+      Promise.resolve(onUpdateTrip({
+        ...trip,
+        status,
+        exceptionAt: new Date().toISOString(),
+        exceptionBy: currentUser,
+        exceptionSource: role,
+      })).catch(() => {});
+      setActionTrip(null);
+    };
+    if (requestAuthAction && ['Cancelled', 'No Show', 'Rerouted'].includes(status)) {
+      requestAuthAction(`Mark ${trip.patient || 'trip'} as ${status}`, apply);
+      return;
+    }
+    apply();
   };
 
   const renderManifestTripCard = (trip) => {
@@ -495,6 +527,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           onMessage: (trip) => sendSMS(getClientPhone(trip), trip.patient),
           onEdit: openEdit,
           onArchive: (trip) => onDeleteTrip?.(trip.id),
+          onReroute: canMarkException ? (trip) => markTripException(trip, 'Rerouted') : null,
+          onNoShow: canMarkException ? (trip) => markTripException(trip, 'No Show') : null,
+          onCancel: canMarkException ? (trip) => markTripException(trip, 'Cancelled') : null,
         }}
       />
       {/* HEADER CONTROLS */}
@@ -534,7 +569,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         </div>
 
         <div id="mobile-manifest-filters" className={`${mobileFiltersOpen ? 'space-y-4' : 'hidden'} sm:block sm:space-y-4`}>
-        {/* First Row: Main Filters */}
+        {/* First Row: Main Filters (driver lives in the chips row above) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Search</label>
@@ -566,16 +601,6 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
               <option value="No Show">No Show</option>
               <option value="Cancelled">Cancelled</option>
               <option value="Rerouted">Rerouted</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Driver</label>
-            <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none">
-              <option value="all">All Drivers</option>
-              <option value="unassigned">No Driver</option>
-              {drivers.map((driver) => (
-                <option key={driver.id} value={driver.id}>{driver.name}</option>
-              ))}
             </select>
           </div>
         </div>
@@ -671,9 +696,84 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           { id: 'active', label: 'Active', value: kpiCounts.active, active: kpiFilter === 'active', activeClass: 'border-blue-400 bg-blue-50 text-blue-700', onSelect: () => setKpiFilter(kpiFilter === 'active' ? 'all' : 'active') },
           { id: 'done', label: 'Done', value: kpiCounts.done, active: kpiFilter === 'done', activeClass: 'border-emerald-400 bg-emerald-50 text-emerald-700', onSelect: () => setKpiFilter(kpiFilter === 'done' ? 'all' : 'done') },
           { id: 'pending', label: 'Pending', value: kpiCounts.pending, active: kpiFilter === 'pending', activeClass: 'border-rose-400 bg-rose-50 text-rose-700', onSelect: () => setKpiFilter(kpiFilter === 'pending' ? 'all' : 'pending') },
+          { id: 'ontime', label: 'On-time', value: onTimeStats.rate === null ? '—' : `${onTimeStats.rate}%`, active: false, activeClass: '', onSelect: () => setAuditOpen(true) },
         ]}
       />
       </div>
+
+      {/* On-time audit — real late arrivals only (completed + both timestamps).
+          Empty/insufficient-data states explain instead of inventing. */}
+      {auditOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="On-time audit">
+          <div className="absolute inset-0 bg-slate-950/60" onClick={() => setAuditOpen(false)} />
+          <div className="relative max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+            <div className="mb-3 text-center">
+              <p className="text-4xl font-bold tabular-nums text-emerald-600">{onTimeStats.rate === null ? '—' : `${onTimeStats.rate}%`}</p>
+              <h3 className="mt-1 text-base font-bold text-slate-900">On-time arrivals</h3>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                {onTimeStats.eligible === 0
+                  ? 'No completed trips with both scheduled and arrival times in scope.'
+                  : `${onTimeStats.eligible - onTimeStats.lateTrips.length} of ${onTimeStats.eligible} arrived within ${ON_TIME_GRACE_MIN} min of scheduled.`}
+              </p>
+            </div>
+            {onTimeStats.lateTrips.length > 0 && (
+              <ul className="space-y-1.5">
+                {onTimeStats.lateTrips.slice(0, 20).map(({ trip, lateBy }) => (
+                  <li key={trip.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    <span className="min-w-0 truncate text-xs font-bold text-slate-800">{trip.patient || trip.bookingId || 'Trip'}</span>
+                    <span className="shrink-0 text-xs font-bold tabular-nums text-rose-600">+{lateBy}m</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" onClick={() => setAuditOpen(false)} className="mt-4 min-h-11 w-full rounded-xl bg-slate-100 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 active:scale-95">Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      {/* Driver chips — quick queue filter. drivers prop is pre-scoped by role
+          (App.jsx driverWorkDrivers), so chips never leak out-of-scope drivers.
+          Replaces the old driver dropdown in the filter panel below. */}
+      <section aria-label="Filter by driver" className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { id: 'all', name: 'All', count: filteredTrips.length, dot: 'bg-blue-400' },
+            ...drivers.map((driver) => {
+              const mine = filteredTrips.filter((t) => t.driverId === driver.id);
+              const live = mine.some((t) => ACTIVE_MANIFEST_STATUSES.has(t.status));
+              return {
+                id: driver.id,
+                name: driver.name || 'Driver',
+                count: mine.length,
+                dot: live ? 'bg-emerald-400' : 'bg-slate-300',
+              };
+            }),
+            {
+              id: 'unassigned',
+              name: 'Wait pool',
+              count: filteredTrips.filter((t) => !t.driverId || t.status === 'Unassigned').length,
+              dot: 'bg-rose-400',
+            },
+          ].map((chip) => {
+            const selected = driverFilter === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => setDriverFilter(selected ? 'all' : chip.id)}
+                aria-pressed={selected}
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors active:scale-95 ${
+                  selected ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${chip.dot}`} aria-hidden="true" />
+                {chip.name}
+                <span className={`text-xs tabular-nums ${selected ? 'text-slate-300' : 'text-slate-400'}`}>({chip.count})</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* TABLE / LIST */}
       <div className="card overflow-hidden">

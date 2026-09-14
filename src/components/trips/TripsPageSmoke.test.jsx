@@ -42,6 +42,15 @@ describe('TripsPage render smoke (dispatcher/admin portal entry)', () => {
     expect(html).toContain('Drive trip');
   });
 
+  it('shows driver chips, KPI strip, and on-time KPI', () => {
+    const html = renderEl(
+      <TripsPage trips={trips} role="dispatcher" currentUser="d@x.com" drivers={drivers} />
+    );
+    expect(html).toContain('Filter by driver');
+    expect(html).toContain('Wait pool');
+    expect(html).toContain('On-time');
+  });
+
   it('shows empty state with no trips', () => {
     const html = renderEl(<TripsPage trips={[]} role="dispatcher" drivers={drivers} />);
     expect(html).toContain('Queue is empty');

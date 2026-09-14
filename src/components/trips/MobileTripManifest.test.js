@@ -4,6 +4,7 @@ import {
   getManifestStatusBadge,
   getTripCountdown,
   buildInlineTripActions,
+  getOnTimeStats,
 } from './MobileTripManifest';
 
 const NOON = new Date('2026-09-13T12:00:00');
@@ -64,6 +65,38 @@ describe('getTripCountdown — deterministic urgency', () => {
   it('formats long waits as hours', () => {
     expect(getTripCountdown(trip({ time: '14:00' }), NOON).label).toBe('2h away');
     expect(getTripCountdown(trip({ time: '14:30' }), NOON).label).toBe('2h 30m away');
+  });
+});
+
+describe('getOnTimeStats — honest metric, never invented', () => {
+  const done = (time, arrivalTime) => ({ status: 'Completed', time, arrivalTime });
+
+  it('scores arrivals within grace as on-time', () => {
+    const stats = getOnTimeStats([done('09:00', '09:10'), done('10:00', '10:00')]);
+    expect(stats).toMatchObject({ eligible: 2, rate: 100 });
+    expect(stats.lateTrips).toEqual([]);
+  });
+
+  it('flags arrivals past grace and sorts worst first', () => {
+    const stats = getOnTimeStats([done('09:00', '09:40'), done('10:00', '10:20'), done('11:00', '11:05')]);
+    expect(stats.eligible).toBe(3);
+    expect(stats.rate).toBe(33);
+    expect(stats.lateTrips.map(e => e.lateBy)).toEqual([40, 20]);
+  });
+
+  it('excludes non-completed and timestamp-missing trips without guessing', () => {
+    const stats = getOnTimeStats([
+      { status: 'Assigned', time: '09:00', arrivalTime: '09:00' },
+      { status: 'Completed', time: 'Will Call', arrivalTime: '09:00' },
+      { status: 'Completed', time: '09:00', arrivalTime: '' },
+      done('09:00', '09:05'),
+    ]);
+    expect(stats).toMatchObject({ eligible: 1, rate: 100 });
+  });
+
+  it('returns null rate (not 0, not 100) when nothing is eligible', () => {
+    expect(getOnTimeStats([])).toMatchObject({ eligible: 0, rate: null });
+    expect(getOnTimeStats([{ status: 'Assigned' }]).rate).toBeNull();
   });
 });
 
