@@ -183,7 +183,8 @@ export function buildInlineTripActions({ trip, driver, role, callbacks = {} }) {
     if (!callbacks.onDrive) return null;
     if (driver) {
       if (!access.canOpenWorkflow) return null;
-      return { id: 'drive', label: role === 'driver' ? 'Drive' : 'Drive', onSelect: () => callbacks.onDrive(trip) };
+      const active = isActiveManifestTrip(trip);
+      return { id: 'drive', label: active ? 'Continue' : 'Drive', onSelect: () => callbacks.onDrive(trip) };
     }
     if (!access.canAssign || !callbacks.onAssign) return null;
     return { id: 'assign-drive', label: 'Assign to drive', onSelect: () => callbacks.onAssign(trip) };
@@ -284,64 +285,65 @@ export function ManifestTripCard({
   const dropoff = getManifestAddressLines(trip?.dropoff, trip?.dropoffCity);
   return (
     <article className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
-      <div className="px-2 pt-2 pb-1 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+      {/* Header — time + countdown + legs + status */}
+      <div className="px-2.5 pt-1.5 pb-1 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {selectSlot}
-          <span className={`text-xl font-bold leading-none tabular-nums ${COUNTDOWN_TIME_TEXT[cd.level]}`}>
+          <span className={`text-lg font-bold leading-none tabular-nums ${COUNTDOWN_TIME_TEXT[cd.level]}`}>
             {trip?.time || '—'}
           </span>
-          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${COUNTDOWN_BADGE[cd.level]}`}>
+          <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${COUNTDOWN_BADGE[cd.level]}`}>
             {cd.label}
           </span>
         </div>
-        <div className="flex max-w-[48%] shrink-0 items-center gap-1.5">
+        <div className="flex max-w-[48%] shrink-0 items-center gap-1">
           {legs > 0 && (
             onLegsClick ? (
               <button
                 type="button"
                 onClick={onLegsClick}
-                className="flex min-h-11 items-center rounded-xl text-[11px] font-semibold text-slate-600"
+                className="flex min-h-11 items-center rounded-xl text-[10px] font-semibold text-slate-600"
                 aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}
               >
-                <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
-                  <Layers size={11} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
+                <span className="flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-px">
+                  <Layers size={10} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
                 </span>
               </button>
             ) : (
-              <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                <Layers size={11} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
+              <span className="flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-600">
+                <Layers size={10} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
               </span>
             )
           )}
-          <span title={displayStatus} className={`max-w-[108px] truncate px-2 py-0.5 rounded text-[11px] font-semibold ${statusBadge}`}>{displayStatus}</span>
+          <span title={displayStatus} className={`max-w-[100px] truncate px-1.5 py-px rounded text-[10px] font-semibold ${statusBadge}`}>{displayStatus}</span>
         </div>
       </div>
 
-      <div className="px-2 py-1 flex justify-between items-center gap-2">
-        <span className="min-w-0 truncate text-sm font-semibold text-slate-700">{trip?.patient || 'Unknown client'}</span>
+      {/* Client + trip ID */}
+      <div className="px-2.5 py-0.5 flex justify-between items-center gap-2">
+        <span className="min-w-0 truncate text-[13px] font-semibold text-slate-700">{trip?.patient || 'Unknown client'}</span>
         {(trip?.bookingId || trip?.id) && (
-          <span className="shrink-0 text-xs font-medium tabular-nums text-slate-500">Trip: {trip.bookingId || trip.id}</span>
+          <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-400">#{trip.bookingId || trip.id}</span>
         )}
       </div>
 
-      <div className="px-2 pb-1">
-        <div className="grid grid-cols-2 gap-2">
+      {/* Pickup / Dropoff grid — compact cells */}
+      <div className="px-2.5 pb-1">
+        <div className="grid grid-cols-2 gap-1.5">
           <div className="bg-emerald-50/60 p-1.5 rounded-lg border border-emerald-100/50 min-w-0">
-            <div className="flex items-center justify-between mb-0.5">
-              <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide leading-none">Pickup</div>
-            </div>
-            <div className="truncate text-sm font-semibold leading-tight text-slate-800" title={pickup.street}>{pickup.street}</div>
-            {pickup.locality && <div className="mt-1 truncate text-xs font-medium leading-none text-slate-500" title={pickup.locality}>{pickup.locality}</div>}
+            <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider leading-none mb-0.5">Pickup</div>
+            <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={pickup.street}>{pickup.street}</div>
+            {pickup.locality && <div className="mt-0.5 truncate text-[11px] font-medium leading-none text-slate-400" title={pickup.locality}>{pickup.locality}</div>}
           </div>
           <div className="bg-rose-50/60 p-1.5 rounded-lg border border-rose-100/50 min-w-0">
             <div className="flex items-center justify-between mb-0.5">
-              <div className="text-[10px] font-semibold text-rose-700 uppercase tracking-wide leading-none">Dropoff</div>
+              <div className="text-[9px] font-bold text-rose-600 uppercase tracking-wider leading-none">Dropoff</div>
               {mileage && (
-                <div className="text-xs font-bold text-slate-700 bg-white/90 px-1.5 py-0.5 rounded shadow-sm border border-slate-200/60 leading-none tabular-nums">{mileage}</div>
+                <div className="text-[10px] font-bold text-slate-600 bg-white/80 px-1 py-px rounded border border-slate-200/50 leading-none tabular-nums">{mileage}</div>
               )}
             </div>
-            <div className="truncate text-sm font-semibold leading-tight text-slate-800" title={dropoff.street}>{dropoff.street}</div>
-            {dropoff.locality && <div className="mt-1 truncate text-xs font-medium leading-none text-slate-500" title={dropoff.locality}>{dropoff.locality}</div>}
+            <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={dropoff.street}>{dropoff.street}</div>
+            {dropoff.locality && <div className="mt-0.5 truncate text-[11px] font-medium leading-none text-slate-400" title={dropoff.locality}>{dropoff.locality}</div>}
           </div>
         </div>
       </div>
@@ -349,15 +351,16 @@ export function ManifestTripCard({
       {assignSlot}
       {noteSlot}
 
-      <div className="flex items-center gap-2 px-2 pb-2 pt-1 border-t border-slate-100 mt-1">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+      {/* Action bar — compact */}
+      <div className="flex items-center gap-1.5 px-2.5 pb-1.5 pt-0.5 border-t border-slate-100">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           {reassignAction && (
-            <button type="button" onClick={reassignAction.onClick} className="hidden px-2 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-200 shrink-0 min-[340px]:flex">
+            <button type="button" onClick={reassignAction.onClick} className="hidden px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[11px] font-semibold border border-amber-200 shrink-0 min-[340px]:flex min-h-11 items-center">
               Reassign
             </button>
           )}
           {archiveAction && (
-            <button type="button" onClick={archiveAction.onClick} className="hidden px-2 py-1 bg-slate-50 text-slate-600 rounded-md text-xs font-semibold border border-slate-200 shrink-0 min-[520px]:flex">
+            <button type="button" onClick={archiveAction.onClick} className="hidden px-2 py-0.5 bg-slate-50 text-slate-600 rounded text-[11px] font-semibold border border-slate-200 shrink-0 min-[520px]:flex min-h-11 items-center">
               Archive
             </button>
           )}
@@ -370,15 +373,15 @@ export function ManifestTripCard({
                 onClick={action.onClick}
                 title={action.label}
                 aria-label={action.ariaLabel || action.label}
-                className="p-1 bg-slate-50 text-slate-600 rounded-md border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+                className="p-0 bg-slate-50 text-slate-600 rounded border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
               >
-                <Icon size={14} />
+                <Icon size={13} />
               </button>
             );
           })}
           <div className="flex-1" />
-          <div className="flex items-center gap-1 text-xs font-medium text-slate-500 shrink-0">
-            <User size={12} /> <span className="truncate">{driverName}</span>
+          <div className="flex items-center gap-0.5 text-[11px] font-medium text-slate-400 shrink-0">
+            <User size={11} /> <span className="truncate max-w-[60px]">{driverName}</span>
           </div>
           {onMore && MoreIcon && (
             <button
@@ -386,18 +389,18 @@ export function ManifestTripCard({
               onClick={onMore}
               aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
               title={typeof moreLabel === 'string' ? moreLabel : undefined}
-              className="p-1 text-slate-500 bg-slate-50 rounded-md border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+              className="p-0 text-slate-400 bg-slate-50 rounded border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
             >
-              <MoreIcon size={14} />
+              <MoreIcon size={13} />
             </button>
           )}
           {primaryAction && (
             <button
               type="button"
               onClick={primaryAction.onClick}
-              className="px-2 py-1 bg-blue-600 text-white rounded-md text-xs font-semibold flex items-center gap-1 shrink-0 min-h-11"
+              className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] font-bold flex items-center gap-1 shrink-0 min-h-11 shadow-sm"
             >
-              <Navigation size={12} /> {primaryAction.label}
+              <Navigation size={11} /> {primaryAction.label}
             </button>
           )}
         </div>
