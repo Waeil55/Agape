@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layers, Navigation, User } from 'lucide-react';
-import { timeToMinutes, tripCalendarDateKey, localCalendarYmd } from '../../utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey } from '../../utils/tripDate';
+import { getTripActionCapabilities, isTripActionTerminal, TRIP_TERMINAL_STATUSES } from './tripActionPolicy';
 
 // =============================================================================
 // MobileTripManifest — shared mobile-only trip manifest language.
@@ -10,9 +11,9 @@ import { timeToMinutes, tripCalendarDateKey, localCalendarYmd } from '../../util
 // and callbacks; this module owns presentation + the role/action matrix so
 // buttons are never mixed across roles:
 //
-//   driver                → Drive (workflow) + Navigate + Call + Text + Details.
+//   driver                → Drive (workflow) + Call + Text + Details.
 //                             NEVER Reassign / Archive / Edit / Assign.
-//   dispatcher/fleet_manager → Drive (workspace) + Reassign/Assign + Navigate +
+//   dispatcher/fleet_manager → Drive (workspace) + Reassign/Assign +
 //                             Call + Text + Details. Archive inline (admin and
 //                             dispatcher only; the delete itself stays
 //                             password-gated in App.jsx requestDeleteTrip).
@@ -27,12 +28,30 @@ import { timeToMinutes, tripCalendarDateKey, localCalendarYmd } from '../../util
 // buttons (min-h-11 on text buttons), pb clearance handled by parents.
 // =============================================================================
 
-export const TERMINAL_MANIFEST_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
+export const TERMINAL_MANIFEST_STATUSES = TRIP_TERMINAL_STATUSES;
+export { isTripActionTerminal };
 
 export const ACTIVE_MANIFEST_STATUSES = new Set([
   'In Progress', 'In Mission', 'At Pickup', 'In Transit', 'At Dropoff',
   'En Route', 'Navigating Pickup', 'Navigating Dropoff', 'Arrived',
 ]);
+const ACTIVE_MANIFEST_STATUS_KEYS = new Set(
+  [...ACTIVE_MANIFEST_STATUSES].map((status) => status.toLowerCase()),
+);
+
+export function isActiveManifestTrip(trip) {
+  return !isTripActionTerminal(trip)
+    && ACTIVE_MANIFEST_STATUS_KEYS.has(String(trip?.status || '').trim().toLowerCase());
+}
+
+export function isCompletedManifestTrip(trip) {
+  const status = String(trip?.status || '').trim().toLowerCase();
+  return status === 'completed' || Boolean(trip?.completedAt && !TRIP_TERMINAL_STATUSES.has(status));
+}
+
+export function getManifestDisplayStatus(trip) {
+  return isCompletedManifestTrip(trip) ? 'Completed' : (trip?.status || 'Unknown');
+}
 
 // Canonical status badge — EXACT design tokens (keys normalized so 'No Show'
 // and 'no show', 'Rerouted' and 'Trip rerouted' all resolve). 'Assigned' is
@@ -40,13 +59,23 @@ export const ACTIVE_MANIFEST_STATUSES = new Set([
 // Unknown statuses fail to neutral slate, never crash.
 const STATUS_STYLES = {
   completed: 'bg-emerald-100 text-emerald-800',
+  'in progress': 'bg-blue-100 text-blue-800',
+  'in mission': 'bg-blue-100 text-blue-800',
+  'at pickup': 'bg-emerald-100 text-emerald-800',
+  'at dropoff': 'bg-emerald-100 text-emerald-800',
   'in transit': 'bg-blue-100 text-blue-800',
   'en route': 'bg-amber-100 text-amber-800',
+  'navigating pickup': 'bg-blue-100 text-blue-800',
+  'navigating dropoff': 'bg-blue-100 text-blue-800',
+  arrived: 'bg-emerald-100 text-emerald-800',
   unassigned: 'bg-rose-100 text-rose-800',
   'no show': 'bg-orange-100 text-orange-800',
   'trip rerouted': 'bg-purple-100 text-purple-800',
   rerouted: 'bg-purple-100 text-purple-800',
   cancelled: 'bg-slate-100 text-slate-700',
+  canceled: 'bg-slate-100 text-slate-700',
+  transferred: 'bg-slate-100 text-slate-700',
+  no_show: 'bg-orange-100 text-orange-800',
   assigned: 'bg-blue-100 text-blue-800',
 };
 export function getManifestStatusBadge(status) {
@@ -65,8 +94,7 @@ export function getManifestStatusBadge(status) {
 // Fail closed: anything unparseable is 'unscheduled', never a guessed time.
 // ---------------------------------------------------------------------------
 export function getTripCountdown(trip, now = new Date()) {
-  const status = String(trip?.status || '');
-  if (TERMINAL_MANIFEST_STATUSES.has(status)) {
+  if (isTripActionTerminal(trip)) {
     return { minutes: null, level: 'done', label: 'Done' };
   }
   const rawTime = String(trip?.time || '').trim();
@@ -77,7 +105,10 @@ export function getTripCountdown(trip, now = new Date()) {
   if (!Number.isFinite(clock) || clock < 0 || clock >= 1440) {
     return { minutes: null, level: 'unscheduled', label: rawTime ? 'No time' : 'No time' };
   }
-  const serviceDate = tripCalendarDateKey(trip?.date) || localCalendarYmd(now);
+  const serviceDate = tripCalendarDateKey(trip?.date);
+  if (!serviceDate) {
+    return { minutes: null, level: 'unscheduled', label: 'Date needed' };
+  }
   const scheduled = new Date(`${serviceDate}T00:00:00`);
   scheduled.setHours(Math.floor(clock / 60), clock % 60, 0, 0);
   const minutes = Math.round((scheduled.getTime() - now.getTime()) / 60000);
@@ -122,7 +153,7 @@ export function getOnTimeStats(trips = [], graceMin = ON_TIME_GRACE_MIN) {
   const sched = (t) => timeToMinutes(t?.time);
   const arrived = (t) => timeToMinutes(t?.arrivalTime);
   const eligible = (Array.isArray(trips) ? trips : []).filter((t) =>
-    t?.status === 'Completed'
+    isCompletedManifestTrip(t)
     && Number.isFinite(sched(t)) && sched(t) < 1440
     && Number.isFinite(arrived(t)) && arrived(t) < 1440);
   const lateTrips = eligible
@@ -138,7 +169,7 @@ export function getOnTimeStats(trips = [], graceMin = ON_TIME_GRACE_MIN) {
 
 // ---------------------------------------------------------------------------
 // buildInlineTripActions — role-gated inline bar model. Mirrors
-// buildTripActionModel gates: canOperate (admin/dispatcher/fleet_manager),
+// buildTripActionModel gates: explicit role, assignment, and terminal status,
 // callback presence. Drive opens the workspace for ANY assigned trip (even
 // terminal ones open read-only progress); unassigned trips get an assign CTA
 // for operators. Reassign/Archive are operator-only; Archive has no status
@@ -146,27 +177,26 @@ export function getOnTimeStats(trips = [], graceMin = ON_TIME_GRACE_MIN) {
 // Returns { primary, icons, reassign, archive } descriptors (null when gated).
 // ---------------------------------------------------------------------------
 export function buildInlineTripActions({ trip, driver, role, callbacks = {} }) {
-  const canOperate = role === 'admin' || role === 'dispatcher' || role === 'fleet_manager';
-  const terminal = TERMINAL_MANIFEST_STATUSES.has(trip?.status);
+  const access = getTripActionCapabilities({ role, trip, hasAssignedDriver: Boolean(driver) });
   const phone = callbacks.phone || '';
   const primary = (() => {
     if (!callbacks.onDrive) return null;
     if (driver) {
-      if (role !== 'driver' && !canOperate) return null;
+      if (!access.canOpenWorkflow) return null;
       return { id: 'drive', label: role === 'driver' ? 'Drive' : 'Drive', onSelect: () => callbacks.onDrive(trip) };
     }
-    if (!canOperate || !callbacks.onAssign) return null;
+    if (!access.canAssign || !callbacks.onAssign) return null;
     return { id: 'assign-drive', label: 'Assign to drive', onSelect: () => callbacks.onAssign(trip) };
   })();
   const icons = [
-    callbacks.onNavigate && trip?.pickup && { id: 'navigate', label: 'Navigate to pickup', onSelect: () => callbacks.onNavigate(trip) },
-    callbacks.onCall && phone && { id: 'call', label: `Call ${phone}`, onSelect: () => callbacks.onCall(trip) },
-    callbacks.onMessage && phone && { id: 'message', label: `Text ${phone}`, onSelect: () => callbacks.onMessage(trip) },
+    callbacks.onNavigate && access.canShowInlineNavigation && trip?.pickup && { id: 'navigate', label: 'Navigate to pickup', onSelect: () => callbacks.onNavigate(trip) },
+    callbacks.onCall && phone && access.canCommunicate && { id: 'call', label: `Call ${phone}`, onSelect: () => callbacks.onCall(trip) },
+    callbacks.onMessage && phone && access.canCommunicate && { id: 'message', label: `Text ${phone}`, onSelect: () => callbacks.onMessage(trip) },
   ].filter(Boolean);
-  const reassign = callbacks.onReassign && canOperate && !terminal
+  const reassign = callbacks.onReassign && access.canReassign
     ? { id: 'reassign', label: 'Reassign', onSelect: () => callbacks.onReassign(trip) }
     : null;
-  const archive = callbacks.onArchive && (role === 'admin' || role === 'dispatcher')
+  const archive = callbacks.onArchive && access.canArchive
     ? { id: 'archive', label: 'Archive', onSelect: () => callbacks.onArchive(trip) }
     : null;
   return { primary, icons, reassign, archive };
@@ -189,7 +219,7 @@ export function ManifestKpiStrip({ items = [] }) {
             type="button"
             onClick={item.onSelect}
             aria-pressed={!!item.active}
-            className={`${item.wide ? 'flex-[1.2]' : 'flex-1'} py-1 px-0.5 rounded-md border flex flex-col items-center justify-center leading-none gap-1 ${
+            className={`${item.wide ? 'flex-[1.2]' : 'flex-1'} min-h-11 rounded-xl border px-0.5 py-1 flex flex-col items-center justify-center leading-none gap-1 ${
               item.active ? item.activeClass : 'bg-slate-50 border-slate-200 text-slate-600'
             }`}
           >
@@ -202,13 +232,31 @@ export function ManifestKpiStrip({ items = [] }) {
   );
 }
 
+export function getManifestAddressLines(value, explicitCity = '') {
+  const rawAddress = typeof value === 'object'
+    ? String(value?.address || value?.formattedAddress || '').trim()
+    : String(value || '').trim();
+  const city = String(explicitCity || (typeof value === 'object' ? value?.city || '' : '')).trim();
+  if (!rawAddress) return { street: '—', locality: city };
+  const parts = rawAddress.split(',').map((part) => part.trim()).filter(Boolean);
+  if (city) {
+    const cityIndex = parts.findIndex((part) => part.toLowerCase() === city.toLowerCase());
+    if (cityIndex > 0) {
+      return { street: parts.slice(0, cityIndex).join(', '), locality: parts.slice(cityIndex).join(', ') };
+    }
+    return { street: rawAddress, locality: city };
+  }
+  if (parts.length < 2) return { street: rawAddress, locality: '' };
+  return { street: parts[0], locality: parts.slice(1).join(', ') };
+}
+
 // ---------------------------------------------------------------------------
 // ManifestTripCard — one trip, information-prioritized: decision (time +
 // urgency + status) first, client + locations second, role-gated actions last.
 // Exact design tokens. Slots: selectSlot (bulk checkbox), assignSlot
-// (dispatcher assign block for unassigned trips), noteSlot (notes row).
-// Bar: reassign + archive (operator-gated descriptors), call/text icons,
-// centered driver chip, ⋯ overflow, Drive primary.
+// (optional parent content), noteSlot (notes row). The primary and overflow
+// controls stay pinned on narrow phones; lower-priority actions progressively
+// move to the parent's More sheet instead of creating a hidden action rail.
 // ---------------------------------------------------------------------------
 export function ManifestTripCard({
   trip,
@@ -230,11 +278,14 @@ export function ManifestTripCard({
   moreLabel = 'More actions',
 }) {
   const cd = countdown || getTripCountdown(trip);
-  const statusBadge = getManifestStatusBadge(trip?.status);
+  const displayStatus = getManifestDisplayStatus(trip);
+  const statusBadge = getManifestStatusBadge(displayStatus);
+  const pickup = getManifestAddressLines(trip?.pickup, trip?.pickupCity);
+  const dropoff = getManifestAddressLines(trip?.dropoff, trip?.dropoffCity);
   return (
     <article className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
-      <div className="px-2 pt-2 pb-1 flex items-start justify-between bg-slate-50/50 border-b border-slate-100">
-        <div className="flex items-center gap-2">
+      <div className="px-2 pt-2 pb-1 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {selectSlot}
           <span className={`text-xl font-bold leading-none tabular-nums ${COUNTDOWN_TIME_TEXT[cd.level]}`}>
             {trip?.time || '—'}
@@ -243,23 +294,31 @@ export function ManifestTripCard({
             {cd.label}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {legs > 1 && (
-            <button
-              type="button"
-              onClick={onLegsClick}
-              className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full"
-              aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}
-            >
-              <Layers size={11} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
-            </button>
+        <div className="flex max-w-[48%] shrink-0 items-center gap-1.5">
+          {legs > 0 && (
+            onLegsClick ? (
+              <button
+                type="button"
+                onClick={onLegsClick}
+                className="flex min-h-11 items-center rounded-xl text-[11px] font-semibold text-slate-600"
+                aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}
+              >
+                <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                  <Layers size={11} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
+                </span>
+              </button>
+            ) : (
+              <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                <Layers size={11} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
+              </span>
+            )
           )}
-          <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${statusBadge}`}>{trip?.status || 'Unknown'}</span>
+          <span title={displayStatus} className={`max-w-[108px] truncate px-2 py-0.5 rounded text-[11px] font-semibold ${statusBadge}`}>{displayStatus}</span>
         </div>
       </div>
 
-      <div className="px-2 py-1 flex justify-between items-center">
-        <span className="text-sm font-medium text-slate-700 truncate">{trip?.patient || 'Unknown client'}</span>
+      <div className="px-2 py-1 flex justify-between items-center gap-2">
+        <span className="min-w-0 truncate text-sm font-semibold text-slate-700">{trip?.patient || 'Unknown client'}</span>
         {(trip?.bookingId || trip?.id) && (
           <span className="shrink-0 text-xs font-medium tabular-nums text-slate-500">Trip: {trip.bookingId || trip.id}</span>
         )}
@@ -271,7 +330,8 @@ export function ManifestTripCard({
             <div className="flex items-center justify-between mb-0.5">
               <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide leading-none">Pickup</div>
             </div>
-            <div className="text-sm font-medium text-slate-800 leading-tight truncate" title={trip?.pickup || ''}>{trip?.pickup || '—'}</div>
+            <div className="truncate text-sm font-semibold leading-tight text-slate-800" title={pickup.street}>{pickup.street}</div>
+            {pickup.locality && <div className="mt-1 truncate text-xs font-medium leading-none text-slate-500" title={pickup.locality}>{pickup.locality}</div>}
           </div>
           <div className="bg-rose-50/60 p-1.5 rounded-lg border border-rose-100/50 min-w-0">
             <div className="flex items-center justify-between mb-0.5">
@@ -280,7 +340,8 @@ export function ManifestTripCard({
                 <div className="text-xs font-bold text-slate-700 bg-white/90 px-1.5 py-0.5 rounded shadow-sm border border-slate-200/60 leading-none tabular-nums">{mileage}</div>
               )}
             </div>
-            <div className="text-sm font-medium text-slate-800 leading-tight truncate" title={trip?.dropoff || ''}>{trip?.dropoff || '—'}</div>
+            <div className="truncate text-sm font-semibold leading-tight text-slate-800" title={dropoff.street}>{dropoff.street}</div>
+            {dropoff.locality && <div className="mt-1 truncate text-xs font-medium leading-none text-slate-500" title={dropoff.locality}>{dropoff.locality}</div>}
           </div>
         </div>
       </div>
@@ -289,55 +350,57 @@ export function ManifestTripCard({
       {noteSlot}
 
       <div className="flex items-center gap-2 px-2 pb-2 pt-1 border-t border-slate-100 mt-1">
-        {reassignAction && (
-          <button type="button" onClick={reassignAction.onClick} className="px-2 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-200">
-            Reassign
-          </button>
-        )}
-        {archiveAction && (
-          <button type="button" onClick={archiveAction.onClick} className="px-2 py-1 bg-slate-50 text-slate-600 rounded-md text-xs font-semibold border border-slate-200">
-            Archive
-          </button>
-        )}
-        {iconActions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <button
-              key={action.id}
-              type="button"
-              onClick={action.onClick}
-              title={action.label}
-              aria-label={action.ariaLabel || action.label}
-              className="p-1 bg-slate-50 text-slate-600 rounded-md border border-slate-200"
-            >
-              <Icon size={14} />
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+          {reassignAction && (
+            <button type="button" onClick={reassignAction.onClick} className="hidden px-2 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-200 shrink-0 min-[340px]:flex">
+              Reassign
             </button>
-          );
-        })}
-        <div className="flex-1" />
-        <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
-          <User size={12} /> {driverName}
+          )}
+          {archiveAction && (
+            <button type="button" onClick={archiveAction.onClick} className="hidden px-2 py-1 bg-slate-50 text-slate-600 rounded-md text-xs font-semibold border border-slate-200 shrink-0 min-[520px]:flex">
+              Archive
+            </button>
+          )}
+          {iconActions.slice(0, 2).map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.id}
+                type="button"
+                onClick={action.onClick}
+                title={action.label}
+                aria-label={action.ariaLabel || action.label}
+                className="p-1 bg-slate-50 text-slate-600 rounded-md border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+              >
+                <Icon size={14} />
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          <div className="flex items-center gap-1 text-xs font-medium text-slate-500 shrink-0">
+            <User size={12} /> <span className="truncate">{driverName}</span>
+          </div>
+          {onMore && MoreIcon && (
+            <button
+              type="button"
+              onClick={onMore}
+              aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
+              title={typeof moreLabel === 'string' ? moreLabel : undefined}
+              className="p-1 text-slate-500 bg-slate-50 rounded-md border border-slate-200 shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+            >
+              <MoreIcon size={14} />
+            </button>
+          )}
+          {primaryAction && (
+            <button
+              type="button"
+              onClick={primaryAction.onClick}
+              className="px-2 py-1 bg-blue-600 text-white rounded-md text-xs font-semibold flex items-center gap-1 shrink-0 min-h-11"
+            >
+              <Navigation size={12} /> {primaryAction.label}
+            </button>
+          )}
         </div>
-        {onMore && MoreIcon && (
-          <button
-            type="button"
-            onClick={onMore}
-            aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
-            title={typeof moreLabel === 'string' ? moreLabel : undefined}
-            className="p-1 text-slate-500 bg-slate-50 rounded-md border border-slate-200"
-          >
-            <MoreIcon size={14} />
-          </button>
-        )}
-        {primaryAction && (
-          <button
-            type="button"
-            onClick={primaryAction.onClick}
-            className="px-2 py-1 bg-blue-600 text-white rounded-md text-xs font-semibold flex items-center gap-1"
-          >
-            <Navigation size={12} /> {primaryAction.label}
-          </button>
-        )}
       </div>
     </article>
   );
