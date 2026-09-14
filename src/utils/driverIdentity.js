@@ -1,3 +1,5 @@
+import { isTerminalTripStatus } from './tripLifecycle';
+
 const normalize = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalize(value).toLowerCase();
 
@@ -56,8 +58,7 @@ export const hydrateTripDriverIdentity = (trip = {}, drivers = []) => {
   }
   const name = driverName(authoritative);
   if (!name || isCompanyDriverPlaceholder(name)) return trip;
-  const terminal = ['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted']
-    .includes(normalize(trip.status || trip.lifecycleStatus).toLowerCase());
+  const terminal = isTerminalTripStatus(trip.status || trip.lifecycleStatus);
   return {
     ...trip,
     driverId: authoritative.id || trip.driverId || null,

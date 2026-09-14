@@ -5,6 +5,7 @@ import {
   areTaskCardValuesEqual,
   createTaskCardActionsBridge,
   getTaskCardActionShape,
+  getTaskCardMobileActionAccess,
 } from './TaskCard';
 
 const makeTask = () => ({
@@ -31,6 +32,7 @@ const makeTask = () => ({
   dropoff: { address: '200 Dropoff Ave', phone: '3175550102', time: null },
   workflowPhase: 'pickup',
   activeTrip: false,
+  driverName: 'Example Driver',
 });
 
 const stableOnToggle = vi.fn();
@@ -44,6 +46,8 @@ const makeProps = (task = makeTask()) => ({
   onToggle: stableOnToggle,
   onSelect: stableOnSelect,
   actions: stableActions,
+  role: 'driver',
+  workflowReadOnly: false,
   timeEpochMinute: 123,
 });
 
@@ -71,12 +75,14 @@ describe('TaskCard memoization contract', () => {
     expect(areTaskCardPropsEqual(previous, makeProps(nextTask))).toBe(false);
   });
 
-  it('rerenders for selection, expansion, action shape, and minute-boundary changes', () => {
+  it('rerenders for selection, expansion, action shape, role, read-only mode, and minute-boundary changes', () => {
     const previous = makeProps();
 
     expect(areTaskCardPropsEqual(previous, { ...previous, isSelected: true })).toBe(false);
     expect(areTaskCardPropsEqual(previous, { ...previous, expandedId: previous.task.id })).toBe(false);
     expect(areTaskCardPropsEqual(previous, { ...previous, actions: { ...stableActions } })).toBe(false);
+    expect(areTaskCardPropsEqual(previous, { ...previous, role: 'dispatcher' })).toBe(false);
+    expect(areTaskCardPropsEqual(previous, { ...previous, workflowReadOnly: true })).toBe(false);
     expect(areTaskCardPropsEqual(previous, { ...previous, timeEpochMinute: 124 })).toBe(false);
   });
 
@@ -95,6 +101,61 @@ describe('TaskCard memoization contract', () => {
     }
 
     expect(areTaskCardValuesEqual(new ContactValue('3175550100'), new ContactValue('3175550100'))).toBe(false);
+  });
+});
+
+describe('TaskCard mobile role policy', () => {
+  it('allows an assigned driver to execute, report exceptions, transfer, and plan the route', () => {
+    expect(getTaskCardMobileActionAccess({ task: makeTask(), role: 'driver' })).toMatchObject({
+      canOpenProgress: true,
+      canReportException: true,
+      canRequestTransfer: true,
+      canSelectForRoutePlan: true,
+    });
+  });
+
+  it('keeps operator observation read-only while preserving progress review', () => {
+    expect(getTaskCardMobileActionAccess({ task: makeTask(), role: 'dispatcher' })).toMatchObject({
+      canOpenProgress: true,
+      canReportException: false,
+      canRequestTransfer: false,
+      canSelectForRoutePlan: false,
+    });
+  });
+
+  it('honors workflow read-only mode for an otherwise authorized driver', () => {
+    expect(getTaskCardMobileActionAccess({ task: makeTask(), role: 'driver', workflowReadOnly: true })).toMatchObject({
+      canOpenProgress: true,
+      canReportException: false,
+      canRequestTransfer: false,
+      canSelectForRoutePlan: false,
+    });
+  });
+
+  it('keeps terminal trips reviewable but removes driver mutations and route selection', () => {
+    expect(getTaskCardMobileActionAccess({ task: { ...makeTask(), status: 'Completed' }, role: 'driver' })).toMatchObject({
+      canOpenProgress: true,
+      canReportException: false,
+      canRequestTransfer: false,
+      canSelectForRoutePlan: false,
+    });
+  });
+
+  it('fails closed for unknown roles and trips without an assigned driver', () => {
+    const unassigned = { ...makeTask(), driverName: '', status: 'Unassigned' };
+    expect(getTaskCardMobileActionAccess({ task: makeTask(), role: 'unknown' })).toMatchObject({
+      canOpenProgress: false,
+      canCommunicate: false,
+      canReportException: false,
+      canRequestTransfer: false,
+      canSelectForRoutePlan: false,
+    });
+    expect(getTaskCardMobileActionAccess({ task: unassigned, role: 'driver' })).toMatchObject({
+      canOpenProgress: false,
+      canReportException: false,
+      canRequestTransfer: false,
+      canSelectForRoutePlan: false,
+    });
   });
 });
 

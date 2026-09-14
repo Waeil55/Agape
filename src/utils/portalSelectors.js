@@ -1,6 +1,6 @@
 import { localCalendarYmd, timeToMinutes, tripCalendarDateKey } from './tripDate';
+import { isTerminalTripStatus } from './tripLifecycle';
 
-const TERMINAL_MANIFEST_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
 const normalizeIdentity = (value) => String(value || '').trim().toLowerCase();
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -95,7 +95,7 @@ export function buildHotspots(activeTrips = [], lateTrips = []) {
 }
 
 export function getManifestUrgency(trip, now = new Date()) {
-  if (TERMINAL_MANIFEST_STATUSES.has(trip?.status)) return 'normal';
+  if (isTerminalTripStatus(trip?.status) || trip?.completedAt) return 'normal';
   const serviceDate = tripCalendarDateKey(trip?.date);
   if (!serviceDate || (trip?.serviceDate && tripCalendarDateKey(trip.serviceDate) !== serviceDate)) return 'normal';
   const timeValue = timeToMinutes(trip?.time);

@@ -28,7 +28,7 @@ import { impact, selection } from '../utils/haptics';
 import { isNativeShell } from '../utils/platform';
 
 import { buildContactList, getPrimaryContact, getContactWarning, formatPhoneDisplay, getContactRoleIcon, getContactRoleActions } from '../utils/smartContacts';
-import { normalizeEmail } from '../utils/accessControl';
+import { isDriverTripOwner, normalizeEmail } from '../utils/accessControl';
 import { annotateInOutPairs, isInOutTrip, stackInOutPairs, IN_OUT_WAIT_MINUTES } from '../utils/inOutTrips';
 import { SkeletonTripCard } from './ui/Skeleton';
 import { getDriverLiveStatus } from '../constants/statuses';
@@ -43,6 +43,8 @@ import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
 import { queueSyncOperation } from '../utils/localDB';
 import { normalizeTenantId } from '../utils/tenantScope';
 import { sanitizeOdometerInput } from '../utils/odometerInput';
+import { isWorkflowOverlayConfirmed, shouldApplyWorkflowOverlay } from '../utils/workflowOptimisticOverlay';
+import { getTransferReturnStatus, isPendingTripTransferRecipient } from '../utils/tripTransferPolicy';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import DriverQuickSmsSheet from './DriverQuickSmsSheet';
 
@@ -606,7 +608,7 @@ const getWorkflowExtraFields = (progress = {}) => {
 };
 
 const applyWorkflowProgress = (trip, progress) => {
-  if (!trip || !progress) return trip;
+  if (!shouldApplyWorkflowOverlay(trip, progress)) return trip;
   const merged = { ...trip };
   WORKFLOW_PROGRESS_FIELDS.forEach((field) => {
     if (Object.prototype.hasOwnProperty.call(progress, field) && progress[field] === null) {
@@ -628,9 +630,10 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, workflowReadOnly = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const phoneNumbers = phoneNumbersProp;
+  const canManageTripRecords = !workflowReadOnly && (role === 'admin' || role === 'dispatcher');
   const me = useMemo(
     () => {
       const rawMe = drivers.find(d => (d.email || '').toLowerCase() === (currentUser || '').toLowerCase() || String(d.id || '').toLowerCase() === String(currentUser || '').toLowerCase()) ||
@@ -713,33 +716,33 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     );
   }, [drivers, allDrivers, me?.id, normalizedCurrentUserEmail]);
   const tripBelongsToCurrentDriver = useCallback((trip) => {
-    if (!trip) return false;
-    if (trip.driverId && driverIdentityIds.has(trip.driverId)) return true;
-    const resolvedDriverEmail = (
-      trip.driverEmail ||
-      drivers.find((driver) => driver.id === trip.driverId)?.email ||
-      (allDrivers || []).find((driver) => driver.id === trip.driverId)?.email ||
-      ''
-    ).trim().toLowerCase();
-    return !!normalizedCurrentUserEmail && resolvedDriverEmail === normalizedCurrentUserEmail;
-  }, [driverIdentityIds, normalizedCurrentUserEmail, drivers, allDrivers]);
+    if (driverIdentityIds.size !== 1) return false;
+    return isDriverTripOwner(trip, normalizedCurrentUserEmail, me);
+  }, [driverIdentityIds, me, normalizedCurrentUserEmail]);
+  const transferTargetsCurrentDriver = useCallback((trip) => role === 'driver' && isPendingTripTransferRecipient({
+    trip,
+    currentUser: normalizedCurrentUserEmail,
+    driverIds: [...driverIdentityIds],
+  }), [driverIdentityIds, normalizedCurrentUserEmail, role]);
   const rawDriverScopedTrips = useMemo(
     () => {
       if (!Array.isArray(trips)) return [];
-      const filtered = trips.filter(tripBelongsToCurrentDriver);
-      if (defaultTripId && !filtered.some(t => t.id === defaultTripId)) {
+      const filtered = trips.filter((trip) => tripBelongsToCurrentDriver(trip) || transferTargetsCurrentDriver(trip));
+      // Only an explicitly read-only operator view may add a selected trip
+      // outside the current driver's own scope. Driver execution fails closed.
+      if (workflowReadOnly && defaultTripId && !filtered.some(t => t.id === defaultTripId)) {
         const defaultTrip = trips.find(t => t.id === defaultTripId);
         if (defaultTrip) filtered.push(defaultTrip);
       }
       return filtered;
     },
-    [trips, tripBelongsToCurrentDriver, defaultTripId]
+    [trips, tripBelongsToCurrentDriver, transferTargetsCurrentDriver, defaultTripId, workflowReadOnly]
   );
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9@._-]/g, '_');
   const workflowStorageKey = `agape_drvWorkflow_${userKey}`;
   const [workflowProgressState, setWorkflowProgressState] = useState(() => ({
     storageKey: workflowStorageKey,
-    data: readWorkflowProgress(workflowStorageKey),
+    data: workflowReadOnly ? {} : readWorkflowProgress(workflowStorageKey),
   }));
   const workflowProgress = workflowProgressState.data;
   const workflowProgressRef = useRef(workflowProgress);
@@ -748,11 +751,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [workflowProgress]);
   const setWorkflowProgressData = useCallback((updater) => {
     setWorkflowProgressState((prev) => {
-      const baseData = prev.storageKey === workflowStorageKey ? prev.data : readWorkflowProgress(workflowStorageKey);
+      const baseData = prev.storageKey === workflowStorageKey ? prev.data : workflowReadOnly ? {} : readWorkflowProgress(workflowStorageKey);
       const nextData = typeof updater === 'function' ? updater(baseData) : updater;
       return { storageKey: workflowStorageKey, data: nextData || {} };
     });
-  }, [workflowStorageKey]);
+  }, [workflowReadOnly, workflowStorageKey]);
   const driverScopedTrips = useMemo(
     () => annotateInOutPairs(rawDriverScopedTrips.map((trip) => applyWorkflowProgress(trip, workflowProgress[trip.id]))),
     [rawDriverScopedTrips, workflowProgress]
@@ -762,17 +765,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     if (workflowProgressState.storageKey !== workflowStorageKey) {
       setWorkflowProgressState({
         storageKey: workflowStorageKey,
-        data: readWorkflowProgress(workflowStorageKey),
+        data: workflowReadOnly ? {} : readWorkflowProgress(workflowStorageKey),
       });
     }
-  }, [workflowProgressState.storageKey, workflowStorageKey]);
+  }, [workflowProgressState.storageKey, workflowReadOnly, workflowStorageKey]);
 
   useEffect(() => {
-    if (workflowProgressState.storageKey !== workflowStorageKey) return;
+    if (workflowReadOnly || workflowProgressState.storageKey !== workflowStorageKey) return;
     try {
       localStorage.setItem(workflowStorageKey, JSON.stringify(workflowProgress));
     } catch (e) { console.warn('[workflow persist]', e); }
-  }, [workflowProgressState.storageKey, workflowStorageKey, workflowProgress]);
+  }, [workflowProgressState.storageKey, workflowReadOnly, workflowStorageKey, workflowProgress]);
 
   const [activeNav, setActiveNav] = useState(() => {
     if (defaultTripId) return 'active-trip';
@@ -796,10 +799,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
 
   useEffect(() => {
-    if (!isEmbedded) localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
+    if (isEmbedded || workflowReadOnly) return;
+    localStorage.setItem(`agape_drvNav_${userKey}`, activeNav);
     localStorage.setItem(`agape_drvHistFilter_${userKey}`, historyFilter);
     localStorage.removeItem(`agape_drvHistSearch_${userKey}`);
-  }, [activeNav, historyFilter, userKey, isEmbedded]);
+  }, [activeNav, historyFilter, userKey, isEmbedded, workflowReadOnly]);
 
   useEffect(() => {
     if (!isEmbedded) return;
@@ -825,10 +829,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     try { return Number(localStorage.getItem(`agape_drvOdo_${userKey}`)) || 0; } catch { return 0; }
   });
   useEffect(() => {
-    if (lastOdometer > 0) {
+    if (!workflowReadOnly && lastOdometer > 0) {
       try { localStorage.setItem(`agape_drvOdo_${userKey}`, String(lastOdometer)); } catch (e) { console.warn('[odo persist]', e); }
     }
-  }, [lastOdometer, userKey]);
+  }, [lastOdometer, userKey, workflowReadOnly]);
   const [signatureConfirmed, setSignatureConfirmed] = useState(false);
   const [showSignatureConfirm, setShowSignatureConfirm] = useState(null);
   const [routeStopOdometerPrompt, setRouteStopOdometerPrompt] = useState(null);
@@ -894,19 +898,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const setActiveWorkTripId = useCallback((val) => {
     setActiveWorkTripIdRaw(prev => {
       const next = typeof val === 'function' ? val(prev) : val;
-      try {
-        if (next) {
-          localStorage.setItem(`agape_drvActiveTrip_${userKey}`, next);
-        } else {
-          localStorage.removeItem(`agape_drvActiveTrip_${userKey}`);
+      if (!workflowReadOnly) {
+        try {
+          if (next) {
+            localStorage.setItem(`agape_drvActiveTrip_${userKey}`, next);
+          } else {
+            localStorage.removeItem(`agape_drvActiveTrip_${userKey}`);
+          }
+        } catch (err) {
+          console.error('Failed to save activeWorkTripId to localStorage:', err);
         }
-      } catch (err) {
-        console.error('Failed to save activeWorkTripId to localStorage:', err);
       }
       return next;
     });
-  }, [userKey]);
+  }, [userKey, workflowReadOnly]);
   const [startedTripNavId, setStartedTripNavIdRaw] = useState(() => {
+    if (workflowReadOnly) return null;
     try {
       return localStorage.getItem(`agape_drvStartedTrip_${userKey}`) || me?.activeTripId || null;
     } catch {
@@ -916,11 +923,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const setStartedTripNavId = useCallback((tripId) => {
     const nextId = tripId ? String(tripId) : null;
     setStartedTripNavIdRaw(nextId);
+    if (workflowReadOnly) return;
     try {
       if (nextId) localStorage.setItem(`agape_drvStartedTrip_${userKey}`, nextId);
       else localStorage.removeItem(`agape_drvStartedTrip_${userKey}`);
     } catch { /* local persistence unavailable */ }
-  }, [userKey]);
+  }, [userKey, workflowReadOnly]);
   const [workNotesOpen, setWorkNotesOpen] = useState(false);
   const [showTripDetails, setShowTripDetails] = useState(() => {
     if (initialShowDetailsId) {
@@ -1018,7 +1026,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     [me?.email, currentUser]
   );
   const tripsScrollRef = useRef(null);
-  const workflowSyncRef = useRef({});
   const pullStartY = useRef(null);
   // Mutex against rapid double-taps firing an async trip action twice
   // (duplicate arrivals, duplicate completions, duplicate odometer syncs).
@@ -1088,7 +1095,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [pullDistance, isRefreshing]);
 
   const advanceWorkflow = useCallback((trip, status, extraFields = {}, options = {}) => {
-    if (!trip?.id || !status) return Promise.resolve(false);
+    if (workflowReadOnly || !trip?.id || !status) return Promise.resolve(false);
     const workflowUpdatedAt = new Date().toISOString();
     const previousMap = workflowProgressRef.current || {};
     const previousProgress = previousMap[trip.id] || null;
@@ -1143,9 +1150,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         console.error('[DriverPage] Failed to persist workflow update:', error);
         return false;
       });
-  }, [onUpdateTrip, setWorkflowProgressData, me]);
+  }, [onUpdateTrip, setWorkflowProgressData, me, workflowReadOnly]);
 
   const clearActiveTrip = useCallback(() => {
+    if (workflowReadOnly) return;
     if (me?.id) {
       setDoc(doc(db, 'driverProfiles', me.id), { activeTripId: null, userId: auth.currentUser?.uid || '' }, { merge: true }).catch((err) => {
         console.error('[DriverPage] Failed to clear activeTripId:', err);
@@ -1155,29 +1163,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       setActiveNav('trips');
       setWorkNotesOpen(false);
     }
-  }, [me?.id, setStartedTripNavId]);
+  }, [me?.id, setStartedTripNavId, workflowReadOnly]);
 
   useEffect(() => {
-    Object.entries(workflowProgress).forEach(([tripId, progress]) => {
-      if (!progress?.status || progress.workflowRegression) return;
-      const rawTrip = rawDriverScopedTrips.find((trip) => trip.id === tripId);
-      if (!rawTrip) return;
-      const mergedTrip = applyWorkflowProgress(rawTrip, progress);
-      const rawIndex = getWorkflowStepIndex(rawTrip);
-      const mergedIndex = getWorkflowStepIndex(mergedTrip);
-      const shouldSync = mergedIndex > rawIndex || rawTrip.status !== mergedTrip.status;
-      if (!shouldSync) return;
-      const signature = JSON.stringify({ status: mergedTrip.status, ...getWorkflowExtraFields(progress) });
-      if (workflowSyncRef.current[tripId] === signature) return;
-      workflowSyncRef.current[tripId] = signature;
-      Promise.resolve(onUpdateTrip?.(tripId, mergedTrip.status, {
-        ...getWorkflowExtraFields(progress),
-        workflowUpdatedAt: progress.workflowUpdatedAt || new Date().toISOString(),
-      })).catch((err) => {
-        console.error('[DriverPage] Failed to replay workflow progress:', err);
+    if (workflowReadOnly || Object.keys(workflowProgress).length === 0) return;
+    setWorkflowProgressData((current) => {
+      let changed = false;
+      const next = { ...current };
+      Object.entries(current).forEach(([tripId, progress]) => {
+        const authoritativeTrip = rawDriverScopedTrips.find((trip) => trip.id === tripId);
+        if (!isWorkflowOverlayConfirmed(authoritativeTrip, progress, WORKFLOW_PROGRESS_FIELDS)) return;
+        delete next[tripId];
+        changed = true;
       });
+      return changed ? next : current;
     });
-  }, [rawDriverScopedTrips, workflowProgress, onUpdateTrip]);
+  }, [rawDriverScopedTrips, setWorkflowProgressData, workflowProgress, workflowReadOnly]);
 
   useEffect(() => {
     if (!me?.id) return;
@@ -1368,7 +1369,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
 
   const updateAssignedRouteRecord = useCallback(async (updates, auditTitle, auditMessage) => {
-    if (!assignedSequence?.id || routeTemplates.length === 0) return;
+    if (workflowReadOnly || !assignedSequence?.id || routeTemplates.length === 0) return false;
     const nextTemplates = routeTemplates.map((template) => (
       template.id === assignedSequence.id ? { ...template, ...updates } : template
     ));
@@ -1377,10 +1378,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     if (auditTitle && auditMessage && onAddAuditLog) {
       onAddAuditLog(auditTitle, auditMessage, 'indigo');
     }
-  }, [assignedSequence?.id, routeTemplates, currentUser, onAddAuditLog]);
+    return true;
+  }, [assignedSequence?.id, routeTemplates, onAddAuditLog, workflowReadOnly]);
 
   const startAssignedRoute = useCallback(async () => {
-    if (!assignedSequence) return;
+    if (workflowReadOnly || !assignedSequence) return;
     const orderedTripIds = [...new Set((assignedSequence.sequence || []).map((step) => step.clientId))];
     const steps = (assignedSequence.sequence || []).map((step) => ({ tripId: step.clientId, type: step.type }));
     setAiSequence(orderedTripIds);
@@ -1394,7 +1396,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       driverAcknowledgedAt: assignedSequence.driverAcknowledgedAt || new Date().toISOString(),
       startedAt: new Date().toISOString(),
     }, 'Route Started', `${currentUser} started route "${assignedSequence.name || 'Assigned Route'}".`);
-  }, [assignedSequence, currentUser, updateAssignedRouteRecord]);
+  }, [assignedSequence, currentUser, updateAssignedRouteRecord, workflowReadOnly]);
 
   const getUrgency = (trip) => {
     if (!trip || !trip.time || isWorkflowTerminalTrip(trip)) return 0;
@@ -1426,6 +1428,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   };
 
   const restoreHistoryTrip = (trip) => {
+    if (!canManageTripRecords) return;
     const patientKey = (trip.patient || '').trim().toLowerCase();
     const relatedLegs = driverScopedTrips.filter(t => isTripDateToday(t.date) && (t.patient || '').trim().toLowerCase() === patientKey && isWorkflowTerminalTrip(t));
     if (relatedLegs.length > 1) {
@@ -1844,7 +1847,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     ? driverScopedTrips.find((trip) => String(trip.id) === String(startedTripNavId)) || null
     : null;
   useEffect(() => {
-    if (!startedTripNavId || !startedTripNav) return;
+    if (workflowReadOnly || !startedTripNavId || !startedTripNav) return;
     const status = normalizeWorkflowStatus(startedTripNav.status);
     if (isWorkflowTerminalTrip(startedTripNav) || status === 'assigned' || status === 'unassigned') {
       setStartedTripNavId(null);
@@ -1854,7 +1857,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         });
       }
     }
-  }, [me?.id, setStartedTripNavId, startedTripNav, startedTripNavId]);
+  }, [me?.id, setStartedTripNavId, startedTripNav, startedTripNavId, workflowReadOnly]);
   useEffect(() => {
     if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
       setActiveWorkTripId(null);
@@ -2525,12 +2528,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, []);
 
   const handleStreamLocationUpdate = useCallback(async (driverId, latitude, longitude, telemetry = {}) => {
-    if (!driverId) return;
+    if (workflowReadOnly || isEmbedded || !driverId) return;
     await onUpdateDriverLocation?.(driverId, latitude, longitude, telemetry);
-  }, [onUpdateDriverLocation]);
+  }, [isEmbedded, onUpdateDriverLocation, workflowReadOnly]);
 
   const driverLocStream = useDriverLocationStream({
-    enabled: Boolean(me?.id),
+    enabled: Boolean(me?.id) && !isEmbedded && !workflowReadOnly,
     driver: me,
     role,
     currentTrip: activeLocationTrip,
@@ -2989,18 +2992,28 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }, 'Route Stop Undo', `${currentUser} stepped back stop ${stop.sequenceIndex}: ${stop.name || stop.address || 'Route stop'}.`);
   }, [assignedSequence?.driverWorkflow, assignedSequence?.id, currentUser, getRoutePlanStopKey, updateAssignedRouteRecord]);
 
-  const handleNavigateToPickup = (trip) => {
+  const handleNavigateToPickup = async (trip) => {
     impact('heavy');
-    advanceWorkflow(trip, 'Navigating Pickup', {});
+    const saved = await advanceWorkflow(trip, 'Navigating Pickup', {});
+    if (!saved) {
+      setShowToast({ type: 'error', message: 'Navigation status could not be saved. Check the connection and retry.' });
+      return false;
+    }
     preloadGeofence(trip);
     openInNavApp(trip.pickup, navApp);
+    return true;
   };
 
-  const handleNavigateToDropoff = (trip) => {
+  const handleNavigateToDropoff = async (trip) => {
     impact('heavy');
+    const saved = await advanceWorkflow(trip, 'Navigating Dropoff', {});
+    if (!saved) {
+      setShowToast({ type: 'error', message: 'Navigation status could not be saved. Check the connection and retry.' });
+      return false;
+    }
     preloadGeofence(trip);
-    advanceWorkflow(trip, 'Navigating Dropoff', {});
     openInNavApp(trip.dropoff, navApp);
+    return true;
   };
 
 
@@ -3035,13 +3048,26 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }
 
   const openTransferPrompt = (type, item) => {
+    if (workflowReadOnly) return;
     setTransferPrompt({ type, item });
     setTransferTargetDriverId('');
     setTransferReason('');
   };
 
+  const getRouteTransferTrips = (route) => {
+    const declaredIds = Array.isArray(route?.validTripIds) && route.validTripIds.length > 0
+      ? route.validTripIds
+      : (route?.sequence || []).map((step) => step?.clientId).filter(Boolean);
+    const uniqueIds = [...new Set(declaredIds.map((id) => String(id || '').trim()).filter(Boolean))];
+    const records = uniqueIds.map((tripId) => trips.find((trip) => String(trip.id) === tripId) || null);
+    if (records.some((trip) => !trip)) {
+      throw new Error('The route transfer is blocked because one or more trips are missing from the current scope. Refresh and retry.');
+    }
+    return records.filter((trip) => !isWorkflowTerminalTrip(trip));
+  };
+
   const submitTransferRequest = async () => {
-    if (!transferPrompt || !transferTargetDriverId) return;
+    if (workflowReadOnly || !transferPrompt || !transferTargetDriverId) return;
     const targetDriver = transferTargetDrivers.find((driver) => driver.id === transferTargetDriverId);
     if (!targetDriver) return;
     const nowIso = new Date().toISOString();
@@ -3050,13 +3076,15 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     if (isAdminOrDisp) {
       if (transferPrompt.type === 'trip') {
         const trip = transferPrompt.item;
-        onUpdateTrip?.(trip.id, 'Assigned', {
+        const reassignedStatus = getTransferReturnStatus({ previousStatus: trip.status });
+        const saved = await onUpdateTrip?.(trip.id, reassignedStatus, {
           driverId: targetDriver.id,
           driverEmail: targetDriver.email || '',
           driverName: targetDriver.name || targetDriver.email || 'Driver',
           transferStatus: 'direct_reassign',
           workflowUpdatedAt: nowIso,
         });
+        if (saved !== true) throw new Error('The trip could not be reassigned. Check the connection and retry.');
         onAddAuditLog?.('Trip Reassigned', `${currentUser} reassigned trip for ${trip.patient || trip.id} to ${targetDriver.name}.`, 'emerald');
         setShowToast({ type: 'success', message: `Trip successfully reassigned to ${targetDriver.name}.` });
       } else if (transferPrompt.type === 'route' && assignedSequence?.id) {
@@ -3087,21 +3115,43 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       toDriverEmail: targetDriver.email || '',
       toDriverName: targetDriver.name || targetDriver.email || 'Driver',
       reason: transferReason || 'Emergency transfer request',
+      previousStatus: transferPrompt.type === 'trip' ? (transferPrompt.item?.status || 'Assigned') : null,
       requestedAt: nowIso,
       requestedBy: currentUser || '',
     };
     if (transferPrompt.type === 'trip') {
       const trip = transferPrompt.item;
-      advanceWorkflow(trip, 'Transferred', {
+      const saved = await advanceWorkflow(trip, 'Transferred', {
         transferRequest: request,
         transferStatus: 'pending',
       });
+      if (!saved) throw new Error('The transfer request could not be saved. Check the connection and retry.');
       onAddAuditLog?.('Trip Transfer Requested', `${request.fromDriverName} requested transfer of ${trip.patient || trip.id} to ${request.toDriverName}.`, 'amber');
     } else if (transferPrompt.type === 'route' && assignedSequence?.id) {
-      await updateAssignedRouteRecord({
-        transferRequest: request,
+      const routeTrips = getRouteTransferTrips(assignedSequence);
+      if (routeTrips.length === 0) throw new Error('This route has no active trips to transfer.');
+      const routeRequest = { ...request, tripIds: routeTrips.map((trip) => trip.id) };
+      for (const trip of routeTrips) {
+        const tripRequest = {
+          ...routeRequest,
+          id: `${request.id}-${trip.id}`,
+          type: 'trip',
+          routeTransferId: assignedSequence.id,
+          previousStatus: trip.status || 'Assigned',
+        };
+        const saved = await advanceWorkflow(trip, 'Transferred', {
+          transferRequest: tripRequest,
+          transferStatus: 'pending',
+        });
+        if (!saved) {
+          throw new Error(`The route transfer stopped at trip ${trip.bookingId || trip.id}. Any earlier trip requests remain visible and must be resolved before retrying.`);
+        }
+      }
+      const routeSaved = await updateAssignedRouteRecord({
+        transferRequest: routeRequest,
         transferStatus: 'pending',
       }, 'Route Transfer Requested', `${request.fromDriverName} requested transfer of route "${assignedSequence.name || 'Assigned Route'}" to ${request.toDriverName}.`);
+      if (routeSaved !== true) throw new Error('The route transfer record could not be saved. The staged trip requests remain visible for review.');
     }
     setTransferPrompt(null);
     setTransferTargetDriverId('');
@@ -3109,31 +3159,60 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setShowToast({ type: 'success', message: `Transfer request sent to ${request.toDriverName}.` });
   };
 
-  const applyTripTransferDecision = (trip, accepted) => {
+  const applyTripTransferDecision = async (trip, accepted) => {
     const req = trip?.transferRequest;
-    if (!trip?.id || !req) return;
+    if (!trip?.id || !req) throw new Error('This transfer request is no longer available. Refresh and try again.');
     const nowIso = new Date().toISOString();
+    const restoredStatus = getTransferReturnStatus(req);
     if (accepted) {
-      onUpdateTrip?.(trip.id, 'Assigned', {
+      const saved = await onUpdateTrip?.(trip.id, restoredStatus, {
         driverId: me?.id || req.toDriverId || '',
         driverEmail: me?.email || req.toDriverEmail || '',
         driverName: me?.name || req.toDriverName || '',
         transferStatus: 'accepted',
         transferRequest: { ...req, status: 'accepted', decidedAt: nowIso, decidedBy: currentUser || '' },
       });
+      if (saved !== true) throw new Error('The transfer acceptance could not be saved. Check the connection and retry.');
       onAddAuditLog?.('Trip Transfer Accepted', `${me?.name || currentUser} accepted transfer of ${trip.patient || trip.id}.`, 'emerald');
+      setShowToast({ type: 'success', message: 'Trip transfer accepted.' });
     } else {
-      onUpdateTrip?.(trip.id, trip.status, {
+      const saved = await onUpdateTrip?.(trip.id, restoredStatus, {
         transferStatus: 'declined',
         transferRequest: { ...req, status: 'declined', decidedAt: nowIso, decidedBy: currentUser || '' },
       });
+      if (saved !== true) throw new Error('The transfer decline could not be saved. Check the connection and retry.');
       onAddAuditLog?.('Trip Transfer Declined', `${me?.name || currentUser} declined transfer of ${trip.patient || trip.id}.`, 'rose');
+      setShowToast({ type: 'success', message: 'Trip transfer declined and returned to its previous workflow step.' });
     }
   };
 
   const applyRouteTransferDecision = async (route, accepted) => {
+    if (workflowReadOnly) throw new Error('Route transfer decisions are unavailable in read-only review.');
     const req = route?.transferRequest;
-    if (!route?.id || !req) return;
+    if (!route?.id || !req) throw new Error('This route transfer request is no longer available.');
+    const routeTripIds = Array.isArray(req.tripIds) ? [...new Set(req.tripIds.map((id) => String(id || '').trim()).filter(Boolean))] : [];
+    if (routeTripIds.length === 0) {
+      throw new Error('This legacy route request has no verified trip list. Ask dispatch to reassign the route.');
+    }
+    const routeTrips = routeTripIds.map((tripId) => trips.find((trip) => String(trip.id) === tripId) || null);
+    if (routeTrips.some((trip) => !trip)) {
+      throw new Error('The route decision is blocked because its complete trip set is not visible. Refresh or contact dispatch.');
+    }
+    for (const trip of routeTrips) {
+      const tripRequest = trip.transferRequest;
+      const alreadyAccepted = accepted
+        && trip.transferStatus === 'accepted'
+        && tripRequest?.routeTransferId === route.id
+        && tripBelongsToCurrentDriver(trip);
+      const alreadyDeclined = !accepted
+        && trip.transferStatus === 'declined'
+        && tripRequest?.routeTransferId === route.id;
+      if (alreadyAccepted || alreadyDeclined) continue;
+      if (tripRequest?.routeTransferId !== route.id || tripRequest?.status !== 'pending') {
+        throw new Error(`Trip ${trip.bookingId || trip.id} is not in the expected pending route-transfer state.`);
+      }
+      await applyTripTransferDecision(trip, accepted);
+    }
     const nowIso = new Date().toISOString();
     const nextTemplates = routeTemplates.map((template) => {
       if (template.id !== route.id) return template;
@@ -3157,18 +3236,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       };
     });
     await setDoc(doc(db, 'routeData', 'sequences'), { templates: nextTemplates }, { merge: true });
-    if (accepted && Array.isArray(route.validTripIds)) {
-      route.validTripIds.forEach((tripId) => {
-        const trip = trips.find((item) => item.id === tripId);
-        if (trip) {
-          onUpdateTrip?.(trip.id, 'Assigned', {
-            driverId: me?.id || req.toDriverId || '',
-            driverEmail: me?.email || req.toDriverEmail || '',
-            driverName: me?.name || req.toDriverName || '',
-          });
-        }
-      });
-    }
     onAddAuditLog?.(accepted ? 'Route Transfer Accepted' : 'Route Transfer Declined', `${me?.name || currentUser} ${accepted ? 'accepted' : 'declined'} transfer of route "${route.name || 'Assigned Route'}".`, accepted ? 'emerald' : 'rose');
   };
 
@@ -3303,38 +3370,54 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
   };
 
-  const handleArriveDropoff = (trip) => {
-    setUndoable(trip, trip.status, 'At Dropoff');
-    advanceWorkflow(trip, 'At Dropoff', {
+  const handleArriveDropoff = async (trip) => {
+    const saved = await advanceWorkflow(trip, 'At Dropoff', {
       arrivalDropoffTime: new Date().toISOString(),
     });
+    if (!saved) {
+      setShowToast({ type: 'error', message: 'Dropoff arrival could not be saved. Check the connection and retry.' });
+      return false;
+    }
+    setUndoable(trip, trip.status, 'At Dropoff');
     if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
       ttLogTripEvent('TRIP_ARRIVED_DROPOFF', trip.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
     }
     openCompleteModal(trip);
+    return true;
   };
 
-  const handleSkipNav = (trip) => {
+  const handleSkipNav = async (trip) => {
     impact('medium');
     if (trip.status === 'In Progress') {
       handleArrivePickup(trip);
     } else if (trip.status === 'In Transit') {
-      handleArriveDropoff(trip);
+      await handleArriveDropoff(trip);
     }
   };
 
-  const confirmSignatureAndBegin = () => {
+  const confirmSignatureAndBegin = async () => {
     if (!showSignatureConfirm || !signatureConfirmed) return;
-    setUndoable(showSignatureConfirm, showSignatureConfirm.status, 'In Transit');
-    advanceWorkflow(showSignatureConfirm, 'In Transit', {
-      departedPickupTime: new Date().toISOString(),
-      paperSignatureConfirmed: true,
-    });
-    if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
-      ttLogTripEvent('TRIP_DEPARTED_PICKUP', showSignatureConfirm.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
+    if (tripActionInFlightRef.current) return;
+    tripActionInFlightRef.current = true;
+    try {
+      const signatureTrip = showSignatureConfirm;
+      const saved = await advanceWorkflow(signatureTrip, 'In Transit', {
+        departedPickupTime: new Date().toISOString(),
+        paperSignatureConfirmed: true,
+      });
+      if (!saved) {
+        setShowToast({ type: 'error', message: 'The signature confirmation was not saved. Check the connection and retry.' });
+        return;
+      }
+      setUndoable(signatureTrip, signatureTrip.status, 'In Transit');
+      if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
+        ttLogTripEvent('TRIP_DEPARTED_PICKUP', signatureTrip.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
+      }
+      setShowSignatureConfirm(null);
+      setSignatureConfirmed(false);
+    } finally {
+      tripActionInFlightRef.current = false;
     }
-    setShowSignatureConfirm(null);
-    setSignatureConfirmed(false);
   };
 
   const handleNoShow = (trip) => {
@@ -3402,6 +3485,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   };
 
   const handleStartInlineEdit = (trip) => {
+    if (!canManageTripRecords) return;
     const original = trips.find(t => t.id === trip.id) || trip;
     setHistoryExpandedId(original.id);
     setEditingTripId(original.id);
@@ -3449,7 +3533,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   };
 
   const handleSaveInlineEdit = async () => {
-    if (!editingTripId || !editingTripData || inlineEditSaving) return;
+    if (!canManageTripRecords || !editingTripId || !editingTripData || inlineEditSaving) return;
     const d = editingTripData;
     const serviceDate = d.date;
     const pickupIso = timeToIsoForTripDate(d._pickupTime, serviceDate);
@@ -3610,6 +3694,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const verifyPasswordAndProceed = async () => {
     if (!passwordPrompt) return;
+    if (workflowReadOnly) {
+      setPasswordError('Trip review is read-only. Return to the dispatch workspace to make changes.');
+      return;
+    }
     const isAdminOrDisp = role === 'admin' || role === 'dispatcher';
     if (!isAdminOrDisp && !passwordValue) return;
     if (!auth.currentUser) { setPasswordError('Not authenticated. Please sign in again.'); return; }
@@ -3624,9 +3712,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       if (type === 'route_stop_exception') {
         markRoutePlanStopException(passwordPrompt.stop, passwordPrompt.status, reason);
       } else if (type === 'accept_transfer_trip') {
-        applyTripTransferDecision(trip, true);
+        await applyTripTransferDecision(trip, true);
       } else if (type === 'decline_transfer_trip') {
-        applyTripTransferDecision(trip, false);
+        await applyTripTransferDecision(trip, false);
       } else if (type === 'accept_transfer_route') {
         await applyRouteTransferDecision(passwordPrompt.route, true);
       } else if (type === 'decline_transfer_route') {
@@ -3639,6 +3727,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           dismissedAt: new Date().toISOString(),
         }, 'Route Dismissed', `${currentUser} dismissed route "${dismissSequence.name || 'Assigned Route'}".`);
       } else if (type === 'edittrip') {
+        if (!canManageTripRecords) throw new Error('Your role cannot edit trip records.');
         if (editedData) {
           const saved = await advanceWorkflow(trip, editedData.status || trip.status, editedData);
           if (!saved) throw new Error('Trip changes could not be saved. Check the connection and retry.');
@@ -3648,6 +3737,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           }
         }
       } else if (type === 'edittripcomplete') {
+        if (!canManageTripRecords) throw new Error('Your role cannot complete trips through record editing.');
         if (editedData) {
           const odo = parseInt(editedData.dropoffOdometer, 10) || 0;
           const saved = await advanceWorkflow(trip, 'Completed', { ...editedData, completedVehicle: me?.vehicle || '' });
@@ -3661,27 +3751,30 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           setSelectedTrips(prev => prev.filter(id => id !== trip.id));
         }
       } else if (type === 'restore') {
+        if (!canManageTripRecords) throw new Error('Your role cannot restore terminal trip records.');
         const legsToRestore = selectedLegIds && selectedLegIds.length > 0
           ? trips.filter(t => selectedLegIds.includes(t.id))
           : [trip];
-        legsToRestore.forEach(leg => {
+        const restoreResults = await Promise.all(legsToRestore.map(leg => {
           const prevStatus = leg.status === 'Completed' ? 'Arrived' : 'Assigned';
-          advanceWorkflow(leg, prevStatus, {}, { allowRegression: true });
-        });
+          return advanceWorkflow(leg, prevStatus, {}, { allowRegression: true });
+        }));
+        if (restoreResults.some(saved => saved !== true)) throw new Error('One or more trips could not be restored. Check the connection and retry.');
       } else {
         const newStatus = type === 'noshow' ? 'No Show' : type === 'reroute' ? 'Rerouted' : 'Cancelled';
         const legsToUpdate = selectedLegIds && selectedLegIds.length > 0
           ? trips.filter(t => selectedLegIds.includes(t.id))
           : [trip];
-        legsToUpdate.forEach(leg => {
+        const exceptionResults = await Promise.all(legsToUpdate.map(leg => {
           setUndoable(leg, leg.status, newStatus);
-          advanceWorkflow(leg, newStatus, {
+          return advanceWorkflow(leg, newStatus, {
             completedAt: new Date().toISOString(),
             cancellationReason: reason || null,
             cancelledBy: me?.email || '',
             cancelledAt: new Date().toISOString(),
           });
-        });
+        }));
+        if (exceptionResults.some(saved => saved !== true)) throw new Error('One or more trip updates could not be saved. Check the connection and retry.');
         setExpandedTripId(null);
       }
       setPasswordPrompt(null);
@@ -3921,15 +4014,21 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     requestAnimationFrame(() => tripsScrollRef.current?.scrollTo?.({ top: 0, behavior: 'smooth' }));
   };
 
-  const startTripAndOpen = (trip) => {
+  const startTripAndOpen = async (trip) => {
+    if (workflowReadOnly) return;
     impact('heavy');
+    const saved = await advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() });
+    if (!saved) {
+      setShowToast({ type: 'error', message: 'The trip could not be started. Check the connection and retry.' });
+      return false;
+    }
     setStartedTripNavId(trip.id);
-    advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() });
     openTripWorkPage(trip.id);
+    return true;
   };
 
   const getPrimaryTripAction = (trip) => {
-    if (!trip) return null;
+    if (!trip || workflowReadOnly) return null;
     const s = normalizeWorkflowStatus(trip.status);
     if (s === 'assigned' || s === 'unassigned') {
       return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', onClick: () => startTripAndOpen(trip) };
@@ -3962,7 +4061,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const scheduledTime = getTripCardTimeLabel(trip) || 'Will Call';
     const primary = getPrimaryTripAction(trip);
     const workStepIndex = getTripWorkStepIndex(trip);
-    const stepBackTarget = getTripWorkStepBackTarget(trip);
+    const stepBackTarget = workflowReadOnly ? null : getTripWorkStepBackTarget(trip);
     const contacts = getContactsForTrip(trip);
     const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
     const workTripIsInOut = isInOutTrip(trip);
@@ -3977,13 +4076,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       setShowToast({ message: `${label} copied` });
     };
     const bottomAction = primary || {
-      label: isWorkflowTerminalTrip(trip) ? String(trip.status || 'Completed') : 'No Action Required',
-      icon: isWorkflowTerminalTrip(trip) ? <Check size={16} /> : <Info size={16} />,
-      gradient: isWorkflowTerminalTrip(trip) ? 'bg-emerald-600' : 'bg-slate-500',
+      label: workflowReadOnly ? `Current: ${String(trip.status || 'Assigned')}` : isWorkflowTerminalTrip(trip) ? String(trip.status || 'Completed') : 'No Action Required',
+      icon: workflowReadOnly ? <Lock size={16} /> : isWorkflowTerminalTrip(trip) ? <Check size={16} /> : <Info size={16} />,
+      gradient: workflowReadOnly ? 'bg-slate-700' : isWorkflowTerminalTrip(trip) ? 'bg-emerald-600' : 'bg-slate-500',
       onClick: () => {},
     };
     const handleStepBack = () => {
-      if (!stepBackTarget) return;
+      if (workflowReadOnly || !stepBackTarget) return;
       impact('medium');
       advanceWorkflow(trip, stepBackTarget.status, stepBackTarget.fields, { allowRegression: true });
     };
@@ -4006,7 +4105,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <Clock size={16} /> {scheduledTime}
               </p>
             </div>
-            <button type="button" onClick={() => copyText(trip.bookingId || trip.id, 'Trip ID')} className="shrink-0 rounded-xl bg-blue-50 px-3 py-2 text-left border border-blue-100">
+            <button type="button" onClick={() => copyText(trip.bookingId || trip.id, 'Trip ID')} className="flex min-h-11 shrink-0 items-center rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-left">
               <span className="text-sm font-semibold leading-tight text-blue-700">Trip: {trip.bookingId || trip.id || '--'}</span>
             </button>
 
@@ -4042,11 +4141,18 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <p className="text-xs font-medium uppercase tracking-normal text-blue-600">From</p>
                   <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-950 break-words">{pickupAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="h-7 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="flex min-h-11 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-slate-400">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={() => openInNavApp(pickupAddress, suggestNavApp(pickupAddress))} className="h-11 cursor-pointer text-xs font-semibold text-white">
+                    <button type="button" onClick={async () => {
+                      const status = normalizeWorkflowStatus(trip.status);
+                      if (!workflowReadOnly && ['assigned', 'unassigned', 'in progress', 'in mission', 'en route'].includes(status)) {
+                        await handleNavigateToPickup(trip);
+                        return;
+                      }
+                      openInNavApp(pickupAddress, suggestNavApp(pickupAddress));
+                    }} className="h-11 cursor-pointer text-xs font-semibold text-white">
                       <span className="flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 shadow-sm hover:bg-blue-700"><Navigation size={16} strokeWidth={2.5} /> Navigate</span>
                     </button>
                   </div>
@@ -4056,28 +4162,34 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <p className="text-xs font-medium uppercase tracking-normal text-emerald-600">To</p>
                   <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-950 break-words">{dropoffAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="h-7 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
+                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="flex min-h-11 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800">
                       <Copy size={14} /> Copy
                     </button>
                     <span className="text-xs font-medium text-slate-400" />
-                    <button type="button" onClick={() => openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress))} className="h-11 cursor-pointer text-xs font-semibold text-white">
+                    <button type="button" onClick={async () => {
+                      if (!workflowReadOnly && normalizeWorkflowStatus(trip.status) === 'in transit') {
+                        await handleNavigateToDropoff(trip);
+                        return;
+                      }
+                      openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress));
+                    }} className="h-11 cursor-pointer text-xs font-semibold text-white">
                       <span className="flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 shadow-sm hover:bg-emerald-700"><Navigation size={16} strokeWidth={2.5} /> Navigate</span>
                     </button>
                   </div>
                 </div>
               </div>
-              <div className="mt-2 grid grid-cols-4 gap-2">
-                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
-                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-emerald-600"><Phone size={17} /> Call</span>
+              <div className="mt-2 grid grid-cols-4 gap-1.5 min-[360px]:gap-2">
+                <button type="button" onClick={() => handleSmartCall(trip)} disabled={!primaryContact} className="h-11 cursor-pointer text-[10px] font-semibold text-white disabled:opacity-40 min-[360px]:text-xs">
+                  <span className="flex h-9 items-center justify-center gap-0.5 rounded-xl bg-emerald-600 min-[360px]:gap-1"><Phone size={15} className="shrink-0" /> <span className="truncate">Call</span></span>
                 </button>
-                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="relative h-11 disabled:opacity-40 text-white text-xs font-semibold cursor-pointer">
-                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-blue-600"><MessageCircle size={17} /> SMS</span>
+                <button type="button" onClick={() => handleSmartSMS(trip)} disabled={!primaryContact} className="relative h-11 cursor-pointer text-[10px] font-semibold text-white disabled:opacity-40 min-[360px]:text-xs">
+                  <span className="flex h-9 items-center justify-center gap-0.5 rounded-xl bg-blue-600 min-[360px]:gap-1"><MessageCircle size={15} className="shrink-0" /> <span className="truncate">SMS</span></span>
                 </button>
-                <button type="button" onClick={() => openContactSelector(trip)} className="h-11 text-white text-xs font-semibold cursor-pointer">
-                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-violet-600"><PhoneForwarded size={17} /> Contacts</span>
+                <button type="button" onClick={() => openContactSelector(trip)} className="h-11 cursor-pointer text-[10px] font-semibold text-white min-[360px]:text-xs">
+                  <span className="flex h-9 items-center justify-center gap-0.5 rounded-xl bg-violet-600 px-0.5 min-[360px]:gap-1"><PhoneForwarded size={15} className="shrink-0" /> <span className="truncate">Contacts</span></span>
                 </button>
-                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-11 text-slate-700 text-xs font-semibold cursor-pointer">
-                  <span className="flex h-9 items-center justify-center gap-1 rounded-xl bg-slate-100"><MoreHorizontal size={17} /> More</span>
+                <button type="button" onClick={() => setShowMoreOptions(trip)} className="h-11 cursor-pointer text-[10px] font-semibold text-slate-700 min-[360px]:text-xs">
+                  <span className="flex h-9 items-center justify-center gap-0.5 rounded-xl bg-slate-100 min-[360px]:gap-1"><MoreHorizontal size={15} className="shrink-0" /> <span className="truncate">More</span></span>
                 </button>
               </div>
             </div>
@@ -4092,22 +4204,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   return (
                     <div key={label} className="flex-1 min-w-0">
                       <div className="flex items-center">
-                         <div className={`w-8 h-8 rounded-full flex items-center justify-center border font-semibold text-xs shadow-sm ${
+                         <div className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold shadow-sm min-[360px]:h-8 min-[360px]:w-8 min-[360px]:text-xs ${
                           isActive ? 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100' : isDone ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-300'
                         }`}>
                           {idx + 1}
                         </div>
                         {idx < TRIP_WORK_STEPS.length - 1 && (
-                          <div className={`h-1 flex-1 rounded-full mx-1.5 ${idx < workStepIndex ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                          <div className={`mx-0.5 h-1 flex-1 rounded-full min-[360px]:mx-1.5 ${idx < workStepIndex ? 'bg-slate-700' : 'bg-slate-200'}`} />
                         )}
                       </div>
-                      <p className={`mt-1 text-center text-xs font-medium leading-tight ${isActive ? 'text-slate-800' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
+                      <p className={`mt-1 text-center text-[9px] font-medium leading-tight min-[360px]:text-xs ${isActive ? 'text-slate-800' : isDone ? 'text-slate-700' : 'text-slate-500'}`}>{label}</p>
                     </div>
                   );
                 })}
               </div>
               <div className="mx-1 w-px self-stretch bg-slate-200" />
-              <button
+              {!workflowReadOnly && <button
                 type="button"
                 onClick={handleStepBack}
                 disabled={!stepBackTarget}
@@ -4116,7 +4228,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 aria-label={stepBackTarget ? `Back to ${stepBackTarget.label}` : 'Already at Scheduled'}
               >
                 <Undo2 size={17} strokeWidth={2.5} /><span className="text-[9px] font-semibold">Undo</span>
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -4134,7 +4246,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           </div>
         </div>
 
-        <div className="fixed left-4 right-4 z-40 rounded-xl border-0 bg-transparent p-0 shadow-none" style={{ bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="fixed left-4 right-4 z-40 rounded-xl border-0 bg-transparent p-0 shadow-none" style={{ bottom: isEmbedded ? 'calc(16px + env(safe-area-inset-bottom, 0px))' : 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mb-2 flex items-center gap-1">
             {getWorkflowSteps(trip).map((step, idx) => {
               const currentStep = getCurrentWorkflowStep(trip);
@@ -4151,7 +4263,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             >
               <span className={`flex h-10 w-full items-center justify-center gap-2 rounded-xl shadow-lg ${bottomAction.gradient}`}>{bottomAction.icon} {bottomAction.label}</span>
             </button>
-            {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
+            {!workflowReadOnly && (trip.status === 'In Progress' || trip.status === 'In Transit') && (
               skipConfirmTripId === `work-${trip.id}` ? (
                 <button
                   type="button"
@@ -4176,10 +4288,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     {showMoreOptions?.id === trip.id && (() => {
       const onClose = () => { setShowMoreOptions(null); };
       const moreActions = [
-        { label: 'Cancel', icon: <XCircle size={16} />, color: 'text-rose-600 bg-rose-50 hover:bg-rose-100', onClick: () => { onClose(); handleCancel(trip); } },
-        { label: 'No Show', icon: <AlertCircle size={16} />, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', onClick: () => { onClose(); handleNoShow(trip); } },
-        { label: 'Reroute', icon: <Route size={16} />, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100', onClick: () => { onClose(); handleReroute(trip); } },
-        { label: (role === 'admin' || role === 'dispatcher') ? 'Reassign Driver' : 'Transfer', icon: <ArrowRight size={16} />, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', onClick: () => { onClose(); openTransferPrompt('trip', trip); } },
+        ...(!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? [
+          { label: 'Cancel', icon: <XCircle size={16} />, color: 'text-rose-600 bg-rose-50 hover:bg-rose-100', onClick: () => { onClose(); handleCancel(trip); } },
+          { label: 'No Show', icon: <AlertCircle size={16} />, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', onClick: () => { onClose(); handleNoShow(trip); } },
+          { label: 'Reroute', icon: <Route size={16} />, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100', onClick: () => { onClose(); handleReroute(trip); } },
+          { label: (role === 'admin' || role === 'dispatcher') ? 'Reassign Driver' : 'Transfer', icon: <ArrowRight size={16} />, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', onClick: () => { onClose(); openTransferPrompt('trip', trip); } },
+        ] : []),
         { label: 'Trip Details', icon: <FileText size={16} />, color: 'text-slate-600 bg-slate-50 hover:bg-slate-100', onClick: () => { onClose(); setShowTripDetails(trip); } },
       ];
       return (
@@ -4393,7 +4507,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             <>
 
 
-          {(incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (() => {
+          {!workflowReadOnly && (incomingTransferTrips.length > 0 || incomingTransferRoutes.length > 0) && (() => {
             return (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
               <div className="flex items-center gap-2">
@@ -4461,7 +4575,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {assignedSequence.statusKey === ROUTE_ASSIGNMENT_STATUS.ASSIGNED && (
+                  {!workflowReadOnly && assignedSequence.statusKey === ROUTE_ASSIGNMENT_STATUS.ASSIGNED && (
                     <button
                       onClick={async () => {
                         await updateAssignedRouteRecord({
@@ -4474,30 +4588,30 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       Accept
                     </button>
                   )}
-                  <button
+                  {!workflowReadOnly && <button
                     onClick={() => { void startAssignedRoute(); }}
                     className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-medium rounded-lg shadow-md hover:from-blue-600 hover:to-purple-700 active:scale-95 transition-all"
                   >
                     {assignedSequence.statusKey === ROUTE_ASSIGNMENT_STATUS.ACCEPTED ? 'Start Route' : 'Start Guided'}
-                  </button>
+                  </button>}
                   <button
                     onClick={() => setShowAssignedRouteDetails(prev => !prev)}
                     className="px-3 py-2 bg-white text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-sm"
                   >
                     {showAssignedRouteDetails ? 'Hide Details' : 'Open Details'}
                   </button>
-                  <button
+                  {!workflowReadOnly && <button
                     onClick={() => openTransferPrompt('route', assignedSequence)}
                     className="px-3 py-2 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg border border-amber-200 shadow-sm"
                   >
                     Transfer
-                  </button>
-                  <button
+                  </button>}
+                  {!workflowReadOnly && <button
                     onClick={() => setPasswordPrompt({ type: 'dismiss_route', assignedSequence, trip: {} })}
                     className="px-3 py-2 bg-white text-rose-700 text-xs font-medium rounded-lg border border-rose-200 shadow-sm"
                   >
                     Dismiss
-                  </button>
+                  </button>}
                 </div>
 
                 {showAssignedRouteDetails && (
@@ -5092,11 +5206,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 const getPrimaryAction = () => {
                   const s = normalizeWorkflowStatus(trip.status);
                   if (s === 'assigned' || s === 'unassigned') return { label: 'Start Trip', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-600/25', phase: 'pickup', onClick: () => startTripAndOpen(trip) };
-                  if (s === 'in progress' || s === 'in mission' || s === 'en route') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); openTripWorkPage(trip.id); } };
+                  if (s === 'in progress' || s === 'in mission' || s === 'en route') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: async () => { if (await handleNavigateToPickup(trip)) openTripWorkPage(trip.id); } };
                   if (s === 'navigating pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); openTripWorkPage(trip.id); } };
                   if (s === 'at pickup') return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); openTripWorkPage(trip.id); } };
-                  if (s === 'in transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); openTripWorkPage(trip.id); } };
-                  if (s === 'navigating dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); openTripWorkPage(trip.id); } };
+                  if (s === 'in transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: async () => { if (await handleNavigateToDropoff(trip)) openTripWorkPage(trip.id); } };
+                  if (s === 'navigating dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: async () => { impact('heavy'); if (await handleArriveDropoff(trip)) openTripWorkPage(trip.id); } };
                   if (s === 'at dropoff' || s === 'arrived') {
                     if (showCompleteModal && showCompleteModal.id === trip.id) return null;
                     return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-600/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); openTripWorkPage(trip.id); } };
@@ -5126,6 +5240,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     <TaskCard
                     task={{
                       id: trip.id,
+                      date: trip.date,
                       time: getTripCardTimeLabel(trip),
                       patient: trip.patient,
                       patientName: trip.patient,
@@ -5161,27 +5276,31 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
                       workflowPhase,
                       activeTrip: isActiveTrip,
+                      driverName: me?.name || displayLoginId,
                     }}
+                    role={role}
+                    workflowReadOnly={workflowReadOnly}
                     expandedId={null}
                     onToggle={(id) => openTripWorkPage(id)}
-                    isSelected={isSelected}
-                    onSelect={toggleTripSelect}
+                    isSelected={!workflowReadOnly && isSelected}
+                    onSelect={workflowReadOnly ? undefined : toggleTripSelect}
                     actions={{
                       onNavigatePickup: (t) => openInNavApp(t.pickup?.address || t.pickup, suggestNavApp(t.pickup?.address || t.pickup)),
                       onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
                       onCall: (t) => handleSmartCall(t),
                       onSms: (t) => handleSmartSMS(t),
                       onContacts: (t) => openContactSelector(t),
-                      onRevert: revertTripStatus,
+                      onRevert: workflowReadOnly ? undefined : revertTripStatus,
                       onShowLegs: handleShowLegs,
-                      onEditTrip: handleStartInlineEdit,
-                      onScheduleEdit: () => openScheduleEditor(trip),
-                      onClearActiveTrip: clearActiveTrip,
-                      onNoShow: handleNoShow,
-                      onCancel: handleCancel,
-                      onReroute: handleReroute,
-                      onTransfer: () => openTransferPrompt('trip', trip),
-                      renderWorkflow: !isTerminal && primary ? () => {
+                      onEditTrip: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? handleStartInlineEdit : undefined,
+                      onScheduleEdit: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? () => openScheduleEditor(trip) : undefined,
+                      onClearActiveTrip: workflowReadOnly ? undefined : clearActiveTrip,
+                      onNoShow: workflowReadOnly || isTerminal ? undefined : handleNoShow,
+                      onCancel: workflowReadOnly || isTerminal ? undefined : handleCancel,
+                      onReroute: workflowReadOnly || isTerminal ? undefined : handleReroute,
+                      onTransfer: workflowReadOnly || isTerminal ? undefined : () => openTransferPrompt('trip', trip),
+                      transferLabel: (role === 'admin' || role === 'dispatcher') ? 'Reassign' : 'Transfer',
+                      renderWorkflow: !workflowReadOnly && !isTerminal && primary ? () => {
                         const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                         const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                         const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
@@ -5297,11 +5416,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     const getPrimaryAction = () => {
                       const s = normalizeWorkflowStatus(trip.status);
                       if (s === 'assigned' || s === 'unassigned') return { label: 'Start Trip', icon: <Clock size={16} />, gradient: 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-purple-500/25', phase: 'pickup', badge: 'TOMORROW', onClick: () => startTripAndOpen(trip) };
-                      if (s === 'in progress' || s === 'in mission' || s === 'en route') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { handleNavigateToPickup(trip); openTripWorkPage(trip.id); } };
+                      if (s === 'in progress' || s === 'in mission' || s === 'en route') return { label: 'Navigate to Pickup', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: async () => { if (await handleNavigateToPickup(trip)) openTripWorkPage(trip.id); } };
                       if (s === 'navigating pickup') return { label: 'Arrive at Pickup', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); handleArrivePickup(trip); openTripWorkPage(trip.id); } };
                       if (s === 'at pickup') return { label: 'Begin Transport', icon: <Play size={16} />, gradient: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-emerald-500/25', phase: 'pickup', onClick: () => { impact('heavy'); setSignatureConfirmed(false); setShowSignatureConfirm(trip); openTripWorkPage(trip.id); } };
-                      if (s === 'in transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: () => { handleNavigateToDropoff(trip); openTripWorkPage(trip.id); } };
-                      if (s === 'navigating dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: () => { impact('heavy'); handleArriveDropoff(trip); openTripWorkPage(trip.id); } };
+                      if (s === 'in transit') return { label: 'Navigate to Dropoff', icon: <Navigation size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25', phase: 'dropoff', onClick: async () => { if (await handleNavigateToDropoff(trip)) openTripWorkPage(trip.id); } };
+                      if (s === 'navigating dropoff') return { label: 'Arrive at Dropoff', icon: <MapPin size={16} />, gradient: 'bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-amber-500/25', phase: 'dropoff', onClick: async () => { impact('heavy'); if (await handleArriveDropoff(trip)) openTripWorkPage(trip.id); } };
                       if (s === 'at dropoff' || s === 'arrived') {
                         if (showCompleteModal && showCompleteModal.id === trip.id) return null;
                         return { label: 'Complete Trip', icon: <Check size={16} />, gradient: 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-600/25', phase: 'dropoff', onClick: () => { impact('heavy'); openCompleteModal(trip); openTripWorkPage(trip.id); } };
@@ -5324,6 +5443,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <TaskCard
                             task={{
                               id: trip.id,
+                              date: trip.date,
                               time: getTripCardTimeLabel(trip),
                               patient: trip.patient,
                               patientName: trip.patient,
@@ -5359,27 +5479,31 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                               dropoff: { address: trip.dropoff, phone: trip.dropoffPhone, time: null },
                               workflowPhase,
                               activeTrip: isActiveTrip,
+                              driverName: me?.name || displayLoginId,
                             }}
+                            role={role}
+                            workflowReadOnly={workflowReadOnly}
                             expandedId={null}
                             onToggle={(id) => openTripWorkPage(id)}
-                            isSelected={isSelected}
-                            onSelect={toggleTripSelect}
+                            isSelected={!workflowReadOnly && isSelected}
+                            onSelect={workflowReadOnly ? undefined : toggleTripSelect}
                             actions={{
                               onNavigatePickup: (t) => openInNavApp(t.pickup?.address || t.pickup, suggestNavApp(t.pickup?.address || t.pickup)),
                               onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
                               onCall: (t) => handleSmartCall(t),
                               onSms: (t) => handleSmartSMS(t),
                               onContacts: (t) => openContactSelector(t),
-                              onRevert: revertTripStatus,
+                              onRevert: workflowReadOnly ? undefined : revertTripStatus,
                               onShowLegs: handleShowLegs,
-                              onEditTrip: handleStartInlineEdit,
-                              onScheduleEdit: () => openScheduleEditor(trip),
-                              onClearActiveTrip: clearActiveTrip,
-                              onNoShow: handleNoShow,
-                              onCancel: handleCancel,
-                              onReroute: handleReroute,
-                              onTransfer: () => openTransferPrompt('trip', trip),
-                              renderWorkflow: !isTerminal && primary ? () => {
+                              onEditTrip: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? handleStartInlineEdit : undefined,
+                              onScheduleEdit: !workflowReadOnly && (role === 'admin' || role === 'dispatcher') ? () => openScheduleEditor(trip) : undefined,
+                              onClearActiveTrip: workflowReadOnly ? undefined : clearActiveTrip,
+                              onNoShow: workflowReadOnly || isTerminal ? undefined : handleNoShow,
+                              onCancel: workflowReadOnly || isTerminal ? undefined : handleCancel,
+                              onReroute: workflowReadOnly || isTerminal ? undefined : handleReroute,
+                              onTransfer: workflowReadOnly || isTerminal ? undefined : () => openTransferPrompt('trip', trip),
+                              transferLabel: (role === 'admin' || role === 'dispatcher') ? 'Reassign' : 'Transfer',
+                              renderWorkflow: !workflowReadOnly && !isTerminal && primary ? () => {
                                 const borderColor = isDropoffPhase ? 'border-orange-200' : 'border-blue-200';
                                 const bgColor = isDropoffPhase ? 'bg-orange-50' : 'bg-blue-50';
                                 const labelColor = isDropoffPhase ? 'text-orange-700' : 'text-blue-700';
@@ -5862,7 +5986,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <p className="text-xs text-slate-500">{showTripDetails.bookingId || '—'}</p>
             </div>
              <div className="flex items-center gap-2">
-              {!isEditingDetails && (
+              {!isEditingDetails && canManageTripRecords && (
                 <button
                   type="button"
                   onClick={() => { handleStartInlineEdit(showTripDetails); setHistoryExpandedId(showTripDetails.id); setShowTripDetails(null); }}
@@ -6429,7 +6553,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <HistoryTripDetailTable trip={trip} driver={me} />
                         )}
                       </div>
-                      <div className={`grid gap-2 ${isEditing ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                      {canManageTripRecords && <div className={`grid gap-2 ${isEditing ? 'grid-cols-2' : 'grid-cols-2'}`}>
                         {isEditing ? (
                           <>
                             <button type="button" onClick={handleSaveInlineEdit} disabled={inlineEditSaving} className="h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm disabled:opacity-50"><CheckCircle2 size={14} /> {inlineEditSaving ? 'Saving…' : 'Save'}</button>
@@ -6441,7 +6565,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                             <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-7 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><RotateCcw size={14} /> Restore</button>
                           </>
                         )}
-                      </div>
+                      </div>}
                     </div>
                   );
                 }

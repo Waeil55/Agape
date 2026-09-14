@@ -1,9 +1,9 @@
 import { ASSIGNMENT_STATUSES } from '../config/firestoreSchema';
 import { normalizeTenantId } from './tenantScope';
+import { isTerminalTripStatus } from './tripLifecycle';
 
 const hasAssignedDriver = (trip = {}) => Boolean(trip.driverId || trip.driverEmail);
-const isTerminalTrip = (trip = {}) => ['completed', 'cancelled', 'canceled', 'no show', 'no_show']
-  .includes(String(trip.status || trip.lifecycleStatus || '').trim().toLowerCase());
+const isTerminalTrip = (trip = {}) => isTerminalTripStatus(trip.status || trip.lifecycleStatus);
 const safeIdPart = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
 const assignmentIdForTrip = (trip = {}) => trip.assignmentId || `trip_${safeIdPart(trip.id)}_${safeIdPart(trip.driverId || trip.driverEmail)}`;
 

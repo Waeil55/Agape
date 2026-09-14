@@ -44,6 +44,20 @@ describe('assignment global persistence', () => {
     expect(unassigned).toEqual([expect.objectContaining({ status: 'cancelled' })]);
   });
 
+  it('closes the sender assignment while a transfer request is pending', () => {
+    const previous = [{ id: 'TRIP-1', status: 'In Transit', driverId: 'DRV-1' }];
+    const transferred = buildAssignmentMutations(
+      [{ id: 'TRIP-1', status: 'Transferred', driverId: 'DRV-1', transferStatus: 'pending' }],
+      previous,
+      'agape-care',
+      NOW,
+    );
+
+    expect(transferred).toEqual([expect.objectContaining({
+      id: 'trip_TRIP-1_DRV-1', status: 'cancelled', deliveryState: 'closed',
+    })]);
+  });
+
   it('does not reset an existing accepted assignment when ordinary trip details change', () => {
     const previous = [{ id: 'TRIP-1', status: 'Assigned', driverId: 'DRV-1', time: '10:00 AM' }];
     const current = [{ id: 'TRIP-1', status: 'Assigned', driverId: 'DRV-1', time: '10:15 AM' }];

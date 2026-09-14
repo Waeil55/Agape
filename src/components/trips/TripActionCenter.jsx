@@ -4,36 +4,37 @@ import {
   Navigation, Phone, RotateCcw, UserRoundCog, X, XCircle,
 } from 'lucide-react';
 import { resolveClientPhoneForTrip } from '../../utils/clientPhoneResolution';
-
-const TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted']);
+import { getTripActionCapabilities } from './tripActionPolicy';
 
 export const buildTripActionModel = ({ trip, role, driver, phone: resolvedPhone, callbacks = {} }) => {
   if (!trip) return [];
-  const canOperate = role === 'admin' || role === 'dispatcher' || role === 'fleet_manager';
+  const access = getTripActionCapabilities({ role, trip, hasAssignedDriver: Boolean(driver) });
   const phone = resolvedPhone || resolveClientPhoneForTrip(trip);
   const actions = [
     callbacks.onView && { id: 'view', label: 'Trip details', hint: 'Review the complete trip record', icon: ClipboardList, onSelect: callbacks.onView },
-    callbacks.onDrive && canOperate && !TERMINAL_STATUSES.has(trip.status) && {
+    callbacks.onDrive && access.canOpenWorkflow && {
       id: 'drive',
-      label: driver ? 'Open driver workspace' : 'Assign before driving',
-      hint: driver ? `Continue as ${driver.name || 'assigned driver'}` : 'A driver is required before work can begin',
+      label: access.isTerminal ? 'Review trip progress' : 'Open driver workspace',
+      hint: access.isTerminal
+        ? 'Review the completed workflow without changing it'
+        : `Continue as ${driver.name || 'assigned driver'}`,
       icon: Navigation,
       onSelect: callbacks.onDrive,
       tone: 'primary',
     },
-    callbacks.onAssign && canOperate && { id: 'assign', label: driver ? 'Reassign driver' : 'Assign driver', hint: driver?.name || 'Choose an available driver', icon: UserRoundCog, onSelect: callbacks.onAssign },
-    callbacks.onSmartAssign && canOperate && { id: 'smart-assign', label: 'AI driver suggestion', hint: 'Review the best available assignment', icon: BrainCircuit, onSelect: callbacks.onSmartAssign },
-    callbacks.onNavigate && trip.pickup && { id: 'navigate', label: 'Navigate to pickup', hint: trip.pickup, icon: MapPin, onSelect: callbacks.onNavigate },
-    callbacks.onCall && phone && { id: 'call', label: 'Call passenger', hint: phone, icon: Phone, onSelect: callbacks.onCall },
-    callbacks.onMessage && phone && { id: 'message', label: 'Message passenger', hint: phone, icon: MessageSquare, onSelect: callbacks.onMessage },
-    callbacks.onEdit && canOperate && { id: 'edit', label: 'Edit trip', hint: 'Update manifest details', icon: Edit2, onSelect: callbacks.onEdit },
-    callbacks.onToggleInOut && canOperate && { id: 'toggle-in-out', label: trip.inOutTrip || trip.inOut ? 'Remove IN/OUT' : 'Mark IN/OUT', hint: 'Update the trip direction workflow', icon: RotateCcw, onSelect: callbacks.onToggleInOut },
-    callbacks.onReroute && canOperate && { id: 'reroute', label: 'Reroute trip', hint: 'Record this trip as rerouted', icon: MapPin, onSelect: callbacks.onReroute, tone: 'warning' },
-    callbacks.onNoShow && canOperate && { id: 'no-show', label: 'Mark no show', hint: 'Record a passenger no-show', icon: AlertCircle, onSelect: callbacks.onNoShow, tone: 'warning' },
-    callbacks.onCancel && canOperate && { id: 'cancel', label: 'Cancel trip', hint: 'Record this trip as cancelled', icon: XCircle, onSelect: callbacks.onCancel, tone: 'danger' },
+    callbacks.onAssign && access.canAssign && { id: 'assign', label: driver ? 'Reassign driver' : 'Assign driver', hint: driver?.name || 'Choose an available driver', icon: UserRoundCog, onSelect: callbacks.onAssign },
+    callbacks.onSmartAssign && access.canAssign && { id: 'smart-assign', label: 'AI driver suggestion', hint: 'Review the best available assignment', icon: BrainCircuit, onSelect: callbacks.onSmartAssign },
+    callbacks.onNavigate && access.canShowInlineNavigation && trip.pickup && { id: 'navigate', label: 'Navigate to pickup', hint: trip.pickup, icon: MapPin, onSelect: callbacks.onNavigate },
+    callbacks.onCall && access.canCommunicate && phone && { id: 'call', label: 'Call passenger', hint: phone, icon: Phone, onSelect: callbacks.onCall },
+    callbacks.onMessage && access.canCommunicate && phone && { id: 'message', label: 'Message passenger', hint: phone, icon: MessageSquare, onSelect: callbacks.onMessage },
+    callbacks.onEdit && access.canEdit && { id: 'edit', label: 'Edit trip', hint: 'Update manifest details', icon: Edit2, onSelect: callbacks.onEdit },
+    callbacks.onToggleInOut && access.canEdit && { id: 'toggle-in-out', label: trip.inOutTrip || trip.inOut ? 'Remove IN/OUT' : 'Mark IN/OUT', hint: 'Update the trip direction workflow', icon: RotateCcw, onSelect: callbacks.onToggleInOut },
+    callbacks.onReroute && access.canMarkException && { id: 'reroute', label: 'Reroute trip', hint: 'Record this trip as rerouted', icon: MapPin, onSelect: callbacks.onReroute, tone: 'warning' },
+    callbacks.onNoShow && access.canMarkException && { id: 'no-show', label: 'Mark no show', hint: 'Record a passenger no-show', icon: AlertCircle, onSelect: callbacks.onNoShow, tone: 'warning' },
+    callbacks.onCancel && access.canMarkException && { id: 'cancel', label: 'Cancel trip', hint: 'Record this trip as cancelled', icon: XCircle, onSelect: callbacks.onCancel, tone: 'danger' },
     callbacks.onAudit && { id: 'audit', label: 'Audit history', hint: 'Review recorded changes', icon: History, onSelect: callbacks.onAudit },
-    callbacks.onRestore && role === 'admin' && { id: 'restore', label: 'Restore trip', hint: 'Return this trip to operations', icon: RotateCcw, onSelect: callbacks.onRestore, tone: 'success' },
-    callbacks.onArchive && (role === 'admin' || role === 'dispatcher') && { id: 'archive', label: 'Archive trip', hint: 'Password confirmation is required', icon: Archive, onSelect: callbacks.onArchive, tone: 'danger' },
+    callbacks.onRestore && access.canRestore && { id: 'restore', label: 'Restore trip', hint: 'Return this trip to operations', icon: RotateCcw, onSelect: callbacks.onRestore, tone: 'success' },
+    callbacks.onArchive && access.canArchive && { id: 'archive', label: 'Archive trip', hint: 'Password confirmation is required', icon: Archive, onSelect: callbacks.onArchive, tone: 'danger' },
   ];
   return actions.filter(Boolean);
 };

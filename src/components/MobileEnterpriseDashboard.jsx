@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 
 import { useChat } from '../hooks/useChat';
+import { resolveTripDriver } from '../utils/driverIdentity';
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
@@ -21,6 +22,7 @@ class ErrorBoundary extends Component {
 
 const MobileAdminPage = lazy(() => import('./MobileAdminPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
+const MobileReportsPage = lazy(() => import('./MobileReportsPage'));
 const LiveMapPage = lazy(() => import('./LiveMapPage'));
 const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
 const DriverPage = lazy(() => import('./DriverPage'));
@@ -41,7 +43,7 @@ const MOBILE_VIEW_PRELOADERS = Object.freeze({
   trips: () => import('./TripsPage'),
   map: () => import('./LiveMapPage'),
   chat: () => import('./chat/ChatPage'),
-  reports: () => Promise.all([import('./ReportsPage'), import('./MobileReportsPage')]),
+  reports: () => import('./MobileReportsPage'),
   menu: () => import('./MobileMenuPage'),
 });
 const preloadMobileView = (view) => {
@@ -157,8 +159,18 @@ const MobileEnterpriseDashboard = (props) => {
   const [toolGuidedMode, setToolGuidedMode] = useState(false);
   const [toolGuidedStepIndex, setToolGuidedStepIndex] = useState(0);
   const [toolRoutePlanStops, setToolRoutePlanStops] = useState(null);
-  const driverWorkDrivers = props.driverWorkDrivers?.length ? props.driverWorkDrivers : drivers;
-  const driverWorkTrips = props.driverWorkTrips?.length ? props.driverWorkTrips : trips;
+  // An explicitly empty scoped list is authoritative. Falling back because an
+  // array has length zero would expose the broader portal dataset.
+  const driverWorkDrivers = Array.isArray(props.driverWorkDrivers) ? props.driverWorkDrivers : drivers;
+  const driverWorkTrips = Array.isArray(props.driverWorkTrips) ? props.driverWorkTrips : trips;
+  const currentTripDetails = useMemo(() => {
+    if (!tripDetails?.id) return null;
+    return driverWorkTrips.find((trip) => String(trip.id) === String(tripDetails.id)) || null;
+  }, [driverWorkTrips, tripDetails]);
+  const closeTripDetails = () => {
+    setTripDetails(null);
+    setTripWorkflowActive(false);
+  };
 
   const handleNavClick = (view) => {
     preloadMobileView(view);
@@ -383,8 +395,19 @@ const MobileEnterpriseDashboard = (props) => {
       return (
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
           {renderTopBar('Reports & Export')}
-          <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom,0px))' }}>
-            <ErrorBoundary><Suspense fallback={<MobileFallback />}><ReportsPage {...props} initialSection={reportsSection} onSectionChange={setReportsSection} /></Suspense></ErrorBoundary>
+          <div className="flex-1 overflow-hidden relative" style={{ paddingBottom: NAV_BOTTOM_CLEARANCE }}>
+            <ErrorBoundary>
+              <Suspense fallback={<MobileFallback />}>
+                <MobileReportsPage
+                  trips={driverWorkTrips}
+                  drivers={driverWorkDrivers}
+                  onUpdateTrip={props.onUpdateTrip || props.onUpdateDriverTrip}
+                  setShowUploadModal={setShowUploadModal}
+                  isLoading={props.tripsLoading}
+                  readOnly={false}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       );
@@ -500,12 +523,21 @@ const MobileEnterpriseDashboard = (props) => {
 
     if (currentView === 'chat') {
       return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-white min-h-0 relative">
-          <ErrorBoundary>
-            <Suspense fallback={<MobileFallback />}>
-              <ChatPage onThreadActive={setIsChatThreadOpen} />
-            </Suspense>
-          </ErrorBoundary>
+        <div className="flex-1 overflow-hidden flex flex-col bg-slate-50 min-h-0">
+          {renderTopBar('Messages')}
+          <div
+            className="flex-1 overflow-hidden relative"
+            style={{ paddingBottom: isChatThreadOpen ? 0 : NAV_BOTTOM_CLEARANCE }}
+          >
+            <ErrorBoundary>
+              <Suspense fallback={<MobileFallback />}>
+                <ChatPage
+                  onBack={() => setIsChatThreadOpen(false)}
+                  onThreadActive={setIsChatThreadOpen}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
         </div>
       );
     }
@@ -557,7 +589,7 @@ const MobileEnterpriseDashboard = (props) => {
   // Show the bottom nav everywhere EXCEPT:
   // 1. When a trip detail overlay is open (full-screen DriverPage)
   // 2. When a chat thread is open inside chat view (thread takes full screen)
-  const showNav = !tripDetails && !isChatThreadOpen && subView !== 'admin';
+  const showNav = !currentTripDetails && !isChatThreadOpen;
 
 
 
@@ -565,22 +597,20 @@ const MobileEnterpriseDashboard = (props) => {
     <div className="app-page-frame mobile-enterprise-dashboard-wrapper w-full h-full bg-white flex flex-col relative overflow-hidden">
 
       {/* ── Trip Detail Overlay: opens full DriverPage for any trip ── */}
-      {tripDetails && (() => {
-        const trip = tripDetails;
+      {currentTripDetails && (() => {
+        const trip = currentTripDetails;
         // Find driver for this trip — use their email so DriverPage loads their profile
-        const driverObj = drivers.find(d =>
-          d.id === trip.driverId ||
-          (trip.driverName && d.name === trip.driverName) ||
-          (trip.driverEmail && (d.email || '').toLowerCase() === trip.driverEmail.toLowerCase())
-        );
+        const driverObj = resolveTripDriver(trip, drivers);
         // Use driver email so DriverPage finds the trip; role stays admin/dispatcher for full feature access
         const driverEmail = driverObj?.email || trip.driverEmail || currentUser;
         return (
-          <div className="fixed inset-0 z-[200] flex flex-col bg-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-            {/* Back bar — styled like a top navigation bar */}
-            <div className="shrink-0 flex items-center gap-2.5 px-3 py-2.5 bg-white border-b border-slate-200 shadow-sm">
+          <div className="fixed inset-0 z-[200] flex flex-col bg-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }} role="dialog" aria-modal="true" aria-label={tripWorkflowActive ? `Trip progress for ${trip.patient || trip.bookingId || 'trip'}` : `Trip record for ${trip.patient || trip.bookingId || 'trip'}`}>
+            {/* Record review keeps the operator context bar. The Drive view
+                already has the shared trip header/back control, so rendering
+                this bar there would create a duplicate mobile header. */}
+            {!tripWorkflowActive && <div className="shrink-0 flex items-center gap-2.5 px-3 py-2.5 bg-white border-b border-slate-200 shadow-sm">
               <button
-                onClick={() => setTripDetails(null)}
+                onClick={closeTripDetails}
                 className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] text-blue-600 active:text-blue-800 transition-colors touch-manipulation"
                 aria-label="Back to dispatch board"
               >
@@ -596,46 +626,38 @@ const MobileEnterpriseDashboard = (props) => {
               }`}>
                 {role === 'admin' ? 'Admin' : 'Dispatch'}
               </div>
-            </div>
-            {/* Full DriverPage embedded — role='admin'/'dispatcher' unlocks all admin controls inside DriverPage */}
+            </div>}
+            {/* Operators share the real persisted workflow view with full edit capability.
+                Admin/dispatcher can advance workflow, edit trip data, and save changes. */}
             <div className="min-h-0 flex-1 overflow-hidden">
               <ErrorBoundary>
                 <Suspense fallback={<MobileFallback />}>
                   <DriverPage
-                    {...props}
                     currentUser={driverEmail}
                     role={role}
-                    drivers={drivers}
-                    allDrivers={props.allDrivers || drivers}
-                    trips={trips}
+                    tenantId={props.tenantId}
+                    drivers={driverWorkDrivers}
+                    allDrivers={driverWorkDrivers}
+                    trips={driverWorkTrips}
+                    tripsLoading={props.tripsLoading}
+                    vehicles={props.vehicles || []}
+                    driverTelemetry={props.driverTelemetry || []}
+                    timeTrackingDeclarations={props.timeTrackingDeclarations || []}
                     isEmbedded={true}
+                    workflowReadOnly={false}
                     defaultTripId={tripWorkflowActive ? trip.id : null}
                     initialShowDetailsId={!tripWorkflowActive ? trip.id : null}
-                    onUpdateTrip={props.updateTrip || props.onUpdateDriverTrip}
+                    onUpdateTrip={props.onUpdateTrip || props.onUpdateDriverTrip}
                     onDriverStatusUpdate={props.onDriverStatusUpdate}
                     onUpdateClockEvents={props.onUpdateClockEvents}
                     onUpdateHourlyRate={props.onUpdateHourlyRate}
-                    onLogout={() => { setTripDetails(null); setTripWorkflowActive(false); }}
-                    onEmbeddedClose={() => { setTripDetails(null); setTripWorkflowActive(false); }}
-                    onOpenSettings={() => { setTripDetails(null); setTripWorkflowActive(false); setSubView('settings'); }}
+                    onLogout={closeTripDetails}
+                    onEmbeddedClose={closeTripDetails}
                     appSettings={props.appSettings}
                     phoneNumbers={props.phoneNumbers || {}}
-                    onUpdateDriverLocation={props.handleUpdateDriverLocation || props.updateDriverLocation}
-                    onUpdateAppSettings={props.updateAppSettings}
-                    onAddAuditLog={props.addAuditLog}
-                    requestAuthAction={props.requestAuthAction}
-                    assignTripToDriver={props.assignTripToDriver}
-                    requestDeleteTrip={props.requestDeleteTrip}
-                    bulkAssignTrips={props.bulkAssignTrips}
+                    onUpdateDriverLocation={props.onUpdateDriverLocation}
+                    onUpdateAppSettings={props.onUpdateAppSettings}
                     dispatchers={props.dispatchers || []}
-                    driverAssignments={props.driverAssignments || []}
-                    assignmentUnreadCount={props.assignmentUnreadCount || 0}
-
-                    onAcknowledgeAssignment={props.onAcknowledgeAssignment || (() => {})}
-                    onAcceptAssignment={props.onAcceptAssignment || (() => {})}
-                    onAddTrip={props.addTrip}
-                    showAddTripModal={props.showAddTripModal}
-                    setShowAddTripModal={props.setShowAddTripModal}
                   />
                 </Suspense>
               </ErrorBoundary>
@@ -645,7 +667,7 @@ const MobileEnterpriseDashboard = (props) => {
       })()}
 
       {/* ── Main Content ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0" aria-hidden={currentTripDetails ? 'true' : undefined} inert={currentTripDetails ? true : undefined}>
         {renderContent()}
       </div>
 

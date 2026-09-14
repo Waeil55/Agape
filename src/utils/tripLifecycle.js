@@ -13,16 +13,18 @@ const ACTIVE_DRIVER_STATUSES = new Set([
   'arrived',
 ]);
 
-const TERMINAL_STATUSES = new Set([
+export const TERMINAL_TRIP_STATUSES = new Set([
   'completed',
   'cancelled',
   'canceled',
   'no show',
   'no_show',
   'rerouted',
+  'transferred',
 ]);
 
 export const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
+export const isTerminalTripStatus = (status) => TERMINAL_TRIP_STATUSES.has(normalizeTripStatus(status));
 
 export const getTripLifecycleStatus = (trip = {}) => {
   const status = normalizeTripStatus(trip.status);
@@ -30,6 +32,7 @@ export const getTripLifecycleStatus = (trip = {}) => {
   if (status === 'cancelled' || status === 'canceled') return 'cancelled';
   if (status === 'no show' || status === 'no_show') return 'no_show';
   if (status === 'rerouted') return 'rerouted';
+  if (status === 'transferred') return 'transferred';
   if (status === 'accepted') return 'accepted';
   if (ACTIVE_DRIVER_STATUSES.has(status)) return 'in_progress';
   if (trip.driverId || trip.driverEmail || status === 'assigned') return 'assigned';
@@ -38,7 +41,7 @@ export const getTripLifecycleStatus = (trip = {}) => {
 
 export const getTripLifecycleStep = (trip = {}) => {
   const status = normalizeTripStatus(trip.status);
-  if (TERMINAL_STATUSES.has(status) || trip.completedAt) return 'completed';
+  if (isTerminalTripStatus(status) || trip.completedAt) return 'completed';
   if (trip.arrivalDropoffTime || status === 'at dropoff' || status === 'arrived') return 'arrived_dropoff';
   if (status === 'navigating dropoff') return 'navigating_dropoff';
   if (trip.departedPickupTime || trip.paperSignatureConfirmed || trip.unableToSign || status === 'in transit') return 'picked_up';

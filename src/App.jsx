@@ -6,8 +6,9 @@ import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 import { hasPermission } from './constants/roles';
 import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd, isoToLocalDateKey } from './utils/tripDate';
 import { resolveClientPhoneForTrip } from './utils/clientPhoneResolution';
-import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, getUploadScopeForRole, isDriverAssignedToDispatcher, isTripInDispatcherScope, isTripInUploadScope, normalizeEmail } from './utils/accessControl';
-import { tripImportKey } from './utils/tripLifecycle';
+import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, getUploadScopeForRole, isDriverAssignedToDispatcher, isDriverTripOwner, isTripInDispatcherScope, isTripInUploadScope, normalizeEmail } from './utils/accessControl';
+import { isTerminalTripStatus, tripImportKey } from './utils/tripLifecycle';
+import { isPendingTripTransferRecipient, isValidTripTransferDecision } from './utils/tripTransferPolicy';
 import { requestNotificationPermission, showLocalNotification, onForegroundMessage } from './config/notifications';
 import { playNotificationSound, initAudioContext } from './utils/notificationSound';
 import { makeCall, sendSMS } from './utils/nativeActions';
@@ -140,7 +141,7 @@ const LazyFallback = () => <div className="flex items-center justify-center p-12
 
 
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
-const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted']);
+const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted', 'transferred']);
 const DRIVER_ACTIVE_WORK_STATUSES = new Set(['in progress', 'at pickup', 'navigating pickup', 'en route', 'navigating dropoff', 'in transit']);
 const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
 const getTripHistoryDateKey = (trip) => {
@@ -681,8 +682,9 @@ const App = () => {
   const canControlTrip = useCallback((trip) => {
     if (role === 'admin') return true;
     if (role === 'dispatcher') return isTripInDispatcherScope(trip, scopedDrivers);
-    return normalizeEmail(trip?.driverEmail) === normalizeEmail(currentUser);
-  }, [role, scopedDrivers, currentUser]);
+    if (role !== 'driver' || !currentUserDriverProfile) return false;
+    return isDriverTripOwner(trip, currentUser, currentUserDriverProfile);
+  }, [role, scopedDrivers, currentUser, currentUserDriverProfile]);
 
   // Generate a deterministic dedup key for any trip
   const getTripKey = useCallback((trip) => {
@@ -1950,11 +1952,11 @@ const App = () => {
       ? (() => { const existing = trips.find(t => t.id === tripIdOrObject); return existing ? { ...existing, ...partialFields } : null; })()
       : tripIdOrObject;
     if (!updatedTrip) return Promise.resolve(false);
-    if (!canControlTrip(updatedTrip)) {
+    const prevTrip = trips.find(t => t.id === updatedTrip.id) || null;
+    if (!prevTrip || !canControlTrip(prevTrip)) {
       addAuditLog('Scope Blocked', `${currentUser} attempted to edit an out-of-scope trip.`, 'rose');
       return Promise.resolve(false);
     }
-    const prevTrip = trips.find(t => t.id === updatedTrip.id) || null;
     let nextTripState = { ...updatedTrip };
 
     // Normalize status to canonical PascalCase to prevent case-sensitive filter mismatches.
@@ -1976,6 +1978,7 @@ const App = () => {
         'cancelled': 'Cancelled',
         'canceled': 'Cancelled',
         'rerouted': 'Rerouted',
+        'transferred': 'Transferred',
       };
       const canonical = STATUS_CANONICAL[lower];
       if (canonical && raw !== canonical) {
@@ -1994,7 +1997,7 @@ const App = () => {
     }
 
     // Auto-complete trip if dropoffOdometer is filled and it's not already terminal
-    const isTerminal = ['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted'].includes(String(nextTripState.status).toLowerCase().trim());
+    const isTerminal = isTerminalTripStatus(nextTripState.status);
     if (nextTripState.dropoffOdometer !== undefined && nextTripState.dropoffOdometer !== '' && nextTripState.dropoffOdometer !== null) {
       if (!isTerminal && !nextTripState.completedAt) {
         nextTripState.status = 'Completed';
@@ -2007,6 +2010,15 @@ const App = () => {
         || drivers.find(driver => normalizeEmail(driver.email) === normalizeEmail(nextTripState.driverEmail));
       nextTripState.completedVehicle = resolveTripVehicle(nextTripState, completionDriver) || '';
       nextTripState.completedDriverName = completionDriver?.name || nextTripState.completedDriverName || nextTripState.driverName || '';
+    }
+
+    // Scope must remain valid after the edit as well as before it. Otherwise a
+    // dispatcher could move a trip outside their driver roster (or a driver
+    // could rewrite assignment identity) through the generic edit surface.
+    const resultingAssignmentScope = { ...nextTripState, status: prevTrip.status };
+    if (role !== 'admin' && !canControlTrip(resultingAssignmentScope)) {
+      addAuditLog('Scope Blocked', `${currentUser} attempted to move a trip outside their authorized scope.`, 'rose');
+      return Promise.resolve(false);
     }
 
     const enrichedTrip = enrichTripMetrics(nextTripState);
@@ -2803,6 +2815,12 @@ const App = () => {
   };
 
   const handleDriverTripUpdate = useCallback(async (tripId, status, extraData = {}) => {
+    if (!extraData || typeof extraData !== 'object' || Array.isArray(extraData)) return false;
+    // The authoritative status is the explicit workflow argument. Never let a
+    // second status hidden in the metadata object bypass normalization or the
+    // transfer-decision validator.
+    const workflowFields = { ...extraData };
+    delete workflowFields.status;
     // Normalize status to canonical PascalCase to prevent case-sensitive filter mismatches.
     const raw = String(status || '').trim();
     const lower = raw.toLowerCase();
@@ -2811,14 +2829,34 @@ const App = () => {
       'navigating pickup': 'Navigating Pickup', 'at pickup': 'At Pickup',
       'in transit': 'In Transit', 'at dropoff': 'At Dropoff', 'completed': 'Completed',
       'no show': 'No Show', 'cancelled': 'Cancelled', 'canceled': 'Cancelled', 'rerouted': 'Rerouted',
+      'transferred': 'Transferred',
     };
     const normalizedStatus = STATUS_CANONICAL[lower] || status;
     const previousTrip = trips.find((trip) => trip.id === tripId);
-    const persistence = upsertDriverTrip(tripId, { status: normalizedStatus, ...extraData });
+    if (!previousTrip) return false;
+    const isPendingTransferRecipient = role === 'driver' && isPendingTripTransferRecipient({
+      trip: previousTrip,
+      currentUser,
+      driverIds: currentUserDriverProfile?.id ? [currentUserDriverProfile.id] : [],
+    });
+    const isTransferDecision = isPendingTransferRecipient && isValidTripTransferDecision({
+      trip: previousTrip,
+      currentUser,
+      selfDriver: currentUserDriverProfile,
+      status: normalizedStatus,
+      extraData: workflowFields,
+    });
+    const ownedTripHasPendingTransfer = role === 'driver'
+      && previousTrip.transferRequest?.status === 'pending';
+    const mayUpdateOwnedWorkflow = canControlTrip(previousTrip) && !ownedTripHasPendingTransfer;
+    if (!mayUpdateOwnedWorkflow && !isTransferDecision) {
+      addAuditLog('Scope Blocked', `${currentUser} attempted to update an out-of-scope trip workflow.`, 'rose');
+      return false;
+    }
+    const persistence = upsertDriverTrip(tripId, { ...workflowFields, status: normalizedStatus });
     const saved = await Promise.resolve(persistence);
     if (saved !== true) return false;
-    if (!previousTrip) return true;
-    const nextTrip = { ...previousTrip, status: normalizedStatus, ...extraData };
+    const nextTrip = { ...previousTrip, ...workflowFields, status: normalizedStatus };
     const diffs = Object.keys(nextTrip)
       .filter((key) => String(previousTrip[key]) !== String(nextTrip[key]))
       .map((key) => ({ field: key, before: previousTrip[key], after: nextTrip[key] }));
@@ -2833,7 +2871,7 @@ const App = () => {
       },
     );
     return true;
-  }, [addAuditLog, currentUser, trips, upsertDriverTrip]);
+  }, [addAuditLog, canControlTrip, currentUser, currentUserDriverProfile, role, trips, upsertDriverTrip]);
 
   const renderLoginScreen = () => {
     const handleRoleSelect = (roleKey) => {

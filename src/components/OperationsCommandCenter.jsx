@@ -19,6 +19,7 @@ import { OPERATIONAL_VIEW_PRESETS, getOperationalViewPreset } from '../utils/ope
 import TableCheckbox from './ui/TableCheckbox';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import { compareStableRowOrder, createStableRowOrder } from '../utils/stableTableOrder';
+import { resolveTripDriver } from '../utils/driverIdentity';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -2683,13 +2684,13 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       <TripActionCenter
         open={Boolean(actionCenterTrip)}
         trip={actionCenterTrip}
-        driver={actionCenterTrip ? drivers.find((entry) => entry.id === actionCenterTrip.driverId) : null}
+        driver={actionCenterTrip ? resolveTripDriver(actionCenterTrip, drivers) : null}
         phone={actionCenterTrip ? getClientPhone(actionCenterTrip) : ''}
         role={role}
         onClose={() => setActionCenterTrip(null)}
         callbacks={{
           onView: (trip) => setTripDetails?.(trip),
-          onDrive: (trip) => trip.driverId ? onDriveTrip?.(trip) : setManualAssignTrip(trip),
+          onDrive: (trip) => resolveTripDriver(trip, drivers) ? onDriveTrip?.(trip) : setManualAssignTrip(trip),
           onAssign: (trip) => setManualAssignTrip(trip),
           onSmartAssign: (trip) => triggerSmartAssign?.(trip),
           onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),

@@ -8,6 +8,9 @@ import {
   Square, CheckSquare, RefreshCw, Forward,
   Edit2, Truck, X, MoreVertical
 } from 'lucide-react';
+import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
+import { ManifestTripCard, getTripCountdown, isTripActionTerminal } from './trips/MobileTripManifest';
+import { getTripActionCapabilities } from './trips/tripActionPolicy';
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -125,7 +128,29 @@ export const createTaskCardActionsBridge = (shape, getCurrentProps) => {
   ]));
 };
 
-const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions }) => {
+export const getTaskCardMobileActionAccess = ({ task, role, workflowReadOnly = false } = {}) => {
+  const hasAssignedDriver = Boolean(
+    task?.driverId
+    || task?.driverEmail
+    || task?.driverName
+  );
+  const capabilities = getTripActionCapabilities({ role, trip: task, hasAssignedDriver });
+  const canMutateDriverWorkflow = !workflowReadOnly
+    && capabilities.isDriver
+    && capabilities.canOpenWorkflow
+    && !capabilities.isTerminal;
+
+  return {
+    ...capabilities,
+    canOpenProgress: capabilities.canOpenWorkflow,
+    canReportException: canMutateDriverWorkflow && capabilities.canReportWorkflowException,
+    canRequestTransfer: canMutateDriverWorkflow && capabilities.canRequestTransfer,
+    canSelectForRoutePlan: canMutateDriverWorkflow,
+  };
+};
+
+const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, role, workflowReadOnly = false }) => {
+  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
   const isExpanded = expandedId === task.id;
   const isAnotherExpanded = expandedId !== null && expandedId !== undefined && expandedId !== task.id;
   const [copiedId, setCopiedId] = useState('');
@@ -153,8 +178,22 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!menuOpen || !isMobile) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobile, menuOpen]);
+
   const timeUrgency = getTimeUrgency(task);
-  const isTerminal = ['Completed', 'Cancelled', 'No Show', 'Rerouted'].includes(task.status);
+  const isTerminal = isTripActionTerminal(task);
   const dropoffAddress = task.dropoff?.address || task.dropoff || '';
   const dropoffSiteName = (task.dropoff?.site || task.dropoffSite || '').trim();
   const pickupAddress = task.pickup?.address || task.pickup || '';
@@ -172,6 +211,74 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
     setCopiedId(id);
     setTimeout(() => setCopiedId(''), 2000);
   };
+
+  if (isMobile) {
+    const mobileTrip = {
+      ...task,
+      pickup: pickupAddress,
+      dropoff: dropoffAddress,
+    };
+    const mobileAccess = getTaskCardMobileActionAccess({ task: mobileTrip, role, workflowReadOnly });
+    const canOpenProgress = mobileAccess.canOpenProgress && typeof onToggle === 'function';
+    const parsedLegs = Number.parseInt(String(task.legs || '1'), 10);
+    const legs = Number.isFinite(parsedLegs) && parsedLegs > 0 ? parsedLegs : 1;
+    const menuActions = [
+      actions?.onContacts && mobileAccess.canCommunicate && { label: 'Contacts', icon: <PhoneForwarded size={17} />, onSelect: () => actions.onContacts(task) },
+      actions?.onNoShow && mobileAccess.canReportException && { label: 'No Show', icon: <AlertCircle size={17} />, tone: 'text-orange-700 bg-orange-50', onSelect: () => actions.onNoShow(task) },
+      actions?.onCancel && mobileAccess.canReportException && { label: 'Cancel Trip', icon: <XCircle size={17} />, tone: 'text-rose-700 bg-rose-50', onSelect: () => actions.onCancel(task) },
+      actions?.onReroute && mobileAccess.canReportException && { label: 'Reroute', icon: <RefreshCw size={17} />, tone: 'text-purple-700 bg-purple-50', onSelect: () => actions.onReroute(task) },
+      actions?.onTransfer && mobileAccess.canRequestTransfer && { label: actions.transferLabel || 'Transfer', icon: <Forward size={17} />, tone: 'text-amber-700 bg-amber-50', onSelect: () => actions.onTransfer(task) },
+      onSelect && mobileAccess.canSelectForRoutePlan && { label: isSelected ? 'Remove from route plan' : 'Select for route plan', icon: isSelected ? <CheckSquare size={17} /> : <Square size={17} />, onSelect: () => onSelect(task.id) },
+      canOpenProgress && { label: isTerminal ? 'Review trip progress' : 'Open trip progress', icon: <Navigation size={17} />, tone: 'text-blue-700 bg-blue-50', onSelect: () => onToggle(task.id) },
+    ].filter(Boolean);
+    const iconActions = [
+      actions?.onCall && mobileAccess.canCommunicate && { id: 'call', label: 'Call passenger', icon: PhoneCall, onClick: () => actions.onCall(task) },
+      actions?.onSms && mobileAccess.canCommunicate && { id: 'message', label: 'Message passenger', icon: MessageCircle, onClick: () => actions.onSms(task) },
+    ].filter(Boolean);
+
+    return (
+      <div className={`relative mb-2 rounded-xl ${isSelected ? 'ring-2 ring-blue-300' : ''}`}>
+        <ManifestTripCard
+          trip={mobileTrip}
+          countdown={getTripCountdown(mobileTrip)}
+          legs={legs}
+          legsLabel={`${legs} ${legs === 1 ? 'leg' : 'legs'}`}
+          onLegsClick={actions?.onShowLegs ? () => actions.onShowLegs(task) : undefined}
+          mileage={task.details?.distance || null}
+          driverName={task.driverName || 'You'}
+          primaryAction={canOpenProgress ? { label: 'Drive', onClick: () => onToggle(task.id) } : null}
+          iconActions={iconActions}
+          moreIcon={MoreVertical}
+          onMore={menuActions.length > 0 ? () => setMenuOpen(true) : null}
+          moreLabel={`More actions for ${task.patient || task.patientName || 'trip'}`}
+        />
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={`Trip actions for ${task.patient || task.patientName || 'trip'}`}>
+            <button type="button" className="absolute inset-0 bg-slate-950/45" onClick={() => setMenuOpen(false)} aria-label="Close trip actions" />
+            <div ref={menuRef} className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white px-4 pt-2 shadow-2xl" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))' }}>
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300" />
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900">{task.patient || task.patientName || 'Trip'}</h3>
+                <button autoFocus type="button" onClick={() => setMenuOpen(false)} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-600" aria-label="Close trip actions"><X size={17} /></button>
+              </div>
+              <div className="space-y-1">
+                {menuActions.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => { setMenuOpen(false); action.onSelect(); }}
+                    className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-4 text-left text-sm font-semibold ${action.tone || 'bg-slate-50 text-slate-700'}`}
+                  >
+                    {action.icon} {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -206,11 +313,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                   {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-slate-300" />}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); actions?.onScheduleEdit?.(task); }}
-                className="flex items-center gap-1.5 rounded-xl -ml-1 px-1 py-0.5 hover:bg-white/70 active:scale-95 transition-all cursor-pointer"
-                title="Update time, Will Call, IN/OUT, or urgent deadline"
+              <div
+                className={`-ml-1 flex items-center gap-1.5 rounded-xl px-1 py-0.5 ${actions?.onScheduleEdit ? 'hover:bg-white/70' : ''}`}
               >
                 <Clock size={timeUrgency.type === 'critical' ? 16 : 14} className={`shrink-0 ${
                   timeUrgency.type === 'critical' ? 'text-rose-600' :
@@ -224,7 +328,18 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 }`}>
                   {task.time || 'TBD'}
                 </span>
-              </button>
+                {actions?.onScheduleEdit && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); actions.onScheduleEdit(task); }}
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-white hover:text-blue-600"
+                    title="Update time, Will Call, IN/OUT, or urgent deadline"
+                    aria-label={`Edit schedule for ${task.patient || task.patientName || 'trip'}`}
+                  >
+                    <Edit2 size={15} />
+                  </button>
+                )}
+              </div>
               {timeUrgency.type !== 'normal' && (
                 <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap ${
                   timeUrgency.type === 'critical' ? 'bg-rose-50 text-rose-600' :
@@ -269,7 +384,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                       )}
                       {actions?.onTransfer && (
                         <button onClick={(e) => { e.stopPropagation(); actions.onTransfer(task); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors text-left">
-                          <Forward size={14} /> Transfer
+                          <Forward size={14} /> {actions.transferLabel || 'Transfer'}
                         </button>
                       )}
                     </div>
@@ -588,7 +703,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions })
                 {actions?.onTransfer && !isTerminal && (
                   <button onClick={(e) => { e.stopPropagation(); actions.onTransfer(task); }}
                     className="px-2 py-1 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors text-[0.625em] font-semibold flex items-center gap-1 border border-amber-200/60">
-                    <Forward size={10} /> Transfer
+                    <Forward size={10} /> {actions.transferLabel || 'Transfer'}
                   </button>
                 )}
               </div>
@@ -612,6 +727,8 @@ export const areTaskCardPropsEqual = (previous, next) => {
     && previous.onToggle === next.onToggle
     && previous.onSelect === next.onSelect
     && previous.actions === next.actions
+    && previous.role === next.role
+    && previous.workflowReadOnly === next.workflowReadOnly
     && previous.timeEpochMinute === next.timeEpochMinute
     && areTaskCardValuesEqual(previous.task, next.task);
 };

@@ -59,29 +59,154 @@ service cloud.firestore {
     function tripSelfUpdate() {
       let data = request.resource.data;
       let old = resource.data;
-      return data.get('driverEmail', null) == tripWriterEmail()
-        || old.get('driverEmail', null) == tripWriterEmail()
-        || (old.get('driverId', null) != null
-          && old.get('driverId', null) != ''
-          && exists(/databases/$(database)/documents/drivers/$(old.driverId))
-          && get(/databases/$(database)/documents/drivers/$(old.driverId)).data.email == tripWriterEmail())
+      return (!tripHasPendingTransfer(old) && (
+          data.get('driverEmail', null) == tripWriterEmail()
+          || old.get('driverEmail', null) == tripWriterEmail()
+          || (old.get('driverId', null) != null
+            && old.get('driverId', null) != ''
+            && exists(/databases/$(database)/documents/drivers/$(old.driverId))
+            && get(/databases/$(database)/documents/drivers/$(old.driverId)).data.email == tripWriterEmail())
+        ))
         || tripTransferRecipientUpdate();
     }
-    // Transfer decisions (accept/decline) touch trips owned by the SENDING
-    // driver, so the clauses above would block the recipient. A pending
-    // transfer explicitly addressed to the writer (by email, or by a driverId
-    // resolving to the writer) may update that trip — but the trip may only
-    // stay unassigned or resolve to the writer, never be redirected elsewhere.
+    function tripHasPendingTransfer(trip) {
+      let transfer = trip.get('transferRequest', {});
+      return transfer is map
+        && transfer.get('status', '') is string
+        && transfer.get('status', '').lower() == 'pending';
+    }
+    function strictTransferDriverIdMatchesWriter(driverId) {
+      return driverId is string
+        && driverId != ''
+        && (
+          currentProfile().get('profileId', '') == driverId
+          || (exists(/databases/$(database)/documents/driverProfiles/$(driverId))
+            && get(/databases/$(database)/documents/driverProfiles/$(driverId)).data.get('email', '') is string
+            && get(/databases/$(database)/documents/driverProfiles/$(driverId)).data.get('email', '').lower() == tripWriterEmail().lower())
+          || (exists(/databases/$(database)/documents/drivers/$(driverId))
+            && get(/databases/$(database)/documents/drivers/$(driverId)).data.get('email', '') is string
+            && get(/databases/$(database)/documents/drivers/$(driverId)).data.get('email', '').lower() == tripWriterEmail().lower())
+        );
+    }
+    function transferRequestTargetsWriter(transfer) {
+      let targetEmail = transfer.get('toDriverEmail', '');
+      let targetId = transfer.get('toDriverId', '');
+      return tripWriterEmail() is string
+        && targetEmail is string
+        && targetId is string
+        && (targetEmail != '' || targetId != '')
+        // When both identifiers are stored they must agree. A conflicting
+        // request is ambiguous and therefore fails closed.
+        && (targetEmail == '' || targetEmail.lower() == tripWriterEmail().lower())
+        && (targetId == '' || strictTransferDriverIdMatchesWriter(targetId));
+    }
+    function transferReturnsStoredWorkflow(data, transfer) {
+      let previous = transfer.get('previousStatus', '');
+      let resumable = [
+        'assigned', 'in mission', 'en route', 'in progress',
+        'navigating pickup', 'at pickup', 'in transit',
+        'navigating dropoff', 'at dropoff', 'arrived'
+      ];
+      return previous is string
+        && data.get('status', '') is string
+        && (
+          (previous.lower() in resumable && data.get('status', '').lower() == previous.lower())
+          || (!(previous.lower() in resumable) && data.get('status', '') == 'Assigned')
+        );
+    }
+    function validTransferLifecycle(data) {
+      let status = data.get('status', '');
+      let inProgress = [
+        'assigned', 'in mission', 'in progress', 'navigating pickup',
+        'at pickup', 'in transit', 'navigating dropoff', 'at dropoff', 'arrived'
+      ];
+      return status is string
+        && (
+          (status.lower() in inProgress
+            && data.get('lifecycleStatus', '') == 'in_progress'
+            && data.get('operationalStatus', '') == 'in_progress')
+          // Legacy En Route is resumable but predates the in-progress
+          // lifecycle vocabulary, so the authoritative builder classifies it
+          // as assigned while its workflow step remains resumable.
+          || (status.lower() == 'en route'
+            && data.get('lifecycleStatus', '') == 'assigned'
+            && data.get('operationalStatus', '') == 'assigned')
+        )
+        && data.get('lifecycleStep', '') in [
+          'assigned', 'accepted', 'navigating_pickup', 'arrived_pickup',
+          'picked_up', 'navigating_dropoff', 'arrived_dropoff'
+        ];
+    }
+    function validTransferPersistenceMetadata(data, changed) {
+      return changed.hasAll([
+          'workflowUpdatedAt', 'updatedAtLocal', 'lifecycleStatus',
+          'lifecycleStep', 'operationalStatus', 'updatedAt', 'syncedAt',
+          'syncedAtLocal'
+        ])
+        && data.get('workflowUpdatedAt', '') is string
+        && data.get('workflowUpdatedAt', '').size() >= 20
+        && data.get('updatedAtLocal', '') == data.get('workflowUpdatedAt', '')
+        && data.get('syncedAtLocal', '') is string
+        && data.get('syncedAtLocal', '').size() >= 20
+        && data.get('updatedAt', null) == request.time
+        && data.get('syncedAt', null) == request.time
+        && validTransferLifecycle(data);
+    }
+    function validAcceptedTransferIdentity(data, old, transfer) {
+      let targetId = transfer.get('toDriverId', '');
+      return data.get('transferStatus', '') == 'accepted'
+        && data.get('driverId', '') is string
+        && strictTransferDriverIdMatchesWriter(data.get('driverId', ''))
+        && (targetId == '' || data.get('driverId', '') == targetId)
+        && data.get('driverEmail', '') is string
+        && data.get('driverEmail', '').lower() == tripWriterEmail().lower()
+        && data.get('driverName', '') is string
+        && data.get('driverName', '').size() > 0;
+    }
+    function validDeclinedTransferIdentity(data, old) {
+      return data.get('transferStatus', '') == 'declined'
+        && data.get('driverId', null) == old.get('driverId', null)
+        && data.get('driverEmail', null) == old.get('driverEmail', null)
+        && data.get('driverName', null) == old.get('driverName', null);
+    }
+    // A pending transfer gives its exact recipient permission for one narrow
+    // accept/decline transition only. The recipient cannot edit workflow,
+    // odometer, assignment, or request evidence outside this decision.
     function tripTransferRecipientUpdate() {
       let data = request.resource.data;
-      let req = resource.data.get('transferRequest', {});
-      return req is map
-        && req.get('status', '') == 'pending'
-        && (req.get('toDriverEmail', '') == tripWriterEmail()
-          || (req.get('toDriverId', '') != '' && tripDriverIdMatchesWriter(req.get('toDriverId', ''))))
-        && (data.get('driverId', null) == null
-          || data.get('driverId', '') == ''
-          || tripDriverIdMatchesWriter(data.get('driverId', null)));
+      let old = resource.data;
+      let transfer = old.get('transferRequest', {});
+      let decision = data.get('transferRequest', {});
+      let changed = data.diff(old).affectedKeys();
+      return transfer is map
+        && decision is map
+        && tripHasPendingTransfer(old)
+        && old.get('status', '') is string
+        && old.get('status', '').lower() == 'transferred'
+        && transferRequestTargetsWriter(transfer)
+        && changed.hasAll(['status', 'transferStatus', 'transferRequest'])
+        && changed.hasOnly([
+          'status', 'driverId', 'driverEmail', 'driverName',
+          'transferStatus', 'transferRequest', 'workflowUpdatedAt',
+          'updatedAtLocal', 'lifecycleStatus', 'lifecycleStep',
+          'operationalStatus', 'updatedAt', 'syncedAt', 'syncedAtLocal'
+        ])
+        && decision.diff(transfer).affectedKeys().hasAll(['status', 'decidedAt', 'decidedBy'])
+        && decision.diff(transfer).affectedKeys().hasOnly(['status', 'decidedAt', 'decidedBy'])
+        && decision.get('status', '') in ['accepted', 'declined']
+        && data.get('transferStatus', '') == decision.get('status', '')
+        && decision.get('decidedAt', '') is string
+        && decision.get('decidedAt', '').size() >= 20
+        && decision.get('decidedBy', '') is string
+        && decision.get('decidedBy', '').lower() == tripWriterEmail().lower()
+        && transferReturnsStoredWorkflow(data, transfer)
+        && validTransferPersistenceMetadata(data, changed)
+        && (
+          (decision.get('status', '') == 'accepted'
+            && validAcceptedTransferIdentity(data, old, transfer))
+          || (decision.get('status', '') == 'declined'
+            && validDeclinedTransferIdentity(data, old))
+        );
     }
     function validOverrideCostPolicy() {
       let data = request.resource.data;

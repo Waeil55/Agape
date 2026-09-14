@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  isDriverTripOwner,
+  isTripInDispatcherScope,
   getUploadScopeForRole,
   isTripInUploadScope,
 } from './accessControl';
@@ -52,6 +54,19 @@ describe('getUploadScopeForRole — upload assignment contract', () => {
     expect(scope.allowUnassigned).toBe(false);
   });
 
+  it('blocks ambiguous duplicate-email profiles instead of picking the first', () => {
+    const duplicate = { ...drivers[0], id: 'DRV-1-DUP' };
+    const scope = getUploadScopeForRole({
+      role: 'driver',
+      currentUser: 'ann@x.com',
+      drivers: [...drivers, duplicate],
+      dispatchers,
+      selfDriver: drivers[0],
+    });
+    expect(scope.allowedDrivers).toEqual([]);
+    expect(scope.lockedDriverId).toBe('');
+  });
+
   it('unknown roles get nothing (default deny)', () => {
     for (const role of ['billing', 'supervisor', 'qa_auditor', 'fleet_manager', '']) {
       const scope = getUploadScopeForRole({ role, currentUser: 'u@x.com', drivers, dispatchers });
@@ -92,5 +107,55 @@ describe('isTripInUploadScope — per-trip gate', () => {
   it('fails closed on missing trip or scope', () => {
     expect(isTripInUploadScope(null, dispatcherScope)).toBe(false);
     expect(isTripInUploadScope({ driverId: 'DRV-1' }, null)).toBe(false);
+  });
+});
+
+describe('isTripInDispatcherScope — stored assignment boundary', () => {
+  const scoped = drivers.slice(0, 2);
+
+  it('supports legacy email assignment without treating it as unassigned', () => {
+    expect(isTripInDispatcherScope({ driverEmail: 'BOB@x.com', status: 'Assigned' }, scoped)).toBe(true);
+    expect(isTripInDispatcherScope({ driverEmail: 'cat@x.com', status: 'Assigned' }, scoped)).toBe(false);
+  });
+
+  it('requires ID and email assignment keys to identify the same scoped driver', () => {
+    expect(isTripInDispatcherScope({ driverId: 'DRV-1', driverEmail: 'ann@x.com', status: 'Assigned' }, scoped)).toBe(true);
+    expect(isTripInDispatcherScope({ driverId: 'DRV-1', driverEmail: 'bob@x.com', status: 'Assigned' }, scoped)).toBe(false);
+    expect(isTripInDispatcherScope({ driverId: 'DRV-3', driverEmail: 'ann@x.com', status: 'Assigned' }, scoped)).toBe(false);
+  });
+
+  it('blocks ambiguous email-only assignments', () => {
+    const duplicateScoped = [...scoped, { ...scoped[0], id: 'DRV-1-DUP' }];
+    expect(isTripInDispatcherScope({ driverEmail: 'ann@x.com', status: 'Assigned' }, duplicateScoped)).toBe(false);
+  });
+
+  it('allows only genuinely unassigned trips without an identity', () => {
+    expect(isTripInDispatcherScope({ status: 'Unassigned' }, scoped)).toBe(true);
+    expect(isTripInDispatcherScope({ status: 'Assigned' }, scoped)).toBe(false);
+  });
+});
+
+describe('isDriverTripOwner — workflow mutation boundary', () => {
+  const self = drivers[0];
+
+  it('accepts authoritative current and legacy active ID/email assignments', () => {
+    expect(isDriverTripOwner({ driverId: 'DRV-1' }, 'ann@x.com', self)).toBe(true);
+    expect(isDriverTripOwner({ assignedDriverId: 'DRV-1' }, 'ann@x.com', self)).toBe(true);
+    expect(isDriverTripOwner({ driverEmail: 'ANN@x.com' }, 'ann@x.com', self)).toBe(true);
+    expect(isDriverTripOwner({ assignedDriverEmail: 'ANN@x.com' }, 'ann@x.com', self)).toBe(true);
+  });
+
+  it('rejects name-only, historical, conflicting, and unresolved assignments', () => {
+    expect(isDriverTripOwner({ driverName: 'Ann' }, 'ann@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ completedDriverId: 'DRV-1', completedDriverEmail: 'ann@x.com' }, 'ann@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-2', driverEmail: 'bob@x.com' }, 'ann@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-1', driverEmail: 'bob@x.com' }, 'ann@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-2', driverEmail: 'ann@x.com' }, 'ann@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-1', assignedDriverId: 'DRV-2' }, 'ann@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ driverEmail: 'ann@x.com', assignedDriverEmail: 'bob@x.com' }, 'ann@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-1' }, 'bob@x.com', self)).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-1' }, '', self)).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-1' }, 'ann@x.com', { id: 'DRV-1' })).toBe(false);
+    expect(isDriverTripOwner({ driverId: 'DRV-1' }, 'ann@x.com', null)).toBe(false);
   });
 });

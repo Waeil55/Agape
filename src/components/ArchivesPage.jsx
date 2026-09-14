@@ -3,6 +3,7 @@ import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal
 import { tripMatchesSearch } from '../utils/search';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
+import { resolveTripDriver } from '../utils/driverIdentity';
 
 const formatClock24 = (value) => {
   if (!value) return '—';
@@ -407,7 +408,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role }) =>
       <TripActionCenter
         open={Boolean(actionTrip)}
         trip={actionTrip}
-        driver={actionTrip ? drivers.find((entry) => entry.id === actionTrip.driverId || entry.email === actionTrip.driverEmail) : null}
+        driver={actionTrip ? resolveTripDriver(actionTrip, drivers) : null}
         role={role}
         onClose={() => setActionTrip(null)}
         callbacks={{
