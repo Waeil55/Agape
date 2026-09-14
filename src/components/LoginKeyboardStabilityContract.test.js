@@ -12,7 +12,7 @@ describe('login keyboard stability contract', () => {
     expect(loginBlock).toContain('position: fixed !important');
     expect(loginBlock).toContain('height: 100%');
     expect(loginBlock).toContain('overflow: hidden !important');
-    expect(loginBlock).toContain('touch-action: none');
+    expect(loginBlock).toContain('touch-action: manipulation');
     expect(loginBlock).toContain('overscroll-behavior: none');
     expect(loginBlock).not.toContain('100vh');
     expect(loginBlock).not.toContain('translate3d');
@@ -22,7 +22,8 @@ describe('login keyboard stability contract', () => {
     const hook = read('src/hooks/useLoginKeyboardStability.js');
     expect(hook).toContain('visualViewport');
     expect(hook).toContain('resize');
-    expect(hook).toContain('scrollTo(0, 0)');
+    expect(hook).toContain('.agape-login-stage');
+    expect(hook).toContain('el.scrollTop = 0');
     expect(hook).toContain('Keyboard.setResizeMode({ mode: KeyboardResize.None })');
   });
 });
