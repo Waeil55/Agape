@@ -169,15 +169,11 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       return 0;
     }), [trips, showAllDates, manifestDate, statusFilter, driverFilter, serviceFilter, attentionOnly, searchTerm, sortBy]);
 
-  const visibleTrips = useMemo(() => kpiFilteredTrips.slice(0, renderLimit), [kpiFilteredTrips, renderLimit]);
-
-  React.useEffect(() => {
-    setRenderLimit(150);
-  }, [showAllDates, manifestDate, searchTerm, statusFilter, driverFilter, serviceFilter, attentionOnly, sortBy, layoutMode, groupBy, kpiFilter]);
-
   // KPI layer — tappable summary driving an extra filter pass over the
   // existing filters (states above are untouched). Counts always come from
   // real filtered trips; the strip replaces the old static summary below.
+  // NOTE: this block MUST stay above visibleTrips/groupedTrips (TDZ) — moving
+  // it below crashes every render (portal outage, Sep 2026).
   const [kpiFilter, setKpiFilter] = useState('all');
   const kpiCounts = useMemo(() => ({
     total: filteredTrips.length,
@@ -191,6 +187,12 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     if (kpiFilter === 'pending') return filteredTrips.filter((trip) => !trip.driverId || trip.status === 'Unassigned');
     return filteredTrips;
   }, [filteredTrips, kpiFilter]);
+
+  const visibleTrips = useMemo(() => kpiFilteredTrips.slice(0, renderLimit), [kpiFilteredTrips, renderLimit]);
+
+  React.useEffect(() => {
+    setRenderLimit(150);
+  }, [showAllDates, manifestDate, searchTerm, statusFilter, driverFilter, serviceFilter, attentionOnly, sortBy, layoutMode, groupBy, kpiFilter]);
 
   const groupedTrips = useMemo(() => {
     const sections = new Map();
