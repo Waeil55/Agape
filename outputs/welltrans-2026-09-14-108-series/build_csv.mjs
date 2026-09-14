@@ -5,7 +5,6 @@ import { Workbook } from '@oai/artifact-tool';
 const downloadsDir = 'C:/Users/waeil/Downloads';
 const outputDir = 'C:/Users/waeil/Desktop/Agape Care/App10/outputs/welltrans-2026-09-14-108-series';
 const outputPath = path.join(outputDir, 'WellTrans_Trips_2026-09-14.csv');
-const previewPath = path.join(outputDir, '_preview.png');
 
 const rowPlan = [
   { source: 'download (17).csv', oldId: '107748557', newId: '108091401', client: 'LEGEND DAVIS', time: '07:30' },
@@ -54,8 +53,9 @@ const outputRecords = rowPlan.map((planned) => {
   }
   record['Booking Id'] = planned.newId;
   record.Date = '09-14-2026';
-  if (planned.client === 'LEGEND DAVIS' && !planned.time) {
-    record['Phone Dropoff'] = '(317) 376-5188';
+  if (planned.client === 'LEGEND DAVIS') {
+    if (record['Site Name(orig)'] === "Mother's Address") record['Phone Pickup'] = '(317) 376-5188';
+    if (record['Site Name(dest)'] === "Mother's Address") record['Phone Dropoff'] = '(317) 376-5188';
   }
   return record;
 });
@@ -104,6 +104,7 @@ sheet.getRange('A2:Z13').format = {
 };
 sheet.getRange('A1:Z13').format.autofitColumns();
 sheet.getRange('A1:Z13').format.autofitRows();
+
 workbook.recalculate();
 
 const inspection = await workbook.inspect({
@@ -117,9 +118,6 @@ const inspection = await workbook.inspect({
 });
 console.log(inspection.ndjson);
 
-const preview = await workbook.render({ sheetName: 'Trips', range: 'A1:Z13', scale: 1, format: 'png' });
-await fs.writeFile(previewPath, new Uint8Array(await preview.arrayBuffer()));
-
 const quoteCsv = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 const csv = `${matrix.map((row) => row.map(quoteCsv).join(',')).join('\r\n')}\r\n`;
 await fs.writeFile(outputPath, csv, 'utf8');
@@ -129,5 +127,5 @@ console.log(JSON.stringify({
   rowCount: outputRecords.length,
   bookingIds: newIds,
   serviceDate: '09-14-2026',
-  correctedLegendReturnPhoneRows: outputRecords.filter((record) => record['Client Name'] === 'LEGEND DAVIS' && !record['Requested Time Pickup']).length,
+  correctedLegendResidentialPhoneRows: outputRecords.filter((record) => record['Client Name'] === 'LEGEND DAVIS').length,
 }));

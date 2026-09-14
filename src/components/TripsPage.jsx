@@ -1,24 +1,22 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { AlertCircle, Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, User } from 'lucide-react';
+import { Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, Zap, Filter } from 'lucide-react';
 
 import { makeCall, sendSMS } from '../utils/nativeActions';
 import { saveClientProfile } from '../utils/clientProfileUtils';
 
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { tripMatchesSearch } from '../utils/search';
-import TripActionCenter from './trips/TripActionCenter';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 // Shared mobile manifest language (single card + KPI strip for all mobile
-// portals). getManifestStatusBadge replaces the former local copy below.
+// portals).
 import {
   ACTIVE_MANIFEST_STATUSES,
   ManifestKpiStrip,
   ManifestTripCard,
   ON_TIME_GRACE_MIN,
   buildInlineTripActions,
-  getManifestStatusBadge,
   getOnTimeStats,
   getTripCountdown,
 } from './trips/MobileTripManifest';
@@ -69,13 +67,33 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
-  const [layoutMode, setLayoutMode] = useState('grouped');
+  const [layoutMode, setLayoutMode] = useState('list');
   const [groupBy, setGroupBy] = useState('driver');
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [renderLimit, setRenderLimit] = useState(150);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [actionTrip, setActionTrip] = useState(null);
+  // Update-status modal (⋯ button): status + reason + note, wired to real
+  // updates below. Replaces the generic action sheet for this manifest.
+  const [detailModalTrip, setDetailModalTrip] = useState(null);
+  const [modalForm, setModalForm] = useState({ status: '', reason: '', note: '' });
+  const [toastMessage, setToastMessage] = useState(null);
+
+  React.useEffect(() => {
+    if (!toastMessage) return undefined;
+    const timer = setTimeout(() => setToastMessage(null), 2000);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
+  const showToast = (msg) => setToastMessage(msg);
+
+  React.useEffect(() => {
+    if (!detailModalTrip) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') { setDetailModalTrip(null); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [detailModalTrip]);
 
   const activeFilterCount = [
     sortBy !== 'time',
@@ -84,7 +102,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     serviceFilter !== 'all',
     showAllDates,
     attentionOnly,
-    layoutMode !== 'grouped',
+    layoutMode !== 'list',
     groupBy !== 'driver',
   ].filter(Boolean).length;
 
@@ -330,14 +348,14 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     setSaveAsProfile(false);
   };
 
-  // Status exceptions (Rerouted / No Show / Cancelled) for the ⋯ sheet.
-  // Mirrors OperationsCommandCenter.markTripException: destructive statuses go
-  // through password confirmation when available, and all three require the
-  // delete-trip permission (admin/dispatcher). No one-tap Completed here —
-  // completion requires the driver workflow (odometer + times), reached via
-  // Drive. Drivers never see these (TripActionCenter gates by role).
+  // Status updates from the ⋯ modal (reason + note captured with the change).
+  // Exceptions mirror OperationsCommandCenter.markTripException (password
+  // confirmation when available + delete-trip permission). Completed is also
+  // auth-gated and timestamped — it closes the trip and affects records.
+  // No one-tap status writes bypass these gates; drivers never reach this
+  // modal (the ⋯ button is operator-only via the card bar model).
   const canMarkException = typeof hasPermission === 'function' ? hasPermission(role, 'canDeleteTrip') : (role === 'admin' || role === 'dispatcher');
-  const markTripException = (trip, status) => {
+  const markTripException = (trip, status, meta = {}) => {
     if (!trip || !onUpdateTrip) return;
     const apply = () => {
       Promise.resolve(onUpdateTrip({
@@ -346,14 +364,39 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         exceptionAt: new Date().toISOString(),
         exceptionBy: currentUser,
         exceptionSource: role,
+        ...(meta.reason ? { cancellationReason: meta.reason } : {}),
+        ...(meta.note ? { exceptionNote: meta.note } : {}),
       })).catch(() => {});
-      setActionTrip(null);
     };
-    if (requestAuthAction && ['Cancelled', 'No Show', 'Rerouted'].includes(status)) {
+    if (requestAuthAction && ['Cancelled', 'No Show', 'Rerouted', 'Completed'].includes(status)) {
       requestAuthAction(`Mark ${trip.patient || 'trip'} as ${status}`, apply);
       return;
     }
     apply();
+  };
+  const submitStatusUpdate = () => {
+    if (!detailModalTrip || !modalForm.status) return;
+    const target = detailModalTrip;
+    const meta = { reason: modalForm.reason, note: modalForm.note.trim() };
+    setDetailModalTrip(null);
+    setModalForm({ status: '', reason: '', note: '' });
+    if (modalForm.status === 'Completed') {
+      if (!onUpdateTrip) return;
+      const apply = () => {
+        Promise.resolve(onUpdateTrip({
+          ...target,
+          status: 'Completed',
+          completedAt: new Date().toISOString(),
+          completedBy: currentUser,
+          ...(meta.reason ? { cancellationReason: meta.reason } : {}),
+          ...(meta.note ? { exceptionNote: meta.note } : {}),
+        })).catch(() => {});
+      };
+      if (requestAuthAction) requestAuthAction(`Mark ${target.patient || 'trip'} as Completed`, apply);
+      else apply();
+      return;
+    }
+    markTripException(target, modalForm.status, meta);
   };
 
   const renderManifestTripCard = (trip) => {
@@ -431,11 +474,13 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       role,
       callbacks: {
         phone: getClientPhone(trip),
-        onDrive: (t) => { if (driver) onDriveTrip?.(t); else handleAssignClick(); },
+        onDrive: (trip) => { if (driver) onDriveTrip?.(trip); else handleAssignClick(); },
         onAssign: () => handleAssignClick(),
-        onNavigate: (t) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.pickup || '')}`, '_blank', 'noopener,noreferrer'),
-        onCall: (t) => makeCall(getClientPhone(t), t.patient),
-        onMessage: (t) => sendSMS(getClientPhone(t), t.patient),
+        onReassign: () => handleReassignClick(),
+        onArchive: (trip) => onDeleteTrip?.(trip.id),
+        onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
+        onCall: (trip) => makeCall(getClientPhone(trip), trip.patient),
+        onMessage: (trip) => sendSMS(getClientPhone(trip), trip.patient),
       },
     });
     const ICONS = { navigate: Navigation, call: Phone, message: MessageSquare };
@@ -484,23 +529,27 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             </div>
           </div>
         ) : null}
-        primaryAction={inline.primary ? { label: inline.primary.id === 'assign-drive' ? 'Assign to drive' : 'Drive trip', onClick: () => inline.primary.onSelect() } : null}
+        primaryAction={inline.primary ? { label: inline.primary.id === 'assign-drive' ? 'Assign to drive' : 'Drive', onClick: () => inline.primary.onSelect() } : null}
         iconActions={inline.icons.map((action) => ({ ...action, icon: ICONS[action.id], onClick: () => action.onSelect() }))}
+        driverName={driver ? driver.name : 'Unassigned'}
+        reassignAction={inline.reassign ? { onClick: () => inline.reassign.onSelect() } : null}
+        archiveAction={inline.archive ? { onClick: () => inline.archive.onSelect() } : null}
         moreIcon={MoreHorizontal}
-        onMore={() => setActionTrip(trip)}
-        moreLabel={`More actions for ${trip.patient || trip.bookingId || 'trip'}`}
-        footerSlot={driver ? (
-          <span className="inline-flex min-w-0 items-center gap-1 truncate text-xs font-semibold text-slate-500"><User size={12} className="shrink-0" /> <span className="truncate">{driver.name}</span></span>
-        ) : (
-          <span className="text-xs font-semibold text-slate-400">Unassigned</span>
-        )}
+        onMore={canMarkException ? () => { setDetailModalTrip(trip); setModalForm({ status: '', reason: '', note: '' }); } : null}
+        moreLabel={`Update status for ${trip.patient || trip.bookingId || 'trip'}`}
       />
       </div>
     );
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 pb-24 max-md:[&_button]:min-h-11">
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-6 pb-24">
+      {toastMessage && (
+        <div className="absolute top-10 left-4 right-4 z-50 flex items-center gap-1.5 bg-slate-900/95 text-white px-3 py-2 rounded-lg shadow-xl text-xs">
+          <Zap size={14} className="text-amber-400" />
+          <span className="font-semibold">{toastMessage}</span>
+        </div>
+      )}
       {/* Assignment Success Feedback */}
       {assignmentFeedback && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-in">
@@ -509,31 +558,92 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           </div>
         </div>
       )}
-      <TripActionCenter
-        open={Boolean(actionTrip)}
-        trip={actionTrip}
-        driver={actionTrip ? drivers.find((entry) => entry.id === actionTrip.driverId) : null}
-        role={role}
-        onClose={() => setActionTrip(null)}
-        callbacks={{
-          onDrive: (trip) => {
-            const assigned = drivers.find((entry) => entry.id === trip.driverId);
-            if (assigned) onDriveTrip?.(trip);
-            else { setSelectedTrip(trip); setAssignMode('assign'); setShowAssign(true); }
-          },
-          onAssign: (trip) => { setSelectedTrip(trip); setAssignMode(trip.driverId ? 'reassign' : 'assign'); trip.driverId ? setShowReassignModal(true) : setShowAssign(true); },
-          onNavigate: (trip) => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.pickup || '')}`, '_blank', 'noopener,noreferrer'),
-          onCall: (trip) => makeCall(getClientPhone(trip), trip.patient),
-          onMessage: (trip) => sendSMS(getClientPhone(trip), trip.patient),
-          onEdit: openEdit,
-          onArchive: (trip) => onDeleteTrip?.(trip.id),
-          onReroute: canMarkException ? (trip) => markTripException(trip, 'Rerouted') : null,
-          onNoShow: canMarkException ? (trip) => markTripException(trip, 'No Show') : null,
-          onCancel: canMarkException ? (trip) => markTripException(trip, 'Cancelled') : null,
-        }}
-      />
-      {/* HEADER CONTROLS */}
-      <div className="card p-4 sm:p-6 space-y-4">
+      {/* Update Status modal (⋯ button): status + reason + note → real update.
+          Edit-details link preserves the inline row editor. */}
+      {detailModalTrip && canMarkException && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Update trip status">
+          <div className="bg-white w-full max-w-sm rounded-xl p-4 shadow-2xl space-y-3">
+            <div className="flex justify-between items-center border-b pb-2 border-slate-100">
+              <h3 className="text-sm font-bold">Update Status</h3>
+              <button onClick={() => setDetailModalTrip(null)} aria-label="Close status update" className="p-1 bg-slate-100 rounded-full"><X size={14} /></button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mb-1">
+              {[
+                { value: 'Completed', label: 'Completed' },
+                { value: 'No Show', label: 'No show' },
+                { value: 'Rerouted', label: 'Trip rerouted' },
+                { value: 'Cancelled', label: 'Trip cancelled' },
+              ].map((st) => {
+                const isSelected = modalForm.status === st.value;
+                let btnClass = '';
+                if (isSelected) {
+                  if (st.value === 'Completed') btnClass = 'bg-emerald-600 text-white border-emerald-700 shadow-inner';
+                  if (st.value === 'No Show') btnClass = 'bg-orange-500 text-white border-orange-600 shadow-inner';
+                  if (st.value === 'Rerouted') btnClass = 'bg-purple-600 text-white border-purple-700 shadow-inner';
+                  if (st.value === 'Cancelled') btnClass = 'bg-slate-700 text-white border-slate-800 shadow-inner';
+                } else {
+                  if (st.value === 'Completed') btnClass = 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100';
+                  if (st.value === 'No Show') btnClass = 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100';
+                  if (st.value === 'Rerouted') btnClass = 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100';
+                  if (st.value === 'Cancelled') btnClass = 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100';
+                }
+                return (
+                  <button
+                    key={st.value}
+                    onClick={() => setModalForm((prev) => ({ ...prev, status: st.value }))}
+                    className={`py-1.5 px-2 rounded-md text-xs font-semibold border transition-all ${btnClass}`}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <select
+              value={modalForm.reason}
+              onChange={(e) => setModalForm((prev) => ({ ...prev, reason: e.target.value }))}
+              className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-md px-2 py-2 outline-none focus:border-slate-400"
+              aria-label="Status reason"
+            >
+              <option value="">Select Reason (Optional)</option>
+              <option value="Heavy Traffic">Heavy Traffic</option>
+              <option value="Client Delay">Client Delay</option>
+              <option value="Vehicle Issue">Vehicle Issue</option>
+              <option value="Weather Conditions">Weather Conditions</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <textarea
+              placeholder="Add a note... (Optional)"
+              value={modalForm.note}
+              onChange={(e) => setModalForm((prev) => ({ ...prev, note: e.target.value }))}
+              className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-md px-2 py-2 h-16 resize-none outline-none focus:border-slate-400"
+              aria-label="Status note"
+            />
+
+            <button
+              onClick={submitStatusUpdate}
+              disabled={!modalForm.status}
+              className="w-full bg-slate-900 disabled:bg-slate-400 disabled:cursor-not-allowed text-white py-2 rounded-lg text-sm font-bold mt-1 transition-colors"
+            >
+              Confirm Update
+            </button>
+            <button
+              type="button"
+              onClick={() => { const t = detailModalTrip; setDetailModalTrip(null); setModalForm({ status: '', reason: '', note: '' }); openEdit(t); }}
+              className="w-full text-center text-xs font-bold text-blue-600 hover:underline"
+            >
+              Edit full details instead
+            </button>
+          </div>
+        </div>
+      )}
+      {/* HEADER CONTROLS — 44px mobile buttons kept here (filters/upload/new).
+          Manifest cards + manifest modals below follow the approved compact
+          manifest design instead (exact small buttons); the min-height rule is
+          intentionally scoped to this chrome, not the page root. */}
+      <div className="card p-4 sm:p-6 space-y-4 max-md:[&_button]:min-h-11">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 sm:hidden">
           <button
             type="button"
@@ -692,11 +802,11 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       <div data-testid="trip-manifest-summary" aria-label="Trip manifest summary">
       <ManifestKpiStrip
         items={[
-          { id: 'all', label: 'All', value: kpiCounts.total, active: kpiFilter === 'all', activeClass: 'border-slate-800 bg-slate-800 text-white', onSelect: () => setKpiFilter('all') },
-          { id: 'active', label: 'Active', value: kpiCounts.active, active: kpiFilter === 'active', activeClass: 'border-blue-400 bg-blue-50 text-blue-700', onSelect: () => setKpiFilter(kpiFilter === 'active' ? 'all' : 'active') },
-          { id: 'done', label: 'Done', value: kpiCounts.done, active: kpiFilter === 'done', activeClass: 'border-emerald-400 bg-emerald-50 text-emerald-700', onSelect: () => setKpiFilter(kpiFilter === 'done' ? 'all' : 'done') },
-          { id: 'pending', label: 'Pending', value: kpiCounts.pending, active: kpiFilter === 'pending', activeClass: 'border-rose-400 bg-rose-50 text-rose-700', onSelect: () => setKpiFilter(kpiFilter === 'pending' ? 'all' : 'pending') },
-          { id: 'ontime', label: 'On-time', value: onTimeStats.rate === null ? '—' : `${onTimeStats.rate}%`, active: false, activeClass: '', onSelect: () => setAuditOpen(true) },
+          { id: 'all', label: 'All', value: kpiCounts.total, active: kpiFilter === 'all', activeClass: 'bg-slate-800 border-slate-800 text-white', onSelect: () => { setKpiFilter('all'); showToast('Viewing all trips'); } },
+          { id: 'active', label: 'Active', value: kpiCounts.active, active: kpiFilter === 'active', activeClass: 'bg-blue-50 border-blue-400 text-blue-700', onSelect: () => { const next = kpiFilter === 'active' ? 'all' : 'active'; setKpiFilter(next); showToast(next === 'all' ? 'Cleared active filter' : 'Filtered: active trips'); } },
+          { id: 'done', label: 'Done', value: kpiCounts.done, active: kpiFilter === 'done', activeClass: 'bg-emerald-50 border-emerald-400 text-emerald-700', onSelect: () => { const next = kpiFilter === 'done' ? 'all' : 'done'; setKpiFilter(next); showToast(next === 'all' ? 'Cleared done filter' : 'Filtered: completed'); } },
+          { id: 'pending', label: 'Pending', value: kpiCounts.pending, active: kpiFilter === 'pending', activeClass: 'bg-rose-50 border-rose-400 text-rose-700', onSelect: () => { const next = kpiFilter === 'pending' ? 'all' : 'pending'; setDriverFilter('all'); setKpiFilter(next); showToast(next === 'all' ? 'Viewing all fleet' : 'Viewing unassigned queue'); } },
+          { id: 'ontime', label: 'On-time', value: onTimeStats.rate === null ? '—' : `${onTimeStats.rate}%`, wide: true, valueClass: 'text-slate-900', onSelect: () => setAuditOpen(true) },
         ]}
       />
       </div>
@@ -734,8 +844,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       {/* Driver chips — quick queue filter. drivers prop is pre-scoped by role
           (App.jsx driverWorkDrivers), so chips never leak out-of-scope drivers.
           Replaces the old driver dropdown in the filter panel below. */}
-      <section aria-label="Filter by driver" className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
+      <section aria-label="Filter by driver" className="bg-white px-3 py-2 border-b border-slate-200 shrink-0 shadow-sm">
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar">
           {[
             { id: 'all', name: 'All', count: filteredTrips.length, dot: 'bg-blue-400' },
             ...drivers.map((driver) => {
@@ -762,8 +872,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                 type="button"
                 onClick={() => setDriverFilter(selected ? 'all' : chip.id)}
                 aria-pressed={selected}
-                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors active:scale-95 ${
-                  selected ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-600'
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium whitespace-nowrap shrink-0 ${
+                  selected ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'
                 }`}
               >
                 <span className={`h-2 w-2 rounded-full ${chip.dot}`} aria-hidden="true" />
@@ -775,21 +885,14 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         </div>
       </section>
 
-      {/* TABLE / LIST */}
-      <div className="card overflow-hidden">
-        <div className="p-3 sm:p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-heading text-slate-900">Live Manifest Queue</h3>
-          <div className="flex items-center gap-3">
-            {showAllDates && <span className="badge badge-warning text-xs">Viewing All Dates</span>}
-            <span className="badge badge-info">Showing {visibleTrips.length} / {filteredTrips.length}</span>
-          </div>
-        </div>
-
-        <div className="divide-y divide-slate-100">
-          {filteredTrips.length === 0 ? (
-            <div className="p-12 text-center">
-              <AlertCircle size={48} className="mx-auto text-slate-200 mb-4" />
-              <p className="text-slate-400 font-semibold text-lg">Queue is empty</p>
+      {/* LIST — flat queue by default (grouped sections stay available via
+          the layout control in filters). Shows kpi-filtered trips. */}
+      <div>
+        <div>
+          {kpiFilteredTrips.length === 0 ? (
+            <div className="bg-white rounded-lg p-6 text-center border border-slate-200 shadow-sm mt-2">
+              <Filter size={24} className="mx-auto text-slate-400 mb-2" />
+              <p className="text-base font-medium text-slate-600">No trips found</p>
             </div>
           ) : (
             layoutMode === 'grouped' ? (
@@ -813,11 +916,13 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                 ))}
               </div>
             ) : (
-              visibleTrips.map((trip) => renderManifestTripCard(trip))
+              <div className="space-y-2">
+                {visibleTrips.map((trip) => renderManifestTripCard(trip))}
+              </div>
             )
           )}
         </div>
-        {filteredTrips.length > visibleTrips.length && (
+        {kpiFilteredTrips.length > visibleTrips.length && (
           <div className="p-4 border-t border-slate-100 flex justify-center">
             <button
               type="button"
@@ -962,39 +1067,37 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
       {/* REASSIGN MODAL */}
       {showReassignModal && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center sm:p-4">
-          <div className="absolute inset-0 bg-slate-950/60" onClick={() => setShowReassignModal(false)} />
-          <div className="relative z-10 flex max-h-[85dvh] w-full max-w-md flex-col rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-3xl">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                <UserCheck size={20} className="text-amber-600" /> Reassign
-              </h3>
-              <button onClick={() => setShowReassignModal(false)} className="p-1.5 bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200" aria-label="Close"><X size={18} /></button>
+        <div className="fixed inset-0 z-[110] bg-slate-900/40 flex items-end justify-center p-3">
+          <div className="bg-white w-full rounded-xl p-4 shadow-2xl space-y-3">
+            <div className="flex justify-between items-center border-b pb-2 border-slate-100">
+              <h3 className="text-base font-bold">Reassign to...</h3>
+              <button onClick={() => setShowReassignModal(false)} aria-label="Close reassign" className="p-1.5 bg-slate-100 rounded-full text-slate-500"><X size={16} /></button>
             </div>
-            <p className="text-[11px] font-semibold text-slate-500 mb-3 uppercase tracking-widest line-clamp-1">
-              Replace for {selectedTasks.length > 0 ? selectedTasks.length : 1} trip{selectedTasks.length !== 1 ? 's' : ''}
-            </p>
-            <div className="space-y-1.5 overflow-y-auto flex-1 pr-2">
-              {drivers.map(d => (
-                <button key={d.id} onClick={() => {
-                  if (selectedTasks.length > 0) {
-                    handleBulkReassign(d.id);
-                  } else if (selectedTrip) {
-                    handleAssign(d.id);
-                    setShowReassignModal(false);
-                  }
-                }}
-                  className="w-full flex items-center justify-between p-2.5 bg-slate-50 hover:bg-amber-50 border border-slate-100 rounded-xl transition group">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-amber-600 font-bold text-sm shadow-sm group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">{String(d?.name || '?').charAt(0)}</div>
-                    <div className="text-left min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 truncate">{d.name}</p>
-                      <p className="text-[10px] font-semibold text-slate-400 truncate">{d.vehicle || '—'}</p>
+            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+              {drivers.map(d => {
+                const isCurrent = selectedTrip && selectedTrip.driverId === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    disabled={isCurrent}
+                    onClick={() => {
+                      if (selectedTasks.length > 0) {
+                        handleBulkReassign(d.id);
+                      } else if (selectedTrip) {
+                        handleAssign(d.id);
+                        setShowReassignModal(false);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white text-left disabled:opacity-50 disabled:bg-slate-50"
+                  >
+                    <div>
+                      <div className="text-sm font-bold text-slate-800">{d.name}</div>
+                      <div className="text-[10px] text-slate-500">{d.vehicle || '—'}</div>
                     </div>
-                  </div>
-                  <span className="text-[10px] font-semibold text-amber-600 uppercase shrink-0 ml-1">→</span>
-                </button>
-              ))}
+                    <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">Assign</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

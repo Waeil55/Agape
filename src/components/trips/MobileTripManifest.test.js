@@ -20,16 +20,18 @@ const trip = (over = {}) => ({
   ...over,
 });
 
-describe('getManifestStatusBadge — canonical badges', () => {
-  it('maps the working set without crashing on unknowns', () => {
-    expect(getManifestStatusBadge('Unassigned')).toContain('rose');
-    expect(getManifestStatusBadge('Assigned')).toContain('blue');
-    expect(getManifestStatusBadge('En Route')).toContain('amber');
-    expect(getManifestStatusBadge('In Transit')).toContain('amber');
+describe('getManifestStatusBadge — design tokens', () => {
+  it('maps the design badge set with normalized keys and slate fallback', () => {
     expect(getManifestStatusBadge('Completed')).toContain('emerald');
-    expect(getManifestStatusBadge('Cancelled')).toContain('rose');
-    expect(getManifestStatusBadge('No Show')).toContain('amber');
+    expect(getManifestStatusBadge('In Transit')).toContain('blue');
+    expect(getManifestStatusBadge('En Route')).toContain('amber');
+    expect(getManifestStatusBadge('Unassigned')).toContain('rose');
+    expect(getManifestStatusBadge('No Show')).toContain('orange');
+    expect(getManifestStatusBadge('no show')).toContain('orange');
     expect(getManifestStatusBadge('Rerouted')).toContain('purple');
+    expect(getManifestStatusBadge('Trip rerouted')).toContain('purple');
+    expect(getManifestStatusBadge('Cancelled')).toContain('slate');
+    expect(getManifestStatusBadge('Assigned')).toContain('blue');
     expect(getManifestStatusBadge('Something New')).toContain('slate');
     expect(getManifestStatusBadge(undefined)).toContain('slate');
   });
@@ -105,22 +107,28 @@ describe('buildInlineTripActions — role matrix', () => {
   const cbs = {
     onDrive: () => {},
     onAssign: () => {},
+    onReassign: () => {},
+    onArchive: () => {},
     onNavigate: () => {},
     onCall: () => {},
     onMessage: () => {},
     phone: '555',
   };
 
-  it('driver gets Drive + comms, never assign', () => {
-    const { primary, icons } = buildInlineTripActions({ ...base, role: 'driver', callbacks: cbs });
+  it('driver gets Drive + comms, never reassign/archive', () => {
+    const { primary, icons, reassign, archive } = buildInlineTripActions({ ...base, role: 'driver', callbacks: cbs });
     expect(primary.id).toBe('drive');
     expect(primary.label).toBe('Drive');
     expect(icons.map(i => i.id).sort()).toEqual(['call', 'message', 'navigate']);
+    expect(reassign).toBeNull();
+    expect(archive).toBeNull();
   });
 
-  it('dispatcher gets Drive + assign path for assigned trips', () => {
-    const { primary } = buildInlineTripActions({ ...base, role: 'dispatcher', callbacks: cbs });
+  it('dispatcher gets Drive + reassign + archive for assigned trips', () => {
+    const { primary, reassign, archive } = buildInlineTripActions({ ...base, role: 'dispatcher', callbacks: cbs });
     expect(primary.id).toBe('drive');
+    expect(reassign?.id).toBe('reassign');
+    expect(archive?.id).toBe('archive');
   });
 
   it('dispatcher gets assign CTA for unassigned trips', () => {
@@ -128,11 +136,19 @@ describe('buildInlineTripActions — role matrix', () => {
     expect(primary.id).toBe('assign-drive');
   });
 
-  it('hides Drive on terminal trips', () => {
+  it('Drive stays available on terminal trips (opens progress read-only)', () => {
     const { primary } = buildInlineTripActions({
       ...base, role: 'dispatcher', callbacks: cbs, trip: trip({ status: 'Completed' }),
     });
-    expect(primary).toBeNull();
+    expect(primary?.id).toBe('drive');
+  });
+
+  it('reassign hides on terminal trips; archive does not', () => {
+    const { reassign, archive } = buildInlineTripActions({
+      ...base, role: 'dispatcher', callbacks: cbs, trip: trip({ status: 'Completed' }),
+    });
+    expect(reassign).toBeNull();
+    expect(archive?.id).toBe('archive');
   });
 
   it('hides assign for non-operating roles', () => {

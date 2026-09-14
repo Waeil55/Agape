@@ -5879,3 +5879,14 @@ textarea:focus,
     animation: none !important;
   }
 }
+
+/* Horizontal chip rails (mobile manifest driver filter). The ONLY sanctioned
+   overflow-x scroll in src — the layout contract bans it everywhere else.
+   No visible scrollbar; content remains keyboard reachable. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

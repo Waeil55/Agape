@@ -18,7 +18,10 @@ describe('unified trip workspace information architecture', () => {
     expect(operations).toContain('Open Driver Workspace');
     expect(operations).toContain('Assign to Drive');
     expect(trips).toContain("onDriveTrip?.(trip)");
-    expect(trips).toContain('Drive trip');
+    // Manifest Drive entry keeps its exact design label ('Drive'); the assign
+    // CTA vocabulary is pinned alongside so neither entry can silently drop.
+    expect(trips).toContain("'Assign to drive'");
+    expect(trips).toContain(": 'Drive'");
   });
 
   it('moves archived records and broker portal completion into Reports', () => {

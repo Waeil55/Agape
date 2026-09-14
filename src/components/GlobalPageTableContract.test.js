@@ -34,7 +34,17 @@ describe('global page and table layout contract', () => {
     expect(css).toMatch(/\.app-filter-bar\s*\{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?overflow-x:\s*hidden;/);
     expect(css).toMatch(/@media \(min-width:\s*768px\)[\s\S]*?\.app-filter-bar\s*\{[\s\S]*?flex-wrap:\s*nowrap;/);
     for (const path of files) {
-      expect(readFileSync(path, 'utf8'), path).not.toMatch(/overflow-x-(?:auto|scroll)/);
+      const source = readFileSync(path, 'utf8');
+      if (path.endsWith('TripsPage.jsx')) {
+        // Single sanctioned exception: the mobile driver-chips rail (one
+        // scrollable row, scrollbar hidden via .no-scrollbar). Everything
+        // else in the file must still avoid horizontal scrolling.
+        const hits = source.match(/overflow-x-(?:auto|scroll)/g) || [];
+        expect(hits.length).toBeLessThanOrEqual(1);
+        expect(source).toContain('no-scrollbar');
+        continue;
+      }
+      expect(source, path).not.toMatch(/overflow-x-(?:auto|scroll)/);
     }
     expect(dashboard).toContain('hidden h-14 items-center');
     expect(dashboard).not.toContain('hidden h-20 items-center');
