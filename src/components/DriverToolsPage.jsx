@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from 
 import {
   BrainCircuit, Play, ChevronRight, X, Navigation, Map as MapIcon,
   Route, Repeat, AlertTriangle, Zap, ChevronDown, ChevronUp,
-  Timer, Copy, CheckSquare, Trash2, ArrowUp, ArrowDown
+  Timer, Copy, CheckSquare, Square, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 import { openMapLink } from '../utils/nativeActions';
@@ -940,57 +940,91 @@ const DriverToolsPage = ({ trips, activeTrips, aiSequence, aiSuggestions, aiRide
       {/* Route Quick Nav */}
       {activeTrips.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <button
-            onClick={() => toggleSection('quicknav')}
-            aria-expanded={expandedSection === 'quicknav'}
-            aria-controls={quickNavId}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
-          >
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => toggleSection('quicknav')}
+              aria-expanded={expandedSection === 'quicknav'}
+              aria-controls={quickNavId}
+              className="flex items-center gap-2 flex-1 min-w-0"
+            >
               <Navigation size={16} className="text-emerald-600" />
               <span className="text-sm font-semibold text-slate-800">Quick Navigation</span>
               <span className="text-xs text-slate-400 font-medium">({activeTrips.length})</span>
-            </div>
-            {expandedSection === 'quicknav' ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-          </button>
+              {expandedSection === 'quicknav' ? <ChevronUp size={16} className="text-slate-400 ml-auto" /> : <ChevronDown size={16} className="text-slate-400 ml-auto" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectAllTrips()}
+              className="ml-2 shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-colors min-h-[32px] ${
+                selectedTrips.length === activeTrips.length && activeTrips.length > 0
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+              }"
+              aria-label={selectedTrips.length === activeTrips.length ? 'Deselect all trips' : 'Select all trips'}
+            >
+              {selectedTrips.length === activeTrips.length && activeTrips.length > 0 ? <CheckSquare size={12} /> : <Square size={12} />}
+              {selectedTrips.length === activeTrips.length && activeTrips.length > 0 ? 'All' : 'Select'}
+            </button>
+          </div>
           {expandedSection === 'quicknav' && (
             <div id={quickNavId} className="border-t border-slate-100 divide-y divide-slate-100">
-              {activeTrips.map(trip => (
-                <div key={trip.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="min-w-0">
+              {activeTrips.map(trip => {
+                const isSelected = selectedTrips.includes(trip.id);
+                return (
+                  <div key={trip.id} className={`px-4 py-3 transition-colors ${isSelected ? 'bg-blue-50/60' : ''}`}>
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = isSelected
+                            ? selectedTrips.filter(id => id !== trip.id)
+                            : [...selectedTrips, trip.id];
+                          onSetSelectedTrips(next);
+                        }}
+                        className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border transition-colors min-h-[24px] min-w-[24px] ${
+                          isSelected
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : 'bg-white border-slate-300 text-transparent hover:border-slate-400'
+                        }"
+                        aria-label={`${isSelected ? 'Deselect' : 'Select'} ${trip.patient || 'trip'}`}
+                        aria-pressed={isSelected}
+                      >
+                        {isSelected && <CheckSquare size={14} />}
+                      </button>
+                      <div className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-semibold text-slate-800">{trip.patient}</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {trip.bookingId && (
-                          <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
-                            {trip.bookingId}
-                          </span>
-                        )}
-                        {(trip.type || trip.serviceType) && (
-                          <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600">
-                            {trip.type || trip.serviceType}
-                          </span>
-                        )}
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {trip.bookingId && (
+                            <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                              #{trip.bookingId}
+                            </span>
+                          )}
+                          {(trip.type || trip.serviceType) && (
+                            <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                              {trip.type || trip.serviceType}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <span className="text-[11px] text-slate-400 font-medium shrink-0">{to12hr(trip.time)}</span>
                     </div>
-                    <span className="text-xs text-slate-400 font-medium">{to12hr(trip.time)}</span>
+                    <div className="flex items-center gap-2 ml-8">
+                      <button
+                        onClick={() => onOpenInNav(trip.pickup)}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-8 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold active:bg-emerald-100 transition border border-emerald-200/60"
+                      >
+                        <Navigation size={11} /> Pickup
+                      </button>
+                      <button
+                        onClick={() => onOpenInNav(trip.dropoff)}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-8 bg-rose-50 text-rose-700 rounded-lg text-xs font-bold active:bg-rose-100 transition border border-rose-200/60"
+                      >
+                        <Navigation size={11} /> Dropoff
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onOpenInNav(trip.pickup)}
-                      className="flex-1 flex items-center justify-center gap-1.5 h-8 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold active:bg-emerald-100 transition"
-                    >
-                      <Navigation size={12} /> Pickup
-                    </button>
-                    <button
-                      onClick={() => onOpenInNav(trip.dropoff)}
-                      className="flex-1 flex items-center justify-center gap-1.5 h-8 bg-rose-50 text-rose-700 rounded-lg text-xs font-bold active:bg-rose-100 transition"
-                    >
-                      <Navigation size={12} /> Dropoff
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
