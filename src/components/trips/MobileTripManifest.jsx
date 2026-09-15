@@ -387,6 +387,8 @@ export function ManifestTripCard({
   legsLabel,
   onLegsClick,
   mileage,
+  selected,
+  onSelect,
   selectSlot,
   assignSlot,
   noteSlot,
@@ -436,7 +438,19 @@ export function ManifestTripCard({
       {/* ── HEADER: Checkbox + Time | Passenger Name + Trip ID ── */}
       <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {selectSlot}
+          {selectSlot || (onSelect && (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={!!selected}
+              aria-label={`Select trip ${trip?.patient || trip?.bookingId || ''}`}
+              onClick={(e) => { e.stopPropagation(); onSelect(trip); }}
+              className="shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+              style={selected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
+            >
+              {selected && <Check size={11} className="text-white" strokeWidth={3} />}
+            </button>
+          ))}
           {onTimeEdit ? (
             <button type="button" onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
               className={`text-[17px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer ${timeColor}`}

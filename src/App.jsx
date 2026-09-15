@@ -2980,7 +2980,7 @@ const App = () => {
               </div>
             </div>
           ) : (
-            <form onSubmit={submitLogin} className="space-y-4">
+            <form action="javascript:void(0)" className="space-y-4">
               <div className="flex items-center gap-4 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <button type="button" disabled={loginSubmitting} onClick={() => {
                   loginPortalRoleRef.current = null;
@@ -3020,7 +3020,7 @@ const App = () => {
                 </div>
               )}
 
-              <button type="submit" disabled={loginSubmitting} aria-busy={loginSubmitting} className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">{loginSubmitting ? 'Authenticating…' : 'Authorize Access'}</button>
+              <button type="button" onClick={submitLogin} disabled={loginSubmitting} aria-busy={loginSubmitting} className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">{loginSubmitting ? 'Authenticating…' : 'Authorize Access'}</button>
 
               <div className="pt-2 flex items-center justify-between text-sm font-semibold">
                 <button type="button" disabled={loginSubmitting} onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-full font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>

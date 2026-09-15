@@ -47,62 +47,76 @@ const tripMeta = (trip) => (
 );
 
 const MobileMetric = ({ icon: Icon, label, value, hint, tone = 'brand' }) => (
-  <div className={`mobile-admin-metric mobile-admin-metric--${tone}`}>
-    <div className="mobile-admin-metric-icon">{Icon && <Icon size={17} />}</div>
+  <div className={`flex items-center gap-2.5 flex-1 min-w-0 rounded-xl border px-2.5 py-2.5 shadow-sm ${
+    tone === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+    : tone === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-700'
+    : tone === 'danger' ? 'bg-rose-50 border-rose-200 text-rose-700'
+    : tone === 'info' ? 'bg-blue-50 border-blue-200 text-blue-700'
+    : 'bg-white border-slate-200 text-slate-700'
+  }`}>
+    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+      tone === 'success' ? 'bg-emerald-100'
+      : tone === 'warning' ? 'bg-amber-100'
+      : tone === 'danger' ? 'bg-rose-100'
+      : tone === 'info' ? 'bg-blue-100'
+      : 'bg-slate-100'
+    }`}>
+      {Icon && <Icon size={17} />}
+    </div>
     <div className="min-w-0">
-      <p className="mobile-admin-metric-value">{value}</p>
-      <p className="mobile-admin-metric-label">{label}</p>
-      {hint && <p className="mobile-admin-metric-hint">{hint}</p>}
+      <p className="text-base font-black tabular-nums">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">{label}</p>
+      {hint && <p className="text-[9px] font-semibold opacity-60">{hint}</p>}
     </div>
   </div>
 );
 
 const MobileCommandSignals = ({ openTrips, activeTrips, unassignedTrips, offlineDrivers }) => (
-  <AdminCard pad={false} className="mobile-admin-command-card">
-    <div className="mobile-admin-command-head">
+  <AdminCard pad={false} className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-100">
       <div>
-        <p>Command signals</p>
-        <h3>Operational health</h3>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Command signals</p>
+        <h3 className="text-sm font-bold text-slate-900">Operational health</h3>
       </div>
       <AdminBadge tone={unassignedTrips.length || offlineDrivers ? 'warning' : 'online'} dot>
         {unassignedTrips.length || offlineDrivers ? 'Watch' : 'Stable'}
       </AdminBadge>
     </div>
-    <div className="mobile-admin-signal-grid">
-      <div><TrendingUp size={16} /><strong>{openTrips.length}</strong><span>Open</span></div>
-      <div><RadioTower size={16} /><strong>{activeTrips.length}</strong><span>Live</span></div>
-      <div><BellRing size={16} /><strong>{unassignedTrips.length}</strong><span>Dispatch</span></div>
-      <div><CircleDot size={16} /><strong>{offlineDrivers}</strong><span>Offline</span></div>
+    <div className="grid grid-cols-4 gap-2 px-3.5 py-3">
+      <div className="flex flex-col items-center gap-0.5 text-center"><TrendingUp size={16} className="text-slate-500" /><strong className="text-lg font-black tabular-nums text-slate-900">{openTrips.length}</strong><span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Open</span></div>
+      <div className="flex flex-col items-center gap-0.5 text-center"><RadioTower size={16} className="text-blue-500" /><strong className="text-lg font-black tabular-nums text-slate-900">{activeTrips.length}</strong><span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Live</span></div>
+      <div className="flex flex-col items-center gap-0.5 text-center"><BellRing size={16} className="text-amber-500" /><strong className="text-lg font-black tabular-nums text-slate-900">{unassignedTrips.length}</strong><span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Dispatch</span></div>
+      <div className="flex flex-col items-center gap-0.5 text-center"><CircleDot size={16} className="text-rose-500" /><strong className="text-lg font-black tabular-nums text-slate-900">{offlineDrivers}</strong><span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Offline</span></div>
     </div>
   </AdminCard>
 );
 
 const MobilePriorityStack = ({ trips = [] }) => (
-  <AdminCard pad={false} className="mobile-admin-command-card">
-    <div className="mobile-admin-command-head">
+  <AdminCard pad={false} className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-100">
       <div>
-        <p>Priority stack</p>
-        <h3>Trips to watch</h3>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Priority stack</p>
+        <h3 className="text-sm font-bold text-slate-900">Trips to watch</h3>
       </div>
       <AdminBadge tone={trips.length ? 'danger' : 'success'}>{trips.length ? trips.length : 'Clear'}</AdminBadge>
     </div>
-    <div className="mobile-admin-priority-list">
+    <div className="divide-y divide-slate-100">
       {trips.slice(0, 4).map((trip, index) => (
-        <div key={trip.id || trip.bookingId || index} className="mobile-admin-priority-row">
-          <div className="mobile-admin-priority-rank">{index + 1}</div>
+        <div key={trip.id || trip.bookingId || index} className="flex items-center gap-3 px-3.5 py-2.5">
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[11px] font-bold text-slate-600 shrink-0">{index + 1}</div>
           <div className="min-w-0 flex-1">
-            <div className="mobile-admin-priority-title">
-              <strong>{tripLabel(trip)}</strong>
+            <div className="flex items-center gap-1.5">
+              <strong className="text-xs font-bold text-slate-900 truncate">{tripLabel(trip)}</strong>
               <AdminBadge tone={!trip.driverId || trip.status === 'Unassigned' ? 'danger' : 'warning'}>{trip.status || 'Open'}</AdminBadge>
             </div>
-            <span>{tripMeta(trip)}</span>
+            <span className="text-[11px] text-slate-500 font-medium">{tripMeta(trip)}</span>
           </div>
         </div>
       ))}
       {trips.length === 0 && (
-        <div className="mobile-admin-clear-state">
+        <div className="flex items-center gap-2 px-3.5 py-4 text-emerald-600">
           <CheckCircle2 size={20} />
-          <span>No urgent dispatch items</span>
+          <span className="text-xs font-semibold">No urgent dispatch items</span>
         </div>
       )}
     </div>
@@ -112,34 +126,34 @@ const MobilePriorityStack = ({ trips = [] }) => (
 const MobileDriverCard = ({ driver, activeTrip }) => {
   const live = getDriverLiveStatus(driver);
   return (
-    <AdminCard pad={false} className="mobile-admin-driver-card">
-      <div className="mobile-admin-card-top">
+    <AdminCard pad={false} className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-3.5 py-3">
         <AdminAvatar name={driver.name} brand size={46} />
         <div className="min-w-0 flex-1">
-          <div className="mobile-admin-card-title-row">
-            <h3>{driver.name || 'Unnamed driver'}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-bold text-slate-900 truncate">{driver.name || 'Unnamed driver'}</h3>
             <AdminBadge tone={liveTone(live.label)} dot>{live.label}</AdminBadge>
           </div>
-          <p>{driver.vehicle || 'No vehicle assigned'}</p>
+          <p className="text-[11px] text-slate-500 font-medium truncate">{driver.vehicle || 'No vehicle assigned'}</p>
         </div>
       </div>
-      <div className="mobile-admin-field-grid">
+      <div className="grid grid-cols-2 gap-2 px-3.5 py-2 border-t border-slate-100">
         <div>
-          <span>Phone</span>
-          <strong>{driver.phone || '--'}</strong>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Phone</span>
+          <strong className="text-xs font-bold text-slate-900 block">{driver.phone || '--'}</strong>
         </div>
         <div>
-          <span>Zone</span>
-          <strong>{driver.currentZone || '--'}</strong>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Zone</span>
+          <strong className="text-xs font-bold text-slate-900 block">{driver.currentZone || '--'}</strong>
         </div>
       </div>
       {activeTrip && (
-        <div className="mobile-admin-trip-strip">
+        <div className="flex items-center justify-between px-3.5 py-2 bg-blue-50 border-t border-blue-100">
           <div>
-            <span>{activeTrip.status || 'Active'}</span>
-            <strong>{tripLabel(activeTrip)}</strong>
+            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">{activeTrip.status || 'Active'}</span>
+            <strong className="text-xs font-bold text-blue-900 block">{tripLabel(activeTrip)}</strong>
           </div>
-          <Clock3 size={16} />
+          <Clock3 size={16} className="text-blue-500" />
         </div>
       )}
     </AdminCard>
@@ -147,37 +161,37 @@ const MobileDriverCard = ({ driver, activeTrip }) => {
 };
 
 const MobilePersonCard = ({ user, role, live, pwResetMsg, onRoleChange, onResetPassword }) => (
-  <AdminCard pad={false} className="mobile-admin-person-card">
-    <div className="mobile-admin-card-top">
+  <AdminCard pad={false} className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex items-center gap-3 px-3.5 py-3">
       <AdminAvatar name={user.name} size={44} />
       <div className="min-w-0 flex-1">
-        <div className="mobile-admin-card-title-row">
-          <h3>{user.name || 'Unnamed user'}</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-sm font-bold text-slate-900 truncate">{user.name || 'Unnamed user'}</h3>
           {user._role === 'driver' ? (
             <AdminBadge tone={liveTone(live?.label)} dot>{live?.label || 'Driver'}</AdminBadge>
           ) : (
             <AdminBadge tone="info" dot>Dispatcher</AdminBadge>
           )}
         </div>
-        <p>{user.email || 'No email'}</p>
+        <p className="text-[11px] text-slate-500 font-medium truncate">{user.email || 'No email'}</p>
       </div>
     </div>
-    <div className="mobile-admin-contact-lines">
-      <span><Mail size={14} /> {user.email || 'No email'}</span>
-      <span><Phone size={14} /> {user.phone || 'No phone'}</span>
+    <div className="flex flex-col gap-1 px-3.5 py-2 border-t border-slate-100">
+      <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium"><Mail size={14} /> {user.email || 'No email'}</span>
+      <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium"><Phone size={14} /> {user.phone || 'No phone'}</span>
     </div>
-    <div className="mobile-admin-person-actions">
+    <div className="flex items-center gap-2 px-3.5 py-2.5 border-t border-slate-100">
       <select
         value={user._role}
         onChange={(event) => onRoleChange(user, event.target.value)}
-        className="adm-select"
+        className="min-h-9 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 focus:border-blue-500 outline-none"
       >
         {role === 'admin' && <option value="admin">Admin</option>}
         <option value="dispatcher">Dispatcher</option>
         <option value="driver">Driver</option>
       </select>
       <div className="flex items-center gap-2">
-        {pwResetMsg[user.email] && <span className="mobile-admin-reset-note">{pwResetMsg[user.email]}</span>}
+        {pwResetMsg[user.email] && <span className="text-[10px] font-semibold text-emerald-600">{pwResetMsg[user.email]}</span>}
         {user.email && (
           <AdminIconButton onClick={() => onResetPassword(user.email)} title="Send password reset">
             <KeyRound size={15} />
@@ -189,14 +203,16 @@ const MobilePersonCard = ({ user, role, live, pwResetMsg, onRoleChange, onResetP
 );
 
 const MobileActivityItem = ({ log }) => (
-  <div className="mobile-admin-activity-item">
-    <div className={`mobile-admin-activity-dot ${log.c === 'rose' ? 'is-danger' : log.c === 'amber' ? 'is-warning' : log.c === 'emerald' ? 'is-success' : ''}`} />
+  <div className="flex items-start gap-3 px-3.5 py-2.5">
+    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${
+      log.c === 'rose' ? 'bg-rose-500' : log.c === 'amber' ? 'bg-amber-500' : log.c === 'emerald' ? 'bg-emerald-500' : 'bg-slate-400'
+    }`} />
     <div className="min-w-0 flex-1">
-      <div className="mobile-admin-activity-head">
-        <strong>{log.t || 'Activity'}</strong>
-        <span>{formatTime(log.time)}</span>
+      <div className="flex items-center justify-between">
+        <strong className="text-xs font-bold text-slate-900">{log.t || 'Activity'}</strong>
+        <span className="text-[10px] text-slate-500 font-semibold">{formatTime(log.time)}</span>
       </div>
-      <p>{log.meta?.summary || log.d || 'System update'}</p>
+      <p className="text-[11px] text-slate-500 font-medium">{log.meta?.summary || log.d || 'System update'}</p>
     </div>
   </div>
 );
@@ -394,38 +410,42 @@ const MobileAdminPage = ({
         </div>
       }
     >
-      <div className="mobile-admin-page bg-slate-50 pb-24">
+      <div className="bg-slate-50 pb-24">
         {isLoading && <AdminEmpty title="Loading workspace" description="Refreshing today’s operational data…" />}
         {readOnly && <div role="status" className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">Read-only mode: operational changes are temporarily disabled.</div>}
         {activeTab === 'overview' && (
           <>
-            <div className="mobile-admin-hero">
-              <div className="mobile-admin-hero-icon"><ShieldCheck size={22} /></div>
+            <div className="flex items-start gap-3 px-4 py-4 bg-white border-b border-slate-200">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 text-blue-600"><ShieldCheck size={22} /></div>
               <div className="min-w-0">
-                <p className="mobile-admin-eyebrow">Agape command</p>
-                <p>Live team, trips, drivers, and access signals in one clean mobile workspace.</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agape command</p>
+                <p className="text-xs font-semibold text-slate-700">Live team, trips, drivers, and access signals in one clean mobile workspace.</p>
               </div>
             </div>
 
-            <div className="mobile-admin-metric-grid">
+            <div className="grid grid-cols-2 gap-2 px-3 py-3">
               <MobileMetric icon={Truck} value={drivers.length} label="Drivers" hint={`${driverStatusCounts.online} online`} />
               <MobileMetric icon={RadioTower} value={driverStatusCounts.busy} label="Busy" hint={`${activeTrips.length} trips`} tone="warning" />
               <MobileMetric icon={CircleDot} value={unassignedTrips.length} label="Open" hint="Need dispatch" tone={unassignedTrips.length ? 'danger' : 'success'} />
               <MobileMetric icon={Briefcase} value={dispatchers.length} label="Dispatchers" hint="Access desk" tone="info" />
             </div>
 
-            <MobileCommandSignals
-              openTrips={openTrips}
-              activeTrips={activeTrips}
-              unassignedTrips={unassignedTrips}
-              offlineDrivers={driverStatusCounts.offline}
-            />
+            <div className="px-3 pb-3">
+              <MobileCommandSignals
+                openTrips={openTrips}
+                activeTrips={activeTrips}
+                unassignedTrips={unassignedTrips}
+                offlineDrivers={driverStatusCounts.offline}
+              />
+            </div>
 
-            <MobilePriorityStack trips={attentionTrips} />
+            <div className="px-3 pb-3">
+              <MobilePriorityStack trips={attentionTrips} />
+            </div>
 
-            <AdminCard pad={false} className="overflow-hidden">
+            <AdminCard pad={false} className="mx-3 mb-3 overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm">
               <AdminCardHead icon={Truck} title="Live Fleet" action={<AdminButton variant="ghost" size="sm" onClick={() => setActiveTab('drivers')}>View all</AdminButton>} />
-              <div className="mobile-admin-list">
+              <div className="divide-y divide-slate-100">
                 {sortedDrivers.slice(0, 6).map(driver => (
                   <MobileDriverCard key={driver.id || driver.email || driver.name} driver={driver} activeTrip={activeTripsByDriver.get(driver.id)} />
                 ))}
@@ -433,9 +453,9 @@ const MobileAdminPage = ({
               </div>
             </AdminCard>
 
-            <AdminCard pad={false} className="overflow-hidden">
+            <AdminCard pad={false} className="mx-3 mb-3 overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm">
               <AdminCardHead icon={Activity} title="Latest Activity" action={<AdminButton variant="ghost" size="sm" onClick={() => setActiveTab('activity')}>Timeline</AdminButton>} />
-              <div className="mobile-admin-activity-list">
+              <div className="divide-y divide-slate-100">
                 {logs.slice(0, 5).map((log, index) => <MobileActivityItem key={log.id || index} log={log} />)}
                 {logs.length === 0 && <AdminEmpty icon={Activity} title="No activity yet" />}
               </div>
@@ -446,7 +466,7 @@ const MobileAdminPage = ({
         {activeTab === 'drivers' && (
           <>
             <AdminSearch icon={Search} value={driverQuery} onChange={setDriverQuery} placeholder="Search drivers, vehicle, zone..." />
-            <div className="mobile-admin-list">
+            <div className="space-y-3 px-3 py-3">
               {visibleDrivers.map(driver => (
                 <MobileDriverCard key={driver.id || driver.email || driver.name} driver={driver} activeTrip={activeTripsByDriver.get(driver.id)} />
               ))}
@@ -472,7 +492,7 @@ const MobileAdminPage = ({
         {activeTab === 'people' && (
           <>
             <AdminSearch icon={Search} value={peopleQuery} onChange={setPeopleQuery} placeholder="Search people, role, phone..." />
-            <div className="mobile-admin-list">
+            <div className="space-y-3 px-3 py-3">
               {visibleUsers.map((user, index) => (
                 <MobilePersonCard
                   key={`${user._source}-${user.id || user.email || index}`}
@@ -493,9 +513,9 @@ const MobileAdminPage = ({
         )}
 
         {activeTab === 'activity' && (
-          <AdminCard pad={false} className="overflow-hidden">
+          <AdminCard pad={false} className="mx-3 mt-3 overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm">
             <AdminCardHead icon={Activity} title="System Timeline" />
-            <div className="mobile-admin-activity-list">
+            <div className="divide-y divide-slate-100">
               {logs.slice(0, 50).map((log, index) => <MobileActivityItem key={log.id || index} log={log} />)}
               {logs.length === 0 && <AdminEmpty icon={Activity} title="No activity yet" />}
             </div>

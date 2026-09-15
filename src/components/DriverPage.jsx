@@ -6181,30 +6181,30 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
       {/* ===== HISTORY PAGE ===== */}
       {activeNav === 'history' && (
-        <div className="agape-mobile-page agape-mobile-history flex-1 overflow-y-auto">
-          <div className="agape-mobile-toolbar">
-            <div className="app-filter-bar gap-2">
+        <div className="flex-1 overflow-y-auto bg-slate-50 pb-24">
+          <div className="shrink-0 border-b border-slate-200 bg-white">
+            <div className="flex items-center gap-2 px-2 py-1.5">
 
               <button
                 type="button"
                 onClick={() => goToHistoryDay(-1)}
                 disabled={selectedHistoryDate <= historyWindowStart}
-                className="agape-mobile-icon-btn disabled:opacity-30"
+                className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600 disabled:opacity-30"
                 aria-label="Previous history day"
               >
                 <ChevronLeft size={15} />
               </button>
 
-              <div className="agape-mobile-date-pill" title={formatHistoryDayLabel(selectedHistoryDate)}>
+              <button className="flex items-center gap-1 px-3 min-h-11 rounded-xl border border-slate-200 bg-white shadow-sm text-[11px] font-bold text-slate-700" title={formatHistoryDayLabel(selectedHistoryDate)}>
                 <span>{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
                 <span>({selectedHistoryDayTrips.length})</span>
-              </div>
+              </button>
 
               <button
                 type="button"
                 onClick={() => goToHistoryDay(1)}
                 disabled={selectedHistoryDate >= historyWindowEnd}
-                className="agape-mobile-icon-btn disabled:opacity-30"
+                className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600 disabled:opacity-30"
                 aria-label="Next history day"
               >
                 <ChevronRight size={15} />
@@ -6227,7 +6227,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     key={f.id}
                     type="button"
                     onClick={() => { setHistoryFilter(f.id); setHistoryExpandedId(null); }}
-                    className={`agape-mobile-icon-btn relative ${active ? `${activeClass} agape-mobile-icon-active` : ''}`}
+                    className={`min-h-11 w-11 rounded-xl border flex items-center justify-center active:scale-95 transition-all shadow-sm relative ${active ? activeClass : 'border-slate-200 bg-white text-slate-600'}`}
                     title={`${f.label} (${historyStatusCounts[f.id] || 0})`}
                     aria-label={`${f.label} filter, ${historyStatusCounts[f.id] || 0} trips`}
                   >
@@ -6240,7 +6240,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 <button
                   type="button"
                   onClick={exportDailyLog}
-                  className="agape-mobile-icon-btn agape-mobile-icon-btn-primary"
+                  className="min-h-11 w-11 rounded-xl bg-blue-600 text-white flex items-center justify-center active:scale-95 transition-transform shadow-sm"
                   title="Export"
                   aria-label="Export history"
                 >
@@ -6250,8 +6250,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             </div>
           </div>
 
-          <div className="agape-mobile-search-section">
-            <div className="agape-mobile-search">
+          <div className="shrink-0 px-3 py-2 border-b border-slate-200 bg-white">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm">
               <Search size={16} className="text-slate-400 shrink-0" />
             <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => { setHistorySearch(e.target.value); setHistoryExpandedId(null); }}
               className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400" />
@@ -6265,10 +6265,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             </p>
           </div>
 
-          <div className="agape-mobile-list">
+          <div className="space-y-3 px-3 py-3">
             {filteredHistory.length === 0 ? (
-              <div className="agape-empty-card">
-                <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem] flex items-center justify-center mb-4 shadow-inner">
                   <Clock size={28} className="text-slate-300" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-900">{historySearch ? 'No matching trips' : 'No history'}</h3>
@@ -6295,9 +6295,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   const inputCls = "w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs focus:border-blue-500 focus:bg-white outline-none transition-all";
                   return (
                     <div key={trip.id} className="space-y-3">
-                      <div className={`agape-trip-list-card agape-trip-${historyTone}`}>
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                         <div
-                          className="agape-trip-card-summary border-b border-slate-100"
+                          className="flex items-center gap-3 px-3 py-3 border-b border-slate-100 cursor-pointer"
                           role={!isEditing ? 'button' : undefined}
                           tabIndex={!isEditing ? 0 : undefined}
                           aria-expanded={isExpanded}
@@ -6312,8 +6312,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           }}
                         >
                           <div className="min-w-0 flex-1">
-                            <h3 className="agape-trip-title">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
-                            <p className="agape-trip-id">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
+                            <h3 className="text-sm font-bold text-slate-900">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
+                            <p className="text-[11px] font-semibold text-slate-500">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
                             {!isEditing && (trip.pickupCity || trip.dropoffCity) && (
                               <p className="text-[11px] text-slate-400 font-medium truncate flex items-center gap-1 mt-0.5">
                                 <MapPin size={10} />
@@ -6321,11 +6321,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                               </p>
                             )}
                           </div>
-                          <div className="agape-trip-right">
+                          <div className="flex items-center gap-2 shrink-0">
                             <div className="flex flex-col items-end">
                               <span className="text-[12px] text-slate-500 font-medium">Driver: {me?.name || '-'}</span>
                             </div>
-                            <span className={`agape-trip-status-dot agape-trip-status-${historyTone}`} title={statusMeta.label} aria-label={statusMeta.label}>
+                            <span className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              historyTone === 'success' ? 'bg-emerald-100 text-emerald-600'
+                              : historyTone === 'danger' ? 'bg-rose-100 text-rose-600'
+                              : historyTone === 'warning' ? 'bg-amber-100 text-amber-600'
+                              : historyTone === 'info' ? 'bg-blue-100 text-blue-600'
+                              : 'bg-slate-100 text-slate-600'
+                            }`} title={statusMeta.label} aria-label={statusMeta.label}>
                               <StatusIcon size={15} />
                             </span>
                             {!isEditing && <ChevronDown size={17} className="text-slate-400" />}
@@ -6479,7 +6485,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   );
                 }
                 return (
-                  <div key={trip.id} className={`agape-trip-list-card agape-trip-${historyTone}`}>
+                  <div key={trip.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div
                       onClick={() => setHistoryExpandedId(trip.id)}
                       onKeyDown={(event) => {
@@ -6491,19 +6497,25 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       role="button"
                       tabIndex={0}
                       aria-expanded={false}
-                      className="agape-trip-card-summary"
+                      className="flex items-center gap-3 px-3 py-3 cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="agape-trip-title">{trip.patient || 'Trip'}</h3>
-                        <p className="agape-trip-id">#{trip.bookingId || trip.id}</p>
+                        <h3 className="text-sm font-bold text-slate-900">{trip.patient || 'Trip'}</h3>
+                        <p className="text-[11px] font-semibold text-slate-500">#{trip.bookingId || trip.id}</p>
                       </div>
-                      <div className="agape-trip-right">
+                      <div className="flex items-center gap-2 shrink-0">
                         <div className="flex flex-col items-end">
                           <span className={`text-[15px] font-semibold ${historyTone === 'danger' ? 'text-rose-600' : historyTone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>{to12hr(trip.time)}</span>
                           <span className="text-[12px] text-slate-500 mt-0.5 font-medium">Driver: {me?.name || '-'}</span>
                         </div>
                         <span
-                          className={`agape-trip-status-dot agape-trip-status-${historyTone}`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            historyTone === 'success' ? 'bg-emerald-100 text-emerald-600'
+                            : historyTone === 'danger' ? 'bg-rose-100 text-rose-600'
+                            : historyTone === 'warning' ? 'bg-amber-100 text-amber-600'
+                            : historyTone === 'info' ? 'bg-blue-100 text-blue-600'
+                            : 'bg-slate-100 text-slate-600'
+                          }`}
                           title={statusMeta.label}
                           aria-label={statusMeta.label}
                         >

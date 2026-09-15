@@ -377,22 +377,22 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const inputCls = "w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg font-semibold text-[11px] focus:border-blue-600 outline-none transition-all";
 
   return (
-    <div className="agape-mobile-page agape-mobile-reports w-full flex-1 flex flex-col overflow-hidden overscroll-contain bg-slate-50 pb-24">
+    <div className="w-full flex-1 flex flex-col overflow-hidden overscroll-contain bg-slate-50 pb-24">
       {/* PAGE HEADER */}
       <div className="shrink-0 px-3 pt-2 pb-1.5 bg-white border-b border-slate-200">
         {editMessage && <div role={editMessage.includes('not saved') ? 'alert' : 'status'} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
       </div>
 
       {/* DATE & FILTERS BAR */}
-      <div className="agape-mobile-toolbar shrink-0 border-b border-slate-200 bg-white">
+      <div className="shrink-0 border-b border-slate-200 bg-white">
         <div className="flex min-w-0 items-center gap-1 px-2 py-1.5">
-          <button onClick={() => shiftDate(-1)} className="agape-mobile-icon-btn" aria-label="Previous date">
+          <button onClick={() => shiftDate(-1)} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Previous date">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button className="agape-mobile-date-pill text-[11px]">
+          <button className="flex items-center gap-1 px-3 min-h-11 rounded-xl border border-slate-200 bg-white shadow-sm text-[11px] font-bold text-slate-700">
             {allDates ? 'All' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
           </button>
-          <button onClick={() => shiftDate(1)} className="agape-mobile-icon-btn" aria-label="Next date">
+          <button onClick={() => shiftDate(1)} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Next date">
             <ChevronRight className="w-4 h-4" />
           </button>
 
@@ -403,7 +403,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             const isActive = statusFilter === p.status;
             return (
               <button key={p.id} onClick={() => { setStatusFilter(p.status); setExpandedTripId(null); }}
-                className={`agape-mobile-icon-btn ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : ''}`}
+                className={`min-h-11 w-11 rounded-xl border flex items-center justify-center active:scale-95 transition-all shadow-sm ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 bg-white text-slate-600'}`}
                 title={p.label}>
                 <Icon size={13} />
               </button>
@@ -411,10 +411,10 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
           })}
 
           <div className="flex items-center gap-0.5 ml-auto">
-            <button onClick={() => handleExport('csv')} className="agape-mobile-icon-btn" aria-label="Download" title="Export CSV">
+            <button onClick={() => handleExport('csv')} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Download" title="Export CSV">
               <Download className="w-4 h-4" />
             </button>
-            <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn" aria-label="Upload" title="Upload">
+            <button onClick={() => setShowUploadModal(true)} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Upload" title="Upload">
               <Upload className="w-4 h-4" />
             </button>
           </div>
@@ -422,9 +422,9 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       </div>
 
       {/* SEARCH BAR & DRIVER FILTER */}
-      <div className="agape-mobile-search-section shrink-0">
+      <div className="shrink-0 px-3 py-2 border-b border-slate-200 bg-white">
         <div className="flex gap-1.5">
-          <div className="agape-mobile-search flex-1">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm flex-1">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="text"
@@ -447,7 +447,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       </div>
 
       {/* MAIN SCROLLABLE CONTENT */}
-      <div className="agape-mobile-scroll flex-1 overflow-y-auto overscroll-contain relative">
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50 relative">
 
         {/* ANALYTICS DASHBOARD TOGGLE */}
         <div className="px-3 py-2 border-b border-slate-200 bg-white">
@@ -470,14 +470,14 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         </div>
 
         {/* DAILY SUMMARY BAR */}
-        <div className="agape-mobile-summary-bar sticky top-0 z-10">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-white shadow-sm">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <span className="agape-mobile-chip">{filteredTrips.length} trips</span>
-            <span className="agape-mobile-chip agape-mobile-chip-success">{filteredTrips.filter(t => t.reviewed).length}/{filteredTrips.length} reviewed</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">{filteredTrips.length} trips</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-700">{filteredTrips.filter(t => t.reviewed).length}/{filteredTrips.length} reviewed</span>
           </div>
           <button
             disabled={readOnly || isLoading}
-            className="agape-mobile-review-btn"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold shadow-sm active:scale-95 transition-transform disabled:opacity-50"
             onClick={async () => {
               const pendingTrips = filteredTrips.filter((trip) => !trip.reviewed);
               if (!onUpdateTrip || pendingTrips.length === 0) return;
@@ -489,7 +489,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
           </button>
         </div>
 
-        <div className="agape-mobile-list">
+        <div className="space-y-3 px-3 py-3">
           {isLoading && (
             <div role="status" className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm font-semibold text-slate-600">Loading reports…</div>
           )}
@@ -526,7 +526,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                 </div>
 
                 {isExpanded && (
-                  <div className="agape-trip-card-details mt-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="mt-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     {isEditing ? (
                       <div className="space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
