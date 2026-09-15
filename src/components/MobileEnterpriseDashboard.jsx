@@ -168,7 +168,7 @@ const MobileEnterpriseDashboard = (props) => {
   const driverWorkTrips = Array.isArray(props.driverWorkTrips) ? props.driverWorkTrips : trips;
   const currentTripDetails = useMemo(() => {
     if (!tripDetails?.id) return null;
-    return driverWorkTrips.find((trip) => String(trip.id) === String(tripDetails.id)) || null;
+    return driverWorkTrips.find((trip) => String(trip.id) === String(tripDetails.id)) || tripDetails;
   }, [driverWorkTrips, tripDetails]);
   const closeTripDetails = () => {
     setTripDetails(null);
