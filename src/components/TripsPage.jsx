@@ -552,7 +552,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         legs={legsCount}
         onLegsClick={() => setLegsDetailPatient(trip.patient)}
         mileage={trip.distance ? (/\bmi$/i.test(String(trip.distance).trim()) ? String(trip.distance).trim() : `${trip.distance} mi`) : null}
-        selectSlot={canOperateTrips && (bulkSelectMode || selectedTasks.length > 0) ? (
+        selectSlot={canOperateTrips ? (
           <button type="button" onClick={() => toggleTaskSelection(trip.id)} aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-blue-600">
             {isSelected ? <CheckSquare size={19} /> : <Square size={19} className="text-slate-400" />}
           </button>
@@ -578,7 +578,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-2 pb-24">
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-2 pb-24 max-md:[&_button]:min-h-11">
       {toastMessage && (
         <div role="status" aria-live="polite" className="absolute top-10 left-4 right-4 z-50 flex items-center gap-1.5 bg-slate-900/95 text-white px-3 py-2 rounded-lg shadow-xl text-xs">
           <Zap size={14} className="text-amber-400" />
@@ -735,21 +735,21 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           Manifest cards + manifest modals below follow the approved compact
           manifest design instead (exact small buttons); the min-height rule is
           intentionally scoped to this chrome, not the page root. */}
-      <div className="card p-4 sm:p-6 space-y-4 max-md:[&_button]:min-h-11">
-        <div className="flex gap-2 md:hidden">
+      <div className="space-y-2 px-3 sm:px-4 md:px-0 pt-3 md:pt-0">
+        <div className="flex gap-1.5 md:hidden">
           <button
             type="button"
             aria-expanded={mobileFiltersOpen}
             aria-controls="mobile-manifest-filters"
             onClick={() => setMobileFiltersOpen((open) => !open)}
-            className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 text-left text-sm font-bold text-slate-700"
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-left text-xs font-bold text-slate-700 shadow-sm"
           >
-            <span className="flex min-w-0 items-center gap-2">
-              <SlidersHorizontal size={17} className="shrink-0 text-blue-600" />
-              <span className="truncate">Filters · {manifestDate}</span>
-              {activeFilterCount > 0 && <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">{activeFilterCount}</span>}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <SlidersHorizontal size={14} className="shrink-0 text-blue-600" />
+              <span className="truncate">{manifestDate}</span>
+              {activeFilterCount > 0 && <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] text-white">{activeFilterCount}</span>}
             </span>
-            <ChevronDown size={16} className={`shrink-0 transition-transform ${mobileFiltersOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={13} className={`shrink-0 transition-transform ${mobileFiltersOpen ? 'rotate-180' : ''}`} />
           </button>
           {canOperateTrips && (
             <button
@@ -759,48 +759,47 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                 if (bulkSelectMode) selectedTasks.forEach((tripId) => toggleTaskSelection(tripId));
                 setBulkSelectMode((active) => !active);
               }}
-              className={`min-w-11 rounded-xl px-3 text-sm font-bold ${bulkSelectMode ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-slate-50 text-slate-600'}`}
+              className={`min-h-10 min-w-10 rounded-xl px-2 text-xs font-bold flex items-center justify-center ${bulkSelectMode ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 shadow-sm'}`}
               title={bulkSelectMode ? 'Exit trip selection' : 'Select trips'}
               aria-label={bulkSelectMode ? 'Exit trip selection' : 'Select trips'}
             >
-              <CheckSquare size={16} className="inline" />
+              <CheckSquare size={15} />
             </button>
           )}
           {canUploadTrips && onShowUploadModal && (
             <button
               type="button"
               onClick={() => onShowUploadModal(true)}
-              className="rounded-xl bg-blue-500 px-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 active:scale-95 transition-transform"
+              className="min-h-10 min-w-10 rounded-xl bg-blue-500 text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform"
               title="Upload CSV or scan trips"
             >
-              <Upload size={16} className="inline" />
+              <Upload size={15} />
             </button>
           )}
           {canCreateTrips && <button
             type="button"
             onClick={() => setShowCreateForm(true)}
-            className="rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-transform"
+            className="min-h-10 rounded-xl bg-emerald-500 px-3 text-xs font-bold text-white shadow-sm active:scale-95 transition-transform flex items-center gap-1"
           >
-            <Plus size={16} className="inline" /> New
+            <Plus size={14} /> New
           </button>}
         </div>
 
-        <div id="mobile-manifest-filters" className={`${mobileFiltersOpen ? 'space-y-4' : 'hidden'} md:block md:space-y-4`}>
-        {/* First Row: Main Filters (driver lives in the chips row above) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div id="mobile-manifest-filters" className={`${mobileFiltersOpen ? 'space-y-3 md:space-y-4' : 'hidden'} md:block`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Search</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Search</label>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Patient, booking, phone..."
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none"
+              placeholder="Patient, booking..."
+              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Sort</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Sort</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
               <option value="time">By Time</option>
               <option value="patient">By Patient</option>
               <option value="zip">By Zip</option>
@@ -808,8 +807,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Status</label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Status</label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
               <option value="all">All</option>
               <option value="Unassigned">Unassigned</option>
               <option value="Assigned">Assigned</option>
@@ -822,12 +821,11 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           </div>
         </div>
 
-        {/* Second Row: Additional Filters & Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 items-end">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Service</label>
-            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none">
-              <option value="all">All Services</option>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Service</label>
+            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
+              <option value="all">All</option>
               {serviceOptions.map((service) => (
                 <option key={service} value={service}>{service}</option>
               ))}
@@ -835,27 +833,27 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Date</label>
-            <div className="flex gap-2">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Date</label>
+            <div className="flex gap-1.5">
               <input
                 type="date"
                 value={manifestDate}
                 disabled={showAllDates}
                 onChange={(e) => setManifestDate(e.target.value)}
-                className={`flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`}
+                className={`flex-1 px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`}
               />
-              <button onClick={() => setShowAllDates(!showAllDates)} className={`px-3 py-2.5 rounded-lg text-xs font-bold uppercase whitespace-nowrap ${showAllDates ? 'bg-blue-100 text-blue-700' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
+              <button onClick={() => setShowAllDates(!showAllDates)} className={`px-2 py-2 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap ${showAllDates ? 'bg-blue-100 text-blue-700' : 'bg-white border border-slate-200 text-slate-600'}`}>
                 {showAllDates ? 'All' : 'Today'}
               </button>
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <select value={layoutMode} onChange={(e) => setLayoutMode(e.target.value)} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none">
+          <div className="flex gap-1.5">
+            <select value={layoutMode} onChange={(e) => setLayoutMode(e.target.value)} className="flex-1 px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
               <option value="grouped">Grouped</option>
               <option value="list">List</option>
             </select>
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-sm outline-none">
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className="flex-1 px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
               <option value="driver">By Driver</option>
               <option value="status">By Status</option>
               <option value="service">By Service</option>
@@ -863,16 +861,13 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             </select>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               type="button"
               onClick={() => setAttentionOnly((prev) => !prev)}
-              className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-bold uppercase whitespace-nowrap ${attentionOnly ? 'bg-rose-100 text-rose-700' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+              className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap ${attentionOnly ? 'bg-rose-100 text-rose-700' : 'bg-white border border-slate-200 text-slate-600'}`}
             >
-              {attentionOnly ? '⚠ Attention' : 'Full Queue'}
-            </button>
-            <button onClick={() => setShowCreateForm(true)} className={`${canCreateTrips ? 'hidden md:block' : 'hidden'} flex-1 px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-sm uppercase`}>
-              <Plus size={14} className="inline mr-1" /> New
+              {attentionOnly ? 'Attention' : 'Full'}
             </button>
           </div>
         </div>
@@ -880,24 +875,24 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
         {/* Bulk Actions - Only show when items selected */}
         {canOperateTrips && selectedTasks.length > 0 && (
-          <div className="flex flex-wrap gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <span className="text-xs font-semibold text-blue-700 self-center">{selectedTasks.length} selected:</span>
-            <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-emerald-700">
-              <Users size={12} className="inline mr-1" /> Assign
+          <div className="flex flex-wrap gap-1.5 p-2 bg-blue-50 border border-blue-200 rounded-xl">
+            <span className="text-[10px] font-bold text-blue-700 self-center">{selectedTasks.length} sel</span>
+            <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="px-2 py-1.5 bg-emerald-600 text-white rounded-lg font-bold text-[10px] uppercase">
+              <Users size={11} className="inline mr-0.5" /> Assign
             </button>
-            <button onClick={() => { setShowReassignModal(true); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-amber-700">
-              <UserCheck size={12} className="inline mr-1" /> Reassign
+            <button onClick={() => { setShowReassignModal(true); }} className="px-2 py-1.5 bg-amber-600 text-white rounded-lg font-bold text-[10px] uppercase">
+              <UserCheck size={11} className="inline mr-0.5" /> Reassign
             </button>
-            <button onClick={handleBulkUnassign} className="px-3 py-2 bg-slate-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-slate-700">
-              <X size={12} className="inline mr-1" /> Remove
+            <button onClick={handleBulkUnassign} className="px-2 py-1.5 bg-slate-600 text-white rounded-lg font-bold text-[10px] uppercase">
+              <X size={11} className="inline mr-0.5" /> Remove
             </button>
             {selectedTasks.length > 1 && (
-              <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-indigo-700">
-                <Sparkles size={12} className="inline mr-1" /> Mission
+              <button onClick={() => { setAssignMode('mission'); setShowAssign(true); }} className="px-2 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[10px] uppercase">
+                <Sparkles size={11} className="inline mr-0.5" /> Mission
               </button>
             )}
-            {canArchiveTrips && <button onClick={handleBulkDelete} className="px-3 py-2 bg-rose-600 text-white rounded-lg font-bold text-xs uppercase hover:bg-rose-700 ml-auto">
-              <Archive size={12} className="inline mr-1" /> Archive
+            {canArchiveTrips && <button onClick={handleBulkDelete} className="px-2 py-1.5 bg-rose-600 text-white rounded-lg font-bold text-[10px] uppercase ml-auto">
+              <Archive size={11} className="inline mr-0.5" /> Archive
             </button>}
           </div>
         )}
@@ -951,8 +946,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       {/* Driver chips — quick queue filter. drivers prop is pre-scoped by role
           (App.jsx driverWorkDrivers), so chips never leak out-of-scope drivers.
           Replaces the old driver dropdown in the filter panel below. */}
-      <section aria-label="Filter by driver" className="bg-white px-3 py-2 border-b border-slate-200 shrink-0 shadow-sm">
-        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+      <section aria-label="Filter by driver" className="bg-white px-2 py-1.5 border-b border-slate-200 shrink-0 shadow-sm">
+        <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {[
             { id: 'all', name: 'All', count: filteredTrips.length, dot: 'bg-blue-400' },
             ...drivers.map((driver) => {
@@ -979,7 +974,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                 type="button"
                 onClick={() => setDriverFilter(selected ? 'all' : chip.id)}
                 aria-pressed={selected}
-                className={`flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium whitespace-nowrap shrink-0 ${
+                className={`flex min-h-9 items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap shrink-0 ${
                   selected ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'
                 }`}
               >

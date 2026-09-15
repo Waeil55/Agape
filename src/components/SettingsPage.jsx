@@ -928,7 +928,7 @@ const SettingsPage = ({
       </nav>
 
       {/* Mobile nav */}
-      <div className="app-filter-bar -mx-1 w-full px-1 pb-2 touch-manipulation lg:hidden">
+      <div className="-mx-1 w-full px-1 pb-2 touch-manipulation lg:hidden">
         <div className="flex flex-wrap gap-1.5">
           {mobileNavItems.map(item => {
             const Icon = item.icon;

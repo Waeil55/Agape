@@ -740,7 +740,7 @@ const DriverToolsPage = ({ trips, activeTrips, aiSequence, aiSuggestions, aiRide
   };
 
   return (
-    <div className="driver-tools-workspace flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50 px-3 pb-24 pt-3 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:px-4 sm:pt-4">
+    <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50 px-3 pb-24 pt-3 sm:px-4 sm:pt-4">
       <section className="relative overflow-hidden rounded-xl bg-slate-950 px-4 py-4 text-white shadow-[0_16px_40px_rgba(15,23,42,0.16)]" aria-labelledby="driver-route-studio-title">
         <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-blue-500/20" aria-hidden="true" />
         <div className="relative">
