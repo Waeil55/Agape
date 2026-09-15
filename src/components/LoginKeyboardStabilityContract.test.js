@@ -18,11 +18,13 @@ describe('login keyboard stability contract', () => {
     expect(loginBlock).not.toContain('translate3d');
   });
 
-  it('sets native keyboard resize mode without scroll lock', () => {
+  it('scrolls focused input into view without locking scrollTop', () => {
     const hook = read('src/hooks/useLoginKeyboardStability.js');
-    expect(hook).toContain('Keyboard.setResizeMode({ mode: KeyboardResize.None })');
-    expect(hook).toContain('isNativeShell');
+    expect(hook).toContain('visualViewport');
+    expect(hook).toContain('resize');
+    expect(hook).toContain('scrollIntoView');
     expect(hook).not.toContain('el.scrollTop = 0');
-    expect(hook).not.toContain('visualViewport');
+    expect(hook).not.toContain('Keyboard.setResizeMode');
+    expect(hook).not.toContain('isNativeShell');
   });
 });

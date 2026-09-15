@@ -1,28 +1,38 @@
 import { useEffect } from 'react';
-import { isNativeShell } from '../utils/platform';
 
 /**
- * Stabilizes the login page on mobile when the virtual keyboard opens.
- *
- * With `interactive-widget=overlays-content`, the viewport doesn't shrink,
- * so iOS auto-scrolls the focused input into view above the keyboard. We
- * must NOT lock scrollTop — that would prevent the user from reaching the
- * submit button. We only set the native keyboard resize mode to "none" so
- * Capacitor doesn't fight the viewport meta.
+ * Keeps the login form's submit button reachable when the virtual keyboard opens
+ * on mobile. With `interactive-widget=overlays-content`, the keyboard overlays
+ * the content instead of shrinking the viewport. We scroll the focused input
+ * into view above the keyboard — we never lock scrollTop to 0.
  */
 export default function useLoginKeyboardStability(enabled) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return undefined;
 
-    if (isNativeShell()) {
-      let cancelled = false;
-      import('@capacitor/keyboard').then(async ({ Keyboard, KeyboardResize }) => {
-        if (cancelled) return;
-        await Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {});
-      }).catch(() => {});
-      return () => { cancelled = true; };
-    }
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
 
-    return undefined;
+    const handleResize = () => {
+      const height = vv.height;
+      const fullHeight = window.innerHeight;
+      if (!height || !fullHeight) return;
+      const keyboardOpen = height < fullHeight * 0.75;
+
+      if (keyboardOpen) {
+        const active = document.activeElement;
+        if (active && active.tagName !== 'BODY') {
+          const login = document.querySelector('.agape-login');
+          if (login) {
+            setTimeout(() => {
+              active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }
+        }
+      }
+    };
+
+    vv.addEventListener('resize', handleResize);
+    return () => { vv.removeEventListener('resize', handleResize); };
   }, [enabled]);
 }

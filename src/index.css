@@ -5594,6 +5594,7 @@ textarea:focus,
     overscroll-behavior: none;
     touch-action: pan-y;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    scroll-padding-bottom: 350px;
   }
 
   .agape-login-panel {
@@ -5611,6 +5612,7 @@ textarea:focus,
   .agape-login {
     padding-inline: 12px !important;
     padding-block: max(var(--sat), 12px) max(var(--sab), 12px) !important;
+    overflow-y: auto !important;
   }
 
   .agape-login-panel {
