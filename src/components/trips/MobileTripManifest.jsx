@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Navigation, User, AlertTriangle, Clock, CheckCircle2, Zap, Shield, Timer, ChevronRight } from 'lucide-react';
+import { Layers, Navigation, User, AlertTriangle, Clock, CheckCircle2, Zap, Shield, Timer, ChevronRight, Copy } from 'lucide-react';
 import { timeToMinutes, tripCalendarDateKey } from '../../utils/tripDate';
 import { getTripActionCapabilities, isTripActionTerminal, TRIP_TERMINAL_STATUSES } from './tripActionPolicy';
 
@@ -58,25 +58,25 @@ export function getManifestDisplayStatus(trip) {
 // the only extension beyond the design (real trips need it; blue family).
 // Unknown statuses fail to neutral slate, never crash.
 const STATUS_STYLES = {
-  completed: 'bg-emerald-100 text-emerald-800',
-  'in progress': 'bg-blue-100 text-blue-800',
-  'in mission': 'bg-blue-100 text-blue-800',
-  'at pickup': 'bg-emerald-100 text-emerald-800',
-  'at dropoff': 'bg-emerald-100 text-emerald-800',
-  'in transit': 'bg-blue-100 text-blue-800',
-  'en route': 'bg-amber-100 text-amber-800',
-  'navigating pickup': 'bg-blue-100 text-blue-800',
-  'navigating dropoff': 'bg-blue-100 text-blue-800',
-  arrived: 'bg-emerald-100 text-emerald-800',
-  unassigned: 'bg-rose-100 text-rose-800',
-  'no show': 'bg-orange-100 text-orange-800',
-  'trip rerouted': 'bg-purple-100 text-purple-800',
-  rerouted: 'bg-purple-100 text-purple-800',
-  cancelled: 'bg-slate-100 text-slate-700',
-  canceled: 'bg-slate-100 text-slate-700',
-  transferred: 'bg-slate-100 text-slate-700',
-  no_show: 'bg-orange-100 text-orange-800',
-  assigned: 'bg-blue-100 text-blue-800',
+  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
+  'in progress': 'bg-blue-50 text-blue-700 border border-blue-200/80',
+  'in mission': 'bg-blue-50 text-blue-700 border border-blue-200/80',
+  'at pickup': 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
+  'at dropoff': 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
+  'in transit': 'bg-blue-50 text-blue-700 border border-blue-200/80',
+  'en route': 'bg-amber-50 text-amber-700 border border-amber-200/80',
+  'navigating pickup': 'bg-blue-50 text-blue-700 border border-blue-200/80',
+  'navigating dropoff': 'bg-blue-50 text-blue-700 border border-blue-200/80',
+  arrived: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
+  unassigned: 'bg-rose-50 text-rose-700 border border-rose-200/80',
+  'no show': 'bg-orange-50 text-orange-700 border border-orange-200/80',
+  'trip rerouted': 'bg-purple-50 text-purple-700 border border-purple-200/80',
+  rerouted: 'bg-purple-50 text-purple-700 border border-purple-200/80',
+  cancelled: 'bg-slate-50 text-slate-700 border border-slate-200/80',
+  canceled: 'bg-slate-50 text-slate-700 border border-slate-200/80',
+  transferred: 'bg-slate-50 text-slate-700 border border-slate-200/80',
+  no_show: 'bg-orange-50 text-orange-700 border border-orange-200/80',
+  assigned: 'bg-blue-50 text-blue-700 border border-blue-200/80',
 };
 export function getManifestStatusBadge(status) {
   return STATUS_STYLES[String(status || '').trim().toLowerCase()] || 'bg-slate-100 text-slate-700';
@@ -374,12 +374,10 @@ export function getManifestAddressLines(value, explicitCity = '') {
 }
 
 // ---------------------------------------------------------------------------
-// ManifestTripCard — one trip, information-prioritized: decision (time +
-// urgency + status) first, client + locations second, role-gated actions last.
-// Exact design tokens. Slots: selectSlot (bulk checkbox), assignSlot
-// (optional parent content), noteSlot (notes row). The primary and overflow
-// controls stay pinned on narrow phones; lower-priority actions progressively
-// move to the parent's More sheet instead of creating a hidden action rail.
+// ManifestTripCard — modern fleet-dispatch card matching reference design:
+// header (checkbox + time + name + ID), route timeline with dashed connector,
+// compact footer (driver pill + action icons + telemetry + status badge).
+// Slots: selectSlot (bulk checkbox), assignSlot, primaryAction, iconActions, onMore.
 // ---------------------------------------------------------------------------
 export function ManifestTripCard({
   trip,
@@ -406,148 +404,171 @@ export function ManifestTripCard({
   const statusBadge = getManifestStatusBadge(displayStatus);
   const pickup = getManifestAddressLines(trip?.pickup, trip?.pickupCity);
   const dropoff = getManifestAddressLines(trip?.dropoff, trip?.dropoffCity);
+  const isDone = isTripActionTerminal(trip);
+  const timeColor = trip?.urgent
+    ? 'text-rose-600'
+    : cd.level === 'on-time' || cd.level === 'ready'
+      ? 'text-blue-600'
+      : cd.level === 'approaching'
+        ? 'text-amber-600'
+        : 'text-slate-700';
+  const statusPulseColor = isDone
+    ? 'bg-emerald-500'
+    : cd.level === 'on-time' || cd.level === 'ready'
+      ? 'bg-blue-600'
+      : cd.level === 'approaching'
+        ? 'bg-amber-500'
+        : 'bg-slate-400';
+
   return (
-    <article className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
-      {/* Header — time + countdown + legs + status */}
-      <div className="px-2 pt-1 pb-0.5 flex items-start justify-between gap-2 bg-slate-50/50 border-b border-slate-100">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    <article className="bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150" aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
+
+      {/* ── HEADER: Checkbox + Time | Passenger Name + Trip ID ── */}
+      <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {selectSlot}
           {onTimeEdit ? (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
-              className={`text-base font-bold leading-none tabular-nums hover:underline decoration-1 underline-offset-2 ${COUNTDOWN_TIME_TEXT[cd.level]}`}
-              title="Edit schedule"
-            >
+            <button type="button" onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
+              className={`text-[17px] font-extrabold tracking-tight shrink-0 hover:underline decoration-1 underline-offset-2 ${timeColor}`}
+              title="Edit schedule">
               {trip?.time || '—'}
             </button>
           ) : (
-            <span className={`text-base font-bold leading-none tabular-nums ${COUNTDOWN_TIME_TEXT[cd.level]}`}>
-              {trip?.time || '—'}
-            </span>
+            <span className={`text-[17px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
           )}
-          <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${COUNTDOWN_BADGE[cd.level]}`}>
-            {cd.label}
-          </span>
+          <span className="text-slate-300 shrink-0 font-light">|</span>
+          <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
+            <span className="text-[15px] font-bold text-slate-900 truncate">{trip?.patient || 'Unknown client'}</span>
+            {legs > 0 && (
+              onLegsClick ? (
+                <button type="button" onClick={onLegsClick} className="text-[11px] text-slate-500 hidden sm:inline shrink-0"
+                  aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}>
+                  ({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-500 hidden sm:inline shrink-0">({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})</span>
+              )
+            )}
+          </div>
         </div>
-        <div className="flex max-w-[48%] shrink-0 items-center gap-1">
-          {legs > 0 && (
-            onLegsClick ? (
-              <button
-                type="button"
-                onClick={onLegsClick}
-                className="flex min-h-9 items-center rounded-xl text-[10px] font-semibold text-slate-600"
-                aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}
-              >
-                <span className="flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-px">
-                  <Layers size={10} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
-                </span>
-              </button>
-            ) : (
-              <span className="flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-600">
-                <Layers size={10} /> {legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`}
-              </span>
-            )
-          )}
-          <span title={displayStatus} className={`max-w-[100px] truncate px-1.5 py-px rounded text-[10px] font-semibold ${statusBadge}`}>{displayStatus}</span>
-        </div>
-      </div>
-
-      {/* Client + trip ID */}
-      <div className="px-2 py-0 flex justify-between items-center gap-2">
-        <span className="min-w-0 truncate text-[13px] font-semibold text-slate-700">{trip?.patient || 'Unknown client'}</span>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center shrink-0 gap-1.5">
           <PriorityBadge trip={trip} />
           <SLABadge trip={trip} />
-          {(trip?.bookingId || trip?.id) && (
-            <span className="text-[11px] font-medium tabular-nums text-slate-400">#{trip.bookingId || trip.id}</span>
-          )}
+          <span className="text-xs font-bold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-300/60 tracking-wide">
+            #{trip?.bookingId || trip?.id || '—'}
+          </span>
         </div>
       </div>
 
-      {/* Workflow Progress — compact 1-line bar */}
-      {!isTripActionTerminal(trip) && trip?.status && (
-        <div className="px-2 pb-0.5">
+      {/* ── ROUTE TIMELINE: Pickup → Dropoff with dashed connector ── */}
+      <div className="px-3.5 py-2">
+        <div className="relative pl-3.5 space-y-1.5 before:content-[''] before:absolute before:left-[3.5px] before:top-2 before:bottom-2 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
+
+          {/* Pickup Line */}
+          <div className="relative flex items-center justify-between gap-1.5 text-xs">
+            <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-emerald-500 bg-white" />
+            <div className="flex items-baseline gap-1.5 truncate min-w-0">
+              <span className="text-[10px] font-black uppercase text-emerald-600 shrink-0">PU</span>
+              <span className="text-[13.5px] font-semibold text-slate-800 truncate">{pickup.street}</span>
+              {pickup.locality && <span className="text-[11px] text-slate-500 truncate hidden sm:inline">• {pickup.locality}</span>}
+            </div>
+            <PriorityBadge trip={trip} />
+          </div>
+
+          {/* Dropoff Line */}
+          <div className="relative flex items-center justify-between gap-1.5 text-xs">
+            <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-rose-500 bg-white" />
+            <div className="flex items-baseline gap-1.5 truncate min-w-0">
+              <span className="text-[10px] font-black uppercase text-rose-600 shrink-0">DO</span>
+              <span className="text-[13.5px] font-semibold text-slate-800 truncate">{dropoff.street}</span>
+              {dropoff.locality && <span className="text-[11px] text-slate-500 truncate hidden sm:inline">• {dropoff.locality}</span>}
+            </div>
+            {mileage && (
+              <span className="text-[11px] font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200/50 tabular-nums shrink-0">{mileage}</span>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── WORKFLOW PROGRESS (non-terminal only) ── */}
+      {!isDone && trip?.status && (
+        <div className="px-3.5 pb-1">
           <WorkflowProgressBar trip={trip} />
         </div>
       )}
 
-      {/* Pickup / Dropoff grid — compact cells */}
-      <div className="px-2 pb-0.5">
-        <div className="grid grid-cols-2 gap-1">
-          <div className="bg-emerald-50/60 p-1 rounded-lg border border-emerald-100/50 min-w-0">
-            <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider leading-none mb-0.5">Pickup</div>
-            <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={pickup.street}>{pickup.street}</div>
-            {pickup.locality && <div className="mt-0.5 truncate text-[11px] font-medium leading-none text-slate-400" title={pickup.locality}>{pickup.locality}</div>}
-          </div>
-          <div className="bg-rose-50/60 p-1 rounded-lg border border-rose-100/50 min-w-0">
-            <div className="flex items-center justify-between mb-0.5">
-              <div className="text-[9px] font-bold text-rose-600 uppercase tracking-wider leading-none">Dropoff</div>
-              {mileage && (
-                <div className="text-[10px] font-bold text-slate-600 bg-white/80 px-1 py-px rounded border border-slate-200/50 leading-none tabular-nums">{mileage}</div>
-              )}
-            </div>
-            <div className="truncate text-[13px] font-semibold leading-tight text-slate-800" title={dropoff.street}>{dropoff.street}</div>
-            {dropoff.locality && <div className="mt-0.5 truncate text-[11px] font-medium leading-none text-slate-400" title={dropoff.locality}>{dropoff.locality}</div>}
-          </div>
-        </div>
-      </div>
-
       {assignSlot}
 
-      {/* Action bar — compact */}
-      <div className="flex items-center gap-1.5 px-2 pb-1 pt-0 border-t border-slate-100">
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-          {reassignAction && (
-            <button type="button" onClick={reassignAction.onClick} className="hidden px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[11px] font-semibold border border-amber-200 shrink-0 min-[340px]:flex min-h-9 items-center">
-              Reassign
-            </button>
-          )}
-          {archiveAction && (
-            <button type="button" onClick={archiveAction.onClick} className="hidden px-2 py-0.5 bg-slate-50 text-slate-600 rounded text-[11px] font-semibold border border-slate-200 shrink-0 min-[520px]:flex min-h-9 items-center">
-              Archive
-            </button>
-          )}
-          {iconActions.slice(0, 2).map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.id}
-                type="button"
-                onClick={action.onClick}
-                title={action.label}
-                aria-label={action.ariaLabel || action.label}
-                className="p-0 bg-slate-50 text-slate-600 rounded border border-slate-200 shrink-0 min-h-9 min-w-9 flex items-center justify-center"
-              >
-                <Icon size={13} />
-              </button>
-            );
-          })}
-          <div className="flex-1" />
-          <div className="flex items-center gap-0.5 text-[11px] font-medium text-slate-400 shrink-0">
-            <User size={11} /> <span className="truncate max-w-[60px]">{driverName}</span>
+      {/* ── FOOTER: Driver pill + Action icons + Telemetry + Status ── */}
+      <div className="px-3 py-2 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-1">
+
+        {/* Left: Driver Pill + Call/SMS/Options buttons */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          {/* Driver Pill */}
+          <div className="flex items-center gap-1 h-7 px-2 rounded-lg bg-white border border-slate-200/80 text-[11px] font-semibold text-slate-700 shadow-2xs">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusPulseColor}`} />
+            <span className="truncate max-w-[100px]">{driverName || trip?.driverName || '—'}</span>
           </div>
-          {onMore && MoreIcon && (
-            <button
-              type="button"
-              onClick={onMore}
+
+          {/* Call Button */}
+          {iconActions.find(a => a.id === 'call') ? (
+            <button type="button" onClick={iconActions.find(a => a.id === 'call')?.onClick}
+              title="Call" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
+              <User size={13} className="text-emerald-600" />
+            </button>
+          ) : null}
+
+          {/* SMS Button */}
+          {iconActions.find(a => a.id === 'message') ? (
+            <button type="button" onClick={iconActions.find(a => a.id === 'message')?.onClick}
+              title="Text" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
+              <Navigation size={13} className="text-blue-500" />
+            </button>
+          ) : null}
+
+          {/* More / Options Button */}
+          {onMore && (
+            <button type="button" onClick={onMore}
               aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
               title={typeof moreLabel === 'string' ? moreLabel : undefined}
-              className="p-0 text-slate-400 bg-slate-50 rounded border border-slate-200 shrink-0 min-h-9 min-w-9 flex items-center justify-center"
-            >
-              <MoreIcon size={13} />
-            </button>
-          )}
-          {primaryAction && (
-            <button
-              type="button"
-              onClick={primaryAction.onClick}
-              className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] font-bold flex items-center gap-1 shrink-0 min-h-9 shadow-sm"
-            >
-              <Navigation size={11} /> {primaryAction.label}
+              className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
+              {MoreIcon ? <MoreIcon size={13} /> : <AlertTriangle size={13} />}
             </button>
           )}
         </div>
+
+        {/* Right: Telemetry (countdown/time away + distance) + Status Badge */}
+        <div className="flex items-center gap-1 shrink-0 justify-end">
+          {/* Telemetry Pill */}
+          <div className="flex items-center h-7 rounded-lg border border-slate-200 bg-white overflow-hidden text-[11px] font-semibold shadow-2xs">
+            {!isDone ? (
+              <div className={`flex items-center gap-1 px-1.5 h-full border-r border-slate-200 whitespace-nowrap ${
+                trip?.urgent ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'
+              }`}>
+                <Navigation size={10} className="text-blue-500 fill-current" />
+                <span>{cd.label}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 px-1.5 h-full bg-emerald-50 text-emerald-700 border-r border-slate-200 whitespace-nowrap">
+                <CheckCircle2 size={10} className="text-emerald-500" />
+              </div>
+            )}
+            {mileage && (
+              <div className="flex items-center gap-1 px-1.5 h-full text-slate-700 whitespace-nowrap font-bold">
+                <span>{mileage}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Status Badge */}
+          <span title={displayStatus} className={`inline-flex items-center h-7 gap-1 px-2 rounded-lg text-[11px] font-bold whitespace-nowrap ${statusBadge}`}>
+            {isDone && <CheckCircle2 size={11} />}
+            {!isDone && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
+            {displayStatus}
+          </span>
+        </div>
+
       </div>
     </article>
   );

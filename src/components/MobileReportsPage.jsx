@@ -1,5 +1,5 @@
 import { useDeferredValue, useState, useMemo, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw, Pencil, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw, Pencil, RotateCcw, List } from 'lucide-react';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
@@ -12,12 +12,9 @@ import ScheduleEditorModal from './trips/ScheduleEditorModal';
 const MOBILE_REPORT_PAGE_SIZE = 40;
 
 const FILTER_PRESETS = Object.freeze([
-  { id: 'today-completed', label: 'Today Completed', status: 'completed', allDates: false },
-  { id: 'today-all', label: 'Today All', status: 'all', allDates: false },
-  { id: 'week-completed', label: 'Week Completed', status: 'completed', allDates: true },
-  { id: 'week-all', label: 'Week All', status: 'all', allDates: true },
-  { id: 'cancelled-only', label: 'Cancelled Only', status: 'cancelled', allDates: true },
-  { id: 'pending-review', label: 'Pending Review', status: 'other', allDates: true, reviewed: false },
+  { id: 'all', label: 'All', status: 'all', allDates: true, Icon: List },
+  { id: 'completed', label: 'Completed', status: 'completed', allDates: true, Icon: CheckCircle2 },
+  { id: 'cancelled', label: 'Cancelled', status: 'cancelled', allDates: true, Icon: XCircle },
 ]);
 
 const EXPORT_FORMATS = Object.freeze([
@@ -104,12 +101,15 @@ function AnalyticsDashboard({ kpis, onExport, onApplyPreset, activePreset }) {
         <KPICard label="Unassigned" value={kpis.unassigned} icon={AlertTriangle} color={kpis.unassigned > 0 ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-slate-50 border-slate-200 text-slate-500'} />
       </div>
       <div className="flex items-center gap-1 flex-wrap pb-1">
-        {FILTER_PRESETS.map(p => (
-          <button key={p.id} onClick={() => onApplyPreset(p)}
-            className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${activePreset === p.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'}`}>
-            {p.label}
-          </button>
-        ))}
+        {FILTER_PRESETS.map(p => {
+          const Icon = p.Icon;
+          return (
+            <button key={p.id} onClick={() => onApplyPreset(p)}
+              className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${activePreset === p.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'}`}>
+              <Icon size={10} /> {p.label}
+            </button>
+          );
+        })}
       </div>
       <div className="flex gap-1">
         <button onClick={() => onExport('csv')} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:border-indigo-400 transition-all">
@@ -384,8 +384,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       </div>
 
       {/* DATE & FILTERS BAR */}
-      <div className="agape-mobile-toolbar shrink-0">
-        <div className="flex min-w-0 items-center gap-1.5">
+      <div className="agape-mobile-toolbar shrink-0 border-b border-slate-200 bg-white">
+        <div className="flex min-w-0 items-center gap-1.5 px-2 py-1.5">
           <button onClick={() => shiftDate(-1)} className="agape-mobile-icon-btn" aria-label="Previous date">
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -401,35 +401,14 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             <input type="checkbox" checked={allDates} onChange={event => { setAllDates(event.target.checked); setExpandedTripId(null); }} /> All dates
           </label>
 
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'completed', label: 'Completed' },
-            { id: 'cancelled', label: 'Cancelled' },
-          ].map(f => {
-            const active = statusFilter === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => { setStatusFilter(f.id); setExpandedTripId(null); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${active ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-1">
-          {setShowUploadModal && (
-            <>
-              <button onClick={() => handleExport('csv')} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Download reports" title="Export CSV">
-                <Download className="w-4 h-4" />
-              </button>
-              <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports" title="Upload reports">
-                <Upload className="w-4 h-4" />
-              </button>
-            </>
-          )}
+          <div className="flex items-center gap-1 ml-auto">
+            <button onClick={() => handleExport('csv')} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Download reports" title="Export CSV">
+              <Download className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports" title="Upload reports">
+              <Upload className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

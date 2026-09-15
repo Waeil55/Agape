@@ -6337,6 +6337,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <div className="min-w-0 flex-1">
                             <h3 className="agape-trip-title">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
                             <p className="agape-trip-id">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
+                            {!isEditing && (trip.pickupCity || trip.dropoffCity) && (
+                              <p className="text-[11px] text-slate-400 font-medium truncate flex items-center gap-1 mt-0.5">
+                                <MapPin size={10} />
+                                <span>{trip.pickupCity || ''}{trip.pickupCity && trip.dropoffCity ? ' → ' : ''}{trip.dropoffCity || ''}</span>
+                              </p>
+                            )}
                           </div>
                           <div className="agape-trip-right">
                             <div className="flex flex-col items-end">

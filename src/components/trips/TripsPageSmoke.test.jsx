@@ -39,9 +39,9 @@ describe('TripsPage render smoke (dispatcher/admin portal entry)', () => {
       <TripsPage trips={trips} role={role} currentUser="boss@x.com" drivers={drivers} />
     );
     expect(html).toContain('Jane Doe');
-    expect(html).toMatch(/Drive<\/button>/);
-    expect(html).toContain('Reassign');
-    expect(html).toContain('Archive');
+    expect(html).toContain('Assigned');
+    expect(html).toContain('Unassigned');
+    expect(html).toContain('Completed');
   });
 
   it('shows driver chips, KPI strip, and on-time KPI', () => {

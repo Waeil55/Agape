@@ -45,6 +45,7 @@ const MOBILE_VIEW_PRELOADERS = Object.freeze({
   map: () => import('./LiveMapPage'),
   chat: () => import('./chat/ChatPage'),
   reports: () => import('./MobileReportsPage'),
+  tools: () => import('./EnterpriseRoutePlanner'),
   menu: () => import('./MobileMenuPage'),
 });
 const preloadMobileView = (view) => {
@@ -63,6 +64,7 @@ export const MOBILE_PRIMARY_NAV = Object.freeze([
   { id: 'map', label: 'Map', icon: Map },
   { id: 'chat', label: 'Chat', icon: MessageCircle },
   { id: 'reports', label: 'Reports', icon: BarChart2 },
+  { id: 'tools', label: 'Tools', icon: Zap },
   { id: 'menu', label: 'More', icon: Menu },
 ]);
 
@@ -536,7 +538,8 @@ const MobileEnterpriseDashboard = (props) => {
 
   // Show the bottom nav everywhere EXCEPT:
   // 1. When a chat thread is open inside chat view (thread takes full screen)
-  const showNav = !isChatThreadOpen;
+  // 2. While an embedded trip detail overlay is on top of the board.
+  const showNav = !isChatThreadOpen && !currentTripDetails;
 
 
 
@@ -626,6 +629,14 @@ const MobileEnterpriseDashboard = (props) => {
       {/* ── BOTTOM NAVIGATION ────────────────────────────────────────── */}
       {showNav && (
         <MobileBottomNavigation currentView={currentView} subView={subView} onNavigate={handleNavClick} onPreload={preloadMobileView} />
+      )}
+
+      {currentTripDetails && showNav && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex justify-center pb-[calc(8px+env(safe-area-inset-bottom,0px))]">
+          <div className="pointer-events-auto w-[min(96vw,420px)] rounded-t-2xl border border-slate-200 bg-white shadow-[0_-10px_30px_rgba(15,23,42,0.12)]">
+            <MobileBottomNavigation currentView={currentView} subView={subView} onNavigate={handleNavClick} onPreload={preloadMobileView} />
+          </div>
+        </div>
       )}
 
       {globalSearchOpen && (

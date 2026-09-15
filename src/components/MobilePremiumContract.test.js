@@ -12,7 +12,7 @@ describe('mobile premium interaction contract', () => {
     const enterpriseIds = [...enterpriseNav.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
     const driverIds = [...driverNav.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
 
-    expect(enterpriseIds).toEqual(['trips', 'map', 'chat', 'reports', 'menu']);
+    expect(enterpriseIds).toEqual(['trips', 'map', 'chat', 'reports', 'tools', 'menu']);
     expect(driverIds).toEqual(['trips', 'tools', 'chat', 'history', 'settings', 'active-trip']);
     expect(driverNav).toContain('items.splice(1, 0');
     expect(driverNav).toContain("id: 'active-trip'");

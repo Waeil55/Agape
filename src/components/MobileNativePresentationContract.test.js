@@ -29,7 +29,7 @@ describe('mobile native presentation contract', () => {
     const nav = source.match(/MOBILE_PRIMARY_NAV = Object\.freeze\(\[([\s\S]*?)\]\);/)?.[1] || '';
     const ids = [...nav.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
 
-    expect(ids).toEqual(['trips', 'map', 'chat', 'reports', 'menu']);
+    expect(ids).toEqual(['trips', 'map', 'chat', 'reports', 'tools', 'menu']);
     expect(source).not.toContain('backdrop-blur');
     expect(source).not.toContain('transition-all');
   });
