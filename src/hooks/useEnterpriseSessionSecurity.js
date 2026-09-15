@@ -106,6 +106,15 @@ export default function useEnterpriseSessionSecurity({
     const activityEvents = ['pointerdown', 'keydown', 'touchstart', 'focus'];
     activityEvents.forEach((eventName) => window.addEventListener(eventName, recordActivity, { passive: true }));
 
+    // Re-validate session on bfcache restoration (iOS Safari tabs, back/forward)
+    const handlePageShow = (event) => {
+      if (event.persisted) {
+        recordActivity();
+        checkSecurityState();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+
     const checkSecurityState = async () => {
       const currentUser = auth.currentUser;
       if (!currentUser || terminatingRef.current) return;
@@ -154,6 +163,7 @@ export default function useEnterpriseSessionSecurity({
       unsubscribeProfile();
       window.clearInterval(interval);
       activityEvents.forEach((eventName) => window.removeEventListener(eventName, recordActivity));
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, [driverWorking, enabled, policy.absoluteMs, policy.idleMs, recordActivity, role, terminate]);
 

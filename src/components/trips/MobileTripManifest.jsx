@@ -437,7 +437,15 @@ export function ManifestTripCard({
       <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {selectSlot}
-          <span className={`text-[17px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
+          {onTimeEdit ? (
+            <button type="button" onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
+              className={`text-[17px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer ${timeColor}`}
+              title="Edit schedule" aria-label={`Edit schedule for ${trip?.patient || 'trip'}`}>
+              {trip?.time || '—'}
+            </button>
+          ) : (
+            <span className={`text-[17px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
+          )}
           <span className="text-slate-300 shrink-0 font-light">|</span>
           <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
             <span className="text-[15px] font-bold text-slate-900 truncate">{trip?.patient || 'Unknown client'}</span>
