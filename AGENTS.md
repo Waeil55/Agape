@@ -60,6 +60,85 @@ For each implementation, obtain and report the relevant evidence:
 Never say "perfect", "fully working", "zero errors", "synced", or "deployed"
 without direct evidence. State any external or human verification that remains.
 
+## Non-negotiable mobile and native contracts
+
+These rules exist because real users were blocked by violations. Every rule
+below is backed by a specific incident. Do not relax, rationalize, or
+"improve" them without a rendered mobile verification and explicit user approval.
+
+### GPS / Navigation — NEVER BLOCK OR ASK
+
+- **NEVER** use `@capacitor/browser` `Browser.open()` for native URL schemes
+  (`maps://`, `google.navigation:`, `waze://`, `tel:`, `sms:`). The Browser
+  plugin intercepts the scheme redirect and opens its own WebView instead of
+  handing off to the native app. **Always** use `window.location.href` directly.
+- **NEVER** show `window.confirm()`, `ActionSheet`, bottom sheet, or any
+  chooser before opening GPS. The user taps "Navigate" to go **now**, not to
+  pick an app. Open the configured app immediately.
+- **NEVER** add a timeout-based fallback (`openUrlWithFallback`) on navigation
+  paths. A 2.5s timer can redirect to a web URL before the GPS app opens,
+  losing the user's trip context.
+- **NEVER** import or use `showNavActionSheet`. It is dead code. All navigation
+  call sites must go through `openNavigation()` which opens directly.
+- `openNavigation()` in `src/utils/nativeActions.js` is the single authority.
+  Every navigation call site (DriverPage, MobileDispatchView, TripsPage,
+  OperationsCommandCenter, EnterpriseRoutePlanner, TaskCard, MobileTripManifest,
+  TripActionCenter) must call it. Do not bypass it with inline URL logic.
+
+### Mobile login — NEVER LOCK SCROLL OR HIDE THE SUBMIT BUTTON
+
+- **NEVER** lock `scrollTop` to 0 on any scrollable container when the keyboard
+  opens. iOS auto-scrolls the focused input into view above the keyboard; a
+  scroll lock prevents the user from reaching the submit button. The login
+  button appeared to do nothing because the keyboard covered it and the scroll
+  lock prevented iOS from revealing it.
+- **NEVER** use `items-center` with `min-h-full` on the login stage
+  (`.agape-login-stage`) on mobile. Use `items-start lg:items-center` so the
+  form starts at the top on mobile and is centered only on desktop.
+- **NEVER** add a `visualViewport` resize listener that manipulates scroll
+  position on the login page. The only acceptable keyboard stabilization is
+  setting `Keyboard.setResizeMode({ mode: KeyboardResize.None })` in the
+  Capacitor native shell.
+- **NEVER** place the submit button below the visible viewport on mobile. Test
+  with the keyboard open on a 375px-wide viewport before deploying any login
+  form change.
+
+### Mobile filters — NEVER EXCEED 3 STATUS BUTTONS
+
+- **NEVER** show more than 3 status filter buttons on any mobile page. The
+  three are: All, Completed, Cancelled. "Cancelled" includes all non-completed
+  outcomes (cancelled, no show, rerouted).
+- **NEVER** place filter buttons on a separate sticky bar when they can share
+  a single line with the date navigator. Mobile screen real estate is
+  constrained; every extra row costs usability.
+- **NEVER** show `No Show` or `Rerouted` as separate filter buttons on mobile.
+  They are merged into the Cancelled filter with a combined count.
+- The filter buttons use icon-only (`agape-mobile-icon-btn`) — do not add text
+  labels on mobile. Desktop may use text labels.
+
+### Native action patterns — ALWAYS USE THE SHARED UTILITIES
+
+- `makeCall()` in `src/utils/nativeActions.js` is the single authority for
+  phone calls. Never use `tel:` links directly in components.
+- `sendSMS()` / `sendSMSWithBody()` in `src/utils/nativeActions.js` is the
+  single authority for SMS. Never use `sms:` links directly in components.
+- `openMapLink()` in `src/utils/nativeActions.js` is the single authority for
+  map opens outside of navigation (e.g., showing a trip location without
+  routing).
+- Every native action must use `window.location.href` for URL scheme handoff
+  on mobile. Never use `window.open()` or `Browser.open()` for `tel:`, `sms:`,
+  `maps:`, or navigation schemes.
+
+### Build and deploy discipline — NEVER SKIP THESE STEPS
+
+- After every change, run `npm run build` AND `npx vitest run` (700/700 tests
+  must pass). A passing build without tests is NOT evidence of correctness.
+- After deploying to Firebase, **always** copy `dist/*` to
+  `ios/App/App/public/` so the Capacitor app picks up changes.
+- After copying to iOS, tell the user to **force-quit** the app. Hot reload
+  does not work in the installed Capacitor app.
+- Never deploy without first verifying the commit hash matches what was pushed.
+
 ## Agape UI conventions
 
 - The application is light-only. Do not add theme selection or dark-mode variants.
