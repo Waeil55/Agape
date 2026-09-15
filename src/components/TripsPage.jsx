@@ -570,16 +570,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           setModalError('');
         } : null}
         moreLabel={`${isTerminal ? 'Review' : 'Update'} ${trip.patient || trip.bookingId || 'trip'}`}
-        onTimeEdit={(t) => setScheduleEditTrip(t)}
-        onCardClick={(t) => {
-          if (onDriveTrip) {
-            onDriveTrip(t);
-          } else {
-            setDetailModalTrip(t);
-            setModalForm({ status: '', reason: '', note: '' });
-            setModalError('');
-          }
-        }}
+        onTimeEdit={null}
+        onCardClick={onDriveTrip || null}
       />
       </div>
     );
