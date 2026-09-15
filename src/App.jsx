@@ -2899,7 +2899,7 @@ const App = () => {
     return (
       <div className="agape-login flex-1 relative overflow-y-auto px-4 py-6" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
         <div className="agape-login-backdrop absolute inset-0 pointer-events-none" aria-hidden="true" />
-        <div className="agape-login-stage relative z-10 mx-auto grid min-h-full w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="agape-login-stage relative z-10 mx-auto grid w-full max-w-6xl items-start lg:items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="agape-login-mobile-intro lg:hidden">
             <div className="agape-login-live-pill">
               <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
