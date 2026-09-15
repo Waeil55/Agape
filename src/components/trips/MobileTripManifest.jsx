@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Navigation, User, AlertTriangle, Clock, CheckCircle2, Zap, Shield, Timer, ChevronRight, Copy, Phone, MessageSquare, MoreHorizontal, Check, Ban, GitBranch } from 'lucide-react';
+import { Layers, Navigation, User, AlertTriangle, Clock, CheckCircle2, Zap, Shield, Timer, ChevronRight, Copy, Phone, MessageSquare, MoreHorizontal, Check, Ban, GitBranch, Pencil } from 'lucide-react';
 import { timeToMinutes, tripCalendarDateKey } from '../../utils/tripDate';
 import { getTripActionCapabilities, isTripActionTerminal, TRIP_TERMINAL_STATUSES } from './tripActionPolicy';
 
@@ -462,6 +462,11 @@ export function ManifestTripCard({
           </div>
         </div>
         <div className="flex items-center shrink-0 gap-1.5">
+          {(trip?.notes || trip?.driverNotes || trip?.specialInstructions || trip?.instructions) && (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700" title="Has driver notes">
+              <Pencil size={10} />
+            </span>
+          )}
           <PriorityBadge trip={trip} />
           <span className="text-xs font-bold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-300/60 tracking-wide">
             #{trip?.bookingId || trip?.id || '—'}
