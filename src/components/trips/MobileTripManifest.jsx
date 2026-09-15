@@ -409,18 +409,26 @@ export function ManifestTripCard({
   const isDone = isTripActionTerminal(trip);
   const timeColor = trip?.urgent
     ? 'text-rose-600'
-    : cd.level === 'on-time' || cd.level === 'ready'
-      ? 'text-blue-600'
-      : cd.level === 'approaching'
-        ? 'text-amber-600'
-        : 'text-slate-700';
+    : isDone
+      ? 'text-slate-400'
+      : cd.level === 'overdue'
+        ? 'text-rose-600'
+        : cd.level === 'critical'
+          ? 'text-rose-600'
+          : cd.level === 'soon'
+            ? 'text-amber-600'
+            : cd.level === 'later'
+              ? 'text-blue-600'
+              : 'text-slate-700';
   const statusPulseColor = isDone
     ? 'bg-emerald-500'
-    : cd.level === 'on-time' || cd.level === 'ready'
-      ? 'bg-blue-600'
-      : cd.level === 'approaching'
+    : cd.level === 'overdue' || cd.level === 'critical'
+      ? 'bg-rose-500'
+      : cd.level === 'soon'
         ? 'bg-amber-500'
-        : 'bg-slate-400';
+        : cd.level === 'later'
+          ? 'bg-blue-600'
+          : 'bg-slate-400';
 
   return (
     <article onClick={onCardClick ? () => onCardClick(trip) : undefined} className={`bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
@@ -429,15 +437,7 @@ export function ManifestTripCard({
       <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {selectSlot}
-          {onTimeEdit ? (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
-              className={`text-[17px] font-extrabold tracking-tight shrink-0 hover:underline decoration-1 underline-offset-2 ${timeColor}`}
-              title="Edit schedule">
-              {trip?.time || '—'}
-            </button>
-          ) : (
-            <span className={`text-[17px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
-          )}
+          <span className={`text-[17px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
           <span className="text-slate-300 shrink-0 font-light">|</span>
           <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
             <span className="text-[15px] font-bold text-slate-900 truncate">{trip?.patient || 'Unknown client'}</span>
@@ -455,7 +455,6 @@ export function ManifestTripCard({
         </div>
         <div className="flex items-center shrink-0 gap-1.5">
           <PriorityBadge trip={trip} />
-          <SLABadge trip={trip} />
           <span className="text-xs font-bold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-300/60 tracking-wide">
             #{trip?.bookingId || trip?.id || '—'}
           </span>
