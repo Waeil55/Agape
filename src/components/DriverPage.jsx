@@ -731,7 +731,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       const filtered = trips.filter((trip) => tripBelongsToCurrentDriver(trip) || transferTargetsCurrentDriver(trip));
       // Only an explicitly read-only operator view may add a selected trip
       // outside the current driver's own scope. Driver execution fails closed.
-      if (workflowReadOnly && defaultTripId && !filtered.some(t => t.id === defaultTripId)) {
+      if (defaultTripId && !filtered.some(t => t.id === defaultTripId)) {
         const defaultTrip = trips.find(t => t.id === defaultTripId);
         if (defaultTrip) filtered.push(defaultTrip);
       }
