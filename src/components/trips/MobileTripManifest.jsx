@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Navigation, User, AlertTriangle, Clock, CheckCircle2, Zap, Shield, Timer, ChevronRight, Copy } from 'lucide-react';
+import { Layers, Navigation, User, AlertTriangle, Clock, CheckCircle2, Zap, Shield, Timer, ChevronRight, Copy, Phone, MessageSquare, MoreHorizontal, Check, Ban, GitBranch } from 'lucide-react';
 import { timeToMinutes, tripCalendarDateKey } from '../../utils/tripDate';
 import { getTripActionCapabilities, isTripActionTerminal, TRIP_TERMINAL_STATUSES } from './tripActionPolicy';
 
@@ -58,28 +58,29 @@ export function getManifestDisplayStatus(trip) {
 // the only extension beyond the design (real trips need it; blue family).
 // Unknown statuses fail to neutral slate, never crash.
 const STATUS_STYLES = {
-  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
-  'in progress': 'bg-blue-50 text-blue-700 border border-blue-200/80',
-  'in mission': 'bg-blue-50 text-blue-700 border border-blue-200/80',
-  'at pickup': 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
-  'at dropoff': 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
-  'in transit': 'bg-blue-50 text-blue-700 border border-blue-200/80',
-  'en route': 'bg-amber-50 text-amber-700 border border-amber-200/80',
-  'navigating pickup': 'bg-blue-50 text-blue-700 border border-blue-200/80',
-  'navigating dropoff': 'bg-blue-50 text-blue-700 border border-blue-200/80',
-  arrived: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
-  unassigned: 'bg-rose-50 text-rose-700 border border-rose-200/80',
-  'no show': 'bg-orange-50 text-orange-700 border border-orange-200/80',
-  'trip rerouted': 'bg-purple-50 text-purple-700 border border-purple-200/80',
-  rerouted: 'bg-purple-50 text-purple-700 border border-purple-200/80',
-  cancelled: 'bg-slate-50 text-slate-700 border border-slate-200/80',
-  canceled: 'bg-slate-50 text-slate-700 border border-slate-200/80',
-  transferred: 'bg-slate-50 text-slate-700 border border-slate-200/80',
-  no_show: 'bg-orange-50 text-orange-700 border border-orange-200/80',
-  assigned: 'bg-blue-50 text-blue-700 border border-blue-200/80',
+  completed: { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: Check },
+  'in progress': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null, pulse: true },
+  'in mission': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null, pulse: true },
+  'at pickup': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: null, pulse: true },
+  'at dropoff': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: null, pulse: true },
+  'in transit': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null, pulse: true },
+  'en route': { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', icon: null },
+  'navigating pickup': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null },
+  'navigating dropoff': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null },
+  arrived: { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: null },
+  unassigned: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', icon: null },
+  'no show': { cls: 'bg-orange-50 text-orange-700 border border-orange-200/80', icon: User },
+  'trip rerouted': { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', icon: GitBranch },
+  rerouted: { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', icon: GitBranch },
+  cancelled: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', icon: Ban },
+  canceled: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', icon: Ban },
+  transferred: { cls: 'bg-slate-50 text-slate-700 border border-slate-200/80', icon: null },
+  no_show: { cls: 'bg-orange-50 text-orange-700 border border-orange-200/80', icon: User },
+  assigned: { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null },
+  pending: { cls: 'bg-purple-50 text-purple-700 border border-purple-200/80', icon: Clock },
 };
 export function getManifestStatusBadge(status) {
-  return STATUS_STYLES[String(status || '').trim().toLowerCase()] || 'bg-slate-100 text-slate-700';
+  return STATUS_STYLES[String(status || '').trim().toLowerCase()] || { cls: 'bg-slate-100 text-slate-700', icon: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -471,9 +472,12 @@ export function ManifestTripCard({
             <div className="flex items-baseline gap-1.5 truncate min-w-0">
               <span className="text-[10px] font-black uppercase text-emerald-600 shrink-0">PU</span>
               <span className="text-[13.5px] font-semibold text-slate-800 truncate">{pickup.street}</span>
-              {pickup.locality && <span className="text-[11px] text-slate-500 truncate hidden sm:inline">• {pickup.locality}</span>}
+              {pickup.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {pickup.locality}</span>}
             </div>
-            <PriorityBadge trip={trip} />
+            <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.pickup || ''}${pickup.locality ? ', ' + pickup.locality : ''}`); }}
+              title="Copy Pickup" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+              <Copy size={13} />
+            </button>
           </div>
 
           {/* Dropoff Line */}
@@ -482,11 +486,12 @@ export function ManifestTripCard({
             <div className="flex items-baseline gap-1.5 truncate min-w-0">
               <span className="text-[10px] font-black uppercase text-rose-600 shrink-0">DO</span>
               <span className="text-[13.5px] font-semibold text-slate-800 truncate">{dropoff.street}</span>
-              {dropoff.locality && <span className="text-[11px] text-slate-500 truncate hidden sm:inline">• {dropoff.locality}</span>}
+              {dropoff.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {dropoff.locality}</span>}
             </div>
-            {mileage && (
-              <span className="text-[11px] font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200/50 tabular-nums shrink-0">{mileage}</span>
-            )}
+            <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.dropoff || ''}${dropoff.locality ? ', ' + dropoff.locality : ''}`); }}
+              title="Copy Dropoff" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+              <Copy size={13} />
+            </button>
           </div>
 
         </div>
@@ -509,7 +514,7 @@ export function ManifestTripCard({
           {iconActions.find(a => a.id === 'call') ? (
             <button type="button" onClick={iconActions.find(a => a.id === 'call')?.onClick}
               title="Call" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
-              <User size={13} className="text-emerald-600" />
+              <Phone size={13} className="text-emerald-600" />
             </button>
           ) : null}
 
@@ -517,7 +522,7 @@ export function ManifestTripCard({
           {iconActions.find(a => a.id === 'message') ? (
             <button type="button" onClick={iconActions.find(a => a.id === 'message')?.onClick}
               title="Text" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
-              <Navigation size={13} className="text-blue-500" />
+              <MessageSquare size={13} className="text-blue-500" />
             </button>
           ) : null}
 
@@ -527,7 +532,7 @@ export function ManifestTripCard({
               aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
               title={typeof moreLabel === 'string' ? moreLabel : undefined}
               className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
-              {MoreIcon ? <MoreIcon size={13} /> : <AlertTriangle size={13} />}
+              <MoreHorizontal size={13} />
             </button>
           )}
         </div>
@@ -556,9 +561,11 @@ export function ManifestTripCard({
           </div>
 
           {/* Status Badge */}
-          <span title={displayStatus} className={`inline-flex items-center h-7 gap-1 px-2 rounded-lg text-[11px] font-bold whitespace-nowrap ${statusBadge}`}>
-            {isDone && <CheckCircle2 size={11} />}
-            {!isDone && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
+          <span title={displayStatus} className={`inline-flex items-center h-7 gap-1 px-2 rounded-lg text-[11px] font-bold whitespace-nowrap ${statusBadge.cls}`}>
+            {isDone && <Check size={11} />}
+            {!isDone && statusBadge.pulse && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
+            {!isDone && !statusBadge.pulse && statusBadge.icon && <statusBadge.icon size={11} />}
+            {!isDone && !statusBadge.pulse && !statusBadge.icon && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
             {displayStatus}
           </span>
         </div>

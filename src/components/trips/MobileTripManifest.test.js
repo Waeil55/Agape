@@ -26,22 +26,22 @@ const trip = (over = {}) => ({
 
 describe('getManifestStatusBadge — design tokens', () => {
   it('maps the design badge set with normalized keys and slate fallback', () => {
-    expect(getManifestStatusBadge('Completed')).toContain('emerald');
-    expect(getManifestStatusBadge('In Transit')).toContain('blue');
-    expect(getManifestStatusBadge('En Route')).toContain('amber');
-    expect(getManifestStatusBadge('Unassigned')).toContain('rose');
-    expect(getManifestStatusBadge('No Show')).toContain('orange');
-    expect(getManifestStatusBadge('no show')).toContain('orange');
-    expect(getManifestStatusBadge('Rerouted')).toContain('purple');
-    expect(getManifestStatusBadge('Trip rerouted')).toContain('purple');
-    expect(getManifestStatusBadge('Cancelled')).toContain('slate');
-    expect(getManifestStatusBadge('Assigned')).toContain('blue');
-    expect(getManifestStatusBadge('In Progress')).toContain('blue');
-    expect(getManifestStatusBadge('At Pickup')).toContain('emerald');
-    expect(getManifestStatusBadge('Navigating Pickup')).toContain('blue');
-    expect(getManifestStatusBadge('Arrived')).toContain('emerald');
-    expect(getManifestStatusBadge('Something New')).toContain('slate');
-    expect(getManifestStatusBadge(undefined)).toContain('slate');
+    expect(getManifestStatusBadge('Completed').cls).toContain('emerald');
+    expect(getManifestStatusBadge('In Transit').cls).toContain('blue');
+    expect(getManifestStatusBadge('En Route').cls).toContain('amber');
+    expect(getManifestStatusBadge('Unassigned').cls).toContain('rose');
+    expect(getManifestStatusBadge('No Show').cls).toContain('orange');
+    expect(getManifestStatusBadge('no show').cls).toContain('orange');
+    expect(getManifestStatusBadge('Rerouted').cls).toContain('amber');
+    expect(getManifestStatusBadge('Trip rerouted').cls).toContain('amber');
+    expect(getManifestStatusBadge('Cancelled').cls).toContain('rose');
+    expect(getManifestStatusBadge('Assigned').cls).toContain('blue');
+    expect(getManifestStatusBadge('In Progress').cls).toContain('blue');
+    expect(getManifestStatusBadge('At Pickup').cls).toContain('emerald');
+    expect(getManifestStatusBadge('Navigating Pickup').cls).toContain('blue');
+    expect(getManifestStatusBadge('Arrived').cls).toContain('emerald');
+    expect(getManifestStatusBadge('Something New').cls).toContain('slate');
+    expect(getManifestStatusBadge(undefined).cls).toContain('slate');
   });
 });
 

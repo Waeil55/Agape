@@ -497,7 +497,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             <input value={editTrip.type || ''} onChange={event => setEditTrip(current => ({ ...current, type: event.target.value }))} className={fieldClass} placeholder="Service type" aria-label="Service type" />
             <div className={`${fieldClass} flex items-center justify-between`} aria-label={`Workflow status: ${editTrip.status || 'Unknown'}`}>
               <span className="text-slate-500">Workflow status</span>
-              <span className={`rounded-lg px-2 py-1 ${getManifestStatusBadge(editTrip.status)}`}>{editTrip.status || 'Unknown'}</span>
+              <span className={`rounded-lg px-2 py-1 ${getManifestStatusBadge(editTrip.status).cls}`}>{editTrip.status || 'Unknown'}</span>
             </div>
             <select value={editTrip.driverId || ''} onChange={event => setEditTrip(current => ({ ...current, driverId: event.target.value }))} className={fieldClass} aria-label="Driver">
               <option value="">Unassigned</option>
@@ -612,7 +612,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-sm font-semibold text-slate-900">{detailModalTrip.patient || 'Trip'}</span>
-                    <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-semibold ${getManifestStatusBadge(detailModalTrip.status)}`}>{detailModalTrip.status}</span>
+                    <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-semibold ${getManifestStatusBadge(detailModalTrip.status).cls}`}>{detailModalTrip.status}</span>
                   </div>
                   <p className="mt-2 text-xs font-medium text-slate-600">Terminal trips are read-only. Review the recorded progress or restore the trip before changing it.</p>
                 </div>
