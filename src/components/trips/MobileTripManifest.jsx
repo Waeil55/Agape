@@ -470,7 +470,7 @@ export function ManifestTripCard({
             <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-emerald-500 bg-white" />
             <div className="flex items-baseline gap-1.5 truncate min-w-0">
               <span className="text-[10px] font-black uppercase text-emerald-600 shrink-0">PU</span>
-              <span className="text-[13.5px] font-semibold text-slate-800 truncate">{pickup.street}</span>
+              <span className="text-[12px] font-semibold text-slate-600 truncate">{pickup.street}</span>
               {pickup.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {pickup.locality}</span>}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.pickup || ''}${pickup.locality ? ', ' + pickup.locality : ''}`); }}
@@ -484,7 +484,7 @@ export function ManifestTripCard({
             <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-rose-500 bg-white" />
             <div className="flex items-baseline gap-1.5 truncate min-w-0">
               <span className="text-[10px] font-black uppercase text-rose-600 shrink-0">DO</span>
-              <span className="text-[13.5px] font-semibold text-slate-800 truncate">{dropoff.street}</span>
+              <span className="text-[12px] font-semibold text-slate-600 truncate">{dropoff.street}</span>
               {dropoff.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {dropoff.locality}</span>}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.dropoff || ''}${dropoff.locality ? ', ' + dropoff.locality : ''}`); }}
