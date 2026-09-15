@@ -385,27 +385,36 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
 
       {/* DATE & FILTERS BAR */}
       <div className="agape-mobile-toolbar shrink-0 border-b border-slate-200 bg-white">
-        <div className="flex min-w-0 items-center gap-1.5 px-2 py-1.5">
+        <div className="flex min-w-0 items-center gap-1 px-2 py-1.5">
           <button onClick={() => shiftDate(-1)} className="agape-mobile-icon-btn" aria-label="Previous date">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button className="agape-mobile-date-pill text-[11px]">
-            {allDates ? 'All dates' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            <span>({filteredTrips.length})</span>
+            {allDates ? 'All' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
           </button>
           <button onClick={() => shiftDate(1)} className="agape-mobile-icon-btn" aria-label="Next date">
             <ChevronRight className="w-4 h-4" />
           </button>
 
-          <label className="flex min-h-[32px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600">
-            <input type="checkbox" checked={allDates} onChange={event => { setAllDates(event.target.checked); setExpandedTripId(null); }} /> All dates
-          </label>
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
-          <div className="flex items-center gap-1 ml-auto">
-            <button onClick={() => handleExport('csv')} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Download reports" title="Export CSV">
+          {FILTER_PRESETS.map(p => {
+            const Icon = p.Icon;
+            const isActive = statusFilter === p.status;
+            return (
+              <button key={p.id} onClick={() => { setStatusFilter(p.status); setExpandedTripId(null); }}
+                className={`agape-mobile-icon-btn ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : ''}`}
+                title={p.label}>
+                <Icon size={13} />
+              </button>
+            );
+          })}
+
+          <div className="flex items-center gap-0.5 ml-auto">
+            <button onClick={() => handleExport('csv')} className="agape-mobile-icon-btn" aria-label="Download" title="Export CSV">
               <Download className="w-4 h-4" />
             </button>
-            <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn agape-mobile-icon-btn-primary" aria-label="Upload reports" title="Upload reports">
+            <button onClick={() => setShowUploadModal(true)} className="agape-mobile-icon-btn" aria-label="Upload" title="Upload">
               <Upload className="w-4 h-4" />
             </button>
           </div>
@@ -439,30 +448,6 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
 
       {/* MAIN SCROLLABLE CONTENT */}
       <div className="agape-mobile-scroll flex-1 overflow-y-auto overscroll-contain relative">
-
-        {/* PERSISTENT STATUS FILTER BAR */}
-        <div className="sticky top-0 z-20 bg-white border-b border-slate-200">
-          <div className="flex items-center gap-1 px-3 py-1.5">
-            {FILTER_PRESETS.map(p => {
-              const Icon = p.Icon;
-              const isActive = statusFilter === p.status;
-              return (
-                <button key={p.id} onClick={() => { setStatusFilter(p.status); setExpandedTripId(null); }}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${isActive ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'}`}>
-                  <Icon size={12} /> {p.label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-end gap-1 px-3 pb-1.5">
-            <button onClick={() => handleExport('csv')} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 bg-white border border-slate-200 hover:border-indigo-400 transition-all" title="Export CSV">
-              <Download size={12} /> CSV
-            </button>
-            <button onClick={() => setShowUploadModal(true)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 bg-white border border-slate-200 hover:border-indigo-400 transition-all" title="Upload trips">
-              <Upload size={12} /> Upload
-            </button>
-          </div>
-        </div>
 
         {/* ANALYTICS DASHBOARD TOGGLE */}
         <div className="px-3 py-2 border-b border-slate-200 bg-white">

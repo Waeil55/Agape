@@ -1824,9 +1824,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const historyStatusCounts = useMemo(() => ({
     all: selectedHistoryDayTrips.length,
     completed: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed').length,
-    noshow: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'no show').length,
-    cancelled: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'cancelled').length,
-    rerouted: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'rerouted').length,
+    cancelled: selectedHistoryDayTrips.filter(t => {
+      const s = normalizeWorkflowStatus(t.status);
+      return s === 'cancelled' || s === 'no show' || s === 'rerouted';
+    }).length,
   }), [selectedHistoryDayTrips]);
   useEffect(() => {
     if (historyDate !== selectedHistoryDate) setHistoryDate(selectedHistoryDate);
@@ -2671,11 +2672,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   }, [activeNav, activeTrips.length, calculateEta]);
 
   const filteredHistory = useMemo(() => selectedHistoryDayTrips.filter(t => {
+    const status = normalizeWorkflowStatus(t.status);
     const matchFilter = historyFilter === 'all' ? true :
-      historyFilter === 'completed' ? normalizeWorkflowStatus(t.status) === 'completed' :
-      historyFilter === 'noshow' ? normalizeWorkflowStatus(t.status) === 'no show' :
-      historyFilter === 'cancelled' ? normalizeWorkflowStatus(t.status) === 'cancelled' :
-      normalizeWorkflowStatus(t.status) === 'rerouted';
+      historyFilter === 'completed' ? status === 'completed' :
+      historyFilter === 'cancelled' ? (status === 'cancelled' || status === 'no show' || status === 'rerouted') :
+      true;
     if (!matchFilter) return false;
     return tripMatchesSearch(t, historySearch);
   }), [selectedHistoryDayTrips, historyFilter, historySearch]);
@@ -6210,23 +6211,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </button>
 
               {[
-                { id: 'all', label: 'All outcomes', Icon: Clock },
+                { id: 'all', label: 'All', Icon: Clock },
                 { id: 'completed', label: 'Completed', Icon: CheckCircle2 },
                 { id: 'cancelled', label: 'Cancelled', Icon: XCircle },
-                { id: 'noshow', label: 'No Show', Icon: AlertTriangle },
-                { id: 'rerouted', label: 'Rerouted', Icon: Repeat },
               ].map(f => {
                 const FilterIcon = f.Icon;
                 const active = historyFilter === f.id;
-                const activeClass = f.id === 'rerouted'
-                  ? 'bg-purple-600 text-white border-purple-600'
+                const activeClass = f.id === 'completed'
+                  ? 'bg-emerald-600 text-white border-emerald-600'
                   : f.id === 'cancelled'
                     ? 'bg-rose-600 text-white border-rose-600'
-                    : f.id === 'noshow'
-                      ? 'bg-amber-500 text-white border-amber-500'
-                      : f.id === 'completed'
-                        ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-blue-600 text-white border-blue-600';
+                    : 'bg-blue-600 text-white border-blue-600';
                 return (
                   <button
                     key={f.id}
