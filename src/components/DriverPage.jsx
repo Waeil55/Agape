@@ -4276,23 +4276,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <span className={`flex h-10 w-full items-center justify-center gap-2 rounded-xl shadow-lg ${bottomAction.gradient}`}>{bottomAction.icon} {bottomAction.label}</span>
             </button>
             {!workflowReadOnly && (trip.status === 'In Progress' || trip.status === 'In Transit') && (
-              skipConfirmTripId === `work-${trip.id}` ? (
-                <button
-                  type="button"
-                  onClick={() => { setSkipConfirmTripId(null); handleSkipNav(trip); }}
-                  className="flex-[2] h-10 bg-blue-600 border-2 border-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
-                >
-                  <MapPin size={16} /> {trip.status === 'In Progress' ? 'Here?' : 'At dropoff?'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { impact('medium'); setSkipConfirmTripId(`work-${trip.id}`); }}
-                  className="flex-[2] h-10 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1"
-                >
-                  <Forward size={16} /> Skip Nav
-                </button>
-              )
+              <button
+                type="button"
+                onClick={() => { impact('medium'); handleSkipNav(trip); }}
+                className="flex-[2] h-10 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+              >
+                <MapPin size={16} /> {trip.status === 'In Progress' ? "I'm here" : "I'm here"}
+              </button>
             )}
           </div>
         </div>
@@ -5358,15 +5348,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                                 {primary.icon} {primary.label}
                               </button>
                               {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
-                                skipConfirmTripId === trip.id ? (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSkipConfirmTripId(null); handleSkipNav(trip); }} className="flex-1 h-8 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
-                                     <MapPin size={16} /> {trip.status === 'In Progress' ? 'Arrived to pick up?' : 'Arrived to drop off?'}
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleSkipNav(trip); }} className="flex-1 h-8 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
+                                     <MapPin size={16} /> I'm here
                                   </button>
-                                ) : (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); setSkipConfirmTripId(trip.id); }} className="flex-1 h-8 bg-white border-2 border-slate-300 text-slate-600 rounded-xl hover:bg-slate-100 hover:border-slate-400 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1">
-                                     <Forward size={16} /> Skip
-                                  </button>
-                                )
                               )}
                             </div>
                             <div className="flex items-center gap-2">

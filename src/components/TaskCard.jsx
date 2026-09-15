@@ -628,8 +628,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                         </button>
                         {actions?.onSkipNav && (
                           <button onClick={(e) => { e.stopPropagation(); actions.onSkipNav(task); }}
-                           className="flex-1 h-11 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors text-[0.75em] font-semibold flex items-center justify-center gap-1">
-                             <Forward size={14} /> Skip
+                           className="flex-1 h-11 bg-emerald-500 text-white font-semibold text-[0.875em] rounded-xl hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1">
+                             <MapPin size={14} /> I'm here
                           </button>
                         )}
                       </div>
