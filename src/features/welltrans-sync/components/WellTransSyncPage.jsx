@@ -21,7 +21,7 @@ import {
 } from '../services/welltransService';
 import {
   buildWellTransPayload, calculateWellTransDraftMileage, DEFAULT_WELLTRANS_FIELD_MAPPING, hydrateWellTransTrip,
-  validateTripForWellTrans,
+  validateTripForWellTrans, autoCorrectTripsBatch,
 } from '../utils/welltransMapping';
 import { pageWellTransRows, WELLTRANS_TABLE_PAGE_SIZE } from '../utils/welltransScale';
 import { isValidWellTransServiceDate } from '../utils/welltransDate';
@@ -249,6 +249,69 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       setSavingTripId('');
     }
   }, [drivers, editingTrip, onUpdateTrip, savingTripId]);
+
+  const autoCorrectSelected = useCallback(async () => {
+    if (!selectedIds.length || !onUpdateTrip || busy) return;
+    setBusy('auto-correct');
+    setNotice('');
+    try {
+      const selected = hydratedTrips.filter(trip => selectedIds.includes(trip.id));
+      const results = autoCorrectTripsBatch(selected);
+      let corrected = 0;
+      let skipped = 0;
+      for (const { trip: fixedTrip, corrections } of results) {
+        if (corrections.length === 0) { skipped++; continue; }
+        const patch = {};
+        if (fixedTrip._pickupArrival != null) {
+          const d = new Date(fixedTrip.date || fixedTrip.serviceDate || '');
+          const [h, m] = (fixedTrip._pickupArrival || '').split(':').map(Number);
+          if (!Number.isNaN(h) && !Number.isNaN(m)) {
+            d.setHours(h, m, 0, 0);
+            patch.arrivalTime = d.toISOString();
+            patch.startTime = d.toISOString();
+          }
+        }
+        if (fixedTrip._pickupDeparture != null) {
+          const d = new Date(fixedTrip.date || fixedTrip.serviceDate || '');
+          const [h, m] = (fixedTrip._pickupDeparture || '').split(':').map(Number);
+          if (!Number.isNaN(h) && !Number.isNaN(m)) {
+            d.setHours(h, m, 0, 0);
+            patch.departedPickupTime = d.toISOString();
+          }
+        }
+        if (fixedTrip._dropoffArrival != null) {
+          const d = new Date(fixedTrip.date || fixedTrip.serviceDate || '');
+          const [h, m] = (fixedTrip._dropoffArrival || '').split(':').map(Number);
+          if (!Number.isNaN(h) && !Number.isNaN(m)) {
+            d.setHours(h, m, 0, 0);
+            patch.arrivalDropoffTime = d.toISOString();
+          }
+        }
+        if (fixedTrip._dropoffDeparture != null) {
+          const d = new Date(fixedTrip.date || fixedTrip.serviceDate || '');
+          const [h, m] = (fixedTrip._dropoffDeparture || '').split(':').map(Number);
+          if (!Number.isNaN(h) && !Number.isNaN(m)) {
+            d.setHours(h, m, 0, 0);
+            patch.dropoffDeparture = d.toISOString();
+          }
+        }
+        if (fixedTrip.pickupOdometer != null) patch.pickupOdometer = fixedTrip.pickupOdometer;
+        if (fixedTrip.dropoffOdometer != null) patch.dropoffOdometer = fixedTrip.dropoffOdometer;
+        if (Object.keys(patch).length > 0) {
+          try {
+            const result = await Promise.resolve(onUpdateTrip({ id: fixedTrip.id, ...patch }));
+            if (result !== false) corrected++;
+          } catch { skipped++; }
+        } else { skipped++; }
+      }
+      setSelectedIds([]);
+      setNotice(`Auto-corrected ${corrected} trip(s). ${skipped > 0 ? `${skipped} needed no changes or could not be fixed.` : ''}`);
+    } catch (error) {
+      setNotice(`Auto-correct failed: ${error?.message || 'unknown error'}`);
+    } finally {
+      setBusy('');
+    }
+  }, [selectedIds, hydratedTrips, onUpdateTrip, busy]);
 
   useEffect(() => {
     let active = true;
@@ -829,16 +892,34 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
           )}
 
           {selectedIds.length > 0 && (
-            <button disabled={!settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
-              className="h-8 shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-2 text-[9px] font-bold text-blue-700 transition disabled:opacity-40">
-              Sync ({selectedIds.length})
-            </button>
+            <>
+              <button disabled={!settings.enabled || Boolean(busy)} onClick={() => runQueue(selectedIds, 'selected')}
+                className="h-8 shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-2 text-[9px] font-bold text-blue-700 transition disabled:opacity-40">
+                Sync ({selectedIds.length})
+              </button>
+              <button disabled={Boolean(busy)} onClick={autoCorrectSelected}
+                className="h-8 shrink-0 rounded-xl border border-amber-200 bg-amber-50 px-2 text-[9px] font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-40"
+                title="Auto-fix common data errors: swap times, fix odometer order, fill missing timestamps">
+                <span className="flex items-center gap-1"><Sparkles size={10} /> Auto-correct ({selectedIds.length})</span>
+              </button>
+            </>
           )}
 
           {retryableFailed.length > 0 && (
             <button disabled={!workerDateMatches || Boolean(busy)} onClick={() => runQueue(retryableFailed.map(log => log.tripId), 'retry')}
               className="flex h-8 shrink-0 items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-[9px] font-bold text-amber-700 transition disabled:opacity-40">
               <RefreshCw size={10} /> Retry ({retryableFailed.length})
+            </button>
+          )}
+
+          {coverage.invalid > 0 && selectedIds.length === 0 && (
+            <button disabled={Boolean(busy)} onClick={() => {
+              const invalidTrips = enrichedTrips.filter(t => !t._valid && t._errors?.length);
+              setSelectedIds(invalidTrips.map(t => t.id));
+            }}
+              className="flex h-8 shrink-0 items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-[9px] font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-40"
+              title={`Select all ${coverage.invalid} invalid trips for auto-correction`}>
+              <Sparkles size={10} /> Select Invalid ({coverage.invalid})
             </button>
           )}
 
@@ -1046,7 +1127,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                     <React.Fragment key={trip.id}>
                     <tr className={`group ${isEditing ? 'bg-blue-50/80' : 'cursor-pointer hover:bg-slate-50/50'} ${recentlySavedTripId === trip.id ? 'ring-1 ring-inset ring-emerald-300' : ''}`} onClick={() => { if (!isEditing) setTripDrawer(trip); }}>
                       <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
-                        <input type="checkbox" disabled={!trip._valid}
+                        <input type="checkbox" disabled={!trip._valid && !trip._errors?.length}
                           checked={selectedIds.includes(trip.id)}
                           onChange={() => setSelectedIds(ids => ids.includes(trip.id) ? ids.filter(id => id !== trip.id) : [...ids, trip.id])}
                           className="rounded border-slate-300" />

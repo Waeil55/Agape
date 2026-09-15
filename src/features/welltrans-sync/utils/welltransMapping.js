@@ -284,3 +284,85 @@ export const buildWellTransCoverage = (completedTrips = [], latestByTrip = new M
     trips,
   };
 };
+
+const toTimeInput = (isoOrClock) => {
+  if (!isoOrClock) return '';
+  if (/^\d{2}:\d{2}$/.test(isoOrClock)) return isoOrClock;
+  try {
+    const d = new Date(isoOrClock);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  } catch { return ''; }
+};
+
+const swapTimes = (a, b) => {
+  if (!a || !b) return { a, b, changed: false };
+  const mA = clockMinutes(a);
+  const mB = clockMinutes(b);
+  if (mA == null || mB == null) return { a, b, changed: false };
+  if (mB < mA) return { a: b, b: a, changed: true };
+  return { a, b, changed: false };
+};
+
+const swapOdometers = (pickup, dropoff) => {
+  const p = Number(pickup);
+  const d = Number(dropoff);
+  if (!Number.isFinite(p) || !Number.isFinite(d)) return { pickup, dropoff, changed: false };
+  if (d < p) return { pickup: dropoff, dropoff: pickup, changed: true };
+  return { pickup, dropoff, changed: false };
+};
+
+const fillMissing = (arrival, departure) => {
+  if (arrival && !departure) return { arrival, departure: arrival, changed: true };
+  if (!arrival && departure) return { arrival: departure, departure, changed: true };
+  return { arrival, departure, changed: false };
+};
+
+export const autoCorrectTripData = (trip = {}) => {
+  const payload = (() => { try { return buildWellTransPayload(trip); } catch { return null; } })();
+  if (!payload) return { trip, corrections: [] };
+
+  const corrections = [];
+  const patch = {};
+
+  const pickupSwap = swapTimes(payload.pickup.arrival, payload.pickup.departure);
+  if (pickupSwap.changed) {
+    patch._pickupArrival = toTimeInput(pickupSwap.a);
+    patch._pickupDeparture = toTimeInput(pickupSwap.b);
+    corrections.push('Swapped pickup arrival ↔ departure');
+  }
+
+  const dropoffSwap = swapTimes(payload.dropoff.arrival, payload.dropoff.departure);
+  if (dropoffSwap.changed) {
+    patch._dropoffArrival = toTimeInput(dropoffSwap.a);
+    patch._dropoffDeparture = toTimeInput(dropoffSwap.b);
+    corrections.push('Swapped dropoff arrival ↔ departure');
+  }
+
+  const pickupFill = fillMissing(payload.pickup.arrival, payload.pickup.departure);
+  if (pickupFill.changed) {
+    if (!patch._pickupArrival) patch._pickupArrival = toTimeInput(pickupFill.arrival);
+    if (!patch._pickupDeparture) patch._pickupDeparture = toTimeInput(pickupFill.departure);
+    corrections.push('Filled missing pickup timestamp from paired value');
+  }
+
+  const dropoffFill = fillMissing(payload.dropoff.arrival, payload.dropoff.departure);
+  if (dropoffFill.changed) {
+    if (!patch._dropoffArrival) patch._dropoffArrival = toTimeInput(dropoffFill.arrival);
+    if (!patch._dropoffDeparture) patch._dropoffDeparture = toTimeInput(dropoffFill.departure);
+    corrections.push('Filled missing dropoff timestamp from paired value');
+  }
+
+  const odoSwap = swapOdometers(payload.pickup.mileage, payload.dropoff.mileage);
+  if (odoSwap.changed) {
+    patch.pickupOdometer = Number(odoSwap.pickup);
+    patch.dropoffOdometer = Number(odoSwap.dropoff);
+    corrections.push('Swapped pickup ↔ dropoff odometer');
+  }
+
+  return { trip: { ...trip, ...patch }, corrections };
+};
+
+export const autoCorrectTripsBatch = (trips = []) => {
+  return trips.map(trip => autoCorrectTripData(trip));
+};
