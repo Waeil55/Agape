@@ -9,31 +9,16 @@ import {
   Edit2, Truck, X, MoreVertical
 } from 'lucide-react';
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
-import { ManifestTripCard, getTripCountdown, isTripActionTerminal } from './trips/MobileTripManifest';
+import { ManifestTripCard, getTripCountdown, isTripActionTerminal, getManifestStatusBadge } from './trips/MobileTripManifest';
 import { getTripActionCapabilities } from './trips/tripActionPolicy';
 
 const StatusBadge = ({ status }) => {
-  const styles = {
-    'NAVIGATING PICKUP': 'bg-blue-50 text-blue-700 border-blue-200/60',
-    'PENDING': 'bg-slate-50 text-slate-600 border-slate-200/60',
-    'COMPLETED': 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
-    'CANCELLED': 'bg-rose-50 text-rose-700 border-rose-200/60',
-    'NO SHOW': 'bg-rose-50 text-rose-700 border-rose-200/60',
-    'ASSIGNED': 'bg-indigo-50 text-indigo-700 border-indigo-200/60',
-    'UNASSIGNED': 'bg-slate-50 text-slate-500 border-slate-200/60',
-    'IN PROGRESS': 'bg-cyan-50 text-cyan-700 border-cyan-200/60',
-    'EN ROUTE': 'bg-blue-50 text-blue-700 border-blue-200/60',
-    'AT PICKUP': 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
-    'IN TRANSIT': 'bg-orange-50 text-orange-700 border-orange-200/60',
-    'NAVIGATING DROPOFF': 'bg-orange-50 text-orange-700 border-orange-200/60',
-    'AT DROPOFF': 'bg-purple-50 text-purple-700 border-purple-200/60',
-    'ARRIVED': 'bg-teal-50 text-teal-700 border-teal-200/60',
-  };
-  const key = (status || '').toUpperCase();
+  const badge = getManifestStatusBadge(status);
+  const Icon = badge.icon;
   return (
-    <div className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider border ${styles[key] || 'bg-slate-50 text-slate-600 border-slate-200/60'}`}>
-      {status || 'PENDING'}
-    </div>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${badge.cls}`}>
+      {Icon && <Icon size={10} />} {status || 'Pending'}
+    </span>
   );
 };
 
@@ -312,8 +297,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
           <div className="flex justify-between items-center mb-1">
             <div className="flex items-center gap-2 min-w-0 pr-2">
               {onSelect && (
-                <button onClick={(e) => { e.stopPropagation(); onSelect(task.id); }} className="shrink-0">
-                  {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-slate-300" />}
+                <button onClick={(e) => { e.stopPropagation(); onSelect(task.id); }} className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg">
+                  {isSelected ? <CheckSquare size={19} className="text-blue-600" /> : <Square size={19} className="text-slate-400" />}
                 </button>
               )}
               <div
@@ -398,9 +383,9 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
+                      )}
+                    </div>
+                </div>
 
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-[15px] font-semibold text-slate-800 truncate min-w-0 flex items-center gap-1.5">
@@ -433,7 +418,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg border border-emerald-100/70 bg-emerald-50/60 p-1.5 min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 leading-none">Pickup</p>
-                <p className="mt-1 truncate text-[13px] font-semibold leading-tight text-slate-800" title={pickupAddress}>{pickupAddress || '—'}</p>
+                <p className="mt-1 truncate text-[13px] font-semibold leading-tight text-slate-600" title={pickupAddress}>{pickupAddress || '—'}</p>
               </div>
               <div className="rounded-lg border border-rose-100/70 bg-rose-50/60 p-1.5 min-w-0">
                 <div className="flex items-center justify-between gap-1">
@@ -442,7 +427,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                     <span className="rounded border border-slate-200/70 bg-white/90 px-1.5 py-px text-[11px] font-bold tabular-nums text-slate-700 shadow-sm">{task.details.distance}</span>
                   )}
                 </div>
-                <p className="mt-1 truncate text-[13px] font-semibold leading-tight text-slate-800" title={dropoffAddress}>{dropoffAddress || '—'}</p>
+                <p className="mt-1 truncate text-[13px] font-semibold leading-tight text-slate-600" title={dropoffAddress}>{dropoffAddress || '—'}</p>
               </div>
             </div>
           )}
@@ -524,17 +509,13 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
               </div>
 
               {/* Pickup / Dropoff */}
-              <div className="space-y-0 mb-4">
+              <div className="relative pl-5 space-y-3 mb-4 before:content-[''] before:absolute before:left-[7px] before:top-3 before:bottom-3 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
                 {/* Pickup */}
-                <div className="flex items-stretch gap-3 mb-3">
-                  <div className="flex flex-col items-center pt-1.5">
-                    <div className="w-3 h-3 rounded-full bg-blue-500 ring-[3px] ring-blue-100"></div>
-                    <div className="w-0.5 flex-1 bg-slate-200/80 mt-0.5"></div>
+                <div className="relative">
+                  <div className="absolute -left-5 top-1.5 w-3 h-3 rounded-full border-2 border-emerald-500 bg-white" />
+                  <div className="flex items-center gap-1.5 text-emerald-600 text-[0.6875em] font-extrabold uppercase tracking-widest mb-1">
+                    <Navigation size={12} /> Pickup
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-blue-600 text-[0.6875em] font-extrabold uppercase tracking-widest mb-1">
-                      <Navigation size={12} /> Pickup
-                    </div>
                     <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3">
                       <div className="flex justify-between items-start gap-2">
                         <div className="flex-1 min-w-0">
@@ -578,18 +559,14 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                         </div>
                       )}
                     </div>
-                  </div>
                 </div>
 
                 {/* Dropoff */}
-                <div className="flex items-stretch gap-3">
-                  <div className="flex flex-col items-center pb-1.5">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 ring-[3px] ring-emerald-100"></div>
+                <div className="relative">
+                  <div className="absolute -left-5 top-1.5 w-3 h-3 rounded-full border-2 border-rose-500 bg-white" />
+                  <div className="flex items-center gap-1.5 text-rose-600 text-[0.6875em] font-extrabold uppercase tracking-widest mb-1">
+                    <MapPin size={12} /> Dropoff
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-emerald-600 text-[0.6875em] font-extrabold uppercase tracking-widest mb-1">
-                      <MapPin size={12} /> Dropoff
-                    </div>
                     <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3">
                       <div className="flex justify-between items-start gap-2">
                         <div className="flex-1 min-w-0">
@@ -633,7 +610,6 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
                         </div>
                       )}
                     </div>
-                  </div>
                 </div>
               </div>
 

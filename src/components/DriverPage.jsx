@@ -4144,16 +4144,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 </span>
               </div>
 
-              <div className="mt-4 grid grid-cols-[16px_1fr] gap-x-3">
-                <div className="row-span-2 flex flex-col items-center pt-1.5">
-                  <span className="w-3.5 h-3.5 rounded-full bg-blue-300 ring-2 ring-white" />
-                    <span className="w-0.5 flex-1 min-h-[72px] my-1 bg-slate-200" />
-                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-300 ring-2 ring-white" />
-                </div>
+              <div className="mt-4 relative pl-5 space-y-3 before:content-[''] before:absolute before:left-[7px] before:top-3 before:bottom-3 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
+                <div className="relative">
+                  <div className="absolute -left-5 top-0.5 w-3 h-3 rounded-full border-2 border-emerald-500 bg-white" />
 
-                <div className="pb-2">
-                  <p className="text-xs font-medium uppercase tracking-normal text-blue-600">From</p>
-                  <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-950 break-words">{pickupAddress || '--'}</p>
+                  <p className="text-xs font-medium uppercase tracking-normal text-emerald-600">Pickup</p>
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-600 break-words">{pickupAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="flex min-h-11 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800">
                       <Copy size={14} /> Copy
@@ -4172,9 +4168,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-normal text-emerald-600">To</p>
-                  <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-950 break-words">{dropoffAddress || '--'}</p>
+                <div className="relative">
+                  <div className="absolute -left-5 top-0.5 w-3 h-3 rounded-full border-2 border-rose-500 bg-white" />
+
+                  <p className="text-xs font-medium uppercase tracking-normal text-rose-600">Dropoff</p>
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-600 break-words">{dropoffAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="flex min-h-11 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800">
                       <Copy size={14} /> Copy
