@@ -94,20 +94,10 @@ function buildNavUrls(address, origin) {
 }
 
 async function openUrlNative(url) {
-  try {
-    const { Browser } = await import('@capacitor/browser');
-    await Browser.open({ url, windowName: '_self' });
-  } catch {
-    window.location.href = url;
-  }
+  window.location.href = url;
 }
 
 async function openUrlWithFallback(url, fallbackUrl, timeout = 2500) {
-  if (isNativeShell()) {
-    await openUrlNative(url);
-    return;
-  }
-
   const start = Date.now();
   let hidden = false;
 
@@ -132,16 +122,12 @@ async function openUrlWithFallback(url, fallbackUrl, timeout = 2500) {
 }
 
 export async function openMapLink(primaryUrl, webFallbackUrl) {
-  if (isNativeShell()) {
-    await openUrlNative(primaryUrl);
+  if (isNativeShell() || isIOS() || isAndroid()) {
+    window.location.href = primaryUrl;
     return;
   }
-  
-  if (isIOS() || isAndroid()) {
-    await openUrlWithFallback(primaryUrl, webFallbackUrl || primaryUrl, 2500);
-  } else {
-    window.open(webFallbackUrl || primaryUrl, '_blank', 'noopener,noreferrer');
-  }
+
+  window.open(webFallbackUrl || primaryUrl, '_blank', 'noopener,noreferrer');
 }
 
 export async function openNavigation(address, app, origin) {
@@ -152,12 +138,12 @@ export async function openNavigation(address, app, origin) {
   const urls = buildNavUrls(address, origin);
   const ios = isIOS();
   const android = isAndroid();
+  const native = isNativeShell();
 
   if (android) {
     if (app === 'waze') {
-      await openUrlWithFallback(urls.wazeNative, urls.wazeWeb);
+      window.location.href = urls.wazeNative;
     } else {
-      // Android intent directly targets Google Maps app
       window.location.href = urls.googleIntent;
     }
     return;
@@ -165,67 +151,23 @@ export async function openNavigation(address, app, origin) {
 
   if (ios) {
     if (app === 'google') {
-      await openUrlWithFallback(urls.googleIOS, urls.appleNative);
+      window.location.href = urls.googleIOS;
     } else if (app === 'waze') {
-      await openUrlWithFallback(urls.wazeNative, urls.wazeWeb);
+      window.location.href = urls.wazeNative;
     } else {
-      // Default on iOS: Apple Maps native app scheme
       window.location.href = urls.appleNative;
     }
     return;
   }
 
-  if (isNativeShell()) {
-    const nativeTarget = app === 'apple' ? urls.appleNative : app === 'waze' ? urls.wazeNative : urls.googleIntent;
-    await openUrlNative(nativeTarget);
+  if (native) {
+    window.location.href = app === 'apple' ? urls.appleNative : app === 'waze' ? urls.wazeNative : urls.googleNative;
     return;
   }
 
   // Desktop or unrecognized fallback: open standard web maps in new tab
   const webTarget = app === 'apple' ? urls.apple : app === 'waze' ? urls.wazeWeb : urls.googleWeb;
   window.open(webTarget, '_blank', 'noopener,noreferrer');
-}
-
-export async function showNavActionSheet(address, origin, preferredApp) {
-  await impact('light');
-
-  const isNative = isNativeShell();
-  const isApple = isIOS();
-
-  const items = [
-    { title: preferredApp === 'apple' ? 'Apple Maps (Preferred)' : 'Apple Maps', icon: isApple ? '' : '📍' },
-    { title: preferredApp === 'google' ? 'Google Maps (Preferred)' : 'Google Maps', icon: '' },
-    { title: preferredApp === 'waze' ? 'Waze (Preferred)' : 'Waze', icon: '' },
-    { title: 'Cancel', icon: '' },
-  ];
-
-  if (isNative) {
-    try {
-      const { ActionSheet } = await import('@capacitor/action-sheet');
-      const result = await ActionSheet.showActions({
-        title: 'Navigate to',
-        options: items.map((item) => ({
-          title: item.title,
-        })),
-      });
-
-      if (result.index === 3) return;
-
-      const apps = ['apple', 'google', 'waze'];
-      await openNavigation(address, apps[result.index], origin);
-      return;
-    } catch {}
-  }
-
-  const choice = window.confirm(
-    `Open navigation for:\n${address}\n\nOK = ${preferredApp === 'apple' ? 'Apple Maps' : preferredApp === 'waze' ? 'Waze' : 'Google Maps'}\nCancel = Google Maps`
-  );
-
-  if (choice) {
-    await openNavigation(address, preferredApp, origin);
-  } else {
-    await openNavigation(address, 'google', origin);
-  }
 }
 
 export async function makeCall(phone, name) {
