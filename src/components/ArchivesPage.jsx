@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Upload, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw } from 'lucide-react';
+import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Upload, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw, Copy, Navigation } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
@@ -377,64 +377,110 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
 
 
 
-  const renderMobileArchiveCard = (trip) => (
-    <div key={trip.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-900">{renderCellValue(trip, { key: 'patient' })}</p>
-          <p className="mt-0.5 text-xs font-mono font-semibold text-blue-600">{renderCellValue(trip, { key: 'bookingId' })}</p>
+  const renderMobileArchiveCard = (trip) => {
+    const pickupRaw = String(trip?.pickup || '').trim();
+    const dropoffRaw = String(trip?.dropoff || '').trim();
+    const status = String(trip?.status || '').trim().toLowerCase();
+    const isCompleted = status === 'completed';
+    const isCancelled = status === 'cancelled';
+    const isRerouted = status === 'rerouted';
+    const isNoShow = status === 'no show';
+    const statusBadge = isCompleted
+      ? { label: 'Completed', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 }
+      : isCancelled
+      ? { label: 'Cancelled', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: X }
+      : isRerouted
+      ? { label: 'Rerouted', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Navigation }
+      : isNoShow
+      ? { label: 'No Show', cls: 'bg-slate-100 text-slate-600 border-slate-200', icon: AlertTriangle }
+      : { label: trip?.status || 'Archived', cls: 'bg-slate-50 text-slate-600 border-slate-200', icon: Archive };
+    const StatusIcon = statusBadge.icon;
+
+    return (
+      <div key={trip.id} className="bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden">
+        {/* Header */}
+        <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-[17px] font-extrabold tracking-tight shrink-0 text-slate-400">{renderCellValue(trip, { key: 'time' }) || '—'}</span>
+            <span className="text-slate-300 shrink-0 font-light">|</span>
+            <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
+              <span className="text-[15px] font-bold text-slate-900 truncate">{renderCellValue(trip, { key: 'patient' })}</span>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold text-slate-400 bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-300/60 tracking-wide shrink-0">
+            #{renderCellValue(trip, { key: 'bookingId' })}
+          </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setScheduleEditTrip(trip)}
-          className="shrink-0 rounded-md bg-slate-100 hover:bg-blue-100 hover:text-blue-700 px-2 py-0.5 text-xs font-semibold text-slate-700 transition-colors"
-          title="Click to edit schedule"
-        >
-          {renderCellValue(trip, { key: 'time' })}
-        </button>
+
+        {/* Route Timeline */}
+        <div className="px-3.5 py-2">
+          <div className="relative pl-3.5 space-y-1.5 before:content-[''] before:absolute before:left-[3.5px] before:top-2 before:bottom-2 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
+            <div className="relative flex items-center justify-between gap-1.5 text-xs">
+              <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-emerald-500 bg-white" />
+              <div className="flex items-baseline gap-1.5 truncate min-w-0">
+                <span className="text-[10px] font-black uppercase text-emerald-600 shrink-0">PU</span>
+                <span className="text-[12px] font-semibold text-slate-600 truncate">{pickupRaw || '—'}</span>
+              </div>
+              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(pickupRaw); }} title="Copy Pickup" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+                <Copy size={12} />
+              </button>
+            </div>
+            <div className="relative flex items-center justify-between gap-1.5 text-xs">
+              <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-rose-500 bg-white" />
+              <div className="flex items-baseline gap-1.5 truncate min-w-0">
+                <span className="text-[10px] font-black uppercase text-rose-600 shrink-0">DO</span>
+                <span className="text-[12px] font-semibold text-slate-600 truncate">{dropoffRaw || '—'}</span>
+              </div>
+              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(dropoffRaw); }} title="Copy Dropoff" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+                <Copy size={12} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Info Grid: Driver, Vehicle, Miles, Signature */}
+        <div className="px-3.5 pb-2 grid grid-cols-2 gap-1.5 text-xs">
+          {[
+            { label: 'Driver', value: renderCellValue(trip, { key: 'driver' }) },
+            { label: 'Vehicle', value: renderCellValue(trip, { key: 'vehicle' }) },
+            { label: 'Miles', value: renderCellValue(trip, { key: 'distance' }) },
+            { label: 'Signature', value: renderCellValue(trip, { key: 'signature' }) },
+          ].filter(item => item.value && item.value !== '—').map((item) => (
+            <div key={item.label} className="bg-slate-50 rounded-lg px-2.5 py-1.5">
+              <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">{item.label}</span>
+              <span className="ml-1.5 text-[11px] font-semibold text-slate-700">{item.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Compliance + Retention */}
+        <div className="px-3.5 pb-2">
+          <ComplianceTagBar trip={trip} />
+          <RetentionBadge trip={trip} />
+        </div>
+
+        {/* Footer: Status Badge + Actions */}
+        <div className="px-3.5 py-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
+            <StatusIcon size={10} /> {statusBadge.label}
+          </span>
+          <div className="flex items-center gap-1.5">
+            {(role === 'admin' || role === 'dispatcher') && restoreTrip && (
+              <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                <RotateCcw size={11} /> Restore
+              </button>
+            )}
+            <button onClick={() => onDriveTrip ? onDriveTrip(trip) : setScheduleEditTrip(trip)} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-bold text-blue-700 border border-blue-200">
+              <Edit2 size={11} /> Edit
+            </button>
+            <button onClick={() => setActionTrip(trip)} className="flex items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-slate-600 border border-slate-200">
+              <MoreHorizontal size={11} />
+            </button>
+          </div>
+        </div>
       </div>
-      <div className="mt-3 space-y-2 text-xs font-medium text-slate-600">
-        <p className="flex items-start gap-2"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" /><span className="break-words text-emerald-700">{renderCellValue(trip, { key: 'pickup' })}</span></p>
-        <p className="flex items-start gap-2"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-rose-500" /><span className="break-words text-rose-700">{renderCellValue(trip, { key: 'dropoff' })}</span></p>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-semibold uppercase tracking-wide text-slate-500">Driver</p>
-          <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'driver' })}</p>
-        </div>
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-semibold uppercase tracking-wide text-slate-500">Vehicle</p>
-          <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'vehicle' })}</p>
-        </div>
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-semibold uppercase tracking-wide text-slate-500">Miles</p>
-          <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'distance' })}</p>
-        </div>
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="font-semibold uppercase tracking-wide text-slate-500">Signature</p>
-          <p className="mt-1 font-semibold text-slate-700">{renderCellValue(trip, { key: 'signature' })}</p>
-        </div>
-      </div>
-      <ComplianceTagBar trip={trip} />
-      <RetentionBadge trip={trip} />
-      <div className="mt-3 flex gap-2">
-        {(role === 'admin' || role === 'dispatcher') && restoreTrip && (
-          <button onClick={() => restoreTrip(trip.id)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200 transition-colors hover:bg-emerald-100">
-            <RotateCcw size={13} /> Restore
-          </button>
-        )}
-        <button
-          onClick={() => onDriveTrip ? onDriveTrip(trip) : setScheduleEditTrip(trip)}
-          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 transition-colors hover:bg-blue-100"
-        >
-          <Edit2 size={13} /> Edit
-        </button>
-        <button onClick={() => setActionTrip(trip)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 border border-slate-200 transition-colors hover:bg-slate-100">
-          <MoreHorizontal size={13} /> More
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div aria-label="Archived trips" className="flex flex-col flex-1 min-h-0 bg-slate-100 overflow-hidden">
