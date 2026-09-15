@@ -290,37 +290,28 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
       {/* Left Column: Chat List (Visible on Desktop always, on Mobile only if no active channel) */}
       <div className={`agape-messenger-sidebar w-full md:w-[340px] xl:w-[380px] flex flex-col h-full border-r border-slate-200 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
                 {/* Search Bar + New Chat */}
-        <div className="flex items-center gap-2 px-4 pt-4 pb-2 sm:px-5 sm:pt-5 shrink-0">
-          <div className="agape-messenger-search-bar flex min-h-11 flex-1 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
-            <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-2 shrink-0">
+          <div className="agape-messenger-search-bar flex h-9 flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3">
+            <Search size={14} className="text-slate-400 mr-1.5 flex-shrink-0" />
             <input
               type="text"
-              placeholder="Search people and conversations"
+              placeholder="Search conversations"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
+              className="text-[12px]"
             />
           </div>
           <button
             onClick={() => setShowNewChatModal(true)}
-            className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg shadow-blue-600/15 shrink-0"
+            className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shrink-0"
             title="Start new chat"
             aria-label="Start new conversation"
           >
-            <Plus size={18} strokeWidth={2.5} />
+            <Plus size={16} strokeWidth={2.5} />
           </button>
         </div>
-{/* Search Bar */}
-        <div className="agape-messenger-search-bar mx-4 my-2 flex min-h-11 shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
-          <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search people and conversations"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
 
-        <div className="app-filter-bar agape-chat-filterbar shrink-0 gap-2 border-b border-slate-100 px-4 py-3" aria-label="Conversation filters">
+        <div className="app-filter-bar agape-chat-filterbar shrink-0 gap-2 border-b border-slate-100 px-4 py-2" aria-label="Conversation filters">
           {[
             ['all', 'All'],
             ['unread', `Unread${unreadCount ? ` ${unreadCount}` : ''}`],
