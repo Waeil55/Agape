@@ -289,36 +289,27 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
     <div className="agape-messenger-container flex h-full bg-slate-50">
       {/* Left Column: Chat List (Visible on Desktop always, on Mobile only if no active channel) */}
       <div className={`agape-messenger-sidebar w-full md:w-[340px] xl:w-[380px] flex flex-col h-full border-r border-slate-200 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
-        {/* Header */}
-        <div className="agape-chat-sidebar-head flex shrink-0 items-center justify-between px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="w-9 h-9 flex items-center justify-center text-slate-600 rounded-full hover:bg-slate-100 transition mr-1"
-              >
-                <ArrowLeft size={18} strokeWidth={2.5} />
-              </button>
-            )}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-700">Care team</p>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-950 leading-none tracking-tight">Messages</h1>
-              <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{unreadCount > 0 ? `${unreadCount} unread ${unreadCount === 1 ? 'message' : 'messages'}` : 'You’re all caught up'}</p>
-            </div>
+                {/* Search Bar + New Chat */}
+        <div className="flex items-center gap-2 px-4 pt-4 pb-2 sm:px-5 sm:pt-5 shrink-0">
+          <div className="agape-messenger-search-bar flex min-h-11 flex-1 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+            <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
+            <input
+              type="text"
+              placeholder="Search people and conversations"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowNewChatModal(true)}
-              className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg shadow-blue-600/15"
-              title="Start new chat"
-              aria-label="Start new conversation"
-            >
-              <Plus size={18} strokeWidth={2.5} />
-            </button>
-          </div>
+          <button
+            onClick={() => setShowNewChatModal(true)}
+            className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg shadow-blue-600/15 shrink-0"
+            title="Start new chat"
+            aria-label="Start new conversation"
+          >
+            <Plus size={18} strokeWidth={2.5} />
+          </button>
         </div>
-
-        {/* Search Bar */}
+{/* Search Bar */}
         <div className="agape-messenger-search-bar mx-4 my-2 flex min-h-11 shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
           <Search size={16} className="text-slate-400 mr-2 flex-shrink-0" />
           <input

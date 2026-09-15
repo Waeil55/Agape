@@ -4279,9 +4279,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <button
                 type="button"
                 onClick={() => { impact('medium'); handleSkipNav(trip); }}
-                className="flex-[2] h-10 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                className="flex-[2] h-10 bg-blue-600 border-2 border-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-xs font-medium uppercase tracking-normal cursor-pointer flex items-center justify-center gap-1 shadow-sm"
               >
-                <MapPin size={16} /> {trip.status === 'In Progress' ? "I'm here" : "I'm here"}
+                <MapPin size={16} /> I'm here
               </button>
             )}
           </div>
@@ -5348,7 +5348,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                                 {primary.icon} {primary.label}
                               </button>
                               {(trip.status === 'In Progress' || trip.status === 'In Transit') && (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleSkipNav(trip); }} className="flex-1 h-8 bg-emerald-500 border-2 border-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); impact('medium'); handleSkipNav(trip); }} className="flex-1 h-8 bg-blue-600 border-2 border-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-xs font-medium cursor-pointer flex items-center justify-center gap-1 shadow-sm">
                                      <MapPin size={16} /> I'm here
                                   </button>
                               )}
