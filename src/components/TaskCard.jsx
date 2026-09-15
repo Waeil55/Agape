@@ -233,6 +233,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
           onLegsClick={actions?.onShowLegs ? () => actions.onShowLegs(task) : undefined}
           mileage={task.details?.distance || null}
           driverName={task.driverName || 'You'}
+          onCardClick={canOpenProgress ? () => onToggle(task.id) : undefined}
           primaryAction={canOpenProgress ? { label: 'Drive', onClick: () => onToggle(task.id) } : null}
           iconActions={iconActions}
           moreIcon={MoreVertical}
