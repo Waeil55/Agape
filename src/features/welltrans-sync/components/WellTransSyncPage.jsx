@@ -259,8 +259,14 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
       const results = autoCorrectTripsBatch(selected);
       let corrected = 0;
       let skipped = 0;
+      const unfixable = [];
       for (const { trip: fixedTrip, corrections } of results) {
-        if (corrections.length === 0) { skipped++; continue; }
+        if (corrections.length === 0) {
+          skipped++;
+          const { errors } = validateTripForWellTrans(fixedTrip);
+          if (errors.length > 0) unfixable.push(`${fixedTrip.bookingId || fixedTrip.id}: ${errors[0]}`);
+          continue;
+        }
         const patch = {};
         if (fixedTrip._pickupArrival != null) {
           const d = new Date(fixedTrip.date || fixedTrip.serviceDate || '');
@@ -305,7 +311,11 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
         } else { skipped++; }
       }
       setSelectedIds([]);
-      setNotice(`Auto-corrected ${corrected} trip(s). ${skipped > 0 ? `${skipped} needed no changes or could not be fixed.` : ''}`);
+      const parts = [];
+      if (corrected > 0) parts.push(`Fixed ${corrected} trip(s)`);
+      if (unfixable.length > 0) parts.push(`${unfixable.length} need manual fix: ${unfixable.slice(0, 3).join('; ')}${unfixable.length > 3 ? ` +${unfixable.length - 3} more` : ''}`);
+      else if (skipped > 0) parts.push(`${skipped} trip(s) had no auto-fixable errors`);
+      setNotice(parts.join('. ') || 'No corrections needed.');
     } catch (error) {
       setNotice(`Auto-correct failed: ${error?.message || 'unknown error'}`);
     } finally {
