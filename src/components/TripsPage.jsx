@@ -571,6 +571,11 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         } : null}
         moreLabel={`${isTerminal ? 'Review' : 'Update'} ${trip.patient || trip.bookingId || 'trip'}`}
         onTimeEdit={(t) => setScheduleEditTrip(t)}
+        onCardClick={(t) => {
+          setDetailModalTrip(t);
+          setModalForm({ status: '', reason: '', note: '' });
+          setModalError('');
+        }}
       />
       </div>
     );

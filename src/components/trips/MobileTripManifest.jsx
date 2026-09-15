@@ -398,6 +398,7 @@ export function ManifestTripCard({
   onMore,
   moreLabel = 'More actions',
   onTimeEdit,
+  onCardClick,
 }) {
   const cd = countdown || getTripCountdown(trip);
   const displayStatus = getManifestDisplayStatus(trip);
@@ -421,7 +422,7 @@ export function ManifestTripCard({
         : 'bg-slate-400';
 
   return (
-    <article className="bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150" aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
+    <article onClick={onCardClick ? () => onCardClick(trip) : undefined} className={`bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
 
       {/* ── HEADER: Checkbox + Time | Passenger Name + Trip ID ── */}
       <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
@@ -490,13 +491,6 @@ export function ManifestTripCard({
 
         </div>
       </div>
-
-      {/* ── WORKFLOW PROGRESS (non-terminal only) ── */}
-      {!isDone && trip?.status && (
-        <div className="px-3.5 pb-1">
-          <WorkflowProgressBar trip={trip} />
-        </div>
-      )}
 
       {assignSlot}
 
