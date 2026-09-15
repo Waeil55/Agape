@@ -95,8 +95,10 @@ export default function useEnterpriseSessionSecurity({
     if (!readTimestamp(activityKey, 0)) writeTimestamp(activityKey, now);
 
     const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), (snapshot) => {
-      if (!snapshot.exists() || !isEmploymentAccessActive(snapshot.data())) {
-        terminate('access_revoked', 'Your Agape Care access has been disabled. Contact an administrator if this is unexpected.');
+      if (!snapshot.metadata?.fromCache && !snapshot.exists() || !isEmploymentAccessActive(snapshot.data())) {
+        if (!snapshot.metadata?.fromCache) {
+          terminate('access_revoked', 'Your Agape Care access has been disabled. Contact an administrator if this is unexpected.');
+        }
       }
     }, () => {
       // Transient Firestore errors (network, permission flicker) should not

@@ -413,6 +413,7 @@ const App = () => {
   const loginObserverAckRef = useRef(null);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
+  const postLoginGraceRef = useRef(false);
 
   const retryStartupSession = useCallback(() => {
     authBootResolvedRef.current = false;
@@ -1149,6 +1150,8 @@ const App = () => {
       setRole(userRole);
       setCurrentUser(userEmail);
       setIsAuthenticated(true);
+      postLoginGraceRef.current = true;
+      setTimeout(() => { postLoginGraceRef.current = false; }, 5000);
       setLoginStep('role_selection');
       setPendingRole(null);
       setPassword('');
@@ -1452,6 +1455,10 @@ const App = () => {
         // session is signed out. Resolve the UI once; do not start another sign-out
         // or delay the login form behind a speculative token-refresh loop.
         if (authBootResolvedRef.current) {
+          if (postLoginGraceRef.current) {
+            console.warn('[Auth] Null event during post-login grace period — ignoring');
+            return;
+          }
           clearRoleCache();
           resetSessionState({ loginErrorMessage: 'Session expired. Please sign in again.' });
           return;
