@@ -5707,13 +5707,11 @@ textarea:focus,
 
 .enterprise-topbar,
 .enterprise-mobile-topbar {
-  background:
-    radial-gradient(circle at 18% -80%, rgb(255 255 255 / 17%), transparent 24rem),
-    linear-gradient(100deg, #1F428F 0%, var(--brand-primary) 62%, #3969CE 100%) !important;
+  background: linear-gradient(100deg, #0f172a 0%, #1e293b 100%) !important;
 }
 
 .enterprise-topbar {
-  box-shadow: 0 8px 28px rgb(2 6 23 / 18%) !important;
+  box-shadow: 0 4px 20px rgb(2 6 23 / 15%) !important;
 }
 
 /* ===== NAVY BRAND HARMONIZATION =====

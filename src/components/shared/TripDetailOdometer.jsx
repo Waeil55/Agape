@@ -180,4 +180,5 @@ const OdometerSection = ({ trip, driver, readOnly = false, onUpdate }) => {
   );
 };
 
+export { OdometerSection };
 export default React.memo(OdometerSection);

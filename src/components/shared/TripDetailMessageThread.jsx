@@ -218,4 +218,5 @@ const MessageThread = ({
   );
 };
 
+export { MessageThread };
 export default React.memo(MessageThread);

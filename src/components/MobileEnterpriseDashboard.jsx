@@ -33,7 +33,7 @@ const RoutePlannerPage = lazyWithRetry(() => import('./RoutePlannerPage'));
 const EnterpriseRoutePlanner = lazyWithRetry(() => import('./EnterpriseRoutePlanner'));
 const PayrollReportPage = lazyWithRetry(() => import('./PayrollReportPage'));
 const TimeTrackingAdmin = lazyWithRetry(() => import('./TimeTrackingAdmin'));
-const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
+const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.default || m.ChatPage })));
 const FileUploadTrips = lazyWithRetry(() => import('./FileUploadTrips'));
 const TripsPage = lazyWithRetry(() => import('./TripsPage'));
 

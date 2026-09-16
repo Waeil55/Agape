@@ -16,11 +16,11 @@ import { normalizeEmail } from '../../utils/accessControl';
 import { openNavigation, makeCall, sendSMS } from '../../utils/nativeActions';
 import { useHeader } from '../shared';
 
-const MessageThread = lazy(() => import('../shared/TripDetailMessageThread').then(m => ({ default: m.MessageThread })));
-const AuditHistory = lazy(() => import('../shared/TripDetailAuditHistory').then(m => ({ default: m.AuditHistory })));
-const MapPreview = lazy(() => import('../shared/TripDetailMapPreview').then(m => ({ default: m.MapPreview })));
-const NotesSection = lazy(() => import('../shared/TripDetailNotes').then(m => ({ default: m.NotesSection })));
-const OdometerSection = lazy(() => import('../shared/TripDetailOdometer').then(m => ({ default: m.OdometerSection })));
+const MessageThread = lazy(() => import('../shared/TripDetailMessageThread').then(m => ({ default: m.default || m.MessageThread })));
+const AuditHistory = lazy(() => import('../shared/TripDetailAuditHistory').then(m => ({ default: m.default || m.AuditHistory })));
+const MapPreview = lazy(() => import('../shared/TripDetailMapPreview').then(m => ({ default: m.default || m.MapPreview })));
+const NotesSection = lazy(() => import('../shared/TripDetailNotes').then(m => ({ default: m.default || m.NotesSection })));
+const OdometerSection = lazy(() => import('../shared/TripDetailOdometer').then(m => ({ default: m.default || m.OdometerSection })));
 
 const FALLBACK = () => (
   <div className="flex items-center justify-center py-12">

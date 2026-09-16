@@ -139,4 +139,5 @@ const MapPreview = ({ trip, expanded, onToggle, pickup, dropoff }) => {
   );
 };
 
+export { MapPreview };
 export default React.memo(MapPreview);

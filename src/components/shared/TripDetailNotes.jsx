@@ -114,4 +114,5 @@ const NotesSection = ({ trip, readOnly = false, onUpdate }) => {
   );
 };
 
+export { NotesSection };
 export default React.memo(NotesSection);

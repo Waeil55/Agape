@@ -290,33 +290,33 @@ export const ChatSession = ({ chatModel, onBack, onThreadActive }) => {
       {/* Left Column: Chat List (Visible on Desktop always, on Mobile only if no active channel) */}
       <div className={`agape-messenger-sidebar w-full md:w-[340px] xl:w-[380px] flex flex-col h-full border-r border-slate-200 bg-white shrink-0 ${activeChannelId ? 'hidden md:flex' : 'flex'}`}>
                 {/* Search Bar + New Chat */}
-        <div className="flex items-center gap-2 px-4 py-2 shrink-0">
-          <div className="agape-messenger-search-bar flex h-9 flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3">
-            <Search size={14} className="text-slate-400 mr-1.5 flex-shrink-0" />
+        <div className="flex items-center gap-2 px-3 py-1.5 shrink-0">
+          <div className="agape-messenger-search-bar flex h-8 flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5">
+            <Search size={13} className="text-slate-400 mr-1.5 flex-shrink-0" />
             <input
               type="text"
               placeholder="Search conversations"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="text-[12px]"
+              className="w-full bg-transparent text-[11px] focus:outline-none leading-none"
             />
           </div>
           <button
             onClick={() => setShowNewChatModal(true)}
-            className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shrink-0"
+            className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition shrink-0"
             title="Start new chat"
             aria-label="Start new conversation"
           >
-            <Plus size={16} strokeWidth={2.5} />
+            <Plus size={15} strokeWidth={2.5} />
           </button>
         </div>
 
-        <div className="app-filter-bar agape-chat-filterbar shrink-0 gap-2 border-b border-slate-100 px-4 py-2" aria-label="Conversation filters">
+        <div className="app-filter-bar agape-chat-filterbar shrink-0 gap-1.5 border-b border-slate-100 px-3 py-1.5" aria-label="Conversation filters">
           {[
             ['all', 'All'],
             ['unread', `Unread${unreadCount ? ` ${unreadCount}` : ''}`],
             ['groups', 'Groups'],
-          ].map(([value, label]) => <button key={value} onClick={() => setConversationFilter(value)} aria-pressed={conversationFilter === value} className={`min-h-9 rounded-xl px-3 text-[11px] font-semibold transition ${conversationFilter === value ? 'bg-slate-950 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>)}
+          ].map(([value, label]) => <button key={value} onClick={() => setConversationFilter(value)} aria-pressed={conversationFilter === value} className={`h-7 rounded-lg px-2.5 text-[10px] font-semibold transition ${conversationFilter === value ? 'bg-slate-950 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>)}
         </div>
 
         {/* Channels List */}
@@ -581,3 +581,5 @@ export const ChatPage = ({ onBack, onThreadActive }) => {
     : { ...chatModel, draftChannel: null };
   return <ChatSession key={sessionIdentity} chatModel={safeModel} onBack={onBack} onThreadActive={onThreadActive} />;
 };
+
+export default ChatPage;

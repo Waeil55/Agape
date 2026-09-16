@@ -15,7 +15,7 @@ import { showLocalNotification } from '../config/notifications';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useChat } from '../hooks/useChat';
 const DriverToolsPage = lazy(() => import('./DriverToolsPage'));
-const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
+const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.default || m.ChatPage })));
 const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';

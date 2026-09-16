@@ -146,4 +146,5 @@ const AuditHistory = ({ entries = [], loading, tripId }) => {
   );
 };
 
+export { AuditHistory };
 export default React.memo(AuditHistory);

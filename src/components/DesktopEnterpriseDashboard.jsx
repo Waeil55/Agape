@@ -15,7 +15,7 @@ const MobileDispatchView = lazyWithRetry(() => import('./MobileDispatchView'));
 const DesktopAdminPage = lazyWithRetry(() => import('./DesktopAdminPage'));
 const DriverPage = lazyWithRetry(() => import('./DriverPage'));
 const RoutePlannerPage = lazyWithRetry(() => import('./RoutePlannerPage'));
-const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
+const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.default || m.ChatPage })));
 
 const RouteSequencerApp = lazyWithRetry(() => import('./RouteSequencer'));
 const LiveMapPage = lazyWithRetry(() => import('./LiveMapPage'));
@@ -493,7 +493,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-black text-white leading-none">Agape Care</p>
-          <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-blue-200">Enterprise Fleet OS</p>
+          <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400">Enterprise Fleet OS</p>
         </div>
       </div>
 
@@ -511,8 +511,8 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                 aria-label={item.label}
                 className={`inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wide transition-all duration-200 xl:px-3.5 ${
                   item.active
-                    ? 'bg-white text-[var(--brand-primary)] shadow-md'
-                    : 'text-blue-100 hover:text-white hover:bg-white/10'
+                    ? 'bg-white text-slate-950 shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10'
                 }`}
                 title={item.label}
               >
@@ -592,7 +592,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
           </div>
           <div className="min-w-0 pr-1.5">
             <p className="truncate text-xs font-semibold text-white leading-none">{displayLoginId || 'Account'}</p>
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-200 mt-1">{role}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-1">{role}</p>
           </div>
         </button>
       </div>
@@ -601,13 +601,13 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="enterprise-mobile-topbar bg-[var(--brand-primary)] text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="enterprise-mobile-topbar bg-slate-900 text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
         <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
       </div>
       <div>
         <h1 className="text-[13px] font-semibold tracking-tight leading-none text-white drop-shadow-sm">Agape Care</h1>
-        <p className="text-xs font-medium text-blue-200 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
+        <p className="text-xs font-medium text-slate-300 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
       </div>
       <div className="flex-1" />
       {activePanel === 'operations' && (
