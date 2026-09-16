@@ -41,15 +41,16 @@ export const designTokens = {
       dispatcher: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
       driver: { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' },
     },
-    // Elevation tokens
-    elevation: {
-      none: 'shadow-none',
-      sm: 'shadow-sm',
-      md: 'shadow-md',
-      lg: 'shadow-lg',
-      xl: 'shadow-xl',
-      bottomSheet: 'shadow-[0_-10px_30px_rgba(15,23,42,0.12)]',
-    },
+  },
+
+  // Elevation tokens
+  elevation: {
+    none: 'shadow-none',
+    sm: 'shadow-sm',
+    md: 'shadow-md',
+    lg: 'shadow-lg',
+    xl: 'shadow-xl',
+    bottomSheet: 'shadow-[0_-10px_30px_rgba(15,23,42,0.12)]',
   },
 
   spacing: {
