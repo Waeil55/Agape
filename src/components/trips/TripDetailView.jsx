@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import { 
   ChevronLeft, Navigation, Phone, MessageSquare, Edit2, MoreHorizontal, 
-  MapPin, User, Clock, Truck, AlertCircle, CheckCircle2, XCircle,
+  MapPin, User, Clock, Truck, AlertCircle, CheckCircle2, XCircle, X,
   FileText, History, Archive, RotateCcw, Download, Copy, Eye, EyeOff
 } from 'lucide-react';
 import { 
@@ -52,6 +52,7 @@ const getAddr = (v) => typeof v === 'object' ? v?.address || '' : v || '';
 const buildTripTitle = (trip) => trip?.patient || trip?.memberName || trip?.bookingId || trip?.id || 'Trip Details';
 
 const TripDetailView = ({ 
+  trip: tripProp,
   tripId, 
   role = 'dispatcher',
   currentUser = '',
@@ -73,9 +74,9 @@ const TripDetailView = ({
   readOnly = false,
 }) => {
   const tokens = designTokens;
-  const { setHeader, clearHeader } = useHeader();
-  const [trip, setTrip] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { setHeader } = useHeader();
+  const [trip, setTrip] = useState(tripProp || null);
+  const [loading, setLoading] = useState(!tripProp);
   const [error, setError] = useState(null);
   const [driver, setDriver] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -88,9 +89,46 @@ const TripDetailView = ({
   const unsubscribeRef = useRef(null);
   const lastTripRef = useRef(null);
 
+  const matchDriver = useCallback((tripData) => {
+    if (tripData?.driverId && drivers.length > 0) {
+      const matchedDriver = drivers.find(d => 
+        d.id === tripData.driverId || 
+        (tripData.driverName && d.name === tripData.driverName) ||
+        (tripData.driverEmail && normalizeEmail(d.email) === normalizeEmail(tripData.driverEmail))
+      );
+      if (matchedDriver) setDriver(matchedDriver);
+    }
+  }, [drivers]);
+
+  const applyHeader = useCallback((tripData) => {
+    setHeader({
+      title: buildTripTitle(tripData),
+      subtitle: `${tripData.bookingId ? `#${tripData.bookingId}` : tripData.id} · ${tripData.status || 'Open'}`,
+      showBack: true,
+      onBack: onClose,
+      role,
+      rightActions: [
+        { id: 'nav-pickup', icon: Navigation, onClick: () => onNavigate?.(tripData, 'pickup'), ariaLabel: 'Navigate to pickup', variant: 'secondary' },
+        { id: 'nav-dropoff', icon: MapPin, onClick: () => onNavigate?.(tripData, 'dropoff'), ariaLabel: 'Navigate to dropoff', variant: 'secondary' },
+        { id: 'call', icon: Phone, onClick: () => onCall?.(tripData), ariaLabel: 'Call passenger', variant: 'secondary' },
+        { id: 'message', icon: MessageSquare, onClick: () => onMessage?.(tripData), ariaLabel: 'Message passenger', variant: 'secondary' },
+        { id: 'more', icon: MoreHorizontal, onClick: () => setShowContacts(true), ariaLabel: 'More actions', variant: 'secondary' },
+      ],
+    });
+  }, [setHeader, onClose, role, onNavigate, onCall, onMessage]);
+
   const statusTokens = useMemo(() => trip ? getStatusTokens(trip.status) : tokens.colors.status.slate, [trip?.status]);
 
   useEffect(() => {
+    if (tripProp) {
+      setTrip(tripProp);
+      setLoading(false);
+      setError(null);
+      matchDriver(tripProp);
+      applyHeader(tripProp);
+      return;
+    }
+
     if (!tripId) {
       setLoading(false);
       setError('No trip ID provided');
@@ -117,30 +155,8 @@ const TripDetailView = ({
 
         const tripData = { id: tripDoc.id, ...tripDoc.data() };
         setTrip(tripData);
-
-        if (tripData.driverId && drivers.length > 0) {
-          const matchedDriver = drivers.find(d => 
-            d.id === tripData.driverId || 
-            (tripData.driverName && d.name === tripData.driverName) ||
-            (tripData.driverEmail && normalizeEmail(d.email) === normalizeEmail(tripData.driverEmail))
-          );
-          if (matchedDriver) setDriver(matchedDriver);
-        }
-
-        setHeader({
-          title: buildTripTitle(tripData),
-          subtitle: `${tripData.bookingId ? `#${tripData.bookingId}` : tripData.id} · ${tripData.status || 'Open'}`,
-          showBack: true,
-          onBack: onClose,
-          role,
-          rightActions: [
-            { id: 'nav-pickup', icon: Navigation, onClick: () => onNavigate?.(tripData, 'pickup'), ariaLabel: 'Navigate to pickup', variant: 'secondary' },
-            { id: 'nav-dropoff', icon: MapPin, onClick: () => onNavigate?.(tripData, 'dropoff'), ariaLabel: 'Navigate to dropoff', variant: 'secondary' },
-            { id: 'call', icon: Phone, onClick: () => onCall?.(tripData), ariaLabel: 'Call passenger', variant: 'secondary' },
-            { id: 'message', icon: MessageSquare, onClick: () => onMessage?.(tripData), ariaLabel: 'Message passenger', variant: 'secondary' },
-            { id: 'more', icon: MoreHorizontal, onClick: () => setShowContacts(true), ariaLabel: 'More actions', variant: 'secondary' },
-          ],
-        });
+        matchDriver(tripData);
+        applyHeader(tripData);
 
         setupRealtimeListener(tripId);
       } catch (err) {
@@ -164,21 +180,7 @@ const TripDetailView = ({
           if (cancelled || !snapshot.exists()) return;
           const updated = { id: snapshot.id, ...snapshot.data() };
           setTrip(updated);
-          
-          setHeader({
-            title: buildTripTitle(updated),
-            subtitle: `${updated.bookingId ? `#${updated.bookingId}` : updated.id} · ${updated.status || 'Open'}`,
-            showBack: true,
-            onBack: onClose,
-            role,
-            rightActions: [
-              { id: 'nav-pickup', icon: Navigation, onClick: () => onNavigate?.(updated, 'pickup'), ariaLabel: 'Navigate to pickup', variant: 'secondary' },
-              { id: 'nav-dropoff', icon: MapPin, onClick: () => onNavigate?.(updated, 'dropoff'), ariaLabel: 'Navigate to dropoff', variant: 'secondary' },
-              { id: 'call', icon: Phone, onClick: () => onCall?.(updated), ariaLabel: 'Call passenger', variant: 'secondary' },
-              { id: 'message', icon: MessageSquare, onClick: () => onMessage?.(updated), ariaLabel: 'Message passenger', variant: 'secondary' },
-              { id: 'more', icon: MoreHorizontal, onClick: () => setShowContacts(true), ariaLabel: 'More actions', variant: 'secondary' },
-            ],
-          });
+          applyHeader(updated);
         },
         (err) => {
           console.error('[TripDetailView] Realtime error:', err);
@@ -195,7 +197,7 @@ const TripDetailView = ({
         unsubscribeRef.current = null;
       }
     };
-  }, [tripId, drivers, role, onClose, onNavigate, onCall, onMessage, setHeader]);
+  }, [tripProp, tripId, drivers, role, onClose, onNavigate, onCall, onMessage, setHeader, applyHeader, matchDriver]);
 
   const loadMessages = useCallback(async () => {
     if (!tripId || messagesLoading) return;

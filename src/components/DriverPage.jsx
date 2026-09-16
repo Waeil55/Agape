@@ -38,6 +38,7 @@ import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
 import { deriveVehicleOdometerState, evaluateOdometerEntry } from '../utils/vehicleOdometer';
+import { saveClientProfile } from '../utils/clientProfileUtils';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
@@ -3571,14 +3572,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setInlineEditSaving(true);
     try {
       if (d.editScope === 'permanent' && cleanData.patient) {
-        saveClientProfile({
-          patient: cleanData.patient,
-          pickup: cleanData.pickup,
-          dropoff: cleanData.dropoff,
-          pickupPhone: cleanData.pickupPhone,
-          dropoffPhone: cleanData.dropoffPhone,
-          notes: cleanData.notes,
-        }).catch((err) => console.warn('Profile save non-blocking error:', err));
+        saveClientProfile(cleanData.patient, cleanData, currentUser).catch((err) => console.warn('Profile save non-blocking error:', err));
       }
       const saved = await advanceWorkflow(original, cleanData.status || original.status, cleanData);
       if (!saved) throw new Error('Trip changes could not be saved. Check the connection and retry.');
@@ -5867,7 +5861,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {/* ===== TRIP RECEIPT ===== */}
       {/* ===== FULL-SCREEN TRIP DETAILS ===== */}
       {showTripDetails && (
-        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 130 }}>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 55 }}>
           <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex-1">
               <h2 className="font-semibold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
@@ -5886,7 +5880,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               <button type="button" onClick={() => { setShowTripDetails(null); setIsEditingDetails(false); }} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto space-y-4 px-4 pb-24">
             {isEditingDetails ? (
               <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-slate-900 border-b pb-2 mb-3">Edit Trip Details</h3>
@@ -7463,6 +7457,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 const isActiveTab = activeNav === item.id;
                 return (
                   <button key={item.id} onClick={() => {
+                    setShowTripDetails(null);
+                    setIsEditingDetails(false);
                     if (item.id === 'active-trip') {
                       selection();
                       setActiveWorkTripId(item.tripId);

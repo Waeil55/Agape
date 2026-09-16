@@ -6,7 +6,8 @@ import {
   MobileLayout, 
   NAV_BOTTOM_CLEARANCE, 
   TripDetailView,
-  HeaderProvider
+  HeaderProvider,
+  useHeader,
 } from './shared';
 import SettingsPage from './SettingsPage';
 import AddTripModal from './AddTripModal';
@@ -108,6 +109,8 @@ const MobileEnterpriseDashboard = (props) => {
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showAddTripModal, setShowAddTripModal] = useState(false);
 
+  const { clearHeader } = useHeader();
+
   const driverWorkDrivers = Array.isArray(props.driverWorkDrivers) ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = Array.isArray(props.driverWorkTrips) ? props.driverWorkTrips : trips;
 
@@ -119,7 +122,8 @@ const MobileEnterpriseDashboard = (props) => {
   const closeTripDetails = useCallback(() => {
     setTripDetails(null);
     setTripWorkflowActive(false);
-  }, []);
+    clearHeader();
+  }, [clearHeader]);
 
   const handleNavClick = useCallback((view) => {
     closeTripDetails();
@@ -137,6 +141,50 @@ const MobileEnterpriseDashboard = (props) => {
       case 'tools': void import('./EnterpriseRoutePlanner'); break;
       case 'menu': void import('./MobileMenuPage'); break;
     }
+  }, []);
+
+  const handleTripEdit = useCallback((_trip) => {
+    // Inline edit is handled by the parent workflows; keep the detail open.
+  }, []);
+
+  const handleTripDrive = useCallback((_trip) => {
+    setTripWorkflowActive(true);
+  }, []);
+
+  const handleTripAssign = useCallback((_trip) => {
+    // Assignment flow is surfaced through the action center; keep detail open.
+  }, []);
+
+  const handleTripMessage = useCallback((_trip) => {
+    setIsChatThreadOpen(true);
+  }, []);
+
+  const handleTripNavigate = useCallback((trip, loc) => {
+    openNavigation(loc === 'pickup' ? trip.pickup : trip.dropoff);
+  }, []);
+
+  const handleTripCall = useCallback((trip) => {
+    makeCall(resolveClientPhoneForTrip(trip, []), trip.patient);
+  }, []);
+
+  const handleTripArchive = useCallback((_trip) => {
+    // Archive flow is surfaced through the Reports view; keep detail open.
+  }, []);
+
+  const handleTripReroute = useCallback((_trip) => {
+    // Reroute flow is surfaced through the action center; keep detail open.
+  }, []);
+
+  const handleTripNoShow = useCallback((_trip) => {
+    // No-show flow is surfaced through the action center; keep detail open.
+  }, []);
+
+  const handleTripCancel = useCallback((_trip) => {
+    // Cancel flow is surfaced through the action center; keep detail open.
+  }, []);
+
+  const handleTripAudit = useCallback((_trip) => {
+    // Audit history is rendered inside the detail history tab; keep detail open.
   }, []);
 
   const renderContent = () => {
@@ -411,33 +459,39 @@ const MobileEnterpriseDashboard = (props) => {
 
   return (
     <HeaderProvider>
-      {renderContent()}
-      
-      {currentTripDetails && (
-        <Suspense fallback={<MobileFallback />}>
-          <TripDetailView
-            tripId={currentTripDetails.id}
-            role={role}
-            currentUser={currentUser}
-            drivers={driverWorkDrivers}
-            onClose={closeTripDetails}
-            onEdit={(trip) => { /* handle edit */ }}
-            onDrive={(trip) => { setTripWorkflowActive(true); }}
-            onAssign={(trip) => { /* handle assign */ }}
-            onMessage={(trip) => { /* handle message */ }}
-            onNavigate={(trip, loc) => openNavigation(loc === 'pickup' ? trip.pickup : trip.dropoff)}
-            onCall={(trip) => makeCall(resolveClientPhoneForTrip(trip, []), trip.patient)}
-            onArchive={(trip) => { /* handle archive */ }}
-            onReroute={(trip) => { /* handle reroute */ }}
-            onNoShow={(trip) => { /* handle no show */ }}
-            onCancel={(trip) => { /* handle cancel */ }}
-            onAudit={(trip) => { /* handle audit */ }}
-            onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
-            isWorkflowMode={tripWorkflowActive}
-            readOnly={false}
-          />
-        </Suspense>
-      )}
+      <div className="relative flex flex-1 flex-col min-h-0 overflow-hidden">
+        {renderContent()}
+        
+        {currentTripDetails && (
+          <div className="absolute inset-x-0 top-0 flex flex-col bg-slate-50" role="presentation" style={{ bottom: NAV_BOTTOM_CLEARANCE, zIndex: 35 }}>
+            <ErrorBoundary>
+              <Suspense fallback={<MobileFallback />}>
+                <TripDetailView
+                  trip={currentTripDetails}
+                  tripId={currentTripDetails.id}
+                  role={role}
+                  currentUser={currentUser}
+                  drivers={driverWorkDrivers}
+                  onClose={closeTripDetails}
+                  onEdit={handleTripEdit}
+                  onDrive={handleTripDrive}
+                  onAssign={handleTripAssign}
+                  onMessage={handleTripMessage}
+                  onNavigate={handleTripNavigate}
+                  onCall={handleTripCall}
+                  onArchive={handleTripArchive}
+                  onReroute={handleTripReroute}
+                  onNoShow={handleTripNoShow}
+                  onCancel={handleTripCancel}
+                  onAudit={handleTripAudit}
+                  onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
+                  isWorkflowMode={tripWorkflowActive}
+                  readOnly={false}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        )}
 
       {showUploadModal && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -507,6 +561,7 @@ const MobileEnterpriseDashboard = (props) => {
           </div>
         </div>
       )}
+      </div>
     </HeaderProvider>
   );
 };

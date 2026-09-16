@@ -40,6 +40,7 @@ export const MobileLayout = ({
         rightActions={mergedConfig.rightActions}
         role={mergedConfig.role}
         largeTitle={mergedConfig.largeTitle}
+        className="relative z-40"
       />
       
       <div 
