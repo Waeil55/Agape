@@ -6085,6 +6085,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         <DriverToolsPage
           trips={trips}
           activeTrips={activeTrips}
+          drivers={drivers}
           aiSequence={aiSequence}
           aiSuggestions={aiSuggestions}
           aiRideShare={aiRideShare}

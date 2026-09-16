@@ -534,13 +534,49 @@ export default function EnterpriseRoutePlanner({ trips = [], drivers = [], appSe
   const importTripsAsStops = useCallback(() => {
     const driverT = selectedDriver ? driverTrips : activeTrips;
     if (driverT.length === 0) { triggerToast('No active trips to import', 'error'); return; }
-    const newStops = driverT.slice(0, 15).map((t, idx) => ({
-      id: `imported-${t.id}-${idx}`, clientName: t.patient || '', address: idx % 2 === 0 ? (t.pickup || '') : (t.dropoff || ''),
-      type: idx % 2 === 0 ? 'PU' : 'DO', mobility: 'Amb', timeWindow: t.time || 'Flexible',
-      timeWindowStart: '', timeWindowEnd: '', notes: t.notes || '', expanded: false,
-      phone: t.phone || t.pickupPhone || '', appointmentTime: t.time || '', specialInstructions: '', priority: 'normal',
-      tripId: t.id, bookingId: t.bookingId,
-    }));
+    const newStops = [];
+    driverT.slice(0, 15).forEach((t, tIdx) => {
+      if (t.pickup) {
+        newStops.push({
+          id: `imported-${t.id || tIdx}-pu`,
+          clientName: t.patient || '',
+          address: t.pickup || '',
+          type: 'PU',
+          mobility: t.mobility || t.req || 'Amb',
+          timeWindow: t.time || 'Flexible',
+          timeWindowStart: '',
+          timeWindowEnd: '',
+          notes: t.notes || '',
+          expanded: false,
+          phone: t.phone || t.pickupPhone || '',
+          appointmentTime: t.time || '',
+          specialInstructions: t.instructions || '',
+          priority: 'normal',
+          tripId: t.id,
+          bookingId: t.bookingId,
+        });
+      }
+      if (t.dropoff) {
+        newStops.push({
+          id: `imported-${t.id || tIdx}-do`,
+          clientName: t.patient || '',
+          address: t.dropoff || '',
+          type: 'DO',
+          mobility: t.mobility || t.req || 'Amb',
+          timeWindow: t.time || 'Flexible',
+          timeWindowStart: '',
+          timeWindowEnd: '',
+          notes: t.notes || '',
+          expanded: false,
+          phone: t.phone || t.dropoffPhone || '',
+          appointmentTime: t.time || '',
+          specialInstructions: t.instructions || '',
+          priority: 'normal',
+          tripId: t.id,
+          bookingId: t.bookingId,
+        });
+      }
+    });
     setStops(newStops);
     addAuditEntry(`Imported ${newStops.length} stops from ${selectedDriver ? selectedDriver.name : 'active trips'}`);
     triggerToast(`Imported ${newStops.length} stops from ${selectedDriver ? selectedDriver.name : 'active trips'}`);
@@ -726,6 +762,9 @@ export default function EnterpriseRoutePlanner({ trips = [], drivers = [], appSe
                         {MOBILITY_OPTIONS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                       </select>
                       <button type="button" onClick={() => handleToggleExpandStop(stop.id)} className={`p-1 rounded-md text-xs transition-colors shrink-0 ${stop.expanded || stop.notes ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}><SlidersHorizontal size={12} /></button>
+                      {stop.address && (
+                        <button type="button" onClick={() => handleOpenNavigation(stop.address)} className="p-1 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors shrink-0" title="Navigate to stop"><Navigation size={12} /></button>
+                      )}
                       <button type="button" onClick={() => handleRemoveStop(stop.id)} className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"><Trash2 size={12} /></button>
                     </div>
 
