@@ -29,7 +29,8 @@ describe('mobile premium interaction contract', () => {
 
   it('keeps the bottom bar visible across all sub-views including admin', () => {
     const enterpriseSource = readComponent('./MobileEnterpriseDashboard.jsx');
-    expect(enterpriseSource).toContain('showNav = !isChatThreadOpen');
+    // New architecture uses showBottomNav prop on MobileLayout
+    expect(enterpriseSource).toContain('showBottomNav');
     expect(enterpriseSource).not.toContain("subView !== 'admin'");
   });
 

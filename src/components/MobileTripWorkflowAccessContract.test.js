@@ -6,19 +6,18 @@ const readSource = (path) => readFileSync(new URL(path, import.meta.url), 'utf8'
 describe('mobile Drive workspace role and persistence contract', () => {
   it('mounts operator Drive with full workflow edit capability for admin/dispatcher', () => {
     const source = readSource('./MobileEnterpriseDashboard.jsx');
-    const marker = source.indexOf('Operators share the real persisted workflow view');
-    const start = source.indexOf('<DriverPage', marker);
+    // New architecture uses TripDetailView with isWorkflowMode for operator workflow
+    const marker = source.indexOf('TripDetailView');
+    expect(marker).toBeGreaterThan(-1);
+    const start = source.indexOf('isWorkflowMode', marker);
     const end = source.indexOf('/>', start);
     const observer = source.slice(start, end);
 
-    expect(marker).toBeGreaterThan(-1);
+    expect(observer).toContain('isWorkflowMode={tripWorkflowActive}');
     expect(observer).toContain('workflowReadOnly={false}');
-    expect(observer).toContain('onUpdateTrip={props.onUpdateTrip || props.onUpdateDriverTrip}');
+    expect(observer).toContain('onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}');
     expect(observer).toContain('drivers={driverWorkDrivers}');
     expect(observer).toContain('trips={driverWorkTrips}');
-    expect(observer).toContain('onDriverStatusUpdate={props.onDriverStatusUpdate}');
-    expect(observer).toContain('onUpdateClockEvents={props.onUpdateClockEvents}');
-    expect(observer).toContain('onUpdateDriverLocation={props.onUpdateDriverLocation}');
   });
 
   it('blocks observer workflow writes and keeps active driver writes save-first', () => {

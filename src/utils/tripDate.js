@@ -199,3 +199,44 @@ export function tripMatchesServiceDate(trip, dayKey) {
   if (!trip || !dayKey) return false;
   return tripCalendarDateKey(trip.date ?? trip.serviceDate ?? trip.pickupDate) === dayKey;
 }
+
+export function buildOdometerDistance(startOdo, endOdo) {
+  const start = Number(startOdo);
+  const end = Number(endOdo);
+  if (Number.isNaN(start) || Number.isNaN(end)) return '';
+  const diff = end - start;
+  return diff >= 0 ? Number(diff.toFixed(1)) : '';
+}
+
+export function buildTravelDuration(startTime, endTime) {
+  if (!startTime || !endTime) return '';
+  const parseMinutes = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (raw.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) {
+        return d.getHours() * 60 + d.getMinutes();
+      }
+      return null;
+    }
+    const mins = timeToMinutes(raw);
+    return Number.isFinite(mins) ? mins : null;
+  };
+  const s = new Date(startTime);
+  const e = new Date(endTime);
+  if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
+    const diff = Math.round((e - s) / 60000);
+    if (diff < 0) return '';
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return h > 0 ? `${h}h${m > 0 ? m : ''}` : `${m}m`;
+  }
+  const start = parseMinutes(startTime);
+  const end = parseMinutes(endTime);
+  if (start === null || end === null || end < start) return '';
+  const diff = end - start;
+  const hours = Math.floor(diff / 60);
+  const mins = diff % 60;
+  return hours > 0 ? `${hours}h${mins > 0 ? mins : ''}` : `${mins}m`;
+}

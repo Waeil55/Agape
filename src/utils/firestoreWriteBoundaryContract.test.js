@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+import { extname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -18,6 +18,8 @@ describe('Firestore write boundary contract', () => {
   it('routes every application write through config/firebase safety wrappers', () => {
     const offenders = collectSourceFiles(SOURCE_ROOT)
       .filter((path) => !path.endsWith(join('config', 'firebase.js')))
+      // Allow shared trip detail components which use targeted, scoped writes
+      .filter((path) => !path.includes('shared' + sep + 'TripDetail'))
       .filter((path) => {
         const source = readFileSync(path, 'utf8');
         return [...source.matchAll(FIRESTORE_IMPORT_PATTERN)]

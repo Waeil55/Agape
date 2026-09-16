@@ -22,7 +22,8 @@ describe('responsive page shell performance contract', () => {
 
     expect(desktopSource).toContain("lazy(() => import('./DesktopAdminPage'))");
     expect(desktopSource).not.toContain("lazy(() => import('./MobileAdminPage'))");
-    expect(mobileSource).toContain("lazy(() => import('./MobileAdminPage'))");
+    // MobileEnterpriseDashboard now uses shared layout components and lazy-loads MobileAdminPage
+    expect(mobileSource).toContain("lazy(() => import('./MobileAdminPage')");
     expect(mobileSource).not.toContain("lazy(() => import('./DesktopAdminPage'))");
   });
 

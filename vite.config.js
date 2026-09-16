@@ -38,6 +38,7 @@ export default defineConfig({
     target: 'es2020',
     chunkSizeWarningLimit: 600,
     rollupOptions: {
+      external: ['@react-google-maps/api', 'react-google-maps/api'],
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined;
