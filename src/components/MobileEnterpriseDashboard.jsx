@@ -469,27 +469,29 @@ const MobileEnterpriseDashboard = (props) => {
       {renderContent()}
       
       {currentTripDetails && (
-        <TripDetailView
-          tripId={currentTripDetails.id}
-          role={role}
-          currentUser={currentUser}
-          drivers={driverWorkDrivers}
-          onClose={closeTripDetails}
-          onEdit={(trip) => { /* handle edit */ }}
-          onDrive={(trip) => { setTripWorkflowActive(true); }}
-          onAssign={(trip) => { /* handle assign */ }}
-          onMessage={(trip) => { /* handle message */ }}
-          onNavigate={(trip, loc) => openNavigation(loc === 'pickup' ? trip.pickup : trip.dropoff)}
-          onCall={(trip) => makeCall(resolveClientPhoneForTrip(trip, []), trip.patient)}
-          onArchive={(trip) => { /* handle archive */ }}
-          onReroute={(trip) => { /* handle reroute */ }}
-          onNoShow={(trip) => { /* handle no show */ }}
-          onCancel={(trip) => { /* handle cancel */ }}
-          onAudit={(trip) => { /* handle audit */ }}
-          onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
-          isWorkflowMode={tripWorkflowActive}
-          readOnly={false}
-        />
+        <Suspense fallback={<MobileFallback />}>
+          <TripDetailView
+            tripId={currentTripDetails.id}
+            role={role}
+            currentUser={currentUser}
+            drivers={driverWorkDrivers}
+            onClose={closeTripDetails}
+            onEdit={(trip) => { /* handle edit */ }}
+            onDrive={(trip) => { setTripWorkflowActive(true); }}
+            onAssign={(trip) => { /* handle assign */ }}
+            onMessage={(trip) => { /* handle message */ }}
+            onNavigate={(trip, loc) => openNavigation(loc === 'pickup' ? trip.pickup : trip.dropoff)}
+            onCall={(trip) => makeCall(resolveClientPhoneForTrip(trip, []), trip.patient)}
+            onArchive={(trip) => { /* handle archive */ }}
+            onReroute={(trip) => { /* handle reroute */ }}
+            onNoShow={(trip) => { /* handle no show */ }}
+            onCancel={(trip) => { /* handle cancel */ }}
+            onAudit={(trip) => { /* handle audit */ }}
+            onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
+            isWorkflowMode={tripWorkflowActive}
+            readOnly={false}
+          />
+        </Suspense>
       )}
 
       {showUploadModal && (
