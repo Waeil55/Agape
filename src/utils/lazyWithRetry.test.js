@@ -64,6 +64,23 @@ describe('loadWorkspaceChunk', () => {
     expect(typeof result.default).toBe('function');
   });
 
+  it('accepts a module whose default export is a memoized component (React.memo is an object, not a function)', async () => {
+    const store = makeStore(MAX_RELOAD_ATTEMPTS);
+    const options = makeOptions({ store });
+    const memo = { $$typeof: Symbol.for('react.memo'), type: () => null };
+    const result = await loadWorkspaceChunk(() => Promise.resolve({ default: memo }), options);
+    expect(result).toEqual({ default: memo });
+    expect(options.reload).not.toHaveBeenCalled();
+  });
+
+  it('accepts a module whose default export is a forwardRef component', async () => {
+    const store = makeStore(MAX_RELOAD_ATTEMPTS);
+    const options = makeOptions({ store });
+    const forwardRef = { $$typeof: Symbol.for('react.forward_ref'), render: () => null };
+    const result = await loadWorkspaceChunk(() => Promise.resolve({ default: forwardRef }), options);
+    expect(result).toEqual({ default: forwardRef });
+  });
+
   it('rejects a module with no usable component export instead of returning an invalid lazy module', async () => {
     const store = makeStore(MAX_RELOAD_ATTEMPTS);
     const options = makeOptions({ store });

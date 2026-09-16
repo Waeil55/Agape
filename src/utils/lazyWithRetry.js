@@ -28,16 +28,23 @@ const defaultStore = {
   },
 };
 
+// React element types come in two shapes: functions (function/class components)
+// and objects carrying a `$$typeof` symbol (React.memo, forwardRef, lazy,
+// context). Checking only `typeof === 'function'` would wrongly reject
+// legitimate `export default React.memo(...)` modules.
+const isReactElementType = (value) =>
+  typeof value === 'function' ||
+  (value !== null && typeof value === 'object' && typeof value.$$typeof === 'symbol');
+
 // A lazy import must resolve to a React element type. If a loader maps the
 // module to a named export that does not exist (for example a module that only
 // has a default export), `.default` becomes `undefined` and React would throw
 // its cryptic "Element type is invalid" production error (#306). Normalize the
 // module here and reject unusable resolutions with a descriptive error instead.
 const normalizeLazyModule = (resolved) => {
-  if (typeof resolved === 'function') return { default: resolved };
-  if (resolved && typeof resolved === 'object') {
-    const d = resolved.default;
-    if (typeof d === 'function') return resolved;
+  if (isReactElementType(resolved)) return { default: resolved };
+  if (resolved && typeof resolved === 'object' && isReactElementType(resolved.default)) {
+    return resolved;
   }
   return null;
 };
