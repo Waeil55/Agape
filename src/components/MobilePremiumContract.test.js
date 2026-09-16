@@ -5,7 +5,7 @@ const readComponent = (path) => readFileSync(new URL(path, import.meta.url), 'ut
 
 describe('mobile premium interaction contract', () => {
   it('keeps enterprise navigation stable and inserts only the pinned started trip for drivers', () => {
-    const enterpriseSource = readComponent('./MobileEnterpriseDashboard.jsx');
+    const enterpriseSource = readComponent('./shared/MobileBottomNav.jsx');
     const driverSource = readComponent('./DriverPage.jsx');
     const enterpriseNav = enterpriseSource.match(/MOBILE_PRIMARY_NAV = Object\.freeze\(\[([\s\S]*?)\]\);/)?.[1] || '';
     const driverNav = driverSource.match(/const navItems = useMemo\(\(\) => \{([\s\S]*?)\}, \[startedTripNav, unreadCount\]\);/)?.[1] || '';

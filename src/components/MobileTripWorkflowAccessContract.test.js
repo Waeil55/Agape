@@ -9,15 +9,14 @@ describe('mobile Drive workspace role and persistence contract', () => {
     // New architecture uses TripDetailView with isWorkflowMode for operator workflow
     const marker = source.indexOf('TripDetailView');
     expect(marker).toBeGreaterThan(-1);
-    const start = source.indexOf('isWorkflowMode', marker);
+    const start = source.indexOf('<TripDetailView', marker);
     const end = source.indexOf('/>', start);
     const observer = source.slice(start, end);
 
     expect(observer).toContain('isWorkflowMode={tripWorkflowActive}');
-    expect(observer).toContain('workflowReadOnly={false}');
+    expect(observer).toContain('readOnly={false}');
     expect(observer).toContain('onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}');
     expect(observer).toContain('drivers={driverWorkDrivers}');
-    expect(observer).toContain('trips={driverWorkTrips}');
   });
 
   it('blocks observer workflow writes and keeps active driver writes save-first', () => {

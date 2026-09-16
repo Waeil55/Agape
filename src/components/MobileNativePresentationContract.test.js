@@ -24,14 +24,16 @@ describe('mobile native presentation contract', () => {
     expect(source).not.toMatch(/\b[wh]-[789]\b/);
   });
 
-  it('keeps enterprise navigation to five stable primary destinations', () => {
-    const source = readComponent('MobileEnterpriseDashboard.jsx');
+  it('keeps enterprise navigation to six stable primary destinations in shared bottom nav', () => {
+    const source = readComponent('shared/MobileBottomNav.jsx');
     const nav = source.match(/MOBILE_PRIMARY_NAV = Object\.freeze\(\[([\s\S]*?)\]\);/)?.[1] || '';
     const ids = [...nav.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
 
     expect(ids).toEqual(['trips', 'map', 'chat', 'reports', 'tools', 'menu']);
-    expect(source).not.toContain('backdrop-blur');
-    expect(source).not.toContain('transition-all');
+
+    const dashSource = readComponent('MobileEnterpriseDashboard.jsx');
+    expect(dashSource).not.toContain('backdrop-blur');
+    expect(dashSource).not.toContain('transition-all');
   });
 
   it('uses separate semantic controls for report expansion and editing', () => {

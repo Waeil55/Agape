@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import { ChevronLeft, Search, X } from 'lucide-react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { designTokens } from '../../utils/designTokens';
 
 const HeaderContext = createContext(null);
@@ -39,9 +39,25 @@ export const HeaderProvider = ({ children }) => {
 export const useHeader = () => {
   const context = useContext(HeaderContext);
   if (!context) {
-    throw new Error('useHeader must be used within a HeaderProvider');
+    // Fail-safe fallback so components never crash when rendered outside a
+    // HeaderProvider (e.g. lazy shells, embedded previews, tests).
+    return useHeaderFallback;
   }
   return context;
+};
+
+export const useHeaderFallback = {
+  headerConfig: {
+    title: '',
+    subtitle: '',
+    showBack: false,
+    onBack: null,
+    rightActions: [],
+    role: null,
+    largeTitle: false,
+  },
+  setHeader: () => {},
+  clearHeader: () => {},
 };
 
 const AppHeader = ({ 

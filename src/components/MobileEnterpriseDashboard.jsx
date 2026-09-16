@@ -1,29 +1,13 @@
-import React, { useState, useMemo, useEffect, useCallback, startTransition, Suspense, lazy, Component } from 'react';
-import { 
-  ChevronLeft, Search, Plus, Upload, Route, Users, Truck, MapPin, 
-  Phone, X, Edit2, Ban, Repeat, MessageSquare, SlidersHorizontal,
-  ChevronRight, XCircle, Play, UserCheck, MoreHorizontal, Navigation,
-  LayoutDashboard, FileText, Wrench, Menu, Map, Bell, Settings,
-  AlertCircle
-} from 'lucide-react';
-import { getDriverLiveStatus } from '../constants/statuses';
-import { tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
-import { tripMatchesSearch } from '../utils/search';
+import React, { useState, useMemo, useCallback, startTransition, Suspense, lazy, Component } from 'react';
+import { Search, X, AlertCircle } from 'lucide-react';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
-import { saveClientProfile } from '../utils/clientProfileUtils';
-import { openNavigation, makeCall, sendSMS } from '../utils/nativeActions';
-import AdminQuickSmsSheet from './trips/AdminQuickSmsSheet';
-import ScheduleEditorModal from './trips/ScheduleEditorModal';
+import { openNavigation, makeCall } from '../utils/nativeActions';
 import { 
   MobileLayout, 
-  MobileBottomNavigation, 
   NAV_BOTTOM_CLEARANCE, 
-  getActiveViewLabel,
   TripDetailView,
-  HeaderProvider,
-  useHeader 
+  HeaderProvider
 } from './shared';
-import { designTokens } from '../utils/designTokens';
 import SettingsPage from './SettingsPage';
 import AddTripModal from './AddTripModal';
 
@@ -86,14 +70,6 @@ class ErrorBoundary extends Component {
 
 ErrorBoundary.displayName = 'ErrorBoundary';
 
-const MOBILE_PRIMARY_NAV = [
-  { id: 'trips', label: 'Trips', icon: LayoutDashboard },
-  { id: 'map', label: 'Map', icon: MapPin },
-  { id: 'reports', label: 'Reports', icon: FileText },
-  { id: 'tools', label: 'Tools', icon: Wrench },
-  { id: 'menu', label: 'More', icon: Menu },
-];
-
 const SUB_VIEW_TITLES = {
   route_planner: 'AI Route Planner',
   reports: 'Reports & Export',
@@ -112,13 +88,11 @@ const getSubViewTitle = (subView) => SUB_VIEW_TITLES[subView] || 'Details';
 const MobileEnterpriseDashboard = (props) => {
   const { 
     trips = [], drivers = [], currentUser, role, 
-    tenantId, onUpdateTrip, onUpdateDriverTrip,
-    onOpenSequencer, onOpenLiveMap,
-    requestAuthAction, addToast, addAuditLog,
+    onUpdateTrip, onUpdateDriverTrip,
+    requestAuthAction,
     hasPermission,
     driverTelemetry = [], timeTrackingDeclarations = [],
-    vehicles = [], dispatchers = [],
-    phoneNumbers = {},
+    dispatchers = [],
   } = props;
 
   const [currentView, setCurrentView] = useState('trips');
@@ -133,7 +107,6 @@ const MobileEnterpriseDashboard = (props) => {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showAddTripModal, setShowAddTripModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   const driverWorkDrivers = Array.isArray(props.driverWorkDrivers) ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = Array.isArray(props.driverWorkTrips) ? props.driverWorkTrips : trips;
@@ -165,34 +138,6 @@ const MobileEnterpriseDashboard = (props) => {
       case 'menu': void import('./MobileMenuPage'); break;
     }
   }, []);
-
-  const renderTopBar = useCallback((title, showBack = false, onBack = null) => {
-    const { setHeader } = useHeader();
-    
-    const rightActions = [
-      { id: 'search', icon: Search, onClick: () => setGlobalSearchOpen(true), ariaLabel: 'Search', variant: 'secondary' },
-    ];
-
-    if (showBack) {
-      rightActions.unshift({ 
-        id: 'back', 
-        icon: ChevronLeft, 
-        onClick: onBack || closeTripDetails, 
-        ariaLabel: 'Back', 
-        variant: 'secondary' 
-      });
-    }
-
-    setHeader({
-      title,
-      showBack,
-      onBack: onBack || closeTripDetails,
-      rightActions,
-      role,
-    });
-
-    return null; // Header is rendered by MobileLayout
-  }, [role, closeTripDetails, setGlobalSearchOpen]);
 
   const renderContent = () => {
     if (subView) {

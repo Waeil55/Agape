@@ -1,24 +1,25 @@
-import React, { useMemo, useEffect, useRef } from 'react';
-import { 
-  LayoutDashboard, MapPin, FileText, Wrench, Menu, MessageSquare,
-  Truck, Users, Settings, Search, Plus, Upload, Route, Map, Bell
+import React, { useMemo } from 'react';
+import {
+  LayoutDashboard, MapPin, FileText, Wrench, Menu, MessageSquare, CheckCircle2, XCircle,
+  Settings
 } from 'lucide-react';
 import { designTokens } from '../../utils/designTokens';
 
-const MOBILE_PRIMARY_NAV = [
+export const MOBILE_PRIMARY_NAV = Object.freeze([
   { id: 'trips', label: 'Trips', icon: LayoutDashboard, roles: ['driver', 'dispatcher', 'admin'] },
   { id: 'map', label: 'Map', icon: MapPin, roles: ['dispatcher', 'admin'] },
+  { id: 'chat', label: 'Messages', icon: MessageSquare, roles: ['dispatcher', 'admin'] },
   { id: 'reports', label: 'Reports', icon: FileText, roles: ['dispatcher', 'admin'] },
   { id: 'tools', label: 'Tools', icon: Wrench, roles: ['dispatcher', 'admin'] },
   { id: 'menu', label: 'More', icon: Menu, roles: ['driver', 'dispatcher', 'admin'] },
-];
+]);
 
-const MOBILE_DRIVER_NAV = [
+const MOBILE_DRIVER_NAV = Object.freeze([
   { id: 'driverHome', label: 'Home', icon: LayoutDashboard, roles: ['driver'] },
   { id: 'completed', label: 'Completed', icon: CheckCircle2, roles: ['driver'] },
   { id: 'cancelled', label: 'Cancelled', icon: XCircle, roles: ['driver'] },
   { id: 'settings', label: 'Settings', icon: Settings, roles: ['driver'] },
-];
+]);
 
 export const MobileBottomNavigation = React.memo(({ 
   currentView, 
@@ -28,7 +29,6 @@ export const MobileBottomNavigation = React.memo(({
   role = 'dispatcher',
   unreadCount = 0,
 }) => {
-  const tokens = designTokens;
   const navItems = useMemo(() => {
     if (role === 'driver') {
       return MOBILE_DRIVER_NAV;

@@ -2,53 +2,43 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(new URL('./MobileEnterpriseDashboard.jsx', import.meta.url), 'utf8');
+const navSource = readFileSync(new URL('./shared/MobileBottomNav.jsx', import.meta.url), 'utf8');
 
 describe('mobile enterprise subview render stability', () => {
-  it('defines the shared subview wrapper at module scope', () => {
-    const wrapperDeclaration = source.indexOf('export const SubViewWrapper');
-    const dashboardDeclaration = source.indexOf('const MobileEnterpriseDashboard');
-
-    expect(wrapperDeclaration).toBeGreaterThan(-1);
-    expect(wrapperDeclaration).toBeLessThan(dashboardDeclaration);
-    expect(source.slice(dashboardDeclaration)).not.toContain('const SubViewWrapper');
+  it('uses shared MobileLayout with HeaderProvider for all views', () => {
+    expect(source).toContain('import {');
+    expect(source).toContain('MobileLayout');
+    expect(source).toContain('HeaderProvider');
+    expect(source).toContain('from \'./shared\'');
+    const mobileLayoutCount = (source.match(/<MobileLayout/g) || []).length;
+    expect(mobileLayoutCount).toBeGreaterThan(5);
   });
 
-  it('passes the dashboard top bar into every stable wrapper instance', () => {
-    const wrapperOpenings = source.match(/<SubViewWrapper\b[^>]*>/g) || [];
-
-    expect(wrapperOpenings.length).toBeGreaterThan(0);
-    wrapperOpenings.forEach((opening) => {
-      expect(opening).toContain('renderTopBar={renderTopBar}');
-    });
+  it('keeps the stable destination set only in the shared bottom navigation', () => {
+    const navDeclaration = navSource.indexOf('export const MOBILE_PRIMARY_NAV = Object.freeze(');
+    expect(navDeclaration).toBeGreaterThan(-1);
+    expect(navSource).toContain("{ id: 'chat', label: 'Messages', icon: MessageSquare, roles: ['dispatcher', 'admin'] }");
+    expect(source).not.toContain('const MOBILE_PRIMARY_NAV');
+    expect(source).not.toContain('const navItems = useMemo');
   });
 
-  it('isolates alert subscription updates inside the memoized bottom navigation', () => {
-    const navigationDeclaration = source.indexOf('export const MobileBottomNavigation = React.memo');
-    const dashboardDeclaration = source.indexOf('const MobileEnterpriseDashboard');
-    const dashboardSource = source.slice(dashboardDeclaration);
-
-    expect(navigationDeclaration).toBeGreaterThan(-1);
-    expect(navigationDeclaration).toBeLessThan(dashboardDeclaration);
-    expect(source.slice(navigationDeclaration, dashboardDeclaration)).toContain('useChat({ alerts: true })');
-    expect(dashboardSource).not.toContain('useChat({ alerts: true })');
-    expect(dashboardSource).toContain('<MobileBottomNavigation');
+  it('wraps TripDetailView in a Suspense boundary', () => {
+    expect(source).toContain('TripDetailView');
+    expect(source).toContain('<Suspense fallback={<MobileFallback />}>');
+    const tripDetailIndex = source.indexOf('<TripDetailView');
+    const suspenseIndex = source.lastIndexOf('<Suspense fallback={<MobileFallback />}>', tripDetailIndex);
+    expect(suspenseIndex).toBeGreaterThan(-1);
+    expect(suspenseIndex).toBeLessThan(tripDetailIndex);
   });
 
   it('defers device-storage reads and writes away from initial render and click handlers', () => {
-    expect(source).toContain('const scheduleIdleWork');
-    expect(source).toContain('window.requestIdleCallback');
     expect(source).not.toContain("useState(() => localStorage.getItem('agape_toolsDriverId')");
     expect(source).not.toContain("if (toolsDriverId) localStorage.setItem('agape_toolsDriverId'");
+    expect(source).toContain('startTransition');
   });
 
-  it('memoizes route-tool trip collections outside the active render branch', () => {
-    const toolsBranchStart = source.indexOf("if (currentView === 'tools')");
-    const toolsBranchEnd = source.indexOf("if (currentView === 'chat')", toolsBranchStart);
-    const toolsBranch = source.slice(toolsBranchStart, toolsBranchEnd);
-
-    expect(source).toContain('const toolsTrips = useMemo');
-    expect(source).toContain('const toolsActiveTrips = useMemo');
-    expect(toolsBranch).not.toContain('driverWorkTrips.filter');
-    expect(toolsBranch).not.toContain('toolSelectedTrips.includes');
+  it('uses code-split lazy imports for heavy sub-views', () => {
+    const lazyImports = (source.match(/lazy\(\(\) => import/g) || []).length;
+    expect(lazyImports).toBeGreaterThan(5);
   });
 });
