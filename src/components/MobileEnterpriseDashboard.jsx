@@ -23,19 +23,19 @@ const prefetchTripDetailSections = () => {
   void import('./shared/TripDetailOdometer');
 };
 
-const ReportsPage = lazyWithRetry(() => import('./ReportsPage').then(m => ({ default: m.ReportsPage })));
-const MobileReportsPage = lazyWithRetry(() => import('./MobileReportsPage').then(m => ({ default: m.MobileReportsPage })));
-const MobileAdminPage = lazyWithRetry(() => import('./MobileAdminPage').then(m => ({ default: m.MobileAdminPage })));
-const MobileMenuPage = lazyWithRetry(() => import('./MobileMenuPage').then(m => ({ default: m.MobileMenuPage })));
-const LiveMapPage = lazyWithRetry(() => import('./LiveMapPage').then(m => ({ default: m.LiveMapPage })));
-const DriversVehiclesPage = lazyWithRetry(() => import('./DriversVehiclesPage').then(m => ({ default: m.DriversVehiclesPage })));
-const RoutePlannerPage = lazyWithRetry(() => import('./RoutePlannerPage').then(m => ({ default: m.RoutePlannerPage })));
-const EnterpriseRoutePlanner = lazyWithRetry(() => import('./EnterpriseRoutePlanner').then(m => ({ default: m.EnterpriseRoutePlanner })));
-const PayrollReportPage = lazyWithRetry(() => import('./PayrollReportPage').then(m => ({ default: m.PayrollReportPage })));
-const TimeTrackingAdmin = lazyWithRetry(() => import('./TimeTrackingAdmin').then(m => ({ default: m.TimeTrackingAdmin })));
+const ReportsPage = lazyWithRetry(() => import('./ReportsPage'));
+const MobileReportsPage = lazyWithRetry(() => import('./MobileReportsPage'));
+const MobileAdminPage = lazyWithRetry(() => import('./MobileAdminPage'));
+const MobileMenuPage = lazyWithRetry(() => import('./MobileMenuPage'));
+const LiveMapPage = lazyWithRetry(() => import('./LiveMapPage'));
+const DriversVehiclesPage = lazyWithRetry(() => import('./DriversVehiclesPage'));
+const RoutePlannerPage = lazyWithRetry(() => import('./RoutePlannerPage'));
+const EnterpriseRoutePlanner = lazyWithRetry(() => import('./EnterpriseRoutePlanner'));
+const PayrollReportPage = lazyWithRetry(() => import('./PayrollReportPage'));
+const TimeTrackingAdmin = lazyWithRetry(() => import('./TimeTrackingAdmin'));
 const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
-const FileUploadTrips = lazyWithRetry(() => import('./FileUploadTrips').then(m => ({ default: m.FileUploadTrips })));
-const TripsPage = lazyWithRetry(() => import('./TripsPage').then(m => ({ default: m.TripsPage })));
+const FileUploadTrips = lazyWithRetry(() => import('./FileUploadTrips'));
+const TripsPage = lazyWithRetry(() => import('./TripsPage'));
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center p-12" role="status" aria-label="Loading">

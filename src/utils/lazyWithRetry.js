@@ -28,6 +28,20 @@ const defaultStore = {
   },
 };
 
+// A lazy import must resolve to a React element type. If a loader maps the
+// module to a named export that does not exist (for example a module that only
+// has a default export), `.default` becomes `undefined` and React would throw
+// its cryptic "Element type is invalid" production error (#306). Normalize the
+// module here and reject unusable resolutions with a descriptive error instead.
+const normalizeLazyModule = (resolved) => {
+  if (typeof resolved === 'function') return { default: resolved };
+  if (resolved && typeof resolved === 'object') {
+    const d = resolved.default;
+    if (typeof d === 'function') return resolved;
+  }
+  return null;
+};
+
 export const clearChunkReloadGuard = () => defaultStore.clear();
 
 const clearStaticCaches = () => {
@@ -109,11 +123,15 @@ export const loadWorkspaceChunk = async (loader, options = {}) => {
   const reloadGraceMs = options.reloadGraceMs ?? RELOAD_GRACE_MS;
 
   try {
-    const mod = await withTimeout(
+    const resolved = await withTimeout(
       loader(),
       timeoutMs,
       () => Object.assign(new Error('Loading timed out'), { name: 'ChunkTimeoutError' })
     );
+    const mod = normalizeLazyModule(resolved);
+    if (!mod) {
+      throw Object.assign(new Error('Loaded chunk does not expose a usable React component.'), { name: 'InvalidChunkModuleError' });
+    }
     store.clear();
     return mod;
   } catch (error) {

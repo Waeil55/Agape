@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { loadWorkspaceChunk, MAX_RELOAD_ATTEMPTS, clearChunkReloadGuard } from './lazyWithRetry';
+import { loadWorkspaceChunk, WorkspaceErrorState, MAX_RELOAD_ATTEMPTS, clearChunkReloadGuard } from './lazyWithRetry';
 
 const makeStore = (initial = 0) => {
   const state = { attempts: initial };
@@ -62,6 +62,20 @@ describe('loadWorkspaceChunk', () => {
     const never = new Promise(() => {});
     const result = await loadWorkspaceChunk(() => never, options);
     expect(typeof result.default).toBe('function');
+  });
+
+  it('rejects a module with no usable component export instead of returning an invalid lazy module', async () => {
+    const store = makeStore(MAX_RELOAD_ATTEMPTS);
+    const options = makeOptions({ store });
+    const result = await loadWorkspaceChunk(() => Promise.resolve({ default: undefined }), options);
+    expect(typeof result.default).toBe('function');
+    expect(result.default).not.toBe(undefined);
+    expect(options.reload).not.toHaveBeenCalled();
+    expect(options.clearCaches).not.toHaveBeenCalled();
+  });
+
+  it('exposes a callable WorkspaceErrorState', () => {
+    expect(() => WorkspaceErrorState({ message: 'boom' })).not.toThrow();
   });
 
   it('exposes a callable clearChunkReloadGuard', () => {
