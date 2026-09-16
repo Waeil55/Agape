@@ -82,6 +82,7 @@ export default {
       fontFamily: {
         outfit: ['Outfit', 'sans-serif'],
         inter: ['Inter', 'sans-serif'],
+        jakarta: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
       },
       fontSize: {
         'display': ['var(--text-5xl)', { lineHeight: '0.9', fontWeight: '900' }],

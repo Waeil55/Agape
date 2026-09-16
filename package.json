@@ -52,5 +52,20 @@
     "@xmldom/xmldom": "^0.9.12",
     "dompurify": "3.4.14",
     "nanoid": "3.3.18"
-  }
+  },
+  "main": "postcss.config.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Waeil55/Agape.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Waeil55/Agape/issues"
+  },
+  "homepage": "https://github.com/Waeil55/Agape#readme"
 }

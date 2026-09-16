@@ -57,11 +57,11 @@
   --radius-full: 9999px;
 
   /* ===== SHADOWS (Premium Enterprise) ===== */
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.03);
-  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 10px 32px rgba(15, 23, 42, 0.08);
-  --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.10);
-  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
+  --shadow-md: 0 4px 14px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  --shadow-lg: 0 10px 25px -4px rgba(15, 23, 42, 0.07), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 35px -6px rgba(15, 23, 42, 0.09), 0 8px 16px -4px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.03), 0 6px 20px -3px rgba(15, 23, 42, 0.05);
 
   /* ===== TOUCH TARGETS ===== */
   --touch-min: 48px;
@@ -365,10 +365,11 @@ body {
   height: 100vh;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
   text-rendering: optimizeLegibility;
   background-color: var(--bg-app);
   color: var(--text-primary);
@@ -1310,6 +1311,8 @@ h1,
 h2,
 h3,
 h4 {
+  font-family: 'Outfit', 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+  letter-spacing: -0.02em;
   color: var(--enterprise-ink);
   line-height: 1.15;
   text-wrap: balance;
@@ -1463,6 +1466,8 @@ button,
   font-weight: 600;
   line-height: 1.15;
   text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition:
     background-color 140ms ease,
     border-color 140ms ease,
@@ -2039,7 +2044,7 @@ table tbody td *:not(button):not(.btn):not(.badge):not(.driver-history-detail-la
   font-weight: 400 !important;
 }
 table, table *, table th, table td {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
 }
 
 table td {
