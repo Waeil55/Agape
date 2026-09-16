@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useCallback, startTransition, Suspense, lazy, Component } from 'react';
+import React, { useState, useMemo, useCallback, startTransition, Suspense, Component } from 'react';
 import { Search, X, AlertCircle } from 'lucide-react';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import { openNavigation, makeCall } from '../utils/nativeActions';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { 
   MobileLayout, 
   NAV_BOTTOM_CLEARANCE, 
@@ -22,19 +23,19 @@ const prefetchTripDetailSections = () => {
   void import('./shared/TripDetailOdometer');
 };
 
-const ReportsPage = lazy(() => import('./ReportsPage').then(m => ({ default: m.ReportsPage })));
-const MobileReportsPage = lazy(() => import('./MobileReportsPage').then(m => ({ default: m.MobileReportsPage })));
-const MobileAdminPage = lazy(() => import('./MobileAdminPage').then(m => ({ default: m.MobileAdminPage })));
-const MobileMenuPage = lazy(() => import('./MobileMenuPage').then(m => ({ default: m.MobileMenuPage })));
-const LiveMapPage = lazy(() => import('./LiveMapPage').then(m => ({ default: m.LiveMapPage })));
-const DriversVehiclesPage = lazy(() => import('./DriversVehiclesPage').then(m => ({ default: m.DriversVehiclesPage })));
-const RoutePlannerPage = lazy(() => import('./RoutePlannerPage').then(m => ({ default: m.RoutePlannerPage })));
-const EnterpriseRoutePlanner = lazy(() => import('./EnterpriseRoutePlanner').then(m => ({ default: m.EnterpriseRoutePlanner })));
-const PayrollReportPage = lazy(() => import('./PayrollReportPage').then(m => ({ default: m.PayrollReportPage })));
-const TimeTrackingAdmin = lazy(() => import('./TimeTrackingAdmin').then(m => ({ default: m.TimeTrackingAdmin })));
-const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
-const FileUploadTrips = lazy(() => import('./FileUploadTrips').then(m => ({ default: m.FileUploadTrips })));
-const TripsPage = lazy(() => import('./TripsPage').then(m => ({ default: m.TripsPage })));
+const ReportsPage = lazyWithRetry(() => import('./ReportsPage').then(m => ({ default: m.ReportsPage })));
+const MobileReportsPage = lazyWithRetry(() => import('./MobileReportsPage').then(m => ({ default: m.MobileReportsPage })));
+const MobileAdminPage = lazyWithRetry(() => import('./MobileAdminPage').then(m => ({ default: m.MobileAdminPage })));
+const MobileMenuPage = lazyWithRetry(() => import('./MobileMenuPage').then(m => ({ default: m.MobileMenuPage })));
+const LiveMapPage = lazyWithRetry(() => import('./LiveMapPage').then(m => ({ default: m.LiveMapPage })));
+const DriversVehiclesPage = lazyWithRetry(() => import('./DriversVehiclesPage').then(m => ({ default: m.DriversVehiclesPage })));
+const RoutePlannerPage = lazyWithRetry(() => import('./RoutePlannerPage').then(m => ({ default: m.RoutePlannerPage })));
+const EnterpriseRoutePlanner = lazyWithRetry(() => import('./EnterpriseRoutePlanner').then(m => ({ default: m.EnterpriseRoutePlanner })));
+const PayrollReportPage = lazyWithRetry(() => import('./PayrollReportPage').then(m => ({ default: m.PayrollReportPage })));
+const TimeTrackingAdmin = lazyWithRetry(() => import('./TimeTrackingAdmin').then(m => ({ default: m.TimeTrackingAdmin })));
+const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
+const FileUploadTrips = lazyWithRetry(() => import('./FileUploadTrips').then(m => ({ default: m.FileUploadTrips })));
+const TripsPage = lazyWithRetry(() => import('./TripsPage').then(m => ({ default: m.TripsPage })));
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center p-12" role="status" aria-label="Loading">

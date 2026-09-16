@@ -12,9 +12,9 @@ describe('code-native UI cleanup contract', () => {
 
   it('keeps each responsive administration implementation in its owning shell', () => {
     expect(existsSync(new URL('components/AdminPage.jsx', srcUrl))).toBe(false);
-    expect(readSource('components/DesktopEnterpriseDashboard.jsx')).toContain("lazy(() => import('./DesktopAdminPage'))");
+    expect(readSource('components/DesktopEnterpriseDashboard.jsx')).toContain("lazyWithRetry(() => import('./DesktopAdminPage'))");
     // MobileEnterpriseDashboard now uses shared layout components and lazy-loads MobileAdminPage
-    expect(readSource('components/MobileEnterpriseDashboard.jsx')).toContain("lazy(() => import('./MobileAdminPage')");
+    expect(readSource('components/MobileEnterpriseDashboard.jsx')).toContain("lazyWithRetry(() => import('./MobileAdminPage')");
   });
 
   it('retains native-feeling interaction, scrolling, and reduced-motion safeguards', () => {

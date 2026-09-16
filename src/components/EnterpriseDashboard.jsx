@@ -1,15 +1,16 @@
-import React, { lazy, Suspense, Component } from 'react';
+import React, { Suspense, Component } from 'react';
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
+import { lazyWithRetry, WorkspaceErrorState } from '../utils/lazyWithRetry';
 
 const loadDesktop = () => import('./DesktopEnterpriseDashboard');
 const loadMobile = () => import('./MobileEnterpriseDashboard');
-const DesktopEnterpriseDashboard = lazy(loadDesktop);
-const MobileEnterpriseDashboard = lazy(loadMobile);
+const DesktopEnterpriseDashboard = lazyWithRetry(loadDesktop);
+const MobileEnterpriseDashboard = lazyWithRetry(loadMobile);
 
 // Preload both shells eagerly so a viewport switch never suspends a
 // not-yet-loaded chunk during a synchronous media-query update (React #306).
 Promise.all([loadDesktop(), loadMobile()]).catch(() => {
-  /* prefetch failures are swallowed; lazy() will retry on demand */
+  /* prefetch failures are swallowed; lazyWithRetry() will retry on demand */
 });
 
 const DashboardFallback = () => (
@@ -18,20 +19,26 @@ const DashboardFallback = () => (
   </div>
 );
 
+// A render error in a dashboard shell must never be hidden behind a spinner.
+// Surface the reason and let the operator recover without losing their session.
 class DashboardErrorBoundary extends Component {
-  state = { hasError: false };
+  state = { hasError: false, message: '' };
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, message: String((error && error.message) || error || 'Unexpected error') };
   }
 
-  componentDidCatch() {
-    // recoverable static fallback instead of a blank screen
+  componentDidCatch(error, errorInfo) {
+    console.error('EnterpriseDashboard ErrorBoundary:', error, errorInfo);
   }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, message: '' });
+  };
 
   render() {
     if (this.state.hasError) {
-      return <DashboardFallback />;
+      return <WorkspaceErrorState title="Unable to open the workspace" message={this.state.message} onRetry={this.handleRetry} />;
     }
     return this.props.children;
   }

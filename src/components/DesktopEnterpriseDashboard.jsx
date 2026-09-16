@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense, useEffect, useCallback, useMemo, startTransition } from 'react';
+import React, { useState, Suspense, useEffect, useCallback, useMemo, startTransition } from 'react';
 import { Users, MapPin, Settings, BarChart2, Archive, MessageCircle, Bell, CheckCircle2, BrainCircuit, Upload, Wand2, Search, AlertTriangle, X, Zap, Clock, PanelRight, Eye, Hash, Route, Activity, ClipboardList, CarFront, RefreshCw } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 
@@ -8,20 +8,21 @@ import { toValidDate } from '../utils/safeDate';
 import { useChat } from '../hooks/useChat';
 import { buildGlobalSearchResults } from './GlobalEntitySearch';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
-const SettingsPage = lazy(() => import('./SettingsPage'));
-const OperationsCommandCenter = lazy(() => import('./OperationsCommandCenter'));
-const MobileDispatchView = lazy(() => import('./MobileDispatchView'));
-const DesktopAdminPage = lazy(() => import('./DesktopAdminPage'));
-const DriverPage = lazy(() => import('./DriverPage'));
-const RoutePlannerPage = lazy(() => import('./RoutePlannerPage'));
-const ChatPage = lazy(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
+import { lazyWithRetry } from '../utils/lazyWithRetry';
+const SettingsPage = lazyWithRetry(() => import('./SettingsPage'));
+const OperationsCommandCenter = lazyWithRetry(() => import('./OperationsCommandCenter'));
+const MobileDispatchView = lazyWithRetry(() => import('./MobileDispatchView'));
+const DesktopAdminPage = lazyWithRetry(() => import('./DesktopAdminPage'));
+const DriverPage = lazyWithRetry(() => import('./DriverPage'));
+const RoutePlannerPage = lazyWithRetry(() => import('./RoutePlannerPage'));
+const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.ChatPage })));
 
-const RouteSequencerApp = lazy(() => import('./RouteSequencer'));
-const LiveMapPage = lazy(() => import('./LiveMapPage'));
-const DispatchAssistant = lazy(() => import('./DispatchAssistant'));
-const FileUploadTrips = lazy(() => import('./FileUploadTrips'));
-const ReportsPage = lazy(() => import('./ReportsPage'));
-const AgapeCommandCenter = lazy(() => import('./AgapeCommandCenter'));
+const RouteSequencerApp = lazyWithRetry(() => import('./RouteSequencer'));
+const LiveMapPage = lazyWithRetry(() => import('./LiveMapPage'));
+const DispatchAssistant = lazyWithRetry(() => import('./DispatchAssistant'));
+const FileUploadTrips = lazyWithRetry(() => import('./FileUploadTrips'));
+const ReportsPage = lazyWithRetry(() => import('./ReportsPage'));
+const AgapeCommandCenter = lazyWithRetry(() => import('./AgapeCommandCenter'));
 
 const DESKTOP_PANEL_PRELOADERS = Object.freeze({
   operations: () => import('./OperationsCommandCenter'),

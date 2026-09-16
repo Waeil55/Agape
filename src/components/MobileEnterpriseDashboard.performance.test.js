@@ -38,7 +38,7 @@ describe('mobile enterprise subview render stability', () => {
   });
 
   it('uses code-split lazy imports for heavy sub-views', () => {
-    const lazyImports = (source.match(/lazy\(\(\) => import/g) || []).length;
+    const lazyImports = (source.match(/lazyWithRetry\(\(\) => import/g) || []).length;
     expect(lazyImports).toBeGreaterThan(5);
   });
 });

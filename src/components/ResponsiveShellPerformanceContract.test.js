@@ -20,11 +20,11 @@ describe('responsive page shell performance contract', () => {
     const desktopSource = readSource('./DesktopEnterpriseDashboard.jsx');
     const mobileSource = readSource('./MobileEnterpriseDashboard.jsx');
 
-    expect(desktopSource).toContain("lazy(() => import('./DesktopAdminPage'))");
-    expect(desktopSource).not.toContain("lazy(() => import('./MobileAdminPage'))");
+    expect(desktopSource).toContain("lazyWithRetry(() => import('./DesktopAdminPage'))");
+    expect(desktopSource).not.toContain("import('./MobileAdminPage')");
     // MobileEnterpriseDashboard now uses shared layout components and lazy-loads MobileAdminPage
-    expect(mobileSource).toContain("lazy(() => import('./MobileAdminPage')");
-    expect(mobileSource).not.toContain("lazy(() => import('./DesktopAdminPage'))");
+    expect(mobileSource).toContain("lazyWithRetry(() => import('./MobileAdminPage')");
+    expect(mobileSource).not.toContain("import('./DesktopAdminPage')");
   });
 
   it('keeps desktop, mobile, and unloaded reports behind dynamic imports', () => {

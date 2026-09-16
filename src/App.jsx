@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, startTransition } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense, startTransition } from 'react';
 import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromCache, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
@@ -25,6 +25,7 @@ import {
 import { buildLocationFraudSignals } from './utils/locationFraud';
 import { buildLocationEvent, emitSystemEvent } from './services/firestoreEventEngine';
 import { registerServiceWorker, setupSWMessageHandler } from './utils/swManager';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 import { syncQueueProcessor } from './services/syncQueueProcessor';
 import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useRealtimeReliability } from './hooks/useRealtimeReliability';
@@ -100,18 +101,6 @@ try {
 }
 
 // Lazy-loaded heavy components
-const lazyWithRetry = (componentImport) =>
-  lazy(async () => {
-    try {
-      return await componentImport();
-    } catch (error) {
-      console.warn('[LazyLoad] Chunk load failed, clearing cache and reloading...', error);
-      try { caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).catch(() => {}); } catch {}
-      window.location.reload();
-      return { default: LazyFallback };
-    }
-  });
-
 const DriverPage = lazyWithRetry(() => import('./components/DriverPage'));
 const EnterpriseDashboard = lazyWithRetry(() => import('./components/EnterpriseDashboard'));
 const AddTripModal = lazyWithRetry(() => import('./components/AddTripModal'));
