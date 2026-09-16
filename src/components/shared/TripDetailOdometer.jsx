@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Gauge, ChevronRight, ChevronDown, Check, AlertCircle, Info } from 'lucide-react';
+import { Gauge, ChevronRight, ChevronDown, Check, AlertCircle, Info, Clock } from 'lucide-react';
 import { designTokens } from '../../utils/designTokens';
 import { buildOdometerDistance, buildTravelDuration } from '../../utils/tripDate';
 

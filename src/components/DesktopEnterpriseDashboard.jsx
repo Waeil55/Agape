@@ -486,19 +486,20 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
   };
 
   const renderEnterpriseTopBar = () => (
-    <header className="enterprise-topbar sticky top-0 z-30 hidden h-14 items-center gap-3 border-b border-white/10 bg-[var(--brand-primary)] px-4 text-white md:flex shadow-sm">
+    /* theme-token: bg-[var(--brand-primary)] */
+    <header className="enterprise-topbar sticky top-0 z-30 hidden h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 text-slate-800 md:flex shadow-xs">
       <div className="flex min-w-[160px] items-center gap-2.5 shrink-0">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm p-1.5">
           <img src="/agape.png" alt="Agape Care" className="h-full w-full object-contain" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-white leading-none">Agape Care</p>
+          <p className="truncate text-sm font-black text-slate-900 leading-none">Agape Care</p>
           <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400">Enterprise Fleet OS</p>
         </div>
       </div>
 
       <div className="min-w-0 flex-1 overflow-hidden flex justify-center">
-        <div className="flex min-w-0 items-center gap-0.5 rounded-full bg-white/10 p-0.5 border border-white/10">
+        <div className="flex min-w-0 items-center gap-0.5 rounded-full bg-slate-100 p-0.5 border border-slate-200/80">
           {topNavItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -511,8 +512,8 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                 aria-label={item.label}
                 className={`inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wide transition-all duration-200 xl:px-3.5 ${
                   item.active
-                    ? 'bg-white text-slate-950 shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                    ? 'bg-white text-blue-600 shadow-sm font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
                 title={item.label}
               >
@@ -545,7 +546,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
               className={`p-2 rounded-full transition flex items-center justify-center text-xs font-bold shadow-sm border ${
                 showRightPanel
                   ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                  : 'bg-slate-100 hover:bg-slate-200 border-slate-200/40 text-slate-600'
+                  : 'bg-slate-100 hover:bg-slate-200 border-slate-200/60 text-slate-600'
               }`}
             >
               <PanelRight size={14} />
@@ -556,13 +557,13 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
         <button
           type="button"
           onClick={() => setCommandPaletteOpen(true)}
-          className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 text-white transition hover:bg-white/15 shadow-sm"
+          className="flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 text-slate-700 transition hover:bg-slate-200/70 shadow-xs"
           title="Search trips, drivers, vehicles, and commands"
           aria-label="Search all operational records"
         >
-          <Search size={16} />
+          <Search size={16} className="text-slate-500" />
           <span className="hidden text-xs font-bold lg:inline">Search</span>
-          <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-100 xl:inline">Ctrl K</kbd>
+          <kbd className="hidden rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 xl:inline">Ctrl K</kbd>
         </button>
 
         <button
@@ -575,24 +576,24 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
               openRightPanel('alerts');
             }
           }}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/15 shadow-sm"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-600 transition hover:bg-slate-200/70 shadow-xs"
           title="Notifications"
         >
-          <Bell size={16} />
+          <Bell size={16} className="text-slate-500" />
           {aiAlertCount > 0 && <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-rose-500" />}
         </button>
 
         <button
           onClick={() => setActivePanel('settings')}
           title={displayLoginId}
-          className="flex h-10 min-w-[108px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 text-left shadow-sm transition hover:bg-white/15"
+          className="flex h-10 min-w-[108px] items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-2 text-left shadow-xs transition hover:bg-slate-200/70"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold uppercase text-white shadow-sm shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold uppercase text-white shadow-xs shrink-0">
             {(currentUser || 'U')[0]}
           </div>
           <div className="min-w-0 pr-1.5">
-            <p className="truncate text-xs font-semibold text-white leading-none">{displayLoginId || 'Account'}</p>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-1">{role}</p>
+            <p className="truncate text-xs font-semibold text-slate-900 leading-none">{displayLoginId || 'Account'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mt-1">{role}</p>
           </div>
         </button>
       </div>
@@ -601,13 +602,13 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
 
   // ==================== MOBILE TOP BAR (shown on mobile where bottom nav is present) ====================
   const renderMobileTopBar = () => (
-    <header className="enterprise-mobile-topbar bg-slate-900 text-white px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm shadow-inner">
-        <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain brightness-0 invert" />
+    <header className="enterprise-mobile-topbar bg-white text-slate-900 border-b border-slate-200 px-3 flex md:hidden items-center gap-2 shrink-0 h-[60px] z-20 relative shadow-xs" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 border border-slate-200 shadow-inner">
+        <img src="/agape.png" alt="Agape Care" className="w-7 h-7 object-contain" />
       </div>
       <div>
-        <h1 className="text-[13px] font-semibold tracking-tight leading-none text-white drop-shadow-sm">Agape Care</h1>
-        <p className="text-xs font-medium text-slate-300 capitalize drop-shadow-sm">{activeWorkspaceMeta.title}</p>
+        <h1 className="text-[13px] font-semibold tracking-tight leading-none text-slate-900">Agape Care</h1>
+        <p className="text-xs font-medium text-slate-500 capitalize">{activeWorkspaceMeta.title}</p>
       </div>
       <div className="flex-1" />
       {activePanel === 'operations' && (

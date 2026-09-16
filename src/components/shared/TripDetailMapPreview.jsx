@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Navigation, Maximize, Minimize, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Navigation, Maximize, Minimize, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { designTokens } from '../../utils/designTokens';
 import { openNavigation } from '../../utils/nativeActions';
 
