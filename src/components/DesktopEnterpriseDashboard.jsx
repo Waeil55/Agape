@@ -629,41 +629,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
     </header>
   );
 
-  // ==================== BOTTOM NAVIGATION (Mobile only for dispatcher/admin) ====================
-  const renderBottomNav = () => (
-    <nav className="bottom-nav md:hidden">
-      <div className="flex h-full items-center justify-around gap-1">
-        {sidebarItems.map(item => {
-          const Icon = item.icon;
-          const isActive = activePanel === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => navigateToPanel(item.id)}
-              onPointerEnter={() => preloadDesktopPanel(item.id)}
-              onFocus={() => preloadDesktopPanel(item.id)}
-              className={`flex-1 flex flex-col items-center justify-center rounded-full px-1 py-1.5 transition-all relative touch-manipulation min-h-[56px] ${
-                isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-500'
-              }`}
-            >
-              <div className="relative flex items-center justify-center">
-                <Icon size={22} strokeWidth={isActive ? 2 : 1.5} className="relative" />
-              </div>
-              <span className={`text-[10px] font-medium leading-none mt-1 truncate max-w-full px-0.5 ${
-                isActive ? 'text-blue-600' : 'text-slate-400'
-              }`}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-
-
-
-  // ==================== RIGHT PANEL ====================
+  {/* ==================== RIGHT PANEL ==================== */}
   const renderRightPanel = () => (
     <div className="w-[320px] lg:w-[340px] min-w-[280px] bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden">
       {/* Tabs */}
@@ -1324,9 +1290,6 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
           </div>
         )}
       </div>
-
-      {/* Bottom Navigation — mobile only */}
-      {renderBottomNav()}
 
       {/* Command Palette */}
       {renderCommandPalette()}

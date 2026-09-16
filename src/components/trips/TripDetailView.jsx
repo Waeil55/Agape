@@ -88,6 +88,7 @@ const TripDetailView = ({
   const [activeSection, setActiveSection] = useState('summary');
   const unsubscribeRef = useRef(null);
   const lastTripRef = useRef(null);
+  const lastLoadedTripIdRef = useRef(null);
 
   const matchDriver = useCallback((tripData) => {
     if (tripData?.driverId && drivers.length > 0) {
@@ -234,6 +235,21 @@ const TripDetailView = ({
       setAuditLoading(false);
     }
   }, [tripId, auditLoading]);
+
+  // When the opened trip changes while this view stays mounted, drop the
+  // previous trip's per-trip state (messages, audit, map, contacts, section)
+  // so stale content from trip A can never flash inside trip B.
+  useEffect(() => {
+    const currentId = (tripProp ? tripProp.id : (trip ? trip.id : tripId)) || null;
+    if (currentId && lastLoadedTripIdRef.current !== currentId) {
+      lastLoadedTripIdRef.current = currentId;
+      setMessages([]);
+      setAuditEntries([]);
+      setShowMap(false);
+      setShowContacts(false);
+      setActiveSection('summary');
+    }
+  }, [trip, tripProp, tripId]);
 
   useEffect(() => {
     if (activeSection === 'messages') loadMessages();

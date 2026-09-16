@@ -12,6 +12,16 @@ import {
 import SettingsPage from './SettingsPage';
 import AddTripModal from './AddTripModal';
 
+// Prefetch the lazy trip-detail sub-sections as soon as a trip is opened so
+// section switching (summary/messages/history) never waits on a chunk.
+const prefetchTripDetailSections = () => {
+  void import('./shared/TripDetailMessageThread');
+  void import('./shared/TripDetailAuditHistory');
+  void import('./shared/TripDetailMapPreview');
+  void import('./shared/TripDetailNotes');
+  void import('./shared/TripDetailOdometer');
+};
+
 const ReportsPage = lazy(() => import('./ReportsPage').then(m => ({ default: m.ReportsPage })));
 const MobileReportsPage = lazy(() => import('./MobileReportsPage').then(m => ({ default: m.MobileReportsPage })));
 const MobileAdminPage = lazy(() => import('./MobileAdminPage').then(m => ({ default: m.MobileAdminPage })));
@@ -125,6 +135,12 @@ const MobileEnterpriseDashboard = (props) => {
     clearHeader();
   }, [clearHeader]);
 
+  const openTripDetail = useCallback((trip) => {
+    prefetchTripDetailSections();
+    setTripWorkflowActive(true);
+    setTripDetails(trip);
+  }, []);
+
   const handleNavClick = useCallback((view) => {
     closeTripDetails();
     startTransition(() => {
@@ -220,7 +236,7 @@ const MobileEnterpriseDashboard = (props) => {
           {subView === 'archives' && (
             <ErrorBoundary>
               <Suspense fallback={<SubViewFallback />}>
-                <ReportsPage {...props} initialSection="archive" onSectionChange={setReportsSection} onDriveTrip={(trip) => { setTripWorkflowActive(true); setTripDetails(trip); }} />
+                <ReportsPage {...props} initialSection="archive" onSectionChange={setReportsSection} onDriveTrip={openTripDetail} />
               </Suspense>
             </ErrorBoundary>
           )}
@@ -439,7 +455,7 @@ const MobileEnterpriseDashboard = (props) => {
                   onBulkAssignTrips={props.bulkAssignTrips}
                   onAssignTrip={props.assignTripToDriver}
                   onUnassignTrip={(tripId) => props.assignTripToDriver?.(tripId, '')}
-                  onDriveTrip={(trip) => { setTripWorkflowActive(true); setTripDetails(trip); }}
+                  onDriveTrip={openTripDetail}
                   onAddTrip={props.addTrip}
                   onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
                   onDeleteTrip={props.requestDeleteTrip}
