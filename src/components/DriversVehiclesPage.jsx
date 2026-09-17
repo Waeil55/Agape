@@ -605,17 +605,27 @@ const [form, setForm] = useState({
             )}
           </div>
           <div className="app-table-frame hidden sm:block">
-            <table className="w-full">
+            <table className="w-full table-fixed text-xs">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[15%]" />
+                <col className="w-[11%]" />
+                <col className="w-[14%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[12%]" />
+              </colgroup>
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Name</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600 hidden md:table-cell">Zone</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600 hidden lg:table-cell">Dispatcher</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Status</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Assign</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Contact</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Name</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Vehicle</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden md:table-cell">Zone</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden lg:table-cell">Dispatcher</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Status</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Assign</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Contact</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -797,16 +807,25 @@ const [form, setForm] = useState({
             )}
           </div>
           <div className="app-table-frame hidden sm:block">
-            <table className="w-full">
+            <table className="w-full table-fixed text-xs">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[10%]" />
+              </colgroup>
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Name</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600 hidden md:table-cell">Year / Color</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600 hidden lg:table-cell">Plate / VIN</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600 hidden lg:table-cell">Odometer</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Driver</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Name</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Make / Model</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden md:table-cell">Year / Color</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden lg:table-cell">Plate / VIN</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden lg:table-cell">Odometer</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Driver</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>

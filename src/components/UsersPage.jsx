@@ -342,12 +342,17 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             })}
           </div>
           <div className="app-table-frame hidden sm:block">
-            <table className="w-full">
+            <table className="w-full table-fixed text-xs">
+              <colgroup>
+                <col className="w-[50%]" />
+                <col className="w-[30%]" />
+                <col className="w-[20%]" />
+              </colgroup>
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Username</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Role</th>
-                  <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Actions</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Username</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Role</th>
+                  <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -456,13 +461,19 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
           )}
         </div>
         <div className="app-table-frame hidden sm:block">
-          <table className="w-full">
+          <table className="w-full table-fixed text-xs">
+            <colgroup>
+              <col className="w-[35%]" />
+              <col className="w-[35%]" />
+              <col className="w-[15%]" />
+              <col className="w-[15%]" />
+            </colgroup>
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Driver</th>
-                <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Assigned To</th>
-                <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Actions</th>
-                <th className="px-3 sm:px-6 py-1.5 text-left text-xs sm:text-xs font-semibold text-slate-600">Remove</th>
+                <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Driver</th>
+                <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Assigned To</th>
+                <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Actions</th>
+                <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Remove</th>
               </tr>
             </thead>
             <tbody>
@@ -569,12 +580,17 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
             )}
           </div>
           <div className="app-table-frame hidden sm:block">
-          <table className="w-full relative">
+          <table className="w-full table-fixed text-xs relative">
+            <colgroup>
+              <col className="w-[20%]" />
+              <col className="w-[25%]" />
+              <col className="w-[55%]" />
+            </colgroup>
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
               <tr>
-                <th className="px-3 sm:px-6 py-1.5 text-left text-xs font-semibold text-slate-600">Time</th>
-                <th className="px-3 sm:px-6 py-1.5 text-left text-xs font-semibold text-slate-600">Action</th>
-                <th className="px-3 sm:px-6 py-1.5 text-left text-xs font-semibold text-slate-600">Details</th>
+                <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Time</th>
+                <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Action</th>
+                <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

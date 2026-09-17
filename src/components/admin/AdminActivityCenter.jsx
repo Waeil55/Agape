@@ -42,19 +42,27 @@ export default function AdminActivityCenter({ logs = [], onViewTrip }) {
         </div>
       </div>
       <div className="app-table-frame">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Action</th><th className="px-4 py-3">Details</th><th className="px-4 py-3">Actor</th><th className="px-4 py-3">Entity</th><th className="px-4 py-3">Open</th></tr></thead>
+        <table className="w-full table-fixed text-left text-xs">
+          <colgroup>
+            <col className="w-[18%]" />
+            <col className="w-[16%]" />
+            <col className="w-[36%]" />
+            <col className="w-[14%]" />
+            <col className="w-[10%]" />
+            <col className="w-[6%]" />
+          </colgroup>
+          <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500"><tr><th className="px-3 py-1">Time</th><th className="px-3 py-1">Action</th><th className="px-3 py-1">Details</th><th className="px-3 py-1">Actor</th><th className="px-3 py-1">Entity</th><th className="px-3 py-1">Open</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((log, index) => {
               const id = log?.meta?.id || log?.entityId;
               const isTrip = entity(log) === 'trip';
               return <tr key={log.id || `${timeValue(log).getTime()}-${index}`} className="hover:bg-slate-50/70">
-                <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-500">{timeValue(log).getTime() ? timeValue(log).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                <td className="px-4 py-3 font-bold text-slate-900">{log.t || log.action || 'Activity'}</td>
-                <td className="max-w-xl px-4 py-3 text-slate-600">{log.meta?.summary || log.d || 'No details recorded'}</td>
-                <td className="px-4 py-3"><p className="font-semibold text-slate-800">{log.actor || log.actorId || 'System'}</p><p className="text-[10px] uppercase text-slate-400">{log.actorRole || 'system'}</p></td>
-                <td className="px-4 py-3"><AdminBadge tone={tone(log)}>{entity(log)}</AdminBadge></td>
-                <td className="px-4 py-3">{isTrip && id && onViewTrip ? <button className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" onClick={() => onViewTrip(id)} aria-label="Open trip"><ExternalLink size={14}/></button> : '—'}</td>
+                <td className="whitespace-nowrap px-3 py-1 font-medium text-slate-500">{timeValue(log).getTime() ? timeValue(log).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                <td className="px-3 py-1 font-bold text-slate-900">{log.t || log.action || 'Activity'}</td>
+                <td className="max-w-xl px-3 py-1 text-slate-600 truncate">{log.meta?.summary || log.d || 'No details recorded'}</td>
+                <td className="px-3 py-1"><p className="font-semibold text-slate-800">{log.actor || log.actorId || 'System'}</p><p className="text-[10px] uppercase text-slate-400">{log.actorRole || 'system'}</p></td>
+                <td className="px-3 py-1"><AdminBadge tone={tone(log)}>{entity(log)}</AdminBadge></td>
+                <td className="px-3 py-1">{isTrip && id && onViewTrip ? <button className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50" onClick={() => onViewTrip(id)} aria-label="Open trip"><ExternalLink size={13}/></button> : '—'}</td>
               </tr>;
             })}
           </tbody>

@@ -1099,28 +1099,28 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-blue-700 bg-blue-600 text-white shadow-sm">
                 <tr>
-                  <th className="px-2 py-2 font-semibold">
+                  <th className="px-2 py-1 font-semibold">
                     <input type="checkbox" className="rounded border-blue-300"
                       onChange={() => setSelectedIds(ids => selectableFilteredTrips.every(t => ids.includes(t.id))
                         ? ids.filter(id => !selectableFilteredTrips.some(t => t.id === id))
                         : [...new Set([...ids, ...selectableFilteredTrips.map(t => t.id)])])}
                       checked={selectableFilteredTrips.length > 0 && selectableFilteredTrips.every(t => selectedIds.includes(t.id))} />
                   </th>
-                  <th className="px-2 py-2 font-semibold">Booking</th>
-                  <th className="px-2 py-2 font-semibold">Passenger</th>
-                  <th className="px-2 py-2 font-semibold">Driver</th>
-                  <th className="px-2 py-2 font-semibold">Vehicle</th>
-                  <th className="px-2 py-2 font-semibold">PU arrive</th>
-                  <th className="px-2 py-2 font-semibold">PU depart</th>
-                  <th className="px-2 py-2 font-semibold">Start odo</th>
-                  <th className="px-2 py-2 font-semibold">DO arrive</th>
-                  <th className="px-2 py-2 font-semibold">DO depart</th>
-                  <th className="px-2 py-2 font-semibold">End odo</th>
-                  <th className="px-2 py-2 font-semibold">Miles</th>
-                  <th className="px-2 py-2 font-semibold">Signed</th>
-                  <th className="px-2 py-2 font-semibold">Validation</th>
-                  <th className="px-2 py-2 font-semibold">Status</th>
-                  <th className="px-2 py-2 font-semibold text-right">Actions</th>
+                  <th className="px-2 py-1 font-semibold">Booking</th>
+                  <th className="px-2 py-1 font-semibold">Passenger</th>
+                  <th className="px-2 py-1 font-semibold">Driver</th>
+                  <th className="px-2 py-1 font-semibold">Vehicle</th>
+                  <th className="px-2 py-1 font-semibold">PU arrive</th>
+                  <th className="px-2 py-1 font-semibold">PU depart</th>
+                  <th className="px-2 py-1 font-semibold">Start odo</th>
+                  <th className="px-2 py-1 font-semibold">DO arrive</th>
+                  <th className="px-2 py-1 font-semibold">DO depart</th>
+                  <th className="px-2 py-1 font-semibold">End odo</th>
+                  <th className="px-2 py-1 font-semibold">Miles</th>
+                  <th className="px-2 py-1 font-semibold">Signed</th>
+                  <th className="px-2 py-1 font-semibold">Validation</th>
+                  <th className="px-2 py-1 font-semibold">Status</th>
+                  <th className="px-2 py-1 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

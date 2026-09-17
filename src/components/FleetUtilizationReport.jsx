@@ -184,35 +184,42 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
-          <Truck size={18} className="text-slate-600" />
-          <h2 className="text-base font-semibold text-slate-900">Vehicle Utilization</h2>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="px-3 h-8 border-b border-slate-200 bg-slate-50/90 flex items-center gap-2">
+          <Truck size={15} className="text-slate-600" />
+          <h2 className="text-sm font-semibold text-slate-900">Vehicle Utilization</h2>
         </div>
         <div className="app-table-frame">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-xs">
+            <colgroup>
+              <col className="w-[36%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+            </colgroup>
             <thead className="bg-slate-50 text-left">
               <tr>
-                <th className="px-5 py-2.5 font-semibold text-slate-600">Vehicle</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-right">Trips</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-right">Miles</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-right">Hours</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-right">Idle</th>
+                <th className="px-3 py-1 font-semibold text-slate-600">Vehicle</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-right">Trips</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-right">Miles</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-right">Hours</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-right">Idle</th>
               </tr>
             </thead>
             <tbody>
               {vehicleStats.length === 0 && (
                 <TableRow>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-400">No vehicle data available</td>
+                  <td colSpan={5} className="px-3 py-8 text-center text-slate-400">No vehicle data available</td>
                 </TableRow>
               )}
               {vehicleStats.map((v, i) => (
                 <TableRow key={v.id || v._id || i} className="hover:bg-slate-50">
-                  <td className="px-5 py-2.5 font-semibold text-slate-900">{v.name || v.id || `Vehicle ${i + 1}`}</td>
-                  <td className="px-5 py-2.5 text-right text-slate-700">{v.trips}</td>
-                  <td className="px-5 py-2.5 text-right text-slate-700">{v.miles.toFixed(1)}</td>
-                  <td className="px-5 py-2.5 text-right text-slate-700">{v.hours.toFixed(1)}</td>
-                  <td className="px-5 py-2.5 text-right text-slate-700">{v.idle.toFixed(1)}</td>
+                  <td className="px-3 py-1 font-semibold text-slate-900">{v.name || v.id || `Vehicle ${i + 1}`}</td>
+                  <td className="px-3 py-1 text-right text-slate-700">{v.trips}</td>
+                  <td className="px-3 py-1 text-right text-slate-700">{v.miles.toFixed(1)}</td>
+                  <td className="px-3 py-1 text-right text-slate-700">{v.hours.toFixed(1)}</td>
+                  <td className="px-3 py-1 text-right text-slate-700">{v.idle.toFixed(1)}</td>
                 </TableRow>
               ))}
             </tbody>
@@ -220,20 +227,27 @@ export default function FleetUtilizationReport({ trips = [], drivers = [], vehic
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
-          <TrendingUp size={18} className="text-slate-600" />
-          <h2 className="text-base font-semibold text-slate-900">Driver Performance</h2>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="px-3 h-8 border-b border-slate-200 bg-slate-50/90 flex items-center gap-2">
+          <TrendingUp size={15} className="text-slate-600" />
+          <h2 className="text-sm font-semibold text-slate-900">Driver Performance</h2>
         </div>
         <div className="app-table-frame">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-xs">
+            <colgroup>
+              <col className="w-[36%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+            </colgroup>
             <thead className="bg-slate-50 text-left">
               <tr>
-                <th className="px-5 py-2.5 font-semibold text-slate-600">Driver</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-right">Trips</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-right">Miles</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-right">Avg Duration</th>
-                <th className="px-5 py-2.5 font-semibold text-slate-600 text-center">Rating</th>
+                <th className="px-3 py-1 font-semibold text-slate-600">Driver</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-right">Trips</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-right">Miles</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-right">Avg Duration</th>
+                <th className="px-3 py-1 font-semibold text-slate-600 text-center">Rating</th>
               </tr>
             </thead>
             <tbody>

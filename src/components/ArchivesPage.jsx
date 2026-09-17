@@ -613,19 +613,19 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-slate-100 text-slate-700 shadow-sm">
                     <tr>
-                      <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Date</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">Driver</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">Time</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">Trip ID</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">Passenger</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">Pickup</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">Dropoff</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">PU Time</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">DO Time</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">PU Odo</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">DO Odo</th>
-                      <th className="px-3 py-1.5 text-left font-semibold">Vehicle</th>
-                      <th className="rounded-tr-xl px-3 py-1.5 text-left font-semibold">Actions</th>
+                      <th className="rounded-tl-xl px-3 py-1 text-left font-semibold">Date</th>
+                      <th className="px-3 py-1 text-left font-semibold">Driver</th>
+                      <th className="px-3 py-1 text-left font-semibold">Time</th>
+                      <th className="px-3 py-1 text-left font-semibold">Trip ID</th>
+                      <th className="px-3 py-1 text-left font-semibold">Passenger</th>
+                      <th className="px-3 py-1 text-left font-semibold">Pickup</th>
+                      <th className="px-3 py-1 text-left font-semibold">Dropoff</th>
+                      <th className="px-3 py-1 text-left font-semibold">PU Time</th>
+                      <th className="px-3 py-1 text-left font-semibold">DO Time</th>
+                      <th className="px-3 py-1 text-left font-semibold">PU Odo</th>
+                      <th className="px-3 py-1 text-left font-semibold">DO Odo</th>
+                      <th className="px-3 py-1 text-left font-semibold">Vehicle</th>
+                      <th className="rounded-tr-xl px-3 py-1 text-left font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">

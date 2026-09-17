@@ -421,13 +421,19 @@ const SettingsPage = ({
             </div>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="app-table-frame">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-xs">
+                  <colgroup>
+                    <col className="w-[30%]" />
+                    <col className="w-[35%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[15%]" />
+                  </colgroup>
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Name</th>
-                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Email</th>
-                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Role</th>
-                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600">Status</th>
+                      <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Name</th>
+                      <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Email</th>
+                      <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Role</th>
+                      <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -492,12 +498,16 @@ const SettingsPage = ({
             </div>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-5 sm:p-8">
               <div className="app-table-frame">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-xs">
+                  <colgroup>
+                    <col className="w-[40%]" />
+                    {Object.keys(ROLE_LABELS).map(r => <col key={r} className="w-[20%]" />)}
+                  </colgroup>
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-700 whitespace-nowrap">Permission</th>
+                      <th className="px-3 py-1 text-left text-xs font-semibold text-slate-700 whitespace-nowrap">Permission</th>
                       {Object.keys(ROLE_LABELS).map(r => (
-                        <th key={r} className="px-3 py-1.5 text-center text-xs font-semibold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
+                        <th key={r} className="px-3 py-1 text-center text-xs font-semibold text-slate-700 whitespace-nowrap">{ROLE_LABELS[r]}</th>
                       ))}
                     </tr>
                   </thead>
@@ -539,15 +549,23 @@ const SettingsPage = ({
                 <div>
                   <button onClick={() => setShowArchivedTrips(false)} className="mb-4 px-4 py-2 text-slate-600 hover:text-slate-900 font-semibold text-sm">← Hide</button>
                   <div className="app-table-frame">
-                    <table className="w-full">
+                    <table className="w-full table-fixed text-xs">
+                      <colgroup>
+                        <col className="w-[15%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[25%]" />
+                        <col className="w-[25%]" />
+                        <col className="w-[8%]" />
+                        <col className="w-[7%]" />
+                      </colgroup>
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600">Booking ID</th>
-                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600">Patient</th>
-                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
-                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
-                          <th className="px-3 sm:px-4 py-1.5 text-left text-xs font-semibold text-slate-600">Time</th>
-                          <th className="px-3 sm:px-4 py-1.5 text-right text-xs font-semibold text-slate-600">Actions</th>
+                          <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Booking ID</th>
+                          <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Patient</th>
+                          <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Pickup</th>
+                          <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600 hidden sm:table-cell">Dropoff</th>
+                          <th className="px-3 py-1 text-left text-xs font-semibold text-slate-600">Time</th>
+                          <th className="px-3 py-1 text-right text-xs font-semibold text-slate-600">Actions</th>
                         </tr>
                       </thead>
                       <tbody>

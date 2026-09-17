@@ -429,9 +429,9 @@ const UnloadedTripsReport = ({ trips = [], drivers = [], overridePolicy, overrid
         </div>
 
         <div className="app-table-frame hidden md:block">
-          <table className="bg-white text-xs shadow-sm" aria-label="Trip cost override candidates">
+          <table className="w-full table-fixed bg-white text-xs shadow-sm" aria-label="Trip cost override candidates">
             <colgroup>{TABLE_COLUMNS.map(([, fullLabel, width]) => <col key={fullLabel} style={{ width }} />)}</colgroup>
-            <thead><tr>{TABLE_COLUMNS.map(([label, fullLabel]) => <th key={fullLabel} className="px-2 py-2 text-left" title={fullLabel}>{label}</th>)}</tr></thead>
+            <thead><tr>{TABLE_COLUMNS.map(([label, fullLabel]) => <th key={fullLabel} className="px-2 py-1 text-left" title={fullLabel}>{label}</th>)}</tr></thead>
             <tbody>
               {rows.map((row) => {
                 const rowId = text(row.rowId);

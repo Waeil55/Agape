@@ -542,7 +542,7 @@ const DesktopReportsPage = ({
 
   const renderInvoiceTable = () => (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-    <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="app-table-frame">
       <table className="w-full table-fixed text-xs">
         <colgroup>
@@ -560,17 +560,17 @@ const DesktopReportsPage = ({
         </colgroup>
         <thead className="sticky top-0 z-10 bg-blue-600 text-white shadow-sm">
           <tr>
-            <th className="rounded-tl-xl px-3 py-1.5 text-left font-semibold">Edit</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Date</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Trip ID</th>
-            <th className="px-3 py-1.5 text-center font-semibold">A/W</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Client Name</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Pickup</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Dropoff</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Drop Odo</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Approved Fee</th>
-            <th className="px-3 py-1.5 text-center font-semibold">Signed</th>
-            <th className="px-3 py-1.5 text-center font-semibold rounded-tr-xl">Done</th>
+            <th className="rounded-tl-xl px-3 py-1 text-left font-semibold">Edit</th>
+            <th className="px-3 py-1 text-left font-semibold">Date</th>
+            <th className="px-3 py-1 text-left font-semibold">Trip ID</th>
+            <th className="px-3 py-1 text-center font-semibold">A/W</th>
+            <th className="px-3 py-1 text-left font-semibold">Client Name</th>
+            <th className="px-3 py-1 text-left font-semibold">Pickup</th>
+            <th className="px-3 py-1 text-left font-semibold">Dropoff</th>
+            <th className="px-3 py-1 text-left font-semibold">Drop Odo</th>
+            <th className="px-3 py-1 text-left font-semibold">Approved Fee</th>
+            <th className="px-3 py-1 text-center font-semibold">Signed</th>
+            <th className="px-3 py-1 text-center font-semibold rounded-tr-xl">Done</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -698,7 +698,7 @@ const DesktopReportsPage = ({
 
     return (
     <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-    <div className="overflow-hidden rounded-xl border border-slate-100/50 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="app-table-frame">
       <table className="w-full table-fixed text-xs">
         {(() => {
@@ -727,7 +727,7 @@ const DesktopReportsPage = ({
               <thead className="sticky top-0 z-10 bg-blue-600 text-white shadow-sm">
                 <tr>
                   {cols.map((c, i) => (
-                    <th key={c.key} className={`px-3 py-1.5 text-left font-semibold ${i === 0 ? 'rounded-tl-xl' : ''} ${i === cols.length - 1 ? 'rounded-tr-xl' : ''}`}>
+                    <th key={c.key} className={`px-3 py-1 text-left font-semibold ${i === 0 ? 'rounded-tl-xl' : ''} ${i === cols.length - 1 ? 'rounded-tr-xl' : ''}`}>
                       {c.key !== 'edit' ? (
                         <button onClick={() => handleReviewSort(c.key)} className="flex w-full items-center gap-1 text-left hover:text-blue-200 transition-colors cursor-pointer outline-none uppercase tracking-wider text-[10px]">
                           {c.label}
