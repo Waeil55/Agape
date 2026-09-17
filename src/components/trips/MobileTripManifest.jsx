@@ -442,11 +442,11 @@ export function ManifestTripCard({
   };
 
   return (
-    <article onClick={onCardClick ? handleArticleClick : undefined} className={`bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150 [&_button]:min-h-0 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
+    <article onClick={onCardClick ? handleArticleClick : undefined} className={`bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all duration-150 [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
 
       {/* ── HEADER: Checkbox + Time | Passenger Name + Trip ID ── */}
-      <div className="px-3 py-2 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="px-3 py-1.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {selectSlot || (onSelect && (
             <button
               type="button"
@@ -454,7 +454,7 @@ export function ManifestTripCard({
               aria-checked={!!selected}
               aria-label={`Select trip ${trip?.patient || trip?.bookingId || ''}`}
               onClick={(e) => { e.stopPropagation(); onSelect(trip); }}
-              className="shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+              className="shrink-0 !w-5 !h-5 !min-h-0 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer"
               style={selected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
             >
               {selected && <Check size={11} className="text-white" strokeWidth={3} />}
@@ -462,70 +462,70 @@ export function ManifestTripCard({
           ))}
           {onTimeEdit ? (
             <button type="button" onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
-              className={`text-[17px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer ${timeColor}`}
+              className={`text-[15px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer !min-h-0 ${timeColor}`}
               title="Edit schedule" aria-label={`Edit schedule for ${trip?.patient || 'trip'}`}>
               {trip?.time || '—'}
             </button>
           ) : (
-            <span className={`text-[17px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
+            <span className={`text-[15px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
           )}
           <span className="text-slate-300 shrink-0 font-light">|</span>
           <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
-            <span className="text-[15px] font-bold text-slate-900 truncate">{trip?.patient || 'Unknown client'}</span>
+            <span className="text-sm font-bold text-slate-900 truncate">{trip?.patient || 'Unknown client'}</span>
             {legs > 0 && (
               onLegsClick ? (
-                <button type="button" onClick={(e) => { e.stopPropagation(); onLegsClick(e); }} className="text-[11px] text-slate-500 hidden sm:inline shrink-0"
+                <button type="button" onClick={(e) => { e.stopPropagation(); onLegsClick(e); }} className="text-[10px] text-slate-500 hidden sm:inline shrink-0 !min-h-0"
                   aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}>
                   ({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})
                 </button>
               ) : (
-                <span className="text-[11px] text-slate-500 hidden sm:inline shrink-0">({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})</span>
+                <span className="text-[10px] text-slate-500 hidden sm:inline shrink-0">({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})</span>
               )
             )}
           </div>
         </div>
         <div className="flex items-center shrink-0 gap-1.5">
           {(trip?.notes || trip?.driverNotes || trip?.specialInstructions || trip?.instructions) && (
-            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700" title="Has driver notes">
-              <Pencil size={10} />
+            <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700" title="Has driver notes">
+              <Pencil size={9} />
             </span>
           )}
           <PriorityBadge trip={trip} />
-          <span className="text-xs font-bold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-300/60 tracking-wide">
+          <span className="text-[11px] font-bold text-slate-600 bg-slate-200/80 px-1.5 py-0.5 rounded border border-slate-300/60 tracking-wide">
             #{trip?.bookingId || trip?.id || '—'}
           </span>
         </div>
       </div>
 
       {/* ── ROUTE TIMELINE: Pickup → Dropoff with dashed connector ── */}
-      <div className="px-3.5 py-1.5">
-        <div className="relative pl-3.5 space-y-1 before:content-[''] before:absolute before:left-[3.5px] before:top-2 before:bottom-2 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
+      <div className="px-3 py-1">
+        <div className="relative pl-3 space-y-0.5 before:content-[''] before:absolute before:left-[3px] before:top-1.5 before:bottom-1.5 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
 
           {/* Pickup Line */}
           <div className="relative flex items-center justify-between gap-1.5 text-xs">
-            <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-emerald-500 bg-white" />
+            <div className="absolute -left-3 top-1.5 w-1.5 h-1.5 rounded-full border-2 border-emerald-500 bg-white" />
             <div className="flex items-baseline gap-1.5 truncate min-w-0">
-              <span className="text-[10px] font-black uppercase text-emerald-600 shrink-0">PU</span>
-              <span className="text-[12px] font-semibold text-slate-600 truncate">{pickup.street}</span>
-              {pickup.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {pickup.locality}</span>}
+              <span className="text-[9px] font-black uppercase text-emerald-600 shrink-0">PU</span>
+              <span className="text-[12px] font-semibold text-slate-700 truncate">{pickup.street}</span>
+              {pickup.locality && <span className="text-[11px] text-slate-400 truncate hidden xs:inline">• {pickup.locality}</span>}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.pickup || ''}${pickup.locality ? ', ' + pickup.locality : ''}`); }}
-              title="Copy Pickup" className="p-1 min-h-0 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-              <Copy size={13} />
+              title="Copy Pickup" className="p-0.5 !min-h-0 !h-auto !w-auto text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+              <Copy size={12} />
             </button>
           </div>
 
           {/* Dropoff Line */}
           <div className="relative flex items-center justify-between gap-1.5 text-xs">
-            <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-rose-500 bg-white" />
+            <div className="absolute -left-3 top-1.5 w-1.5 h-1.5 rounded-full border-2 border-rose-500 bg-white" />
             <div className="flex items-baseline gap-1.5 truncate min-w-0">
-              <span className="text-[10px] font-black uppercase text-rose-600 shrink-0">DO</span>
-              <span className="text-[12px] font-semibold text-slate-600 truncate">{dropoff.street}</span>
-              {dropoff.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {dropoff.locality}</span>}
+              <span className="text-[9px] font-black uppercase text-rose-600 shrink-0">DO</span>
+              <span className="text-[12px] font-semibold text-slate-700 truncate">{dropoff.street}</span>
+              {dropoff.locality && <span className="text-[11px] text-slate-400 truncate hidden xs:inline">• {dropoff.locality}</span>}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.dropoff || ''}${dropoff.locality ? ', ' + dropoff.locality : ''}`); }}
-              title="Copy Dropoff" className="p-1 min-h-0 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-              <Copy size={13} />
+              title="Copy Dropoff" className="p-0.5 !min-h-0 !h-auto !w-auto text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+              <Copy size={12} />
             </button>
           </div>
 
@@ -535,12 +535,12 @@ export function ManifestTripCard({
       {assignSlot}
 
       {/* ── FOOTER: Driver pill + Action icons + Telemetry + Status ── */}
-      <div className="px-3 py-1.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-1">
+      <div className="px-3 py-1 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-1">
 
         {/* Left: Driver Pill + Call/SMS/Options buttons */}
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1 min-w-0">
           {/* Driver Pill */}
-          <div className="flex items-center gap-1 h-7 px-2 rounded-lg bg-white border border-slate-200/80 text-[11px] font-semibold text-slate-700 shadow-2xs">
+          <div className="flex items-center gap-1 h-6.5 px-2 rounded-md bg-white border border-slate-200/80 text-[11px] font-semibold text-slate-700 shadow-2xs">
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusPulseColor}`} />
             <span className="truncate max-w-[100px]">{driverName || trip?.driverName || '—'}</span>
           </div>
@@ -548,16 +548,16 @@ export function ManifestTripCard({
           {/* Call Button */}
           {iconActions.find(a => a.id === 'call') ? (
             <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'call')?.onClick?.(e); }}
-              title="Call" className="w-7 h-7 min-h-0 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
-              <Phone size={13} className="text-emerald-600" />
+              title="Call" className="!w-6.5 !h-6.5 !min-h-0 rounded-md bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer">
+              <Phone size={12} className="text-emerald-600" />
             </button>
           ) : null}
 
           {/* SMS Button */}
           {iconActions.find(a => a.id === 'message') ? (
             <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'message')?.onClick?.(e); }}
-              title="Text" className="w-7 h-7 min-h-0 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
-              <MessageSquare size={13} className="text-blue-500" />
+              title="Text" className="!w-6.5 !h-6.5 !min-h-0 rounded-md bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer">
+              <MessageSquare size={12} className="text-blue-500" />
             </button>
           ) : null}
 
@@ -566,8 +566,8 @@ export function ManifestTripCard({
             <button type="button" onClick={(e) => { e.stopPropagation(); onMore(e); }}
               aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
               title={typeof moreLabel === 'string' ? moreLabel : undefined}
-              className="w-7 h-7 min-h-0 rounded-lg bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
-              <MoreHorizontal size={13} />
+              className="!w-6.5 !h-6.5 !min-h-0 rounded-md bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer">
+              <MoreHorizontal size={12} />
             </button>
           )}
         </div>
@@ -575,17 +575,17 @@ export function ManifestTripCard({
         {/* Right: Telemetry (countdown/time away + distance) + Status Badge */}
         <div className="flex items-center gap-1 shrink-0 justify-end">
           {/* Telemetry Pill */}
-          <div className="flex items-center h-7 rounded-lg border border-slate-200 bg-white overflow-hidden text-[11px] font-semibold shadow-2xs">
+          <div className="flex items-center h-6.5 rounded-md border border-slate-200 bg-white overflow-hidden text-[10px] font-semibold shadow-2xs">
             {!isDone ? (
               <div className={`flex items-center gap-1 px-1.5 h-full border-r border-slate-200 whitespace-nowrap ${
                 trip?.urgent ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'
               }`}>
-                <Navigation size={10} className="text-blue-500 fill-current" />
+                <Navigation size={9} className="text-blue-500 fill-current" />
                 <span>{cd.label}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1 px-1.5 h-full bg-emerald-50 text-emerald-700 border-r border-slate-200 whitespace-nowrap">
-                <CheckCircle2 size={10} className="text-emerald-500" />
+                <CheckCircle2 size={9} className="text-emerald-500" />
               </div>
             )}
             {mileage && (
@@ -596,10 +596,10 @@ export function ManifestTripCard({
           </div>
 
           {/* Status Badge */}
-          <span title={displayStatus} className={`inline-flex items-center h-7 gap-1 px-2 rounded-lg text-[11px] font-bold whitespace-nowrap ${statusBadge.cls}`}>
-            {isDone && <Check size={11} />}
+          <span title={displayStatus} className={`inline-flex items-center h-6.5 gap-1 px-2 rounded-md text-[10px] font-bold whitespace-nowrap ${statusBadge.cls}`}>
+            {isDone && <Check size={10} />}
             {!isDone && statusBadge.pulse && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
-            {!isDone && !statusBadge.pulse && statusBadge.icon && <statusBadge.icon size={11} />}
+            {!isDone && !statusBadge.pulse && statusBadge.icon && <statusBadge.icon size={10} />}
             {!isDone && !statusBadge.pulse && !statusBadge.icon && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
             {displayStatus}
           </span>

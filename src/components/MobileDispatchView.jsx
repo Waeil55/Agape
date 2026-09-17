@@ -189,7 +189,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
 
   return (
     <>
-      <div className={`mb-2 rounded-2xl [&_button]:min-h-0 ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}`}>
+      <div className={`mb-1.5 rounded-xl [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 ${isSelected ? 'ring-2 ring-blue-500 shadow-sm' : ''}`}>
         <ManifestTripCard
           trip={trip}
           countdown={getTripCountdown(trip)}
@@ -203,7 +203,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
               aria-checked={!!isSelected}
               onClick={(e) => { e.stopPropagation(); onSelect(); }}
               aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`}
-              className="shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors"
+              className="shrink-0 !w-5 !h-5 !min-h-0 rounded-md border-2 flex items-center justify-center transition-colors cursor-pointer"
               style={isSelected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
             >
               {isSelected ? (
@@ -357,7 +357,7 @@ const DriverRow = ({ driver, trips }) => {
 };
 
 /* ─── Main Component ──────────────────────────────────────────────── */
-const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assignTripToDriver, setBulkAssignModal, requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onOpenLiveMap, searchQuery, setSearchQuery, addToast, onOpenTripDetails, onOpenTripWorkflow, workspaceControls = null, activeTab = "trips" }) => {
+const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assignTripToDriver, setBulkAssignModal, requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onSendToPlan, onOpenLiveMap, searchQuery, setSearchQuery, addToast, onOpenTripDetails, onOpenTripWorkflow, workspaceControls = null, activeTab = "trips" }) => {
   const [filter, setFilter] = useState("all");
   const [selectedTripIds, setSelectedTripIds] = useState([]);
   const toggleSelectTrip = (tripId) => setSelectedTripIds(prev => prev.includes(tripId) ? prev.filter(id => id !== tripId) : [...prev, tripId]);
@@ -523,6 +523,49 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
               </span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Selected trips bulk action bar */}
+      {activeTab === "trips" && selectedTripIds.length > 0 && (
+        <div className="bg-indigo-50 border-b border-indigo-200 px-3 py-2 flex items-center justify-between gap-2 shrink-0 animate-in fade-in">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs font-bold text-indigo-700">{selectedTripIds.length} selected</span>
+            <button
+              type="button"
+              onClick={() => setSelectedTripIds([])}
+              className="text-[11px] font-semibold text-indigo-500 hover:text-indigo-700 underline"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const selectedList = trips.filter(t => selectedTripIds.includes(t.id));
+                if (onSendToPlan) {
+                  onSendToPlan(selectedList);
+                } else if (onOpenSequencer) {
+                  onOpenSequencer(selectedTripIds);
+                } else {
+                  addToast?.("Queued for plan", `${selectedTripIds.length} trips queued for Plan`, "info");
+                }
+              }}
+              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-xs active:scale-95 transition-colors cursor-pointer"
+            >
+              <Route size={12} /> Plan
+            </button>
+            {setBulkAssignModal && (
+              <button
+                type="button"
+                onClick={() => setBulkAssignModal(selectedTripIds)}
+                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-xs active:scale-95 transition-colors cursor-pointer"
+              >
+                <Users size={12} /> Assign
+              </button>
+            )}
+          </div>
         </div>
       )}
 

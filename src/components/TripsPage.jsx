@@ -616,7 +616,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     };
 
     return (
-      <div key={trip.id} className={`rounded-xl transition-all [&_button]:min-h-0 mb-2 ${isSelected ? 'ring-2 ring-blue-300' : countdown.level === 'overdue' ? 'ring-1 ring-rose-200' : ''}`}>
+      <div key={trip.id} className={`rounded-xl transition-all [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 mb-1.5 ${isSelected ? 'ring-2 ring-blue-300' : countdown.level === 'overdue' ? 'ring-1 ring-rose-200' : ''}`}>
       <ManifestTripCard
         trip={displayTrip}
         countdown={countdown}
@@ -631,7 +631,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             aria-checked={!!isSelected}
             onClick={(e) => { e.stopPropagation(); toggleTaskSelection(trip.id); }}
             aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`}
-            className="shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors"
+            className="shrink-0 !w-5 !h-5 !min-h-0 rounded-md border-2 flex items-center justify-center transition-colors cursor-pointer"
             style={isSelected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
           >
             {isSelected ? (

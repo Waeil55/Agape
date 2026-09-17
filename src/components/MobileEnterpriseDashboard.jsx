@@ -120,6 +120,7 @@ const MobileEnterpriseDashboard = (props) => {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
   const [showAddTripModal, setShowAddTripModal] = useState(false);
+  const [plannedRouteStops, setPlannedRouteStops] = useState(null);
 
   const { clearHeader } = useHeader();
 
@@ -127,6 +128,45 @@ const MobileEnterpriseDashboard = (props) => {
   const driverWorkTrips = Array.isArray(props.driverWorkTrips) ? props.driverWorkTrips : trips;
 
   const [activeDriverTripId, setActiveDriverTripId] = useState(null);
+
+  const handleSendToPlan = useCallback((selectedTripsList) => {
+    const list = Array.isArray(selectedTripsList)
+      ? (typeof selectedTripsList[0] === 'object' ? selectedTripsList : driverWorkTrips.filter(t => selectedTripsList.includes(t.id)))
+      : [];
+    const stops = list.flatMap((t) => [
+      {
+        id: `${t.id}_pickup`,
+        tripId: t.id,
+        type: 'pickup',
+        patient: t.patient || t.clientName || 'Client',
+        time: t.time || '',
+        address: t.pickup || '',
+        phone: resolveClientPhoneForTrip(t, driverWorkTrips),
+        locationPhone: t.pickupPhone || '',
+        bookingId: t.bookingId || '',
+        notes: t.notes || '',
+      },
+      {
+        id: `${t.id}_dropoff`,
+        tripId: t.id,
+        type: 'dropoff',
+        patient: t.patient || t.clientName || 'Client',
+        time: t.doTime || t.dropoffTime || t.time || '',
+        address: t.dropoff || '',
+        phone: resolveClientPhoneForTrip(t, driverWorkTrips),
+        locationPhone: t.dropoffPhone || '',
+        bookingId: t.bookingId || '',
+        notes: t.notes || '',
+      },
+    ]).filter(s => s.address);
+    if (stops.length > 0) {
+      setPlannedRouteStops(stops);
+    }
+    startTransition(() => {
+      setCurrentView('tools');
+      setSubView(null);
+    });
+  }, [driverWorkTrips]);
 
   const currentTripDetails = useMemo(() => {
     if (!tripDetails?.id) return null;
@@ -412,6 +452,7 @@ const MobileEnterpriseDashboard = (props) => {
                   drivers={driverWorkDrivers}
                   appSettings={props.appSettings}
                   onOpenInNav={props.onOpenInNav}
+                  initialStops={plannedRouteStops}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -478,8 +519,8 @@ const MobileEnterpriseDashboard = (props) => {
                   onDriveTrip={openTrip}
                   onOpenTripDetails={openTripDetail}
                   onNavigateToReports={() => handleNavClick('reports')}
-                  onSendToPlan={() => handleNavClick('tools')}
-                  onOpenSequencer={() => handleNavClick('tools')}
+                  onSendToPlan={handleSendToPlan}
+                  onOpenSequencer={handleSendToPlan}
                   onAddTrip={props.addTrip}
                   onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
                   onDeleteTrip={props.requestDeleteTrip}
