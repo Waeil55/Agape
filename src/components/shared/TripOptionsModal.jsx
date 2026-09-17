@@ -85,11 +85,15 @@ export const TripOptionsModal = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    document.documentElement.classList.add('trip-window-open');
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose?.();
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.documentElement.classList.remove('trip-window-open');
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen || !trip) return null;
@@ -136,7 +140,8 @@ export const TripOptionsModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+      className="trip-window-overlay bg-black/40"
+      style={{ zIndex: 140 }}
       role="dialog"
       aria-modal="true"
       aria-labelledby={`trip-options-title-${trip.id}`}
@@ -144,7 +149,7 @@ export const TripOptionsModal = ({
     >
       <div
         ref={panelRef}
-        className="relative w-full max-w-md max-h-[90vh] bg-white rounded-3xl p-5 shadow-2xl border border-slate-200/70 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="trip-window-panel trip-window-panel-wide p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header: Title / Back + Close Button */}

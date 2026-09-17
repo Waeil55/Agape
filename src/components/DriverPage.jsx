@@ -4311,16 +4311,38 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         trip={trip}
         role={role}
         driverName={me?.name || currentUser}
-        onEditDetails={() => openScheduleEditor(trip)}
-        onReassignDriver={(role === 'admin' || role === 'dispatcher') ? () => openTransferPrompt('trip', trip) : null}
-        onTransferTrip={role === 'driver' && !workflowReadOnly ? () => openTransferPrompt('trip', trip) : null}
-        onMarkCompleted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
-          advanceWorkflow(trip, 'Completed', {});
+        onEditDetails={() => {
+          setShowMoreOptions(null);
+          openScheduleEditor(trip);
+        }}
+        onReassignDriver={(role === 'admin' || role === 'dispatcher') ? () => {
+          setShowMoreOptions(null);
+          openTransferPrompt('trip', trip);
         } : null}
-        onMarkRerouted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => handleReroute(trip) : null}
-        onPassengerNoShow={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => handleNoShow(trip) : null}
-        onCancelTrip={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => handleCancel(trip) : null}
-        onArchiveTrip={(role === 'admin' || role === 'dispatcher') ? () => onDeleteTrip?.(trip.id) : null}
+        onTransferTrip={role === 'driver' && !workflowReadOnly ? () => {
+          setShowMoreOptions(null);
+          openTransferPrompt('trip', trip);
+        } : null}
+        onMarkCompleted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+          setShowMoreOptions(null);
+          openCompleteModal(trip);
+        } : null}
+        onMarkRerouted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+          setShowMoreOptions(null);
+          handleReroute(trip);
+        } : null}
+        onPassengerNoShow={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+          setShowMoreOptions(null);
+          handleNoShow(trip);
+        } : null}
+        onCancelTrip={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+          setShowMoreOptions(null);
+          handleCancel(trip);
+        } : null}
+        onArchiveTrip={(role === 'admin' || role === 'dispatcher') ? () => {
+          setShowMoreOptions(null);
+          onDeleteTrip?.(trip.id);
+        } : null}
       />
     )}
     </>
