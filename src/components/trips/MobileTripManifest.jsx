@@ -335,20 +335,20 @@ export function buildInlineTripActions({ trip, driver, role, callbacks = {} }) {
 export function ManifestKpiStrip({ items = [] }) {
   if (!items.length) return null;
   return (
-    <div className="bg-white border-b border-slate-200 shrink-0 z-20 shadow-sm" role="group" aria-label="Trip queue summary">
-      <div className="flex px-2 pb-2 gap-1.5 text-center pt-3">
+    <div className="bg-white border-b border-slate-200 shrink-0 z-20 shadow-xs" role="group" aria-label="Trip queue summary">
+      <div className="flex px-2 py-1.5 gap-1.5 text-center">
         {items.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={item.onSelect}
             aria-pressed={!!item.active}
-            className={`${item.wide ? 'flex-[1.2]' : 'flex-1'} min-h-11 rounded-xl border px-0.5 py-1 flex flex-col items-center justify-center leading-none gap-1 ${
+            className={`${item.wide ? 'flex-[1.2]' : 'flex-1'} min-h-9 h-9 rounded-lg border px-0.5 py-0.5 flex flex-col items-center justify-center leading-none gap-0.5 ${
               item.active ? item.activeClass : 'bg-slate-50 border-slate-200 text-slate-600'
             }`}
           >
-            <span className={`font-semibold text-sm tabular-nums ${item.valueClass || ''}`}>{item.value}</span>
-            <span className="text-[10px]">{item.label}</span>
+            <span className={`font-bold text-xs tabular-nums ${item.valueClass || ''}`}>{item.value}</span>
+            <span className="text-[9px] font-semibold">{item.label}</span>
           </button>
         ))}
       </div>

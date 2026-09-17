@@ -482,7 +482,7 @@ const [form, setForm] = useState({
         </div>
       )}
       {mode === 'all' && (
-        <div className="flex gap-2 flex-wrap sticky top-0 z-10 bg-slate-100 py-1">
+        <div className="flex gap-1.5 flex-wrap sticky top-0 z-10 bg-slate-100 py-1">
           {[
             { id: 'drivers', label: 'Drivers', icon: User },
             { id: 'vehicles', label: 'Vehicles', icon: Truck }
@@ -490,20 +490,20 @@ const [form, setForm] = useState({
             const Icon = tab.icon;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-xl border font-bold flex items-center gap-2 transition-all text-xs ${
-                  activeTab === tab.id ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                className={`h-9 px-3.5 rounded-lg border font-bold flex items-center gap-1.5 transition-colors text-xs ${
+                  activeTab === tab.id ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900 shadow-xs' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}>
-                <Icon size={16} /> {tab.label}
+                <Icon size={14} /> {tab.label}
               </button>
             );
           })}
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 sticky top-[52px] z-10 bg-slate-100 py-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 sticky top-[46px] z-10 bg-slate-100 py-1.5">
         {(role === 'admin' || role === 'dispatcher') && (
-          <button onClick={resolvedTab === 'drivers' ? openAdd : openVAdd} className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2 text-xs">
-            <Plus size={18} /> Add {resolvedTab === 'drivers' ? 'Driver' : 'Vehicle'}
+          <button onClick={resolvedTab === 'drivers' ? openAdd : openVAdd} className="w-full sm:w-auto h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-1.5 text-xs shadow-xs">
+            <Plus size={15} /> Add {resolvedTab === 'drivers' ? 'Driver' : 'Vehicle'}
           </button>
         )}
       </div>

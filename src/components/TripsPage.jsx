@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, CheckSquare, Square, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, Zap, Filter, FileText, Edit2 } from 'lucide-react';
+import { Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, CheckSquare, Square, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, Zap, Filter, FileText, Edit2, Search } from 'lucide-react';
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 
 import { makeCall, sendSMS, openNavigation } from '../utils/nativeActions';
@@ -705,142 +705,212 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           Manifest cards + manifest modals below follow the approved compact
           manifest design instead (exact small buttons); the min-height rule is
           intentionally scoped to this chrome, not the page root. */}
-      <div className="space-y-2 px-3 sm:px-4 md:px-0 pt-3 md:pt-0">
-        <div className="flex gap-1.5 md:hidden">
+      <div className="space-y-2 px-3 sm:px-4 md:px-0 pt-2 md:pt-0">
+        {/* Unified 1-Line Controls Bar for Mobile & Desktop */}
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 bg-white border border-slate-200 rounded-xl p-1.5 shadow-xs">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[140px] flex items-center">
+            <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search trips…"
+              aria-label="Search trips"
+              className="w-full h-9 pl-8 pr-7 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 outline-none transition-colors"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5"
+                aria-label="Clear search"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Driver Filter Dropdown */}
+          <select
+            value={driverFilter}
+            onChange={(e) => setDriverFilter(e.target.value)}
+            aria-label="Filter by driver"
+            className="h-9 min-w-0 max-w-[130px] sm:max-w-[150px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors"
+          >
+            {driverChipData.map((chip) => (
+              <option key={chip.id} value={chip.id}>
+                {chip.name} ({chip.count})
+              </option>
+            ))}
+          </select>
+
+          {/* Status Filter Dropdown */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Filter by status"
+            className="h-9 min-w-0 max-w-[110px] sm:max-w-[130px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors"
+          >
+            <option value="all">All Status</option>
+            <option value="Unassigned">Unassigned</option>
+            <option value="Assigned">Assigned</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="No Show">No Show</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="Rerouted">Rerouted</option>
+          </select>
+
+          {/* Sort Dropdown */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            aria-label="Sort trips"
+            className="h-9 min-w-0 max-w-[100px] sm:max-w-[115px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors hidden sm:block"
+          >
+            <option value="time">Sort: Time</option>
+            <option value="patient">Sort: Patient</option>
+            <option value="zip">Sort: Zip</option>
+            <option value="status">Sort: Status</option>
+          </select>
+
+          {/* Date Picker + Toggle */}
+          <div className="flex items-center gap-1 shrink-0">
+            <input
+              type="date"
+              value={manifestDate}
+              disabled={showAllDates}
+              onChange={(e) => setManifestDate(e.target.value)}
+              aria-label="Filter by date"
+              className={`h-9 w-[115px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-colors ${showAllDates ? 'opacity-40 cursor-not-allowed' : ''}`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowAllDates(!showAllDates)}
+              className={`h-9 px-2 rounded-lg text-[10px] font-bold uppercase transition-colors shrink-0 ${
+                showAllDates ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {showAllDates ? 'All' : 'Day'}
+            </button>
+          </div>
+
+          {/* More Filters / Options Toggle Button */}
           <button
             type="button"
             aria-expanded={mobileFiltersOpen}
             aria-controls="mobile-manifest-filters"
             onClick={() => setMobileFiltersOpen((open) => !open)}
-            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-left text-xs font-bold text-slate-700 shadow-sm"
+            className={`h-9 px-2 rounded-lg border text-xs font-bold flex items-center gap-1 transition-colors shrink-0 ${
+              mobileFiltersOpen || activeFilterCount > 0 ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+            title="More filters & views"
+            aria-label="More filters"
           >
-            <span className="flex min-w-0 items-center gap-1.5">
-              <SlidersHorizontal size={14} className="shrink-0 text-blue-600" />
-              <span className="truncate">{manifestDate}</span>
-              {activeFilterCount > 0 && <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] text-white">{activeFilterCount}</span>}
-            </span>
-            <ChevronDown size={13} className={`shrink-0 transition-transform ${mobileFiltersOpen ? 'rotate-180' : ''}`} />
+            <SlidersHorizontal size={13} className="shrink-0" />
+            <span className="hidden lg:inline">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-blue-600 px-1 py-0.2 text-[9px] text-white leading-none">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown size={12} className={`shrink-0 transition-transform ${mobileFiltersOpen ? 'rotate-180' : ''}`} />
           </button>
-          {canOperateTrips && (
-            <button
-              type="button"
-              aria-pressed={bulkSelectMode}
-              onClick={() => {
-                if (bulkSelectMode) selectedTasks.forEach((tripId) => toggleTaskSelection(tripId));
-                setBulkSelectMode((active) => !active);
-              }}
-              className={`min-h-10 min-w-10 rounded-xl px-2 text-xs font-bold flex items-center justify-center ${bulkSelectMode ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 shadow-sm'}`}
-              title={bulkSelectMode ? 'Exit trip selection' : 'Select trips'}
-              aria-label={bulkSelectMode ? 'Exit trip selection' : 'Select trips'}
-            >
-              <CheckSquare size={15} />
-            </button>
-          )}
-          {canUploadTrips && onShowUploadModal && (
-            <button
-              type="button"
-              onClick={() => onShowUploadModal(true)}
-              className="min-h-10 min-w-10 rounded-xl bg-blue-500 text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform"
-              title="Upload CSV or scan trips"
-            >
-              <Upload size={15} />
-            </button>
-          )}
-          {canCreateTrips && <button
-            type="button"
-            onClick={() => setShowCreateForm(true)}
-            className="min-h-10 rounded-xl bg-emerald-500 px-3 text-xs font-bold text-white shadow-sm active:scale-95 transition-transform flex items-center gap-1"
-          >
-            <Plus size={14} /> New
-          </button>}
-        </div>
 
-        <div id="mobile-manifest-filters" className={`${mobileFiltersOpen ? 'space-y-3 md:space-y-4' : 'hidden'} md:block`}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Search</label>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Patient, booking..."
-              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Sort</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
-              <option value="time">By Time</option>
-              <option value="patient">By Patient</option>
-              <option value="zip">By Zip</option>
-              <option value="status">By Status</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Status</label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
-              <option value="all">All</option>
-              <option value="Unassigned">Unassigned</option>
-              <option value="Assigned">Assigned</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-              <option value="No Show">No Show</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Rerouted">Rerouted</option>
-            </select>
+          {/* Action Buttons with identical h-9 height */}
+          <div className="flex items-center gap-1 ml-auto shrink-0">
+            {canOperateTrips && (
+              <button
+                type="button"
+                aria-pressed={bulkSelectMode}
+                onClick={() => {
+                  if (bulkSelectMode) selectedTasks.forEach((tripId) => toggleTaskSelection(tripId));
+                  setBulkSelectMode((active) => !active);
+                }}
+                className={`h-9 w-9 rounded-lg text-xs font-bold flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                  bulkSelectMode ? 'bg-blue-600 text-white shadow-xs' : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+                title={bulkSelectMode ? 'Exit trip selection' : 'Select trips'}
+                aria-label={bulkSelectMode ? 'Exit trip selection' : 'Select trips'}
+              >
+                <CheckSquare size={14} />
+              </button>
+            )}
+            {canUploadTrips && onShowUploadModal && (
+              <button
+                type="button"
+                onClick={() => onShowUploadModal(true)}
+                className="h-9 w-9 rounded-lg bg-blue-500 text-white shadow-xs flex items-center justify-center hover:bg-blue-600 active:scale-95 transition-all cursor-pointer shrink-0"
+                title="Upload CSV or scan trips"
+              >
+                <Upload size={14} />
+              </button>
+            )}
+            {canCreateTrips && (
+              <button
+                type="button"
+                onClick={() => setShowCreateForm(true)}
+                className="h-9 px-2.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-xs flex items-center gap-1 hover:bg-emerald-700 active:scale-95 transition-all cursor-pointer shrink-0"
+              >
+                <Plus size={14} /> <span className="hidden sm:inline">New</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 items-end">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Service</label>
-            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
-              <option value="all">All</option>
-              {serviceOptions.map((service) => (
-                <option key={service} value={service}>{service}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-2">Date</label>
-            <div className="flex gap-1.5">
-              <input
-                type="date"
-                value={manifestDate}
-                disabled={showAllDates}
-                onChange={(e) => setManifestDate(e.target.value)}
-                className={`flex-1 px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm transition-opacity ${showAllDates ? 'opacity-50' : 'opacity-100'}`}
-              />
-              <button onClick={() => setShowAllDates(!showAllDates)} className={`px-2 py-2 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap ${showAllDates ? 'bg-blue-100 text-blue-700' : 'bg-white border border-slate-200 text-slate-600'}`}>
-                {showAllDates ? 'All' : 'Today'}
+        {/* Collapsible Advanced Filters Drawer */}
+        <div id="mobile-manifest-filters" className={`${mobileFiltersOpen ? 'block' : 'hidden'} bg-white border border-slate-200 rounded-xl p-3 shadow-xs animate-in fade-in`}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Service Type</label>
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500"
+              >
+                <option value="all">All Services</option>
+                {serviceOptions.map((service) => (
+                  <option key={service} value={service}>{service}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">View Layout</label>
+              <select
+                value={layoutMode}
+                onChange={(e) => setLayoutMode(e.target.value)}
+                className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500"
+              >
+                <option value="list">List</option>
+                <option value="grouped">Grouped</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Group By</label>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value)}
+                className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500"
+              >
+                <option value="driver">By Driver</option>
+                <option value="status">By Status</option>
+                <option value="service">By Service</option>
+                <option value="date">By Date</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => setAttentionOnly((prev) => !prev)}
+                className={`w-full h-8 rounded-lg text-xs font-bold transition-colors ${
+                  attentionOnly ? 'bg-rose-100 text-rose-700 border border-rose-300' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {attentionOnly ? '★ Attention Queue' : 'All Queue Items'}
               </button>
             </div>
           </div>
-
-          <div className="flex gap-1.5">
-            <select value={layoutMode} onChange={(e) => setLayoutMode(e.target.value)} className="flex-1 px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
-              <option value="grouped">Grouped</option>
-              <option value="list">List</option>
-            </select>
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className="flex-1 px-2.5 py-2 bg-white border border-slate-200 rounded-xl focus:border-blue-500 font-semibold text-xs outline-none shadow-sm">
-              <option value="driver">By Driver</option>
-              <option value="status">By Status</option>
-              <option value="service">By Service</option>
-              <option value="date">By Date</option>
-            </select>
-          </div>
-
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => setAttentionOnly((prev) => !prev)}
-              className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap ${attentionOnly ? 'bg-rose-100 text-rose-700' : 'bg-white border border-slate-200 text-slate-600'}`}
-            >
-              {attentionOnly ? 'Attention' : 'Full'}
-            </button>
-          </div>
-        </div>
         </div>
 
         {/* Bulk Actions - Only show when items selected */}

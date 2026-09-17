@@ -421,23 +421,34 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         </div>
       </div>
 
-      {/* SEARCH BAR & DRIVER FILTER */}
-      <div className="shrink-0 px-3 py-2 border-b border-slate-200 bg-white">
-        <div className="flex gap-1.5">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm flex-1">
+      {/* SEARCH BAR & DRIVER FILTER ROW */}
+      <div className="shrink-0 px-2.5 py-1.5 border-b border-slate-200 bg-white">
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 px-2.5 h-10 rounded-xl border border-slate-200 bg-slate-50 flex-1 min-w-0">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="text"
-              placeholder="Patient, trip, phone..."
+              placeholder="Search patient, ID, phone…"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setExpandedTripId(null); }}
-              className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+              className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="p-1 text-slate-400 hover:text-slate-600"
+                aria-label="Clear search"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
           <select
             value={driverFilter}
             onChange={(e) => { setDriverFilter(e.target.value); setExpandedTripId(null); }}
-            className="bg-white rounded-lg px-2 py-1.5 outline-none text-slate-600 text-[11px] font-semibold max-w-[120px] border border-slate-200"
+            aria-label="Filter by driver"
+            className="h-10 bg-slate-50 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none max-w-[130px] border border-slate-200 focus:bg-white focus:border-blue-600 transition-colors shrink-0 truncate"
           >
             {uniqueDrivers.map(driver => (
               <option key={driver} value={driver}>{driver}</option>

@@ -359,6 +359,7 @@ const DriverRow = ({ driver, trips }) => {
 /* ─── Main Component ──────────────────────────────────────────────── */
 const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assignTripToDriver, setBulkAssignModal, requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onSendToPlan, onOpenLiveMap, searchQuery, setSearchQuery, addToast, onOpenTripDetails, onOpenTripWorkflow, workspaceControls = null, activeTab = "trips" }) => {
   const [filter, setFilter] = useState("all");
+  const [driverFilter, setDriverFilter] = useState("all");
   const [selectedTripIds, setSelectedTripIds] = useState([]);
   const toggleSelectTrip = (tripId) => setSelectedTripIds(prev => prev.includes(tripId) ? prev.filter(id => id !== tripId) : [...prev, tripId]);
   const [showTools, setShowTools] = useState(false);
@@ -396,11 +397,16 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
     else if (filter === "completed") r = r.filter(t => t.status === "Completed");
     else if (filter === "cancelled") r = r.filter(t => t.status === "Cancelled" || t.status === "No Show" || t.status === "Rerouted");
     else if (filter === "willcall") r = r.filter(t => t.time === "Will Call");
+    if (driverFilter === "unassigned") {
+      r = r.filter(t => !t.driverId || t.status === "Unassigned");
+    } else if (driverFilter !== "all") {
+      r = r.filter(t => t.driverId === driverFilter || t.driverName === driverFilter);
+    }
     if (localSearch) {
       r = r.filter(t => tripMatchesSearch(t, localSearch));
     }
     return r;
-  }, [todayTrips, filter, localSearch]);
+  }, [todayTrips, filter, driverFilter, localSearch]);
 
   const unassignedN = todayTrips.filter(t => t.status === "Unassigned").length;
   const activeN = todayTrips.filter(t => IN_PROGRESS.includes(t.status)).length;
@@ -505,24 +511,54 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
         </div>
       </div>
 
-      {/* Filter chips */}
+      {/* Single-line Filter Bar with Dropdowns */}
       {activeTab === "trips" && (
-        <div className="app-filter-bar shrink-0 gap-1.5 border-b border-slate-100 bg-white px-3 py-2.5 sm:px-4">
-          {CHIPS.map(c => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setFilter(c.id)}
-              className={`min-h-11 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-colors active:scale-95 ${
-                filter === c.id ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-              }`}
+        <div className="app-filter-bar shrink-0 gap-1.5 border-b border-slate-100 bg-white px-3 py-2 sm:px-4 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            {/* Status / Queue Dropdown */}
+            <select
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              aria-label="Filter trips by queue status"
+              className="min-h-11 h-11 flex-1 min-w-0 max-w-[170px] bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 transition-colors"
             >
-              {c.label}
-              <span className={`text-[10px] px-1 py-0.5 rounded-full font-semibold ${filter === c.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"}`}>
-                {c.n}
-              </span>
+              {CHIPS.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.label} ({c.n})
+                </option>
+              ))}
+            </select>
+
+            {/* Driver Dropdown */}
+            <select
+              value={driverFilter}
+              onChange={e => setDriverFilter(e.target.value)}
+              aria-label="Filter trips by driver"
+              className="min-h-11 h-11 flex-1 min-w-0 max-w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 transition-colors"
+            >
+              <option value="all">All Drivers ({todayTrips.length})</option>
+              <option value="unassigned">Unassigned ({unassignedN})</option>
+              {drivers.map(d => {
+                const count = todayTrips.filter(t => t.driverId === d.id || t.driverName === d.name).length;
+                return (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({count})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {(filter !== "all" || driverFilter !== "all") && (
+            <button
+              type="button"
+              onClick={() => { setFilter("all"); setDriverFilter("all"); }}
+              className="min-h-11 px-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-700 text-xs font-bold shrink-0 active:scale-95 transition-colors"
+              title="Reset filters"
+            >
+              Reset
             </button>
-          ))}
+          )}
         </div>
       )}
 
