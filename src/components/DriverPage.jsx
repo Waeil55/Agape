@@ -4093,15 +4093,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
     return (
       <><div className="min-h-full bg-[var(--bg-app)] pb-44">
-        <div className="sticky top-0 z-30 bg-[var(--bg-app)] driver-active-trip-header">
-          <div className="px-4 py-4 flex items-center gap-3">
+        <div className="sticky top-0 z-30 bg-[var(--bg-app)] driver-active-trip-header" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="px-4 py-3 flex items-center gap-3">
             <button
               type="button"
               onClick={() => { if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); setWorkNotesOpen(false); } }}
-              className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-800 active:scale-95 cursor-pointer"
+              className="flex min-h-11 items-center gap-0.5 -ml-1.5 px-2 text-blue-600 hover:text-blue-700 active:text-blue-800 active:scale-95 touch-manipulation transition-all font-medium shrink-0 rounded-lg hover:bg-blue-50/50"
               aria-label="Back to trips"
             >
-              <ChevronLeft size={22} strokeWidth={2.2} />
+              <ChevronLeft size={22} strokeWidth={2.5} />
+              <span className="text-sm font-semibold hidden min-[360px]:inline">Back</span>
             </button>
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-semibold text-slate-950 leading-tight truncate">{trip.patient || 'Trip'}</h1>
@@ -5861,11 +5862,22 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {/* ===== TRIP RECEIPT ===== */}
       {/* ===== FULL-SCREEN TRIP DETAILS ===== */}
       {showTripDetails && (
-        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 55 }}>
+        <div className="fixed inset-0 bg-white flex flex-col animate-slide-up" style={{ zIndex: 55, paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-            <div className="flex-1">
-              <h2 className="font-semibold text-sm text-slate-900 leading-tight">{showTripDetails.patient}</h2>
-              <p className="text-xs text-slate-500">{showTripDetails.bookingId || '—'}</p>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => { setShowTripDetails(null); setIsEditingDetails(false); }}
+                className="flex min-h-11 items-center gap-0.5 -ml-1.5 px-2 text-blue-600 hover:text-blue-700 active:text-blue-800 active:scale-95 touch-manipulation transition-all font-medium shrink-0 rounded-lg hover:bg-blue-50/50"
+                aria-label="Back"
+              >
+                <ChevronLeft size={22} strokeWidth={2.5} />
+                <span className="text-sm font-semibold hidden min-[360px]:inline">Back</span>
+              </button>
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-sm text-slate-900 leading-tight truncate">{showTripDetails.patient}</h2>
+                <p className="text-xs text-slate-500">{showTripDetails.bookingId || '—'}</p>
+              </div>
             </div>
              <div className="flex items-center gap-2">
               {!isEditingDetails && canManageTripRecords && (
@@ -5877,7 +5889,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <Edit2 size={16} /> Edit
                 </button>
               )}
-              <button type="button" onClick={() => { setShowTripDetails(null); setIsEditingDetails(false); }} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer"><X size={18} /></button>
+              <button type="button" onClick={() => { setShowTripDetails(null); setIsEditingDetails(false); }} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center active:scale-90 cursor-pointer" aria-label="Close details"><X size={18} /></button>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto space-y-4 px-4 pb-24">

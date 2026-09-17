@@ -16,22 +16,30 @@ export const MobileLayout = ({
   const tokens = designTokens;
   const { headerConfig: contextConfig, setHeader, clearHeader } = useHeader();
   
-  const mergedConfig = useMemo(() => ({
-    title: '',
-    subtitle: '',
-    showBack: false,
-    onBack: null,
-    rightActions: [],
-    role,
-    largeTitle: false,
-    ...contextConfig,
-    ...headerConfig,
-  }), [contextConfig, headerConfig, role]);
+  const mergedConfig = useMemo(() => {
+    const base = {
+      title: '',
+      subtitle: '',
+      showBack: false,
+      onBack: null,
+      rightActions: [],
+      role,
+      largeTitle: false,
+      ...headerConfig,
+    };
+    if (contextConfig && (contextConfig.title || contextConfig.showBack || contextConfig.onBack)) {
+      return {
+        ...base,
+        ...contextConfig,
+      };
+    }
+    return base;
+  }, [contextConfig, headerConfig, role]);
 
   const activeViewLabel = getActiveViewLabel(currentView, subView);
 
   return (
-    <div className="flex min-h-0 flex-col bg-slate-50 relative">
+    <div className="flex flex-1 min-h-0 flex-col bg-slate-50 relative">
       <AppHeader
         title={mergedConfig.title || activeViewLabel}
         subtitle={mergedConfig.subtitle}

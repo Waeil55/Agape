@@ -89,6 +89,8 @@ const TripDetailView = ({
   const unsubscribeRef = useRef(null);
   const lastTripRef = useRef(null);
   const lastLoadedTripIdRef = useRef(null);
+  const lastAppliedHeaderFingerprintRef = useRef('');
+  const lastTripPropFingerprintRef = useRef('');
 
   const matchDriver = useCallback((tripData) => {
     if (tripData?.driverId && drivers.length > 0) {
@@ -102,9 +104,18 @@ const TripDetailView = ({
   }, [drivers]);
 
   const applyHeader = useCallback((tripData) => {
+    if (!tripData) return;
+    const title = buildTripTitle(tripData);
+    const subtitle = `${tripData.bookingId ? `#${tripData.bookingId}` : tripData.id} · ${tripData.status || 'Open'}`;
+    const fingerprint = `${tripData.id}_${tripData.status}_${title}_${subtitle}`;
+    if (lastAppliedHeaderFingerprintRef.current === fingerprint) {
+      return;
+    }
+    lastAppliedHeaderFingerprintRef.current = fingerprint;
+
     setHeader({
-      title: buildTripTitle(tripData),
-      subtitle: `${tripData.bookingId ? `#${tripData.bookingId}` : tripData.id} · ${tripData.status || 'Open'}`,
+      title,
+      subtitle,
       showBack: true,
       onBack: onClose,
       role,
@@ -122,10 +133,14 @@ const TripDetailView = ({
 
   useEffect(() => {
     if (tripProp) {
-      setTrip(tripProp);
-      setLoading(false);
-      setError(null);
-      matchDriver(tripProp);
+      const propFingerprint = `${tripProp.id}_${tripProp.status}_${tripProp.date}_${tripProp.time}_${tripProp.driverId}_${tripProp.driverName}_${tripProp.pickupOdometer}_${tripProp.dropoffOdometer}_${tripProp.startedAt}_${tripProp.completedAt}`;
+      if (lastTripPropFingerprintRef.current !== propFingerprint) {
+        lastTripPropFingerprintRef.current = propFingerprint;
+        setTrip(tripProp);
+        setLoading(false);
+        setError(null);
+        matchDriver(tripProp);
+      }
       applyHeader(tripProp);
       return;
     }

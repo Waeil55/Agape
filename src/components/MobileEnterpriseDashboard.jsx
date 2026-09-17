@@ -480,7 +480,7 @@ const MobileEnterpriseDashboard = (props) => {
         {renderContent()}
         
         {currentTripDetails && (
-          <div className="absolute inset-x-0 top-0 flex flex-col bg-slate-50" role="presentation" style={{ bottom: NAV_BOTTOM_CLEARANCE, zIndex: 35 }}>
+          <div className="absolute inset-x-0 flex flex-col bg-slate-50" role="presentation" style={{ top: 'calc(65px + env(safe-area-inset-top, 0px))', bottom: NAV_BOTTOM_CLEARANCE, zIndex: 30 }}>
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <TripDetailView

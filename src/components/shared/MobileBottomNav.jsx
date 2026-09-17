@@ -43,11 +43,11 @@ export const MobileBottomNavigation = React.memo(({
 
   return (
     <nav 
-      className="bottom-nav fixed bottom-0 left-0 right-0"
+      className="bottom-nav fixed bottom-0 left-0 right-0 z-40"
       aria-label="Primary navigation"
       style={{ 
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        zIndex: designTokens.zIndex.sticky,
+        zIndex: designTokens.zIndex.num?.bottomNav || 40,
       }}
     >
       <div className="relative flex h-14 min-h-[56px] items-center justify-around gap-1 px-2 bg-white border-t border-slate-200 shadow-lg">

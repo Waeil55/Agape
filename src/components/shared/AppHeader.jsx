@@ -16,7 +16,18 @@ export const HeaderProvider = ({ children }) => {
   });
 
   const setHeader = useCallback((config) => {
-    setHeaderConfig((prev) => ({ ...prev, ...config }));
+    if (!config || typeof config !== 'object') return;
+    setHeaderConfig((prev) => {
+      const keys = Object.keys(config);
+      let changed = false;
+      for (const key of keys) {
+        if (prev[key] !== config[key]) {
+          changed = true;
+          break;
+        }
+      }
+      return changed ? { ...prev, ...config } : prev;
+    });
   }, []);
 
   const clearHeader = useCallback(() => {
@@ -76,20 +87,21 @@ const AppHeader = ({
   return (
     <header className={`shrink-0 ${tokens.elevation.sm} ${tokens.colors.border.hairline} ${tokens.colors.background.secondary} ${className}`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
       <div className="px-3 py-2.5 flex items-center gap-3">
-        {showBack && (
+        {showBack ? (
           <button
             type="button"
             onClick={onBack}
             aria-label="Back"
-            className="flex min-h-11 min-w-11 items-center justify-center -ml-1.5 text-slate-500 hover:text-slate-800 rounded-full bg-slate-100/50 touch-manipulation transition-colors"
+            className="flex min-h-11 items-center gap-0.5 -ml-1.5 px-2 text-blue-600 hover:text-blue-700 active:text-blue-800 active:scale-95 touch-manipulation transition-all font-medium shrink-0 rounded-lg hover:bg-blue-50/50"
           >
-            <ChevronLeft size={20} strokeWidth={2} />
+            <ChevronLeft size={22} strokeWidth={2.5} />
+            <span className="text-sm font-semibold hidden min-[360px]:inline">Back</span>
           </button>
+        ) : (
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+            <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
+          </div>
         )}
-        
-        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-          <img src="/agape.png" alt="Agape Care" className="w-8 h-8 object-contain" />
-        </div>
         
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">

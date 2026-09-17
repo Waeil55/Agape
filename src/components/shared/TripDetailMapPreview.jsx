@@ -20,7 +20,7 @@ const MapPreview = ({ trip, expanded, onToggle, pickup, dropoff }) => {
     if (mapLoaded || mapError || !mapContainerRef.current) return;
     
     try {
-      const { Map, Marker, InfoWindow } = await import('react-google-maps/api');
+      const { GoogleMap: Map, Marker, InfoWindow } = await import('@react-google-maps/api');
       
       const mapOptions = {
         center: { lat: centerLat, lng: centerLng },
