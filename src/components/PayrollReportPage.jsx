@@ -116,7 +116,7 @@ export default function PayrollReportPage({ drivers = [], trips = [], driverTele
   const toggleSect = (id, sect) => setExpandedSection(prev => ({ ...prev, [`${id}_${sect}`]: !prev[`${id}_${sect}`] }));
 
   return (
-    <div className="min-h-0 flex-1 text-slate-900 pb-24 max-md:[&_button]:min-h-11">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y text-slate-900 pb-24 max-md:[&_button]:min-h-11" style={{ WebkitOverflowScrolling: 'touch' }}>
       <div role="toolbar" aria-label="Payroll report controls" data-testid="payroll-toolbar" className="grid grid-cols-2 gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:flex sm:flex-nowrap sm:items-center sm:px-4">
         <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
           aria-label="Payroll service date" className="h-9 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none sm:w-[126px] sm:shrink-0" />

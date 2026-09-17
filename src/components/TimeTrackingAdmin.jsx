@@ -306,7 +306,7 @@ const TimeTrackingAdmin = ({ drivers = [], trips = [], driverTelemetry = [], tim
   };
 
   return (
-    <div className="min-h-0 flex-1 bg-slate-50 max-md:[&_button]:min-h-11">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y bg-slate-50 max-md:[&_button]:min-h-11" style={{ WebkitOverflowScrolling: 'touch' }}>
       <div className="max-w-[1600px] mx-auto px-3 sm:px-5 py-5 pb-24">
         <section className="relative overflow-hidden rounded-3xl bg-blue-600 p-5 sm:p-7 mb-5 text-white shadow-xl shadow-blue-600/10">
           <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">

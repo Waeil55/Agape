@@ -637,7 +637,7 @@ export default function EnterpriseRoutePlanner({ trips = [], drivers = [], appSe
         </div>
       </div>
 
-      <main className="flex-1 pb-8 px-3 w-full space-y-2 mt-1 overflow-y-auto overscroll-contain">
+      <main className="flex-1 pb-24 px-3 w-full space-y-2 mt-1 overflow-y-auto overscroll-y-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* ========== BUILDER TAB ========== */}
         {activeTab === 'builder' && (

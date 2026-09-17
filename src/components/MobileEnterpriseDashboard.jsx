@@ -312,7 +312,9 @@ const MobileEnterpriseDashboard = (props) => {
           headerConfig={{ title, rightActions }}
           showBottomNav={true}
         >
-          {content}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+            {content}
+          </div>
         </MobileLayout>
       );
     }
@@ -327,7 +329,7 @@ const MobileEnterpriseDashboard = (props) => {
           onPreload={preloadMobileView}
           headerConfig={{ title: 'Reports & Export' }}
         >
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <MobileReportsPage
@@ -375,7 +377,7 @@ const MobileEnterpriseDashboard = (props) => {
           onPreload={preloadMobileView}
           headerConfig={{ title: 'Settings & More' }}
         >
-          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: NAV_BOTTOM_CLEARANCE }}>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <MobileMenuPage
@@ -402,7 +404,7 @@ const MobileEnterpriseDashboard = (props) => {
           onPreload={preloadMobileView}
           headerConfig={{ title: 'Route Planner & Tools', showBack: true, onBack: () => handleNavClick('trips') }}
         >
-          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: NAV_BOTTOM_CLEARANCE }}>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <EnterpriseRoutePlanner
@@ -458,7 +460,7 @@ const MobileEnterpriseDashboard = (props) => {
           onPreload={preloadMobileView}
           headerConfig={{ title: 'Dispatch Manifest' }}
         >
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-1.5" style={{ paddingBottom: NAV_BOTTOM_CLEARANCE }}>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-1.5">
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <TripsPage
@@ -496,7 +498,7 @@ const MobileEnterpriseDashboard = (props) => {
 
   return (
     <HeaderProvider>
-      <div className="relative flex flex-1 flex-col min-h-0 overflow-hidden">
+      <div className="mobile-enterprise-dashboard-wrapper relative flex flex-1 flex-col min-h-0 overflow-hidden">
         {renderContent()}
 
         {activeDriverTripId && (

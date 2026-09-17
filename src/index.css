@@ -851,6 +851,17 @@ body:has(input:focus, textarea:focus) .adm-bottomnav {
   transition: padding-bottom 0.22s cubic-bezier(0.3, 0.9, 0.4, 1) !important;
 }
 
+.mobile-enterprise-dashboard-wrapper [class*="adm-main"] {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 !important;
+}
+
+.mobile-enterprise-dashboard-wrapper .adm-topbar {
+  display: none !important;
+}
+
 /* When adm-bottomnav (internal sub-view nav) and main bottom-nav coexist,
    lift the adm-bottomnav above the main nav pill (72px nav + 8px gap + 8px margin) */
 .mobile-enterprise-dashboard-wrapper .adm-bottomnav {

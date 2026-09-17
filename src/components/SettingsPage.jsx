@@ -918,7 +918,7 @@ const SettingsPage = ({
   };
 
   return (
-    <div aria-label="Settings workspace" className="flex min-h-0 w-full flex-col gap-3 lg:flex-row lg:gap-6 lg:overflow-y-auto lg:overscroll-contain">
+    <div aria-label="Settings workspace" className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain touch-pan-y pb-24 lg:flex-row lg:gap-6 lg:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Sidebar */}
       <nav aria-label="Settings sections" className="w-56 flex-shrink-0 hidden lg:block">
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm sticky top-4">

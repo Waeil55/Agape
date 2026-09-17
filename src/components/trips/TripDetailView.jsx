@@ -321,7 +321,7 @@ const TripDetailView = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-slate-50" role="main">
-      <div className={`flex-1 overflow-y-auto ${tokens.safeArea.bottom} ${tokens.spacing.inset.pageMobile}`}>
+      <div className={`flex-1 overflow-y-auto overscroll-y-contain touch-pan-y ${tokens.safeArea.bottom} ${tokens.spacing.inset.pageMobile}`} style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="space-y-4 max-w-xl mx-auto">
           
           {/* Status Header Card */}
