@@ -1652,6 +1652,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         }, 200);
       }
     };
+    const handlePanelFocusIn = (event) => {
+      if (event.target?.closest?.('.trip-window-panel')) {
+        handleKeyboardOpen();
+      }
+    };
     const preventBackgroundTouch = (event) => {
       if (!panelOpen || event.target?.closest?.('.trip-window-panel')) return;
       event.preventDefault();
@@ -1670,6 +1675,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     visualViewport?.addEventListener('resize', scheduleWindowLock);
     visualViewport?.addEventListener('scroll', scheduleWindowLock);
     window.addEventListener('agape:trip-keyboard-open', handleKeyboardOpen);
+    document.addEventListener('focusin', handlePanelFocusIn, true);
     document.addEventListener('focusout', handleKeyboardProxyBlur, true);
     document.addEventListener('touchmove', preventBackgroundTouch, { capture: true, passive: false });
 
@@ -1706,6 +1712,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       visualViewport?.removeEventListener('resize', scheduleWindowLock);
       visualViewport?.removeEventListener('scroll', scheduleWindowLock);
       window.removeEventListener('agape:trip-keyboard-open', handleKeyboardOpen);
+      document.removeEventListener('focusin', handlePanelFocusIn, true);
       document.removeEventListener('focusout', handleKeyboardProxyBlur, true);
       document.removeEventListener('touchmove', preventBackgroundTouch, true);
       if (nativeKeyboard) void nativeKeyboard.setScroll({ isDisabled: false }).catch(() => {});
@@ -7091,16 +7098,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         };
         const actionLabel = cancelPrompt.type === 'noshow' ? 'No Show' : cancelPrompt.type === 'reroute' ? 'Reroute' : 'Cancel';
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 140 }} onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }}>
-            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
-               <div className={`px-5 py-4 bg-blue-600 text-white flex items-center justify-between`}>
+          <div className="trip-window-overlay bg-black/40" style={{ zIndex: 140 }} onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }}>
+            <div className="trip-window-panel trip-window-panel-wide" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+               <div className="trip-window-header px-5 py-4 bg-blue-600 text-white">
                 <div>
                   <h3 className="text-base font-semibold">{actionLabel} Trip Legs</h3>
                   <p className="text-xs text-white/70 mt-0.5">{cancelPrompt.trip.patient} — {cancelPrompt.legs.length} leg{cancelPrompt.legs.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button type="button" onClick={() => { setCancelPrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
               </div>
-              <div className="p-4 space-y-2 max-h-56 overflow-y-auto">
+              <div className="trip-window-body p-4 space-y-2">
                 <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${allSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-100 hover:bg-slate-50'}`}>
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-rose-500 border-rose-500' : 'border-slate-300'}`}>
                     {allSelected && <Check size={12} className="text-white" />}
@@ -7132,7 +7139,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   );
                 })}
               </div>
-              <div className="px-4 pb-4">
+              <div className="trip-window-footer px-4 pb-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -7165,16 +7172,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           setSelectedLegsForAction(prev => prev.size === restorePrompt.legs.length ? new Set() : new Set(restorePrompt.legs.map(l => l.id)));
         };
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6" style={{ zIndex: 140 }} onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }}>
-            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden pointer-events-auto" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
-               <div className="px-5 py-4 bg-blue-600 text-white flex items-center justify-between">
+          <div className="trip-window-overlay bg-black/40" style={{ zIndex: 140 }} onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }}>
+            <div className="trip-window-panel trip-window-panel-wide" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+               <div className="trip-window-header px-5 py-4 bg-blue-600 text-white">
                 <div>
                   <h3 className="text-base font-semibold">Restore Trip Legs</h3>
                   <p className="text-xs text-white/70 mt-0.5">{restorePrompt.trip.patient} — {restorePrompt.legs.length} leg{restorePrompt.legs.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button type="button" onClick={() => { setRestorePrompt(null); setSelectedLegsForAction(new Set()); }} className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center active:scale-90 cursor-pointer"><X size={16} /></button>
               </div>
-              <div className="p-4 space-y-2 max-h-56 overflow-y-auto">
+              <div className="trip-window-body p-4 space-y-2">
                 <button type="button" onClick={toggleAll} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition active:scale-95 cursor-pointer ${allSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 hover:bg-slate-50'}`}>
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${allSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
                     {allSelected && <Check size={12} className="text-white" />}
@@ -7206,7 +7213,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   );
                 })}
               </div>
-              <div className="px-4 pb-4">
+              <div className="trip-window-footer px-4 pb-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -7227,7 +7234,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {/* ===== EMERGENCY TRANSFER MODAL ===== */}
       {transferPrompt && (
         <div className="trip-window-overlay bg-black/40" style={{ zIndex: 175 }} onClick={(e) => e.stopPropagation()}>
-          <div className="trip-window-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="trip-window-panel trip-window-panel-wide" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => setTransferPrompt(null)} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
             <div className="trip-window-body p-4">
               <div className="text-center mb-3">
@@ -7274,7 +7281,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {/* ===== PASSWORD CONFIRM MODAL ===== */}
       {passwordPrompt && (
         <div className="trip-window-overlay bg-black/40" style={{ zIndex: 180 }} onClick={(e) => { e.stopPropagation(); }}>
-          <div className="trip-window-panel" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
+          <div className="trip-window-panel trip-window-panel-wide" style={{ zIndex: 10 }} onClick={e => e.stopPropagation()}>
             <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"><X size={16} className="text-slate-500" /></button>
             <div className="trip-window-body p-4">
               {/* Header with step indicator */}
@@ -7440,12 +7447,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </div>
 
               {/* Quick Actions Footer */}
-              <div className="px-4 pb-4 pt-2 border-t border-slate-100">
+              <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2 border-t border-slate-100 bg-white">
                 <button
                   type="button"
                   onClick={() => { handleSmartCall(showContactSelector); setShowContactSelector(null); }}
-                  className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer">
-                  <Phone size={16} /> Quick Call Primary Contact
+                  className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm">
+                  <Phone size={18} /> Quick Call Primary Contact
                 </button>
               </div>
             </div>
@@ -7643,18 +7650,18 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           return 'bg-slate-100 text-slate-700';
         };
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 140 }} onClick={() => setShowLegsModal(null)}>
-            <div className="bg-white rounded-3xl w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between rounded-t-3xl z-10">
+          <div className="trip-window-overlay bg-black/40" style={{ zIndex: 140 }} onClick={() => setShowLegsModal(null)}>
+            <div className="trip-window-panel trip-window-panel-wide" onClick={e => e.stopPropagation()}>
+              <div className="trip-window-header border-b border-slate-100 px-5 py-4">
                 <div>
-                  <h3 className="text-base     font-semibold text-slate-900">{showLegsModal[0]?.patient || 'Trip Legs'}</h3>
+                  <h3 className="text-base font-semibold text-slate-900">{showLegsModal[0]?.patient || 'Trip Legs'}</h3>
                   <p className="text-xs text-slate-500 mt-0.5">{showLegsModal.length} leg{showLegsModal.length !== 1 ? 's' : ''} today</p>
                 </div>
                 <button type="button" onClick={() => setShowLegsModal(null)} className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-all cursor-pointer shrink-0">
                   <X size={16} />
                 </button>
               </div>
-              <div className="p-4 space-y-2">
+              <div className="trip-window-body p-4 space-y-2">
                 {showLegsModal.map((leg) => (
                   <div key={leg.id} className="border border-slate-100 rounded-xl p-3 hover:border-slate-200 transition-colors">
                     <div className="flex items-center justify-between mb-1.5">

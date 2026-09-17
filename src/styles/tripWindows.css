@@ -146,12 +146,27 @@ html.trip-window-open {
   min-height: 25rem;
 }
 
+.trip-window-panel-wide {
+  max-width: 28rem;
+}
+
+.trip-window-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 12;
+  background: #ffffff;
+}
+
 .trip-window-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .trip-window-footer {
@@ -159,6 +174,7 @@ html.trip-window-open {
   display: flex;
   gap: 0.75rem;
   padding-top: 0.5rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   position: relative;
   z-index: 12;
   background: #ffffff;

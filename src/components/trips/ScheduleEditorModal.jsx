@@ -653,11 +653,11 @@ export default function ScheduleEditorModal({
         role="dialog"
         aria-modal="true"
         aria-label="Enterprise schedule editor"
-        className="max-h-[92vh] w-full overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:max-w-md sm:rounded-3xl"
+        className="max-h-[92vh] w-full overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:max-w-md sm:rounded-3xl flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
-        <header className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-3">
+        <header className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900">Schedule Editor</h3>
             <p className="text-[11px] text-slate-500 font-semibold">{trip.patient} #{trip.bookingId || trip.id}</p>
@@ -674,7 +674,7 @@ export default function ScheduleEditorModal({
         </header>
 
         {/* SCROLLABLE CONTENT */}
-        <div className="max-h-[68vh] overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 overscroll-contain touch-pan-y">
 
           {/* STATUS BAR */}
           <div className="flex items-center gap-2">
@@ -935,7 +935,7 @@ export default function ScheduleEditorModal({
         </div>
 
         {/* FOOTER */}
-        <div className="flex gap-2 px-4 pb-4 pt-3 border-t border-slate-100 bg-slate-50/50">
+        <div className="shrink-0 flex gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3 border-t border-slate-100 bg-white">
           <button type="button" onClick={onClose}
             className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all">
             Cancel
