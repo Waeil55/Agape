@@ -216,6 +216,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [activePreset, setActivePreset] = useState(null);
   const [showExportPanel, setShowExportPanel] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const driverIndex = useMemo(() => buildDriverIndex(drivers), [drivers]);
 
@@ -383,102 +384,153 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         {editMessage && <div role={editMessage.includes('not saved') ? 'alert' : 'status'} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
       </div>
 
-      {/* DATE & FILTERS BAR */}
-      <div className="shrink-0 border-b border-slate-200 bg-white">
-        <div className="flex min-w-0 items-center gap-1 px-2 py-1.5">
-          <button onClick={() => shiftDate(-1)} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Previous date">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button className="flex items-center gap-1 px-3 min-h-11 rounded-xl border border-slate-200 bg-white shadow-sm text-[11px] font-bold text-slate-700">
-            {allDates ? 'All' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </button>
-          <button onClick={() => shiftDate(1)} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Next date">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-          {FILTER_PRESETS.map(p => {
-            const Icon = p.Icon;
-            const isActive = statusFilter === p.status;
-            return (
-              <button key={p.id} onClick={() => { setStatusFilter(p.status); setExpandedTripId(null); }}
-                className={`min-h-11 w-11 rounded-xl border flex items-center justify-center active:scale-95 transition-all shadow-sm ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 bg-white text-slate-600'}`}
-                title={p.label}>
-                <Icon size={13} />
-              </button>
-            );
-          })}
-
-          <div className="flex items-center gap-0.5 ml-auto">
-            <button onClick={() => handleExport('csv')} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Download" title="Export CSV">
-              <Download className="w-4 h-4" />
-            </button>
-            <button onClick={() => setShowUploadModal(true)} className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600" aria-label="Upload" title="Upload">
-              <Upload className="w-4 h-4" />
+      {/* 1-Line Header Bar */}
+      <div className="shrink-0 border-b border-slate-200 bg-white px-2 py-1.5 flex items-center gap-1 min-h-11">
+        {showSearch ? (
+          <div className="flex-1 flex items-center gap-1">
+            <div className="relative flex-1 flex items-center">
+              <Search className="w-4 h-4 text-slate-400 absolute left-2.5 pointer-events-none" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search patient, ID, phone…"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setExpandedTripId(null); }}
+                className="w-full min-h-11 h-11 pl-8 pr-7 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:bg-white focus:border-blue-600"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 p-1 text-slate-400 hover:text-slate-600"
+                  aria-label="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+              className="min-h-11 w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 shrink-0"
+              aria-label="Close search"
+            >
+              <X size={16} />
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* SEARCH BAR & DRIVER FILTER ROW */}
-      <div className="shrink-0 px-2.5 py-1.5 border-b border-slate-200 bg-white">
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-2 px-2.5 h-10 rounded-xl border border-slate-200 bg-slate-50 flex-1 min-w-0">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search patient, ID, phone…"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setExpandedTripId(null); }}
-              className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400"
-            />
-            {searchQuery && (
+        ) : (
+          <>
+            {/* Date Stepper */}
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button onClick={() => shiftDate(-1)} className="min-h-11 w-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 shadow-xs text-slate-600 shrink-0" aria-label="Previous date">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="p-1 text-slate-400 hover:text-slate-600"
-                aria-label="Clear search"
+                onClick={() => setAllDates(!allDates)}
+                className="flex items-center justify-center px-1.5 min-h-11 max-w-[85px] truncate rounded-xl border border-slate-200 bg-white shadow-xs text-[11px] font-bold text-slate-700 shrink-0"
+                title={allDates ? 'Showing all dates' : 'Toggle date'}
               >
-                <X size={12} />
+                {allDates ? 'All Dates' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}
               </button>
-            )}
-          </div>
-          <select
-            value={driverFilter}
-            onChange={(e) => { setDriverFilter(e.target.value); setExpandedTripId(null); }}
-            aria-label="Filter by driver"
-            className="h-10 bg-slate-50 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none max-w-[130px] border border-slate-200 focus:bg-white focus:border-blue-600 transition-colors shrink-0 truncate"
-          >
-            {uniqueDrivers.map(driver => (
-              <option key={driver} value={driver}>{driver}</option>
-            ))}
-          </select>
-        </div>
+              <button onClick={() => shiftDate(1)} className="min-h-11 w-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 shadow-xs text-slate-600 shrink-0" aria-label="Next date">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Status Dropdown */}
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setExpandedTripId(null); }}
+              aria-label="Filter by status"
+              className="min-h-11 h-11 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 truncate transition-colors"
+            >
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="all">All Status</option>
+            </select>
+
+            {/* Driver Dropdown */}
+            <select
+              value={driverFilter}
+              onChange={(e) => { setDriverFilter(e.target.value); setExpandedTripId(null); }}
+              aria-label="Filter by driver"
+              className="min-h-11 h-11 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 truncate transition-colors"
+            >
+              {uniqueDrivers.map(driver => (
+                <option key={driver} value={driver}>{driver}</option>
+              ))}
+            </select>
+
+            {/* Search Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowSearch(true)}
+              className="min-h-11 w-11 h-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 shadow-xs text-slate-600 shrink-0"
+              aria-label="Search"
+              title="Search reports"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+
+            {/* Tools / Options Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowExportPanel(!showExportPanel)}
+              className={`min-h-11 w-11 h-11 rounded-xl border flex items-center justify-center active:scale-95 shadow-xs transition-colors shrink-0 ${
+                showExportPanel ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'
+              }`}
+              aria-label="Tools & Export"
+              title="Export, upload & analytics"
+            >
+              <SlidersHorizontal size={16} />
+            </button>
+          </>
+        )}
       </div>
 
-      {/* MAIN SCROLLABLE CONTENT */}
-      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50 relative">
-
-        {/* ANALYTICS DASHBOARD TOGGLE */}
-        <div className="px-3 py-2 border-b border-slate-200 bg-white">
-          <button onClick={() => setShowAnalytics(!showAnalytics)}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all ${showAnalytics ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
-            <div className="flex items-center gap-2">
-              <BarChart3 size={14} className={showAnalytics ? 'text-indigo-600' : 'text-slate-500'} />
-              <span className="text-xs font-bold text-slate-700">Analytics Dashboard</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500">{kpis.total} trips</span>
-              <ChevronUp size={12} className={`text-slate-400 transition-transform ${showAnalytics ? '' : 'rotate-180'}`} />
-            </div>
-          </button>
+      {/* Collapsible Tools & Analytics Drawer */}
+      {showExportPanel && (
+        <div className="shrink-0 border-b border-slate-200 bg-slate-50/90 px-3 py-2 space-y-2 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleExport('csv')}
+              className="flex-1 min-h-10 rounded-xl border border-slate-200 bg-white flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 active:scale-95 shadow-xs"
+              aria-label="Download"
+              title="Export CSV"
+            >
+              <Download className="w-4 h-4 text-slate-500" /> Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowUploadModal(true)}
+              className="flex-1 min-h-10 rounded-xl border border-slate-200 bg-white flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 active:scale-95 shadow-xs"
+              aria-label="Upload"
+              title="Upload"
+            >
+              <Upload className="w-4 h-4 text-slate-500" /> Upload
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              className={`min-h-10 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-bold active:scale-95 shadow-xs ${
+                showAnalytics ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-slate-200 text-slate-700'
+              }`}
+            >
+              <BarChart3 size={14} /> Analytics
+            </button>
+          </div>
           {showAnalytics && (
             <div className="mt-2 space-y-2 animate-in fade-in duration-150">
               <AnalyticsDashboard kpis={kpis} onExport={handleExport} onApplyPreset={applyPreset} activePreset={activePreset} />
             </div>
           )}
         </div>
+      )}
+
+      {/* MAIN SCROLLABLE CONTENT */}
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50 relative">
 
         {/* DAILY SUMMARY BAR */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-white shadow-sm">

@@ -424,103 +424,52 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
 
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden pb-24">
-      {/* Header: stats + workspace controls + search */}
-      <div className="px-3 pt-3 pb-2 bg-white border-b border-slate-200 sm:px-4 shrink-0">
-        {/* Stats row (only when no workspace controls) */}
-        {!workspaceControls && (
-          <div className="flex gap-2 mb-2.5">
-            {[
-              { label: "Total", value: todayTrips.length, color: "text-slate-900", bg: "bg-slate-50", border: "border-slate-200" },
-              { label: "Dispatch", value: unassignedN, color: unassignedN > 0 ? "text-rose-600" : "text-slate-900", bg: unassignedN > 0 ? "bg-rose-50" : "bg-slate-50", border: unassignedN > 0 ? "border-rose-200" : "border-slate-200" },
-              { label: "Live", value: activeN, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
-              { label: "Done", value: doneN, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-            ].map(s => (
-              <div key={s.label} className={`flex-1 rounded-xl px-2 py-2 text-center border ${s.bg} ${s.border}`}>
-                <p className={`text-lg font-black leading-none ${s.color}`}>{s.value}</p>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
+      {/* Single 1-Line Header & Filter Controls */}
+      <div className="app-filter-bar shrink-0 bg-white border-b border-slate-200 px-2.5 py-1.5 flex items-center gap-1.5 min-h-11">
         {workspaceControls}
+        {showSearch ? (
+          <div className="relative flex-1 min-w-0 flex items-center">
+            <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={localSearch}
+              onChange={e => setLocalSearch(e.target.value)}
+              placeholder="Search patient, ID, address…"
+              className="w-full min-h-11 h-11 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-8 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 transition-colors"
+            />
+            {localSearch && (
+              <button type="button" onClick={() => setLocalSearch("")} className="absolute right-2.5 text-slate-400 hover:text-slate-600 p-1">
+                <X size={13} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { setShowSearch(false); setLocalSearch(""); }}
+              className="min-h-11 w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shrink-0 ml-1.5"
+              aria-label="Close search"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Search Button */}
+            <button
+              type="button"
+              onClick={() => setShowSearch(true)}
+              className="w-11 h-11 min-h-11 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shadow-xs shrink-0"
+              aria-label="Search trips"
+            >
+              <Search size={16} />
+            </button>
 
-        {/* Search + tools row */}
-        <div className="flex items-center gap-2 mt-2">
-          {showSearch ? (
-            <div className="relative flex-1 flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={localSearch}
-                  onChange={e => setLocalSearch(e.target.value)}
-                  placeholder="Search patient, ID, address…"
-                  className="w-full min-h-11 bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
-                />
-                {localSearch && (
-                  <button type="button" onClick={() => setLocalSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => { setShowSearch(false); setLocalSearch(""); }}
-                className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 transition-colors shrink-0"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowSearch(true)}
-                className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shadow-sm shrink-0"
-              >
-                <Search size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowTools(true)}
-                className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shadow-sm shrink-0"
-              >
-                <SlidersHorizontal size={16} />
-              </button>
-              {/* Upload trips button */}
-              <button
-                type="button"
-                onClick={() => setShowUploadModal?.(true)}
-                className="min-h-11 w-11 rounded-xl bg-blue-500 text-white flex items-center justify-center active:scale-95 transition-colors shadow-sm shrink-0"
-                title="Upload CSV or scan trips"
-              >
-                <Upload size={16} />
-              </button>
-              {/* Add trip button */}
-              <button
-                type="button"
-                onClick={() => setShowAddTripModal?.(true)}
-                className="min-h-11 px-3 rounded-xl bg-blue-600 text-white text-[12px] font-bold flex items-center gap-1.5 active:scale-95 transition-colors shadow-sm ml-auto"
-              >
-                <Plus size={14} /> Add Trip
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Single-line Filter Bar with Dropdowns */}
-      {activeTab === "trips" && (
-        <div className="app-filter-bar shrink-0 gap-1.5 border-b border-slate-100 bg-white px-3 py-2 sm:px-4 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
             {/* Status / Queue Dropdown */}
             <select
               value={filter}
               onChange={e => setFilter(e.target.value)}
               aria-label="Filter trips by queue status"
-              className="min-h-11 h-11 flex-1 min-w-0 max-w-[170px] bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 transition-colors"
+              className="min-h-11 h-11 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 truncate transition-colors"
             >
               {CHIPS.map(c => (
                 <option key={c.id} value={c.id}>
@@ -534,7 +483,7 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
               value={driverFilter}
               onChange={e => setDriverFilter(e.target.value)}
               aria-label="Filter trips by driver"
-              className="min-h-11 h-11 flex-1 min-w-0 max-w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 transition-colors"
+              className="min-h-11 h-11 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 truncate transition-colors"
             >
               <option value="all">All Drivers ({todayTrips.length})</option>
               <option value="unassigned">Unassigned ({unassignedN})</option>
@@ -547,20 +496,46 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
                 );
               })}
             </select>
-          </div>
 
-          {(filter !== "all" || driverFilter !== "all") && (
+            {/* Tools Button */}
             <button
               type="button"
-              onClick={() => { setFilter("all"); setDriverFilter("all"); }}
-              className="min-h-11 px-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-700 text-xs font-bold shrink-0 active:scale-95 transition-colors"
-              title="Reset filters"
+              onClick={() => setShowTools(true)}
+              className="w-11 h-11 min-h-11 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shadow-xs shrink-0"
+              aria-label="Tools"
+              title="Dispatch tools"
             >
-              Reset
+              <SlidersHorizontal size={16} />
             </button>
-          )}
-        </div>
-      )}
+
+            {/* Upload CSV Button */}
+            {setShowUploadModal && (
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(true)}
+                className="w-11 h-11 min-h-11 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-colors shadow-xs shrink-0"
+                aria-label="Upload CSV"
+                title="Upload CSV"
+              >
+                <Upload size={16} />
+              </button>
+            )}
+
+            {/* Add Trip Button */}
+            {setShowAddTripModal && (
+              <button
+                type="button"
+                onClick={() => setShowAddTripModal(true)}
+                className="w-11 h-11 min-h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center active:scale-95 transition-colors shadow-xs shrink-0"
+                aria-label="Add trip"
+                title="Add trip"
+              >
+                <Plus size={18} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Selected trips bulk action bar */}
       {activeTab === "trips" && selectedTripIds.length > 0 && (
@@ -742,6 +717,22 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
             <div className="px-5 pb-2 pt-2 border-b border-slate-100">
               <h2 className="text-sm font-black text-slate-900">Dispatch Tools</h2>
               <p className="text-xs text-slate-400 mt-0.5">Quick access to all operations</p>
+            </div>
+            {/* Today Fleet Overview */}
+            <div className="px-4 pt-3">
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: "Total", value: todayTrips.length, color: "text-slate-900", bg: "bg-slate-50", border: "border-slate-200" },
+                  { label: "Dispatch", value: unassignedN, color: unassignedN > 0 ? "text-rose-600" : "text-slate-900", bg: unassignedN > 0 ? "bg-rose-50" : "bg-slate-50", border: unassignedN > 0 ? "border-rose-200" : "border-slate-200" },
+                  { label: "Live", value: activeN, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+                  { label: "Done", value: doneN, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
+                ].map(s => (
+                  <div key={s.label} className={`rounded-xl px-2 py-2 text-center border ${s.bg} ${s.border}`}>
+                    <p className={`text-base font-black leading-none ${s.color}`}>{s.value}</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="px-4 py-3 grid grid-cols-3 gap-3" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))" }}>
               {/* NOTE: Upload Trips and Add Trip live in the header toolbar above

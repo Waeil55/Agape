@@ -101,6 +101,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   // Update-status modal (⋯ button): status + reason + note, wired to real
   // updates below. Replaces the generic action sheet for this manifest.
   const [detailModalTrip, setDetailModalTrip] = useState(null);
@@ -706,8 +707,123 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           manifest design instead (exact small buttons); the min-height rule is
           intentionally scoped to this chrome, not the page root. */}
       <div className="space-y-2 px-3 sm:px-4 md:px-0 pt-2 md:pt-0">
-        {/* Unified 1-Line Controls Bar for Mobile & Desktop */}
-        <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 bg-white border border-slate-200 rounded-xl p-1.5 shadow-xs">
+        {/* Mobile 1-Line Controls Bar (strictly 1 line, zero wrap) */}
+        <div className="flex md:hidden items-center gap-1.5 bg-white border border-slate-200 rounded-xl p-1.5 shadow-xs flex-nowrap min-h-11">
+          {mobileSearchOpen ? (
+            <div className="flex-1 flex items-center gap-1.5">
+              <div className="relative flex-1 flex items-center">
+                <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search trips…"
+                  aria-label="Search trips"
+                  className="w-full h-9 pl-8 pr-7 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5"
+                    aria-label="Clear search"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setMobileSearchOpen(false); setSearchTerm(''); }}
+                className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 shrink-0"
+                aria-label="Close search"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Search Toggle */}
+              <button
+                type="button"
+                onClick={() => setMobileSearchOpen(true)}
+                className="h-9 w-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 shrink-0"
+                aria-label="Search trips"
+                title="Search trips"
+              >
+                <Search size={14} />
+              </button>
+
+              {/* Driver Filter Dropdown */}
+              <select
+                value={driverFilter}
+                onChange={(e) => setDriverFilter(e.target.value)}
+                aria-label="Filter by driver"
+                className="h-9 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg px-2 text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate"
+              >
+                {driverChipData.map((chip) => (
+                  <option key={chip.id} value={chip.id}>
+                    {chip.name} ({chip.count})
+                  </option>
+                ))}
+              </select>
+
+              {/* Status Filter Dropdown */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                aria-label="Filter by status"
+                className="h-9 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg px-2 text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate"
+              >
+                <option value="all">All Status</option>
+                <option value="Unassigned">Unassigned</option>
+                <option value="Assigned">Assigned</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="No Show">No Show</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Rerouted">Rerouted</option>
+              </select>
+
+              {/* More Filters Toggle */}
+              <button
+                type="button"
+                aria-expanded={mobileFiltersOpen}
+                aria-controls="mobile-manifest-filters"
+                onClick={() => setMobileFiltersOpen((open) => !open)}
+                className={`h-9 w-9 rounded-lg border text-xs font-bold flex items-center justify-center transition-colors shrink-0 relative ${
+                  mobileFiltersOpen || activeFilterCount > 0 ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-600'
+                }`}
+                title="Date & more filters"
+                aria-label="More filters"
+              >
+                <SlidersHorizontal size={14} />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 rounded-full bg-blue-600 px-1 py-0.2 text-[9px] text-white leading-none">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Add Trip Button */}
+              {canCreateTrips && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(true)}
+                  className="h-9 w-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs active:scale-95 shrink-0"
+                  aria-label="New manifest entry"
+                  title="New manifest entry"
+                >
+                  <Plus size={16} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Desktop 1-Line Controls Bar */}
+        <div className="hidden md:flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl p-1.5 shadow-xs flex-nowrap">
           {/* Search Box */}
           <div className="relative flex-1 min-w-[140px] flex items-center">
             <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
@@ -736,7 +852,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             value={driverFilter}
             onChange={(e) => setDriverFilter(e.target.value)}
             aria-label="Filter by driver"
-            className="h-9 min-w-0 max-w-[130px] sm:max-w-[150px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors"
+            className="h-9 min-w-0 max-w-[150px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors"
           >
             {driverChipData.map((chip) => (
               <option key={chip.id} value={chip.id}>
@@ -750,7 +866,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             aria-label="Filter by status"
-            className="h-9 min-w-0 max-w-[110px] sm:max-w-[130px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors"
+            className="h-9 min-w-0 max-w-[130px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors"
           >
             <option value="all">All Status</option>
             <option value="Unassigned">Unassigned</option>
@@ -767,7 +883,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             aria-label="Sort trips"
-            className="h-9 min-w-0 max-w-[100px] sm:max-w-[115px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors hidden sm:block"
+            className="h-9 min-w-0 max-w-[115px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 truncate transition-colors"
           >
             <option value="time">Sort: Time</option>
             <option value="patient">Sort: Patient</option>
@@ -796,7 +912,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             </button>
           </div>
 
-          {/* More Filters / Options Toggle Button */}
+          {/* More Filters Toggle */}
           <button
             type="button"
             aria-expanded={mobileFiltersOpen}
@@ -818,7 +934,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             <ChevronDown size={12} className={`shrink-0 transition-transform ${mobileFiltersOpen ? 'rotate-180' : ''}`} />
           </button>
 
-          {/* Action Buttons with identical h-9 height */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-1 ml-auto shrink-0">
             {canOperateTrips && (
               <button
@@ -954,10 +1070,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         )}
       </div>
 
-      {/* KPI strip — tappable queue summary wired to the kpiFilter layer.
-          Replaces the former static summary; counts are real filtered trips.
-          The data-testid is pinned by GlobalPageTableContract — keep it. */}
-      <div data-testid="trip-manifest-summary" aria-label="Trip manifest summary">
+      {/* KPI strip — hidden on mobile to enforce 1-line filter layout, preserved on desktop */}
+      <div data-testid="trip-manifest-summary" aria-label="Trip manifest summary" className="hidden md:block">
       <ManifestKpiStrip
         items={[
           { id: 'all', label: 'All', value: kpiCounts.total, active: kpiFilter === 'all', activeClass: 'bg-slate-800 border-slate-800 text-white', onSelect: () => { setKpiFilter('all'); showToast('Viewing all trips'); } },
@@ -999,10 +1113,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         </div>
       )}
 
-      {/* Driver chips — quick queue filter. drivers prop is pre-scoped by role
-          (App.jsx driverWorkDrivers), so chips never leak out-of-scope drivers.
-          Replaces the old driver dropdown in the filter panel below. */}
-      <section aria-label="Filter by driver" className="bg-white px-2 py-1.5 border-b border-slate-200 shrink-0 shadow-sm">
+      {/* Driver chips — hidden on mobile to enforce 1-line filter layout, preserved on desktop */}
+      <section aria-label="Filter by driver" className="hidden md:block bg-white px-2 py-1.5 border-b border-slate-200 shrink-0 shadow-sm">
         <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {driverChipData.map((chip) => {
             const selected = driverFilter === chip.id;
