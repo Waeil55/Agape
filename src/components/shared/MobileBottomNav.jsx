@@ -43,14 +43,26 @@ export const MobileBottomNavigation = React.memo(({
 
   return (
     <nav 
-      className="bottom-nav fixed bottom-0 left-0 right-0 z-40"
+      className="bottom-nav md:hidden"
       aria-label="Primary navigation"
-      style={{ 
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        zIndex: designTokens.zIndex.num?.bottomNav || 40,
-      }}
     >
-      <div className="relative flex h-14 min-h-[56px] items-center justify-around gap-1 px-2 bg-white border-t border-slate-200 shadow-lg">
+      <div className="relative flex h-full items-center justify-around gap-1 px-3">
+        {(() => {
+          const activeIndex = navItems.findIndex((item) => isActive(item.id));
+          if (activeIndex === -1) return null;
+          return (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-1.5 rounded-full bg-blue-50"
+              style={{
+                left: '0.75rem',
+                width: `calc((100% - 1.5rem) / ${Math.max(1, navItems.length)})`,
+                transform: `translateX(${Math.max(0, activeIndex) * 100}%)`,
+                transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            />
+          );
+        })()}
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.id);
@@ -62,7 +74,7 @@ export const MobileBottomNavigation = React.memo(({
               onPointerDown={() => onPreload?.(item.id)}
               onFocus={() => onPreload?.(item.id)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-colors touch-manipulation ${active ? 'text-blue-600' : 'text-slate-400'}`}
+              className={`relative z-10 flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1.5 transition-colors touch-manipulation ${active ? 'text-blue-600 font-bold' : 'text-slate-400 font-medium'}`}
             >
               <span className="relative inline-flex">
                 <Icon size={23} strokeWidth={active ? 2 : 1.55} aria-hidden="true" />
@@ -72,7 +84,7 @@ export const MobileBottomNavigation = React.memo(({
                   </span>
                 )}
               </span>
-              <span className="mt-1 max-w-full truncate text-[10px] font-semibold leading-none">{item.label}</span>
+              <span className="mt-1 max-w-full truncate text-[10px] leading-none">{item.label}</span>
             </button>
           );
         })}

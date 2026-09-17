@@ -500,7 +500,10 @@ const MobileEnterpriseDashboard = (props) => {
         {renderContent()}
 
         {activeDriverTripId && (
-          <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col">
+          <div 
+            className="fixed inset-x-0 top-0 bg-slate-50 flex flex-col z-35"
+            style={{ bottom: NAV_BOTTOM_CLEARANCE }}
+          >
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <DriverPage
