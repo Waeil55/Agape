@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { timeToMinutes, tripMatchesCalendarDay } from '../utils/tripDate';
 import { getManifestUrgency } from '../utils/portalSelectors';
-import { Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, CheckSquare, Square, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, Zap, Filter } from 'lucide-react';
+import { Users, UserCheck, X, Plus, Upload, MessageSquare, Sparkles, Check, CheckSquare, Square, Archive, SlidersHorizontal, ChevronDown, Navigation, MoreHorizontal, Phone, Zap, Filter, FileText } from 'lucide-react';
+import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 
 import { makeCall, sendSMS, openNavigation } from '../utils/nativeActions';
 import { saveClientProfile } from '../utils/clientProfileUtils';
@@ -39,9 +40,10 @@ const toTimeInput = (value) => {
   const raw = String(value || '').trim();
   const twelveHour = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (twelveHour) {
-    let hour = Number(twelveHour[1]);
-    if (twelveHour[3].toUpperCase() === 'PM' && hour < 12) hour += 12;
-    if (twelveHour[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
+    let hour = parseInt(twelveHour[1], 10);
+    const meridiem = twelveHour[3].toUpperCase();
+    if (meridiem === 'PM' && hour < 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
     return `${String(hour).padStart(2, '0')}:${twelveHour[2]}`;
   }
   const clock = raw.match(/^(\d{1,2}):(\d{2})/);
@@ -50,7 +52,9 @@ const toTimeInput = (value) => {
 
 const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', patientPhone: '', clientPhone: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
 
-const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onAddTrip, onUpdateTrip, onDeleteTrip, onShowUploadModal, requestAuthAction, hasPermission }) => {
+const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onOpenTrip, onOpenTripDetails, onNavigateToReports, isMobile: isMobileProp, onAddTrip, onUpdateTrip, onDeleteTrip, onShowUploadModal, requestAuthAction, hasPermission }) => {
+  const isMobileQuery = useMediaQuery(MOBILE_MEDIA_QUERY);
+  const isMobile = isMobileProp ?? isMobileQuery;
   const getClientPhone = (trip) => resolveClientPhoneForTrip(trip, trips);
   const resolveDriverForTrip = React.useCallback((trip) => resolveTripDriver(trip, drivers), [drivers]);
   const today = useMemo(() => getTodayStr(), []);
@@ -178,7 +182,13 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     .filter(t => showAllDates || tripMatchesCalendarDay(t.date, manifestDate))
     .filter((trip) => {
       const resolvedDriverId = resolveDriverForTrip(trip)?.id || '';
-      if (statusFilter !== 'all' && String(trip.status || '').trim().toLowerCase() !== statusFilter.toLowerCase()) return false;
+      if (statusFilter !== 'all') {
+        if (String(trip.status || '').trim().toLowerCase() !== statusFilter.toLowerCase()) return false;
+      } else if (isMobile) {
+        // On mobile, live manifest queue excludes terminal/completed/cancelled trips
+        // (completed, cancelled, no show, rerouted belong in Reports / History)
+        if (isTripActionTerminal(trip)) return false;
+      }
       if (driverFilter === 'unassigned' && resolvedDriverId) return false;
       if (driverFilter !== 'all' && driverFilter !== 'unassigned' && resolvedDriverId !== driverFilter) return false;
       if (serviceFilter !== 'all' && (trip.type || trip.serviceType || '') !== serviceFilter) return false;
@@ -207,7 +217,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
       }
       if (sortBy === 'status') return (a.status || '').localeCompare(b.status || '');
       return 0;
-    }), [trips, showAllDates, manifestDate, statusFilter, driverFilter, serviceFilter, attentionOnly, searchTerm, sortBy, resolveDriverForTrip]);
+    }), [trips, showAllDates, manifestDate, statusFilter, isMobile, driverFilter, serviceFilter, attentionOnly, searchTerm, sortBy, resolveDriverForTrip]);
 
   // KPI layer — tappable summary driving an extra filter pass over the
   // existing filters (states above are untouched). Counts always come from
@@ -553,7 +563,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         onLegsClick={() => setLegsDetailPatient(trip.patient)}
         mileage={trip.distance ? (/\bmi$/i.test(String(trip.distance).trim()) ? String(trip.distance).trim() : `${trip.distance} mi`) : null}
         selectSlot={canOperateTrips ? (
-          <button type="button" onClick={() => toggleTaskSelection(trip.id)} aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-blue-600">
+          <button type="button" onClick={(e) => { e.stopPropagation(); toggleTaskSelection(trip.id); }} aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-blue-600">
             {isSelected ? <CheckSquare size={19} /> : <Square size={19} className="text-slate-400" />}
           </button>
         ) : null}
@@ -571,14 +581,14 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         } : null}
         moreLabel={`${isTerminal ? 'Review' : 'Update'} ${trip.patient || trip.bookingId || 'trip'}`}
         onTimeEdit={(t) => setScheduleEditTrip(t)}
-        onCardClick={onDriveTrip || null}
+        onCardClick={onOpenTrip || onDriveTrip || null}
       />
       </div>
     );
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-2 pb-24 max-md:[&_button]:min-h-11">
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-2 pb-24 max-md:[&_button]:min-h-11 touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
       {toastMessage && (
         <div role="status" aria-live="polite" className="absolute top-10 left-4 right-4 z-50 flex items-center gap-1.5 bg-slate-900/95 text-white px-3 py-2 rounded-lg shadow-xl text-xs">
           <Zap size={14} className="text-amber-400" />
@@ -621,6 +631,11 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
                 {/* Action list */}
                 <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+                  {/* Trip Details Option - opens TripDetailView */}
+                  <button type="button" onClick={() => { closeDetailModal(); if (onOpenTripDetails) onOpenTripDetails(trip); else if (onDriveTrip) onDriveTrip(trip); }}
+                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-slate-100 text-slate-800 hover:bg-slate-200 transition-colors font-semibold">
+                    <FileText size={18} className="text-blue-600" /> <span className="text-sm font-bold">Trip Details</span>
+                  </button>
                   {isTerminal ? (
                     <>
                       {resolveDriverForTrip(trip) && onDriveTrip && (
@@ -995,6 +1010,18 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             <div className="bg-white rounded-lg p-6 text-center border border-slate-200 shadow-sm mt-2">
               <Filter size={24} className="mx-auto text-slate-400 mb-2" />
               <p className="text-base font-medium text-slate-600">No trips found</p>
+              {isMobile && onNavigateToReports && (
+                <div className="mt-3">
+                  <p className="text-xs text-slate-400">Completed & cancelled trips are recorded in Reports.</p>
+                  <button
+                    type="button"
+                    onClick={onNavigateToReports}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 font-semibold text-xs hover:bg-blue-100 active:scale-95 transition-all"
+                  >
+                    View Reports & Records
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             layoutMode === 'grouped' ? (

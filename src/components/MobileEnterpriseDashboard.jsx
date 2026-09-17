@@ -36,6 +36,7 @@ const TimeTrackingAdmin = lazyWithRetry(() => import('./TimeTrackingAdmin'));
 const ChatPage = lazyWithRetry(() => import('./chat/ChatPage').then(m => ({ default: m.default || m.ChatPage })));
 const FileUploadTrips = lazyWithRetry(() => import('./FileUploadTrips'));
 const TripsPage = lazyWithRetry(() => import('./TripsPage'));
+const DriverPage = lazyWithRetry(() => import('./DriverPage'));
 
 const MobileFallback = () => (
   <div className="flex items-center justify-center p-12" role="status" aria-label="Loading">
@@ -125,6 +126,8 @@ const MobileEnterpriseDashboard = (props) => {
   const driverWorkDrivers = Array.isArray(props.driverWorkDrivers) ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = Array.isArray(props.driverWorkTrips) ? props.driverWorkTrips : trips;
 
+  const [activeDriverTripId, setActiveDriverTripId] = useState(null);
+
   const currentTripDetails = useMemo(() => {
     if (!tripDetails?.id) return null;
     return driverWorkTrips.find((trip) => String(trip.id) === String(tripDetails.id)) || tripDetails;
@@ -136,6 +139,17 @@ const MobileEnterpriseDashboard = (props) => {
     clearHeader();
   }, [clearHeader]);
 
+  const openTrip = useCallback((trip) => {
+    const id = trip?.id || trip;
+    if (id) {
+      setActiveDriverTripId(id);
+    }
+  }, []);
+
+  const closeActiveDriverTrip = useCallback(() => {
+    setActiveDriverTripId(null);
+  }, []);
+
   const openTripDetail = useCallback((trip) => {
     prefetchTripDetailSections();
     setTripWorkflowActive(true);
@@ -144,12 +158,13 @@ const MobileEnterpriseDashboard = (props) => {
 
   const handleNavClick = useCallback((view) => {
     closeTripDetails();
+    closeActiveDriverTrip();
     startTransition(() => {
       setCurrentView(view);
       setSubView(null);
       if (view === 'reports') setReportsSection('trips');
     });
-  }, [closeTripDetails]);
+  }, [closeTripDetails, closeActiveDriverTrip]);
 
   const preloadMobileView = useCallback((view) => {
     switch (view) {
@@ -164,9 +179,10 @@ const MobileEnterpriseDashboard = (props) => {
     // Inline edit is handled by the parent workflows; keep the detail open.
   }, []);
 
-  const handleTripDrive = useCallback((_trip) => {
-    setTripWorkflowActive(true);
-  }, []);
+  const handleTripDrive = useCallback((trip) => {
+    closeTripDetails();
+    openTrip(trip);
+  }, [closeTripDetails, openTrip]);
 
   const handleTripAssign = useCallback((_trip) => {
     // Assignment flow is surfaced through the action center; keep detail open.
@@ -442,7 +458,7 @@ const MobileEnterpriseDashboard = (props) => {
           onPreload={preloadMobileView}
           headerConfig={{ title: 'Dispatch Manifest' }}
         >
-          <div className="flex-1 overflow-y-auto p-2" style={{ paddingBottom: NAV_BOTTOM_CLEARANCE }}>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-1.5" style={{ paddingBottom: NAV_BOTTOM_CLEARANCE }}>
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <TripsPage
@@ -456,13 +472,17 @@ const MobileEnterpriseDashboard = (props) => {
                   onBulkAssignTrips={props.bulkAssignTrips}
                   onAssignTrip={props.assignTripToDriver}
                   onUnassignTrip={(tripId) => props.assignTripToDriver?.(tripId, '')}
-                  onDriveTrip={openTripDetail}
+                  onOpenTrip={openTrip}
+                  onDriveTrip={openTrip}
+                  onOpenTripDetails={openTripDetail}
+                  onNavigateToReports={() => handleNavClick('reports')}
                   onAddTrip={props.addTrip}
                   onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
                   onDeleteTrip={props.requestDeleteTrip}
                   onShowUploadModal={setShowUploadModal}
                   requestAuthAction={requestAuthAction}
                   hasPermission={hasPermission}
+                  isMobile={true}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -478,6 +498,36 @@ const MobileEnterpriseDashboard = (props) => {
     <HeaderProvider>
       <div className="relative flex flex-1 flex-col min-h-0 overflow-hidden">
         {renderContent()}
+
+        {activeDriverTripId && (
+          <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col">
+            <ErrorBoundary>
+              <Suspense fallback={<MobileFallback />}>
+                <DriverPage
+                  currentUser={currentUser}
+                  role={role}
+                  drivers={driverWorkDrivers}
+                  trips={driverWorkTrips}
+                  vehicles={props.vehicles || []}
+                  allDrivers={props.allDrivers || driverWorkDrivers}
+                  dispatchers={props.dispatchers || []}
+                  phoneNumbers={props.phoneNumbers || {}}
+                  onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
+                  onDriverStatusUpdate={props.onDriverStatusUpdate}
+                  onAddAuditLog={props.onAddAuditLog}
+                  onLogout={props.onLogout}
+                  requestAuthAction={requestAuthAction}
+                  appSettings={props.appSettings || {}}
+                  onUpdateAppSettings={props.onUpdateAppSettings}
+                  onUpdateDriverLocation={props.onUpdateDriverLocation}
+                  defaultTripId={activeDriverTripId}
+                  isEmbedded={true}
+                  onEmbeddedClose={closeActiveDriverTrip}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        )}
         
         {currentTripDetails && (
           <div className="absolute inset-x-0 flex flex-col bg-slate-50" role="presentation" style={{ top: 'calc(65px + env(safe-area-inset-top, 0px))', bottom: NAV_BOTTOM_CLEARANCE, zIndex: 30 }}>

@@ -432,8 +432,17 @@ export function ManifestTripCard({
           ? 'bg-blue-600'
           : 'bg-slate-400';
 
+  const handleArticleClick = (e) => {
+    if (e.target.closest('button, a, input, select, textarea, [role="button"], [role="checkbox"]')) {
+      return;
+    }
+    if (onCardClick) {
+      onCardClick(trip);
+    }
+  };
+
   return (
-    <article onClick={onCardClick ? () => onCardClick(trip) : undefined} className={`bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
+    <article onClick={onCardClick ? handleArticleClick : undefined} className={`bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
 
       {/* ── HEADER: Checkbox + Time | Passenger Name + Trip ID ── */}
       <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
@@ -465,7 +474,7 @@ export function ManifestTripCard({
             <span className="text-[15px] font-bold text-slate-900 truncate">{trip?.patient || 'Unknown client'}</span>
             {legs > 0 && (
               onLegsClick ? (
-                <button type="button" onClick={onLegsClick} className="text-[11px] text-slate-500 hidden sm:inline shrink-0"
+                <button type="button" onClick={(e) => { e.stopPropagation(); onLegsClick(e); }} className="text-[11px] text-slate-500 hidden sm:inline shrink-0"
                   aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}>
                   ({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})
                 </button>
@@ -538,7 +547,7 @@ export function ManifestTripCard({
 
           {/* Call Button */}
           {iconActions.find(a => a.id === 'call') ? (
-            <button type="button" onClick={iconActions.find(a => a.id === 'call')?.onClick}
+            <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'call')?.onClick?.(e); }}
               title="Call" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
               <Phone size={13} className="text-emerald-600" />
             </button>
@@ -546,7 +555,7 @@ export function ManifestTripCard({
 
           {/* SMS Button */}
           {iconActions.find(a => a.id === 'message') ? (
-            <button type="button" onClick={iconActions.find(a => a.id === 'message')?.onClick}
+            <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'message')?.onClick?.(e); }}
               title="Text" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
               <MessageSquare size={13} className="text-blue-500" />
             </button>
@@ -554,7 +563,7 @@ export function ManifestTripCard({
 
           {/* More / Options Button */}
           {onMore && (
-            <button type="button" onClick={onMore}
+            <button type="button" onClick={(e) => { e.stopPropagation(); onMore(e); }}
               aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
               title={typeof moreLabel === 'string' ? moreLabel : undefined}
               className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
