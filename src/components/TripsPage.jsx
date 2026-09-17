@@ -28,6 +28,7 @@ import {
   getTripCountdown,
 } from './trips/MobileTripManifest';
 import { getTripActionCapabilities } from './trips/tripActionPolicy';
+import { TripOptionsModal } from './shared';
 
 const MANIFEST_EXCEPTION_STATUSES = new Set(['No Show', 'Rerouted', 'Cancelled']);
 
@@ -603,149 +604,27 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           </div>
         </div>
       )}
-      {/* ── TRIP ACTION BOTTOM SHEET ── */}
-      {detailModalTrip && canOpenDetailMenu && (() => {
-        const trip = detailModalTrip;
-        const isTerminal = isTripActionTerminal(trip);
-        const statusBadge = getManifestStatusBadge(trip.status);
-        return (
-          <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={isTerminal ? 'Trip actions' : 'Update trip'}>
-            <div className="absolute inset-0 bg-slate-950/50" onClick={closeDetailModal} />
-            <div className="absolute inset-x-0 bottom-0 z-10 animate-in slide-in-from-bottom duration-200">
-              <div className="bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col">
-                {/* Drag handle */}
-                <div className="flex justify-center pt-3 pb-1">
-                  <div className="w-10 h-1 rounded-full bg-slate-300" />
-                </div>
-
-                {/* Header: patient + status */}
-                <div className="px-5 pb-3 flex items-center justify-between gap-3 border-b border-slate-100">
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-bold text-slate-900 truncate">{trip.patient || 'Trip'}</p>
-                    <p className="text-[11px] font-semibold text-slate-400 mt-0.5">#{trip.bookingId || trip.id}</p>
-                  </div>
-                  <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
-                    {trip.status || 'Unknown'}
-                  </span>
-                </div>
-
-                {/* Action list */}
-                <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
-                  {/* Trip Details Option - opens TripDetailView */}
-                  <button type="button" onClick={() => { closeDetailModal(); if (onOpenTripDetails) onOpenTripDetails(trip); else if (onDriveTrip) onDriveTrip(trip); }}
-                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-slate-100 text-slate-800 hover:bg-slate-200 transition-colors font-semibold">
-                    <FileText size={18} className="text-blue-600" /> <span className="text-sm font-bold">Trip Details</span>
-                  </button>
-                  {isTerminal ? (
-                    <>
-                      {resolveDriverForTrip(trip) && onDriveTrip && (
-                        <button type="button" onClick={() => { closeDetailModal(); onDriveTrip(trip); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">
-                          <Navigation size={18} /> <span className="text-sm font-semibold">Review trip progress</span>
-                        </button>
-                      )}
-                      {canArchiveDetail && (
-                        <button type="button" onClick={() => { closeDetailModal(); onDeleteTrip(trip.id); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200">
-                          <Archive size={18} /> <span className="text-sm font-semibold">Archive record</span>
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {/* Drive / Open trip */}
-                      {onDriveTrip && (
-                        <button type="button" onClick={() => { closeDetailModal(); onDriveTrip(trip); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                          <Navigation size={18} /> <span className="text-sm font-bold">Open trip workspace</span>
-                        </button>
-                      )}
-
-                      {/* Exception statuses */}
-                      {canMarkDetailException && (
-                        <div className="pt-1">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1 mb-1.5">Mark exception</p>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {[
-                              { value: 'No Show', label: 'No Show', active: 'bg-orange-500 border-orange-600 text-white', idle: 'bg-orange-50 border-orange-200 text-orange-700' },
-                              { value: 'Rerouted', label: 'Rerouted', active: 'bg-amber-500 border-amber-600 text-white', idle: 'bg-amber-50 border-amber-200 text-amber-700' },
-                              { value: 'Cancelled', label: 'Cancelled', active: 'bg-rose-500 border-rose-600 text-white', idle: 'bg-rose-50 border-rose-200 text-rose-700' },
-                            ].map((st) => {
-                              const sel = modalForm.status === st.value;
-                              return (
-                                <button key={st.value} type="button"
-                                  onClick={() => setModalForm((p) => ({ ...p, status: sel ? '' : st.value }))}
-                                  className={`py-2 rounded-xl text-[11px] font-bold border transition-all ${sel ? st.active : st.idle}`}>
-                                  {st.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {modalForm.status && (
-                            <div className="mt-2 space-y-2">
-                              <select value={modalForm.reason} onChange={(e) => setModalForm((p) => ({ ...p, reason: e.target.value }))}
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-3 py-2 outline-none focus:border-slate-400">
-                                <option value="">Select reason (optional)</option>
-                                <option value="Heavy Traffic">Heavy Traffic</option>
-                                <option value="Client Delay">Client Delay</option>
-                                <option value="Vehicle Issue">Vehicle Issue</option>
-                                <option value="Weather Conditions">Weather Conditions</option>
-                                <option value="Other">Other</option>
-                              </select>
-                              <textarea placeholder="Add a note... (optional)" value={modalForm.note}
-                                onChange={(e) => setModalForm((p) => ({ ...p, note: e.target.value }))}
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-3 py-2 h-14 resize-none outline-none focus:border-slate-400" />
-                              {modalError && <p className="text-xs font-semibold text-rose-600">{modalError}</p>}
-                              <button type="button" onClick={submitStatusUpdate} disabled={!modalForm.status || modalSaving}
-                                className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors">
-                                {modalSaving ? 'Saving...' : 'Confirm exception'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="border-t border-slate-100 pt-1" />
-
-                      {/* Reassign */}
-                      {detailAccess?.canReassign && (
-                        <button type="button" onClick={() => { closeDetailModal(); setSelectedTrip(trip); setAssignMode('reassign'); setShowReassignModal(true); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200">
-                          <UserCheck size={18} /> <span className="text-sm font-semibold">Reassign driver</span>
-                        </button>
-                      )}
-
-                      {/* Edit */}
-                      {canEditDetail && (
-                        <button type="button" onClick={() => { closeDetailModal(); openEdit(trip); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors">
-                          <Edit2 size={18} /> <span className="text-sm font-semibold">Edit trip details</span>
-                        </button>
-                      )}
-
-                      {/* Archive */}
-                      {canArchiveDetail && (
-                        <button type="button" onClick={() => { closeDetailModal(); onDeleteTrip(trip.id); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors">
-                          <Archive size={18} /> <span className="text-sm font-semibold">Archive trip</span>
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Close */}
-                <div className="px-5 pb-5 pt-2">
-                  <button type="button" onClick={closeDetailModal}
-                    className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-colors">
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* ── TRIP ACTION OPTIONS MODAL (Unified Design Spec) ── */}
+      <TripOptionsModal
+        isOpen={Boolean(detailModalTrip && canOpenDetailMenu)}
+        onClose={closeDetailModal}
+        trip={detailModalTrip}
+        role={role}
+        driverName={detailDriver?.name || ''}
+        onEditDetails={canEditDetail ? openEdit : null}
+        onReassignDriver={detailAccess?.canReassign ? (trip) => {
+          setSelectedTrip(trip);
+          setAssignMode('reassign');
+          setShowReassignModal(true);
+        } : null}
+        onMarkCompleted={!isTripActionTerminal(detailModalTrip) ? (trip) => {
+          onUpdateTrip?.(trip.id, 'Completed');
+        } : null}
+        onConfirmException={hasExceptionPermission && canMarkDetailException ? (trip, status, details) => {
+          return markTripException(trip, status, details);
+        } : null}
+        onArchiveTrip={canArchiveDetail ? (trip) => onDeleteTrip(trip.id) : null}
+      />
       {/* HEADER CONTROLS — 44px mobile buttons kept here (filters/upload/new).
           Manifest cards + manifest modals below follow the approved compact
           manifest design instead (exact small buttons); the min-height rule is

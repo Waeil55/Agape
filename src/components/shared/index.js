@@ -3,4 +3,5 @@ export { MobileBottomNavigation, NAV_BOTTOM_CLEARANCE, getActiveViewLabel } from
 export { MobileLayout, DesktopLayout, PageLayout } from './PageLayout';
 export { default as TripDetailView } from '../trips/TripDetailView';
 export { DestinationNavButtons, AppleMapsIcon, GoogleMapsIcon, WazeIcon } from './DestinationNavButtons';
+export { TripOptionsModal } from './TripOptionsModal';
 export { designTokens, getStatusTokens, getRoleTokens } from '../../utils/designTokens';

@@ -528,6 +528,7 @@ const MobileEnterpriseDashboard = (props) => {
                   defaultTripId={activeDriverTripId}
                   isEmbedded={true}
                   onEmbeddedClose={closeActiveDriverTrip}
+                  onDeleteTrip={props.requestDeleteTrip}
                 />
               </Suspense>
             </ErrorBoundary>

@@ -23,6 +23,7 @@ const TaskCard = lazy(() => import('./TaskCard'));
 import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Upload } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { DestinationNavButtons } from './shared';
+import { TripOptionsModal } from './shared';
 import { tripMatchesSearch } from '../utils/search';
 import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, classifyGap, buildTimeEvents } from '../utils/timeTracking';
 import { impact, selection } from '../utils/haptics';
@@ -633,7 +634,7 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, workflowReadOnly = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null }) => {
+const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, workflowReadOnly = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null, onDeleteTrip = null }) => {
   const { unreadCount } = useChat({ alerts: true });
   const phoneNumbers = phoneNumbersProp;
   const canManageTripRecords = !workflowReadOnly;
@@ -4303,41 +4304,25 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           </div>
         </div>
       </div>
-    {showMoreOptions?.id === trip.id && (() => {
-      const onClose = () => { setShowMoreOptions(null); };
-      const moreActions = [
-        ...(!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? [
-          { label: 'Cancel', icon: <XCircle size={16} />, color: 'text-rose-600 bg-rose-50 hover:bg-rose-100', onClick: () => { onClose(); handleCancel(trip); } },
-          { label: 'No Show', icon: <AlertCircle size={16} />, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', onClick: () => { onClose(); handleNoShow(trip); } },
-          { label: 'Reroute', icon: <Route size={16} />, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100', onClick: () => { onClose(); handleReroute(trip); } },
-          { label: (role === 'admin' || role === 'dispatcher') ? 'Reassign Driver' : 'Transfer', icon: <ArrowRight size={16} />, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', onClick: () => { onClose(); openTransferPrompt('trip', trip); } },
-        ] : []),
-        { label: 'Trip Details', icon: <FileText size={16} />, color: 'text-slate-600 bg-slate-50 hover:bg-slate-100', onClick: () => { onClose(); setShowTripDetails(trip); } },
-      ];
-      return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-white rounded-3xl rounded-b-none w-full max-w-lg pb-6 px-4 pt-2 animate-slide-up" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-center mb-3">
-              <span className="w-10 h-1 rounded-full bg-slate-300" />
-            </div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-900">{trip.patient || 'Trip'}</h3>
-              <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="space-y-1">
-              {moreActions.map((action, idx) => (
-                <button key={idx} type="button" onClick={action.onClick} disabled={action.disabled} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl ${action.color} transition-all text-sm font-medium cursor-pointer disabled:opacity-50`}>
-                  {action.icon} {action.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    })()}
+    {showMoreOptions?.id === trip.id && (
+      <TripOptionsModal
+        isOpen={Boolean(showMoreOptions?.id === trip.id)}
+        onClose={() => setShowMoreOptions(null)}
+        trip={trip}
+        role={role}
+        driverName={me?.name || currentUser}
+        onEditDetails={() => openScheduleEditor(trip)}
+        onReassignDriver={(role === 'admin' || role === 'dispatcher') ? () => openTransferPrompt('trip', trip) : null}
+        onTransferTrip={role === 'driver' && !workflowReadOnly ? () => openTransferPrompt('trip', trip) : null}
+        onMarkCompleted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+          advanceWorkflow(trip, 'Completed', {});
+        } : null}
+        onMarkRerouted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => handleReroute(trip) : null}
+        onPassengerNoShow={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => handleNoShow(trip) : null}
+        onCancelTrip={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => handleCancel(trip) : null}
+        onArchiveTrip={(role === 'admin' || role === 'dispatcher') ? () => onDeleteTrip?.(trip.id) : null}
+      />
+    )}
     </>
     );
   };
