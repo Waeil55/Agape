@@ -23,7 +23,7 @@ const TaskCard = lazy(() => import('./TaskCard'));
 import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Upload } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { DestinationNavButtons } from './shared';
-import { TripOptionsModal } from './shared';
+import { TripOptionsModal } from './shared/TripOptionsModal';
 import { tripMatchesSearch } from '../utils/search';
 import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, classifyGap, buildTimeEvents } from '../utils/timeTracking';
 import { impact, selection } from '../utils/haptics';
@@ -817,13 +817,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setActiveNav(defaultTripId ? 'active-trip' : 'trips');
   }, [isEmbedded, defaultTripId, userKey]);
 
-  useEffect(() => {
-    if (defaultTripId) {
-      setActiveWorkTripId(defaultTripId);
-      setActiveNav('active-trip');
-    }
-  }, [defaultTripId, setActiveWorkTripId]);
-
 
   const [selectedTrips, setSelectedTrips] = useState([]);
   const [routePlanStops, setRoutePlanStops] = useState(null);
@@ -926,6 +919,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       return next;
     });
   }, [userKey, workflowReadOnly]);
+
+  useEffect(() => {
+    if (defaultTripId) {
+      setActiveWorkTripId(defaultTripId);
+      setActiveNav('active-trip');
+    }
+  }, [defaultTripId, setActiveWorkTripId]);
   const [startedTripNavId, setStartedTripNavIdRaw] = useState(() => {
     if (workflowReadOnly) return null;
     try {

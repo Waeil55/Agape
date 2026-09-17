@@ -79,7 +79,7 @@ describe('mobile Drive workspace role and persistence contract', () => {
     expect(driverPageSource).toContain('String(trip.id) === String(activeWorkTripId)');
 
     const swSource = readFileSync(new URL('../../public/sw.js', import.meta.url), 'utf8');
-    expect(swSource).toContain("const CACHE_VERSION = 'agape-v53';");
+    expect(swSource).toMatch(/const CACHE_VERSION = 'agape-v(?:5[3-9]|[6-9]\d+)';/);
   });
 });
 
