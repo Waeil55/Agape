@@ -149,7 +149,7 @@ export const TripOptionsModal = ({
     >
       <div
         ref={panelRef}
-        className="trip-window-panel trip-window-panel-wide p-5"
+        className="trip-window-panel max-w-[23.5rem] p-4 sm:p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header: Title / Back + Close Button */}

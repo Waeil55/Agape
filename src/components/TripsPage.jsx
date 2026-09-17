@@ -564,8 +564,21 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         onLegsClick={() => setLegsDetailPatient(trip.patient)}
         mileage={trip.distance ? (/\bmi$/i.test(String(trip.distance).trim()) ? String(trip.distance).trim() : `${trip.distance} mi`) : null}
         selectSlot={canOperateTrips ? (
-          <button type="button" onClick={(e) => { e.stopPropagation(); toggleTaskSelection(trip.id); }} aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-blue-600">
-            {isSelected ? <CheckSquare size={19} /> : <Square size={19} className="text-slate-400" />}
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={!!isSelected}
+            onClick={(e) => { e.stopPropagation(); toggleTaskSelection(trip.id); }}
+            aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`}
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl cursor-pointer"
+          >
+            <div
+              className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-slate-400'
+              }`}
+            >
+              {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
+            </div>
           </button>
         ) : null}
         noteSlot={null}

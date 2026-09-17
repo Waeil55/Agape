@@ -233,11 +233,31 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
           onLegsClick={actions?.onShowLegs ? () => actions.onShowLegs(task) : undefined}
           mileage={task.details?.distance || null}
           driverName={task.driverName || 'You'}
+          selected={isSelected}
+          onSelect={onSelect ? () => onSelect(task.id) : undefined}
+          selectSlot={onSelect ? (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={!!isSelected}
+              aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${task.patient || task.patientName || 'trip'}`}
+              onClick={(e) => { e.stopPropagation(); onSelect(task.id); }}
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl cursor-pointer"
+            >
+              <div
+                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-slate-400'
+                }`}
+              >
+                {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
+              </div>
+            </button>
+          ) : null}
           onCardClick={canOpenProgress ? () => onToggle(task.id) : undefined}
           primaryAction={canOpenProgress ? { label: 'Drive', onClick: () => onToggle(task.id) } : null}
           iconActions={iconActions}
           moreIcon={MoreVertical}
-          onMore={menuActions.length > 0 ? () => setMenuOpen(true) : null}
+          onMore={actions?.onOptions ? () => actions.onOptions(task) : (menuActions.length > 0 ? () => setMenuOpen(true) : null)}
           moreLabel={`More actions for ${task.patient || task.patientName || 'trip'}`}
           onTimeEdit={actions?.onTimeEdit || actions?.onScheduleEdit}
         />
@@ -298,8 +318,21 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
           <div className="flex justify-between items-center mb-1">
             <div className="flex items-center gap-2 min-w-0 pr-2">
               {onSelect && (
-                <button onClick={(e) => { e.stopPropagation(); onSelect(task.id); }} className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg">
-                  {isSelected ? <CheckSquare size={19} className="text-blue-600" /> : <Square size={19} className="text-slate-400" />}
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={!!isSelected}
+                  onClick={(e) => { e.stopPropagation(); onSelect(task.id); }}
+                  className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg cursor-pointer"
+                  aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${task.patient || task.patientName || 'trip'}`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                      isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-slate-400'
+                    }`}
+                  >
+                    {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
+                  </div>
                 </button>
               )}
               <div
@@ -354,7 +387,17 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
               )}
               {/* Status always visible — the card must answer state at a glance */}
               <StatusBadge status={task.status} />
-              {!isExpanded && !isTerminal && actions && (actions.onNoShow || actions.onCancel || actions.onReroute || actions.onTransfer) && (
+              {actions?.onOptions ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); actions.onOptions(task); }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+                  aria-label={`Options for ${task.patient || task.patientName || 'trip'}`}
+                  title="More options"
+                >
+                  <MoreVertical size={16} strokeWidth={2} />
+                </button>
+              ) : !isExpanded && !isTerminal && actions && (actions.onNoShow || actions.onCancel || actions.onReroute || actions.onTransfer) && (
                 <div className="relative" ref={menuRef}>
                   <button onClick={(e) => { e.stopPropagation(); setMenuOpen(prev => !prev); }} className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
                     <MoreVertical size={16} strokeWidth={2} />

@@ -4304,47 +4304,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           </div>
         </div>
       </div>
-    {showMoreOptions?.id === trip.id && (
-      <TripOptionsModal
-        isOpen={Boolean(showMoreOptions?.id === trip.id)}
-        onClose={() => setShowMoreOptions(null)}
-        trip={trip}
-        role={role}
-        driverName={me?.name || currentUser}
-        onEditDetails={() => {
-          setShowMoreOptions(null);
-          openScheduleEditor(trip);
-        }}
-        onReassignDriver={(role === 'admin' || role === 'dispatcher') ? () => {
-          setShowMoreOptions(null);
-          openTransferPrompt('trip', trip);
-        } : null}
-        onTransferTrip={role === 'driver' && !workflowReadOnly ? () => {
-          setShowMoreOptions(null);
-          openTransferPrompt('trip', trip);
-        } : null}
-        onMarkCompleted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
-          setShowMoreOptions(null);
-          openCompleteModal(trip);
-        } : null}
-        onMarkRerouted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
-          setShowMoreOptions(null);
-          handleReroute(trip);
-        } : null}
-        onPassengerNoShow={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
-          setShowMoreOptions(null);
-          handleNoShow(trip);
-        } : null}
-        onCancelTrip={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
-          setShowMoreOptions(null);
-          handleCancel(trip);
-        } : null}
-        onArchiveTrip={(role === 'admin' || role === 'dispatcher') ? () => {
-          setShowMoreOptions(null);
-          onDeleteTrip?.(trip.id);
-        } : null}
-      />
-    )}
     </>
     );
   };
@@ -5316,6 +5275,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     isSelected={!workflowReadOnly && isSelected}
                     onSelect={workflowReadOnly ? undefined : toggleTripSelect}
                     actions={{
+                      onOptions: (t) => setShowMoreOptions(t),
                       onNavigatePickup: (t) => openInNavApp(t.pickup?.address || t.pickup, suggestNavApp(t.pickup?.address || t.pickup)),
                       onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
                       onCall: (t) => handleSmartCall(t),
@@ -5516,6 +5476,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                             isSelected={!workflowReadOnly && isSelected}
                             onSelect={workflowReadOnly ? undefined : toggleTripSelect}
                             actions={{
+                              onOptions: (t) => setShowMoreOptions(t),
                               onNavigatePickup: (t) => openInNavApp(t.pickup?.address || t.pickup, suggestNavApp(t.pickup?.address || t.pickup)),
                               onNavigateDropoff: (t) => openInNavApp(t.dropoff?.address || t.dropoff, suggestNavApp(t.dropoff?.address || t.dropoff)),
                               onCall: (t) => handleSmartCall(t),
@@ -5614,6 +5575,52 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           onClose={closeScheduleEditor}
         />
       )}
+
+      {/* ===== AUTHORITATIVE SHARED TRIP OPTIONS MODAL ===== */}
+      {showMoreOptions && (() => {
+        const trip = showMoreOptions;
+        return (
+          <TripOptionsModal
+            isOpen={Boolean(showMoreOptions?.id === trip.id)}
+            onClose={() => setShowMoreOptions(null)}
+            trip={trip}
+            role={role}
+            driverName={me?.name || currentUser}
+            onEditDetails={() => {
+              setShowMoreOptions(null);
+              openScheduleEditor(trip);
+            }}
+            onReassignDriver={(role === 'admin' || role === 'dispatcher') ? () => {
+              setShowMoreOptions(null);
+              openTransferPrompt('trip', trip);
+            } : null}
+            onTransferTrip={role === 'driver' && !workflowReadOnly ? () => {
+              setShowMoreOptions(null);
+              openTransferPrompt('trip', trip);
+            } : null}
+            onMarkCompleted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+              setShowMoreOptions(null);
+              openCompleteModal(trip);
+            } : null}
+            onMarkRerouted={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+              setShowMoreOptions(null);
+              handleReroute(trip);
+            } : null}
+            onPassengerNoShow={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+              setShowMoreOptions(null);
+              handleNoShow(trip);
+            } : null}
+            onCancelTrip={!workflowReadOnly && !isWorkflowTerminalTrip(trip) ? () => {
+              setShowMoreOptions(null);
+              handleCancel(trip);
+            } : null}
+            onArchiveTrip={(role === 'admin' || role === 'dispatcher') ? () => {
+              setShowMoreOptions(null);
+              onDeleteTrip?.(trip.id);
+            } : null}
+          />
+        );
+      })()}
 
       {/* ===== ODOMETER PROMPT MODAL ===== */}
       {showOdometerPrompt && (() => {

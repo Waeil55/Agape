@@ -54,4 +54,29 @@ describe('TripOptionsModal design and integration contract', () => {
     const sharedIndex = read('src/components/shared/index.js');
     expect(sharedIndex).toContain("export { TripOptionsModal } from './TripOptionsModal';");
   });
+
+  it('enforces reduced window width matching standard trip dialogs and multi-portal multi-trip selection', () => {
+    const modal = read('src/components/shared/TripOptionsModal.jsx');
+    expect(modal).toContain('trip-window-panel max-w-[23.5rem]');
+    expect(modal).not.toContain('trip-window-panel-wide');
+
+    const driverPage = read('src/components/DriverPage.jsx');
+    expect(driverPage).toContain('onOptions: (t) => setShowMoreOptions(t)');
+
+    const taskCard = read('src/components/TaskCard.jsx');
+    expect(taskCard).toContain('selected={isSelected}');
+    expect(taskCard).toContain('role="checkbox"');
+    expect(taskCard).toContain('bg-blue-600 border-blue-600');
+    expect(taskCard).toContain('actions?.onOptions ? () => actions.onOptions(task)');
+
+    const tripsPage = read('src/components/TripsPage.jsx');
+    expect(tripsPage).toContain('role="checkbox"');
+    expect(tripsPage).toContain('bg-blue-600 border-blue-600');
+
+    const dispatchView = read('src/components/MobileDispatchView.jsx');
+    expect(dispatchView).toContain('selectedTripIds');
+    expect(dispatchView).toContain('toggleSelectTrip');
+    expect(dispatchView).toContain('role="checkbox"');
+    expect(dispatchView).toContain('bg-blue-600 border-blue-600');
+  });
 });
