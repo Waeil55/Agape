@@ -7530,6 +7530,85 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         );
       })()}
 
+      {/* Multi-Trip Selection Floating Bar for Drivers */}
+      {activeNav === 'trips' && selectedTrips.length > 0 && (
+        <div className="fixed bottom-20 left-3 right-3 z-40 bg-slate-900 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between gap-3 border border-slate-700/60">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+              {selectedTrips.length}
+            </span>
+            <span className="text-xs font-semibold text-slate-200 truncate">
+              {selectedTrips.length === 1 ? '1 trip selected' : `${selectedTrips.length} trips selected`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const stops = orderedTrips
+                  .filter(t => selectedTrips.includes(t.id))
+                  .flatMap(t => [
+                    {
+                      address: t.pickup,
+                      clientName: t.patient,
+                      time: t.time,
+                      stopType: 'PU',
+                      tripId: t.id,
+                      bookingId: t.bookingId || t.tripNumber || '',
+                      serviceType: t.serviceType || t.type || t.req || '',
+                      phone: resolveClientPhoneForTrip(t, driverScopedTrips),
+                      locationPhone: t.pickupPhone || '',
+                      source: 'driver-trip',
+                    },
+                    {
+                      address: t.dropoff,
+                      clientName: t.patient,
+                      time: t.doTime || t.dropoffTime || t.time,
+                      stopType: 'DO',
+                      tripId: t.id,
+                      bookingId: t.bookingId || t.tripNumber || '',
+                      serviceType: t.serviceType || t.type || t.req || '',
+                      phone: resolveClientPhoneForTrip(t, driverScopedTrips),
+                      locationPhone: t.dropoffPhone || '',
+                      source: 'driver-trip',
+                    },
+                  ])
+                  .filter(s => s.address);
+                if (stops.length === 0) {
+                  setShowToast({ type: 'error', message: 'Select trips with pickup or dropoff addresses first.' });
+                  return;
+                }
+                setRoutePlanStops(stops);
+                setActiveNav('tools');
+                setShowToast({ type: 'success', message: `${stops.length} stops sent to Route Plan.` });
+              }}
+              className="min-h-11 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-xs font-bold text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Route size={14} />
+              <span>Send to Plan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSequencerTripFilter(selectedTrips);
+                setShowSequencerModal(true);
+              }}
+              className="min-h-11 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-xs font-bold text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Play size={13} fill="currentColor" />
+              <span>Sequence</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedTrips([])}
+              className="min-h-11 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold active:scale-95 transition-colors cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ===== BOTTOM NAVIGATION ===== */}
       {!isEmbedded && !isChatThreadOpen && (
         <nav className="bottom-nav md:hidden">

@@ -478,6 +478,8 @@ const MobileEnterpriseDashboard = (props) => {
                   onDriveTrip={openTrip}
                   onOpenTripDetails={openTripDetail}
                   onNavigateToReports={() => handleNavClick('reports')}
+                  onSendToPlan={() => handleNavClick('tools')}
+                  onOpenSequencer={() => handleNavClick('tools')}
                   onAddTrip={props.addTrip}
                   onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
                   onDeleteTrip={props.requestDeleteTrip}

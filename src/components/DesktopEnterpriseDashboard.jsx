@@ -1092,7 +1092,14 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
         setTripDetails={setTripDetails}
         setShowAddTripModal={setShowAddTripModal}
         setShowUploadModal={setShowUploadModal}
-        onOpenSequencer={() => setShowSequencerModal(true)}
+        onOpenSequencer={(taskIds) => {
+          if (Array.isArray(taskIds) && taskIds.length > 0) {
+            setActivePanel('routePlanner');
+          } else {
+            setShowSequencerModal(true);
+          }
+        }}
+        onSendToPlan={() => setActivePanel('routePlanner')}
         onOpenLiveMap={() => setActivePanel('liveMap')}
         onDriveTrip={openDriverWorkspaceForTrip}
         showRightPanel={showRightPanel}

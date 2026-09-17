@@ -442,10 +442,10 @@ export function ManifestTripCard({
   };
 
   return (
-    <article onClick={onCardClick ? handleArticleClick : undefined} className={`bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
+    <article onClick={onCardClick ? handleArticleClick : undefined} className={`bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden transition-all duration-150 [&_button]:min-h-0 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
 
       {/* ── HEADER: Checkbox + Time | Passenger Name + Trip ID ── */}
-      <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
+      <div className="px-3 py-2 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {selectSlot || (onSelect && (
             <button
@@ -498,8 +498,8 @@ export function ManifestTripCard({
       </div>
 
       {/* ── ROUTE TIMELINE: Pickup → Dropoff with dashed connector ── */}
-      <div className="px-3.5 py-2">
-        <div className="relative pl-3.5 space-y-1.5 before:content-[''] before:absolute before:left-[3.5px] before:top-2 before:bottom-2 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
+      <div className="px-3.5 py-1.5">
+        <div className="relative pl-3.5 space-y-1 before:content-[''] before:absolute before:left-[3.5px] before:top-2 before:bottom-2 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
 
           {/* Pickup Line */}
           <div className="relative flex items-center justify-between gap-1.5 text-xs">
@@ -510,7 +510,7 @@ export function ManifestTripCard({
               {pickup.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {pickup.locality}</span>}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.pickup || ''}${pickup.locality ? ', ' + pickup.locality : ''}`); }}
-              title="Copy Pickup" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+              title="Copy Pickup" className="p-1 min-h-0 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
               <Copy size={13} />
             </button>
           </div>
@@ -524,7 +524,7 @@ export function ManifestTripCard({
               {dropoff.locality && <span className="text-[11px] text-slate-500 truncate hidden xs:inline">• {dropoff.locality}</span>}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.dropoff || ''}${dropoff.locality ? ', ' + dropoff.locality : ''}`); }}
-              title="Copy Dropoff" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+              title="Copy Dropoff" className="p-1 min-h-0 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
               <Copy size={13} />
             </button>
           </div>
@@ -535,7 +535,7 @@ export function ManifestTripCard({
       {assignSlot}
 
       {/* ── FOOTER: Driver pill + Action icons + Telemetry + Status ── */}
-      <div className="px-3 py-2 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-1">
+      <div className="px-3 py-1.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-1">
 
         {/* Left: Driver Pill + Call/SMS/Options buttons */}
         <div className="flex items-center gap-1.5 min-w-0">
@@ -548,7 +548,7 @@ export function ManifestTripCard({
           {/* Call Button */}
           {iconActions.find(a => a.id === 'call') ? (
             <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'call')?.onClick?.(e); }}
-              title="Call" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
+              title="Call" className="w-7 h-7 min-h-0 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
               <Phone size={13} className="text-emerald-600" />
             </button>
           ) : null}
@@ -556,7 +556,7 @@ export function ManifestTripCard({
           {/* SMS Button */}
           {iconActions.find(a => a.id === 'message') ? (
             <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'message')?.onClick?.(e); }}
-              title="Text" className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
+              title="Text" className="w-7 h-7 min-h-0 rounded-lg bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
               <MessageSquare size={13} className="text-blue-500" />
             </button>
           ) : null}
@@ -566,7 +566,7 @@ export function ManifestTripCard({
             <button type="button" onClick={(e) => { e.stopPropagation(); onMore(e); }}
               aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
               title={typeof moreLabel === 'string' ? moreLabel : undefined}
-              className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
+              className="w-7 h-7 min-h-0 rounded-lg bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0">
               <MoreHorizontal size={13} />
             </button>
           )}

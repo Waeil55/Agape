@@ -189,7 +189,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
 
   return (
     <>
-      <div className={`mb-2.5 rounded-2xl ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}`}>
+      <div className={`mb-2 rounded-2xl [&_button]:min-h-0 ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}`}>
         <ManifestTripCard
           trip={trip}
           countdown={getTripCountdown(trip)}
@@ -598,6 +598,20 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenSequencer) {
+                  onOpenSequencer(selectedTripIds);
+                } else {
+                  addToast?.(`${selectedTripIds.length} trips queued for Plan`);
+                }
+              }}
+              className="min-h-11 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-xs font-bold text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Route size={13} />
+              <span>Plan</span>
+            </button>
             {setBulkAssignModal && (
               <button
                 type="button"

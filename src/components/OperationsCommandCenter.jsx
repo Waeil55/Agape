@@ -1667,7 +1667,7 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                 if (editingTripId === trip.id) return renderInlineTripCard(trip);
 
                 return (
-                  <div key={trip.id} className={`rounded-2xl transition-[border-color,box-shadow] ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}`}>
+                  <div key={trip.id} className={`rounded-2xl transition-[border-color,box-shadow] [&_button]:min-h-0 mb-2 ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}`}>
                     <ManifestTripCard
                       trip={trip}
                       countdown={getTripCountdown(trip)}
@@ -2130,7 +2130,71 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
                 </button>
               )}
             </div>
-            <span>{selectedTasks.length} selected</span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700">{selectedTasks.length} selected</span>
+              {selectedTasks.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenSequencer) {
+                        onOpenSequencer(selectedTasks);
+                      } else {
+                        addToast?.(`${selectedTasks.length} trips queued for Plan`);
+                      }
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+                  >
+                    <Route size={12} />
+                    <span>Send to Plan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTasks([])}
+                    className="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Selection Bar for Quick Action */}
+      {selectedTasks.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-40 bg-slate-900 text-white rounded-2xl shadow-2xl px-5 py-3.5 flex items-center gap-4 border border-slate-700/80">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">
+              {selectedTasks.length}
+            </span>
+            <span className="text-xs font-semibold text-slate-200">
+              {selectedTasks.length === 1 ? '1 trip selected' : `${selectedTasks.length} trips selected`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenSequencer) {
+                  onOpenSequencer(selectedTasks);
+                } else {
+                  addToast?.(`${selectedTasks.length} trips queued for Plan`);
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Route size={14} />
+              <span>Send to Plan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedTasks([])}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Clear
+            </button>
           </div>
         </div>
       )}

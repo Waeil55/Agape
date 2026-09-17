@@ -53,7 +53,7 @@ const toTimeInput = (value) => {
 
 const buildNewTripDraft = (date) => ({ patient: '', bookingId: '', date, time: '', type: '', pickup: '', dropoff: '', patientPhone: '', clientPhone: '', pickupPhone: '', dropoffPhone: '', notes: '', driverId: '' });
 
-const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onOpenTrip, onOpenTripDetails, onNavigateToReports, isMobile: isMobileProp, onAddTrip, onUpdateTrip, onDeleteTrip, onShowUploadModal, requestAuthAction, hasPermission }) => {
+const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedTasks = [], toggleTaskSelection = () => {}, onCreateLegMission, onBulkAssignTrips, onAssignTrip, onDriveTrip, onOpenTrip, onOpenTripDetails, onNavigateToReports, onSendToPlan, onOpenSequencer, isMobile: isMobileProp, onAddTrip, onUpdateTrip, onDeleteTrip, onShowUploadModal, requestAuthAction, hasPermission }) => {
   const isMobileQuery = useMediaQuery(MOBILE_MEDIA_QUERY);
   const isMobile = isMobileProp ?? isMobileQuery;
   const getClientPhone = (trip) => resolveClientPhoneForTrip(trip, trips);
@@ -556,7 +556,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     const ICONS = { navigate: Navigation, call: Phone, message: MessageSquare };
 
     return (
-      <div key={trip.id} className={`rounded-xl transition-all ${isSelected ? 'ring-2 ring-blue-300' : countdown.level === 'overdue' ? 'ring-1 ring-rose-200' : ''}`}>
+      <div key={trip.id} className={`rounded-xl transition-all [&_button]:min-h-0 mb-2 ${isSelected ? 'ring-2 ring-blue-300' : countdown.level === 'overdue' ? 'ring-1 ring-rose-200' : ''}`}>
       <ManifestTripCard
         trip={trip}
         countdown={countdown}
@@ -782,6 +782,22 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         {canOperateTrips && selectedTasks.length > 0 && (
           <div className="flex flex-wrap gap-1.5 p-2 bg-blue-50 border border-blue-200 rounded-xl">
             <span className="text-[10px] font-bold text-blue-700 self-center">{selectedTasks.length} sel</span>
+            <button
+              type="button"
+              onClick={() => {
+                const selectedList = trips.filter((t) => selectedTasks.includes(t.id));
+                if (onSendToPlan) {
+                  onSendToPlan(selectedList);
+                } else if (onOpenSequencer) {
+                  onOpenSequencer(selectedTasks);
+                } else {
+                  showToast(`${selectedTasks.length} trips queued for Plan`);
+                }
+              }}
+              className="px-2 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-bold text-[10px] uppercase flex items-center gap-1 cursor-pointer"
+            >
+              <Route size={11} /> Plan
+            </button>
             <button onClick={() => { setAssignMode('assign'); setShowAssign(true); }} className="px-2 py-1.5 bg-emerald-600 text-white rounded-lg font-bold text-[10px] uppercase">
               <Users size={11} className="inline mr-0.5" /> Assign
             </button>

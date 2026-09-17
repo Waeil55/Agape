@@ -40,8 +40,25 @@ const getTodayDateString = () => {
 
 const isActivePlanningStatus = (status) => !TERMINAL_STATUSES.has(status || '');
 
-const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer }) => {
-  const [stops, setStops] = useState([]);
+const RoutePlannerPage = ({ trips = [], drivers = [], onSendToSequencer, initialStops = null }) => {
+  const [stops, setStops] = useState(() => {
+    if (Array.isArray(initialStops) && initialStops.length > 0) {
+      return initialStops.map((s, idx) => ({
+        id: s.id || `stop-${idx}-${Date.now()}`,
+        tripId: s.tripId || s.id || '',
+        type: (s.stopType || s.type || 'PU').toLowerCase() === 'do' || (s.stopType || s.type || 'PU').toLowerCase() === 'dropoff' ? 'dropoff' : 'pickup',
+        patient: s.clientName || s.patient || 'Client',
+        time: s.time || '',
+        address: s.address || '',
+        phone: s.phone || '',
+        locationPhone: s.locationPhone || '',
+        bookingId: s.bookingId || '',
+        notes: s.notes || '',
+        wheelchair: s.wheelchair,
+      }));
+    }
+    return [];
+  });
   const [routeName, setRouteName] = useState('');
   const [selectedDriver, setSelectedDriver] = useState('');
   const [dateStr, setDateStr] = useState(getTodayDateString());
