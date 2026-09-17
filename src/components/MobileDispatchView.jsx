@@ -66,7 +66,7 @@ const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str 
 const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
 /* ─── Admin Trip Card ─────────────────────────────────────────────── */
-const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role, onTimeEdit, onQuickSms, requestDeleteTrip, isSelected = false, onSelect = null }) => {
+const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role, onTimeEdit, onQuickSms, requestDeleteTrip, onSendToPlan, isSelected = false, onSelect = null }) => {
   const [showActions, setShowActions] = useState(false);
   const [showReassign, setShowReassign] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -244,6 +244,10 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
           setShowActions(false);
           setShowReassign(true);
         }}
+        onSendToPlan={onSendToPlan ? (t) => {
+          onSendToPlan(t);
+          setShowActions(false);
+        } : null}
         onComplete={() => {
           markException("Completed");
           setShowActions(false);
@@ -269,12 +273,12 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
       {/* REASSIGN MODAL */}
       {showReassign && availableDrivers.length > 0 && (
         <div className="fixed inset-0 z-[110] bg-slate-900/40 flex items-end justify-center sm:items-center sm:p-4" onClick={() => setShowReassign(false)}>
-          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl space-y-3" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center border-b pb-2 border-slate-100">
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b pb-3 border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Reassign to...</h3>
-              <button type="button" onClick={() => setShowReassign(false)} aria-label="Close reassign" className="flex min-h-11 min-w-11 items-center justify-center bg-slate-100 rounded-xl text-slate-500 active:scale-95"><X size={16} /></button>
+              <button type="button" onClick={() => setShowReassign(false)} aria-label="Close reassign" className="flex min-h-11 min-w-11 items-center justify-center bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 active:scale-95"><X size={18} /></button>
             </div>
-            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+            <div className="space-y-1.5 overflow-y-auto flex-1 py-2 pr-1">
               {availableDrivers.map(d => {
                 const isCurrent = trip.driverId === d.id;
                 return (
@@ -287,7 +291,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
                       addToast?.("Trip Assigned", `Assigned to ${d.name}`, "success");
                       setShowReassign(false);
                     }}
-                    className={`min-h-11 w-full flex items-center justify-between p-2.5 rounded-xl border transition-colors text-left ${isCurrent ? 'border-blue-200 bg-blue-50 opacity-60' : 'border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98]'}`}
+                    className={`min-h-12 w-full flex items-center justify-between p-2.5 rounded-xl border transition-colors text-left ${isCurrent ? 'border-blue-200 bg-blue-50 opacity-60' : 'border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98]'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0">
@@ -295,15 +299,24 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
                       </div>
                       <div>
                         <div className="text-sm font-bold text-slate-800">{d.name}</div>
-                        <div className="text-[10px] text-slate-500">{d.vehicle || 'No vehicle'}</div>
+                        <div className="text-[11px] text-slate-500">{d.vehicle || 'No vehicle'}</div>
                       </div>
                     </div>
-                    <div className={`text-xs font-bold px-2 py-1 rounded ${isCurrent ? 'text-slate-400 bg-slate-100' : 'text-blue-600 bg-blue-50'}`}>
+                    <div className={`text-xs font-bold px-2.5 py-1 rounded-lg ${isCurrent ? 'text-slate-400 bg-slate-100' : 'text-blue-600 bg-blue-50'}`}>
                       {isCurrent ? 'Current' : 'Assign'}
                     </div>
                   </button>
                 );
               })}
+            </div>
+            <div className="pt-2 border-t border-slate-100 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] mt-2">
+              <button
+                type="button"
+                onClick={() => setShowReassign(false)}
+                className="w-full min-h-11 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -558,6 +571,13 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
                 role={role}
                 onTimeEdit={(t) => setScheduleEditTrip(t)}
                 onQuickSms={(t) => setQuickSmsTrip(t)}
+                onSendToPlan={(t) => {
+                  if (onOpenSequencer) {
+                    onOpenSequencer([t.id]);
+                  } else {
+                    addToast?.('Trip queued for Plan');
+                  }
+                }}
                 isSelected={selectedTripIds.includes(trip.id)}
                 onSelect={() => toggleSelectTrip(trip.id)}
               />

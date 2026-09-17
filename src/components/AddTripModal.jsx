@@ -184,7 +184,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden z-10 animate-in slide-in-from-bottom sm:zoom-in-95 duration-300"
+        className="relative w-full sm:max-w-2xl max-h-[90dvh] flex flex-col bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden z-10 animate-in slide-in-from-bottom sm:zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -488,7 +488,7 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
         </form>
 
         {/* Footer */}
-        <div className="flex gap-3 p-5 border-t border-slate-100 bg-white rounded-b-3xl">
+        <div className="shrink-0 flex gap-3 px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] border-t border-slate-100 bg-white sm:rounded-b-3xl">
           <button
             type="button"
             onClick={onClose}

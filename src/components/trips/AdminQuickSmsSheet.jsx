@@ -460,11 +460,11 @@ export default function AdminQuickSmsSheet({
         role="dialog"
         aria-modal="true"
         aria-label="Enterprise messaging center"
-        className="max-h-[92vh] w-full overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:max-w-md sm:rounded-3xl"
+        className="flex flex-col max-h-[90dvh] w-full overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:max-w-md sm:rounded-3xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
-        <header className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/30 px-4 py-3">
+        <header className="shrink-0 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/30 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center">
@@ -509,7 +509,7 @@ export default function AdminQuickSmsSheet({
         </header>
 
         {/* CONTENT */}
-        <div className="max-h-[62vh] overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
 
           {/* COMPOSE TAB */}
           {activeTab === 'compose' && (
@@ -645,7 +645,7 @@ export default function AdminQuickSmsSheet({
         </div>
 
         {/* FOOTER */}
-        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 space-y-2">
+        <div className="shrink-0 border-t border-slate-100 bg-slate-50/50 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] space-y-2">
           {activeTab === 'compose' && (
             <div className="flex gap-2">
               <button type="button" onClick={onClose}

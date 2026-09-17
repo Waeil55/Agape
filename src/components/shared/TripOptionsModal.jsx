@@ -61,6 +61,7 @@ export const TripOptionsModal = ({
   onReassignDriver: onReassignDriverProp,
   onReassign,
   onTransferTrip,
+  onSendToPlan,
   onMarkCompleted,
   onComplete,
   onMarkRerouted,
@@ -324,6 +325,21 @@ export const TripOptionsModal = ({
                     <span>Transfer Trip</span>
                   </div>
                   <ChevronRight size={18} className="shrink-0 opacity-60 text-indigo-700" />
+                </button>
+              )}
+
+              {/* Action Row: Send to Route Plan */}
+              {onSendToPlan && (
+                <button
+                  type="button"
+                  onClick={() => { onClose(); onSendToPlan(trip); }}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-violet-200/80 bg-violet-50/40 hover:bg-violet-50 active:bg-violet-100/60 text-violet-700 transition-all text-sm font-semibold cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3">
+                    <Route size={18} className="shrink-0 text-violet-600" />
+                    <span>Send to Route Plan</span>
+                  </div>
+                  <ChevronRight size={18} className="shrink-0 opacity-60 text-violet-700" />
                 </button>
               )}
 

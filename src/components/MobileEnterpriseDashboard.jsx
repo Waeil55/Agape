@@ -505,8 +505,9 @@ const MobileEnterpriseDashboard = (props) => {
 
         {activeDriverTripId && (
           <div 
-            className="fixed inset-x-0 top-0 bg-slate-50 flex flex-col z-35"
-            style={{ bottom: NAV_BOTTOM_CLEARANCE }}
+            className="fixed inset-0 bg-slate-50 flex flex-col z-50 overflow-hidden"
+            role="region"
+            aria-label="Trip Progress"
           >
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
@@ -538,7 +539,7 @@ const MobileEnterpriseDashboard = (props) => {
         )}
         
         {currentTripDetails && (
-          <div className="absolute inset-x-0 flex flex-col bg-slate-50" role="presentation" style={{ top: 'calc(65px + env(safe-area-inset-top, 0px))', bottom: NAV_BOTTOM_CLEARANCE, zIndex: 30 }}>
+          <div className="fixed inset-0 bg-slate-50 flex flex-col z-50 overflow-hidden" role="presentation" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <TripDetailView
@@ -603,26 +604,18 @@ const MobileEnterpriseDashboard = (props) => {
       )}
 
       {showAddTripModal && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-          <div className="shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-900">Add Trip</h3>
-            <button onClick={() => setShowAddTripModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200"><X size={16} /></button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <ErrorBoundary>
-              <Suspense fallback={<MobileFallback />}>
-                <AddTripModal
-                  onClose={() => setShowAddTripModal(false)}
-                  onAddTrip={props.addTrip}
-                  role={role}
-                  currentUser={currentUser}
-                  drivers={role === 'driver' ? (props.currentUserDriverProfile ? [props.currentUserDriverProfile] : []) : role === 'dispatcher' ? driverWorkDrivers : drivers}
-                  dispatchers={dispatchers}
-                />
-              </Suspense>
-            </ErrorBoundary>
-          </div>
-        </div>
+        <ErrorBoundary>
+          <Suspense fallback={<MobileFallback />}>
+            <AddTripModal
+              onClose={() => setShowAddTripModal(false)}
+              onAddTrip={props.addTrip}
+              role={role}
+              currentUser={currentUser}
+              drivers={role === 'driver' ? (props.currentUserDriverProfile ? [props.currentUserDriverProfile] : []) : role === 'dispatcher' ? driverWorkDrivers : drivers}
+              dispatchers={dispatchers}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {globalSearchOpen && (

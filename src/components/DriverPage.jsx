@@ -634,7 +634,9 @@ const applyWorkflowProgress = (trip, progress) => {
   return merged;
 };
 
-const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, workflowReadOnly = false, defaultTripId = null, initialShowDetailsId = null, onEmbeddedClose = null, onDeleteTrip = null }) => {
+const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tripsLoading = false, vehicles = [], driverTelemetry = [], timeTrackingDeclarations = [], onUpdateTrip, onDriverStatusUpdate, onUpdateClockEvents, onUpdateHourlyRate, onLogout, appSettings = {}, phoneNumbers: phoneNumbersProp = {}, onUpdateDriverLocation, onUpdateAppSettings, allDrivers = [], dispatchers = [], onAddTrip, setShowAddTripModal, showUploadModal = false, setShowUploadModal, onTripsCreated, uploadDrivers, uploadLockedDriverId = '', onAddAuditLog, requestAuthAction, isEmbedded = false, workflowReadOnly = false, defaultTripId = null, activeTripId = null, initialShowDetailsId = null, onEmbeddedClose = null, onBack = null, onDeleteTrip = null }) => {
+  const effectiveDefaultTripId = defaultTripId || activeTripId;
+  const handleClose = onEmbeddedClose || onBack;
   const { unreadCount } = useChat({ alerts: true });
   const phoneNumbers = phoneNumbersProp;
   const canManageTripRecords = !workflowReadOnly;
@@ -895,6 +897,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const [scheduleEditError, setScheduleEditError] = useState('');
   const [activeWorkTripId, setActiveWorkTripIdRaw] = useState(() => {
     if (defaultTripId) return defaultTripId;
+    if (activeTripId) return activeTripId;
     try {
       return localStorage.getItem(`agape_drvActiveTrip_${userKey}`) || null;
     } catch {
@@ -924,8 +927,11 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     if (defaultTripId) {
       setActiveWorkTripId(defaultTripId);
       setActiveNav('active-trip');
+    } else if (activeTripId) {
+      setActiveWorkTripId(activeTripId);
+      setActiveNav('active-trip');
     }
-  }, [defaultTripId, setActiveWorkTripId]);
+  }, [defaultTripId, activeTripId, setActiveWorkTripId]);
   const [startedTripNavId, setStartedTripNavIdRaw] = useState(() => {
     if (workflowReadOnly) return null;
     try {
@@ -3947,7 +3953,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     setExpandedTripId(null);
     setActiveWorkTripId(null);
     if (String(startedTripNavId || '') === String(completionTrip.id)) setStartedTripNavId(null);
-    if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); }
+    if (handleClose) { handleClose(); } else { setActiveNav('trips'); }
     setWorkNotesOpen(false);
 
     // End timekeeping automatically. Home-to-home shifts close at the verified
@@ -4126,7 +4132,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           <div className="px-4 py-3 flex items-center gap-3">
             <button
               type="button"
-              onClick={() => { if (isEmbedded && onEmbeddedClose) { onEmbeddedClose(); } else { setActiveNav('trips'); setWorkNotesOpen(false); } }}
+              onClick={() => { if (handleClose) { handleClose(); } else { setActiveNav('trips'); setWorkNotesOpen(false); } }}
               className="flex min-h-11 items-center gap-0.5 -ml-1.5 px-2 text-blue-600 hover:text-blue-700 active:text-blue-800 active:scale-95 touch-manipulation transition-all font-medium shrink-0 rounded-lg hover:bg-blue-50/50"
               aria-label="Back to trips"
             >

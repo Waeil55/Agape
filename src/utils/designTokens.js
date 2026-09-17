@@ -93,10 +93,10 @@ export const designTokens = {
     calloutEmphasized: 'text-sm font-semibold',
     footnote: 'text-xs font-normal',
     footnoteEmphasized: 'text-xs font-semibold',
-    caption1: 'text-[11px] font-medium',
-    caption2: 'text-[10px] font-semibold',
-    caption2Upper: 'text-[10px] font-bold uppercase tracking-wider',
-    micro: 'text-[9px] font-semibold',
+    caption1: 'text-xs font-medium',
+    caption2: 'text-[11px] font-semibold',
+    caption2Upper: 'text-[11px] font-bold uppercase tracking-wider',
+    micro: 'text-[11px] font-semibold',
   },
 
   touchTarget: {
