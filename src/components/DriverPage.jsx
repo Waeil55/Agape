@@ -730,16 +730,19 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const rawDriverScopedTrips = useMemo(
     () => {
       if (!Array.isArray(trips)) return [];
-      const filtered = trips.filter((trip) => tripBelongsToCurrentDriver(trip) || transferTargetsCurrentDriver(trip));
+      const isPrivilegedOperator = role === 'admin' || role === 'dispatcher';
+      const filtered = isPrivilegedOperator
+        ? [...trips]
+        : trips.filter((trip) => tripBelongsToCurrentDriver(trip) || transferTargetsCurrentDriver(trip));
       // Only an explicitly read-only operator view may add a selected trip
       // outside the current driver's own scope. Driver execution fails closed.
-      if (defaultTripId && !filtered.some(t => t.id === defaultTripId)) {
-        const defaultTrip = trips.find(t => t.id === defaultTripId);
+      if (defaultTripId && !filtered.some(t => String(t.id) === String(defaultTripId))) {
+        const defaultTrip = trips.find(t => String(t.id) === String(defaultTripId));
         if (defaultTrip) filtered.push(defaultTrip);
       }
       return filtered;
     },
-    [trips, tripBelongsToCurrentDriver, transferTargetsCurrentDriver, defaultTripId, workflowReadOnly]
+    [trips, tripBelongsToCurrentDriver, transferTargetsCurrentDriver, defaultTripId, workflowReadOnly, role]
   );
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9@._-]/g, '_');
   const workflowStorageKey = `agape_drvWorkflow_${userKey}`;
@@ -812,6 +815,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     if (!isEmbedded) return;
     setActiveNav(defaultTripId ? 'active-trip' : 'trips');
   }, [isEmbedded, defaultTripId, userKey]);
+
+  useEffect(() => {
+    if (defaultTripId) {
+      setActiveWorkTripId(defaultTripId);
+      setActiveNav('active-trip');
+    }
+  }, [defaultTripId, setActiveWorkTripId]);
 
 
   const [selectedTrips, setSelectedTrips] = useState([]);
@@ -1852,7 +1862,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const activeTrips = useMemo(() => myTrips.filter(t => !isWorkflowTerminalTrip(t)), [myTrips]);
   activeTripsRef.current = activeTrips;
   const activeWorkTrip = activeWorkTripId
-    ? driverScopedTrips.find((trip) => trip.id === activeWorkTripId) || null
+    ? driverScopedTrips.find((trip) => String(trip.id) === String(activeWorkTripId)) || null
     : null;
   const startedTripNav = startedTripNavId
     ? driverScopedTrips.find((trip) => String(trip.id) === String(startedTripNavId)) || null
@@ -1880,7 +1890,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     }
   }, [driverScopedTrips, startedTripNavId, workflowReadOnly, setStartedTripNavId]);
   useEffect(() => {
-    if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
+    if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => String(trip.id) === String(activeWorkTripId))) {
       setActiveWorkTripId(null);
       setActiveNav('trips');
       setWorkNotesOpen(false);

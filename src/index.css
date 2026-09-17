@@ -851,6 +851,7 @@ body:has(input:focus, textarea:focus) .adm-bottomnav {
   transition: padding-bottom 0.22s cubic-bezier(0.3, 0.9, 0.4, 1) !important;
 }
 
+.mobile-enterprise-dashboard-wrapper .admin-app,
 .mobile-enterprise-dashboard-wrapper [class*="adm-main"] {
   height: 100% !important;
   max-height: 100% !important;

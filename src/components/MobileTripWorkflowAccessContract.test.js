@@ -70,4 +70,16 @@ describe('mobile Drive workspace role and persistence contract', () => {
     expect(source).toContain('delete workflowFields.status;');
     expect(source).toContain('if (!prevTrip || !canControlTrip(prevTrip))');
   });
+
+  it('permits privileged operator scoping in DriverPage and bumps PWA service worker cache', () => {
+    const driverPageSource = readSource('./DriverPage.jsx');
+    expect(driverPageSource).toContain("const isPrivilegedOperator = role === 'admin' || role === 'dispatcher';");
+    expect(driverPageSource).toContain('String(t.id) === String(defaultTripId)');
+    expect(driverPageSource).toContain('setActiveWorkTripId(defaultTripId);');
+    expect(driverPageSource).toContain('String(trip.id) === String(activeWorkTripId)');
+
+    const swSource = readFileSync(new URL('../../public/sw.js', import.meta.url), 'utf8');
+    expect(swSource).toContain("const CACHE_VERSION = 'agape-v53';");
+  });
 });
+
