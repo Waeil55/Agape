@@ -562,7 +562,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         countdown={countdown}
         legs={legsCount}
         onLegsClick={() => setLegsDetailPatient(trip.patient)}
-        mileage={trip.distance ? (/\bmi$/i.test(String(trip.distance).trim()) ? String(trip.distance).trim() : `${trip.distance} mi`) : null}
+        selected={isSelected}
+        onSelect={canOperateTrips ? () => toggleTaskSelection(trip.id) : undefined}
         selectSlot={canOperateTrips ? (
           <button
             type="button"
@@ -570,28 +571,25 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             aria-checked={!!isSelected}
             onClick={(e) => { e.stopPropagation(); toggleTaskSelection(trip.id); }}
             aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl cursor-pointer"
+            className="shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors"
+            style={isSelected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
           >
-            <div
-              className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-slate-400'
-              }`}
-            >
-              {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
-            </div>
+            {isSelected ? (
+              <div className="w-full h-full bg-blue-600 border-blue-600 flex items-center justify-center rounded-[3px]">
+                <Check size={11} className="text-white" strokeWidth={3} />
+              </div>
+            ) : null}
           </button>
         ) : null}
         noteSlot={null}
         primaryAction={inline.primary ? { label: inline.primary.label, onClick: () => inline.primary.onSelect() } : null}
         iconActions={inline.icons.map((action) => ({ ...action, icon: ICONS[action.id], onClick: () => action.onSelect() }))}
         driverName={driver ? driver.name : 'Unassigned'}
-        reassignAction={inline.reassign ? { onClick: () => inline.reassign.onSelect() } : null}
-        archiveAction={inline.archive ? { onClick: () => inline.archive.onSelect() } : null}
+        reassignAction={null}
+        archiveAction={null}
         moreIcon={MoreHorizontal}
         onMore={canOpenTripMenu ? () => {
           setDetailModalTrip(trip);
-          setModalForm({ status: '', reason: '', note: '' });
-          setModalError('');
         } : null}
         moreLabel={`${isTerminal ? 'Review' : 'Update'} ${trip.patient || trip.bookingId || 'trip'}`}
         onTimeEdit={(t) => setScheduleEditTrip(t)}
@@ -1202,6 +1200,56 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           onClose={() => setQuickSmsTrip(null)}
         />
       )}
+
+      {detailModalTrip && (() => {
+        const canOpenDetailMenu = Boolean(detailModalTrip);
+        return (
+          <TripOptionsModal
+            isOpen={Boolean(detailModalTrip && canOpenDetailMenu)}
+            onClose={() => setDetailModalTrip(null)}
+            trip={detailModalTrip}
+          driverName={resolveDriverForTrip(detailModalTrip)?.name || detailModalTrip.driverName || 'Unassigned'}
+          role={role}
+          isAdmin={role === 'admin' || role === 'dispatcher'}
+          isDriver={role === 'driver'}
+          isDispatcher={role === 'dispatcher'}
+          onEditDetails={(t) => {
+            setEditTrip(t);
+            setDetailModalTrip(null);
+          }}
+          onReassignDriver={(t) => {
+            setSelectedTrip(t);
+            setAssignMode('reassign');
+            setShowReassignModal(true);
+            setDetailModalTrip(null);
+          }}
+          onMarkCompleted={(t) => {
+            onUpdateTrip?.(t.id, { status: 'Completed', completedAt: new Date().toISOString() });
+            showToast('Trip marked Completed');
+            setDetailModalTrip(null);
+          }}
+          onMarkRerouted={(t, reason, note) => {
+            onUpdateTrip?.(t.id, { status: 'Rerouted', reroutedAt: new Date().toISOString(), ...(note ? { notes: t.notes ? `${t.notes}\n[Rerouted]: ${note}` : `[Rerouted]: ${note}` } : {}) });
+            showToast('Trip marked Rerouted');
+            setDetailModalTrip(null);
+          }}
+          onPassengerNoShow={(t, reason, note) => {
+            onUpdateTrip?.(t.id, { status: 'No Show', noShowAt: new Date().toISOString(), ...(note ? { notes: t.notes ? `${t.notes}\n[No Show]: ${note}` : `[No Show]: ${note}` } : {}) });
+            showToast('Trip marked No Show');
+            setDetailModalTrip(null);
+          }}
+          onCancelTrip={(t, reason, note) => {
+            onUpdateTrip?.(t.id, { status: 'Cancelled', cancelledAt: new Date().toISOString(), ...(note ? { notes: t.notes ? `${t.notes}\n[Cancelled]: ${note}` : `[Cancelled]: ${note}` } : {}) });
+            showToast('Trip marked Cancelled');
+            setDetailModalTrip(null);
+          }}
+          onArchiveTrip={(t) => {
+            onDeleteTrip?.(t.id);
+            setDetailModalTrip(null);
+          }}
+        />
+        );
+      })()}
     </div>
   );
 };

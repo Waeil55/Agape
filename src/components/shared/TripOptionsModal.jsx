@@ -58,14 +58,20 @@ export const TripOptionsModal = ({
   role = 'dispatcher',
   driverName = '',
   onEditDetails,
-  onReassignDriver,
+  onReassignDriver: onReassignDriverProp,
+  onReassign,
   onTransferTrip,
   onMarkCompleted,
+  onComplete,
   onMarkRerouted,
+  onRerouted,
   onPassengerNoShow,
+  onNoShow,
   onCancelTrip,
+  onCancel,
   onConfirmException,
-  onArchiveTrip,
+  onArchiveTrip: onArchiveTripProp,
+  onArchive,
 }) => {
   const panelRef = useRef(null);
   const [selectedException, setSelectedException] = useState(null);
@@ -73,6 +79,13 @@ export const TripOptionsModal = ({
   const [exceptionNote, setExceptionNote] = useState('');
   const [savingException, setSavingException] = useState(false);
   const [exceptionError, setExceptionError] = useState('');
+
+  const onReassignDriver = onReassignDriverProp || onReassign;
+  const onArchiveTrip = onArchiveTripProp || onArchive;
+  const handleCompleted = onMarkCompleted || onComplete;
+  const handleRerouted = onMarkRerouted || onRerouted;
+  const handleNoShow = onPassengerNoShow || onNoShow;
+  const handleCancel = onCancelTrip || onCancel;
 
   // Reset internal exception form when modal opens or trip changes
   useEffect(() => {
@@ -315,10 +328,10 @@ export const TripOptionsModal = ({
               )}
 
               {/* Action Row 3: Mark Completed */}
-              {onMarkCompleted && !isTerminal && (
+              {handleCompleted && !isTerminal && (
                 <button
                   type="button"
-                  onClick={() => { onClose(); onMarkCompleted(trip); }}
+                  onClick={() => { onClose(); handleCompleted(trip); }}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/40 hover:bg-emerald-50 active:bg-emerald-100/60 text-emerald-700 transition-all text-sm font-semibold cursor-pointer active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3">
@@ -330,10 +343,10 @@ export const TripOptionsModal = ({
               )}
 
               {/* Action Row 4: Mark Rerouted */}
-              {(onMarkRerouted || onConfirmException) && !isTerminal && (
+              {(handleRerouted || onConfirmException) && !isTerminal && (
                 <button
                   type="button"
-                  onClick={() => handleExceptionClick('Rerouted', onMarkRerouted)}
+                  onClick={() => handleExceptionClick('Rerouted', handleRerouted)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-amber-200/80 bg-amber-50/40 hover:bg-amber-50 active:bg-amber-100/60 text-amber-800 transition-all text-sm font-semibold cursor-pointer active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3">
@@ -345,10 +358,10 @@ export const TripOptionsModal = ({
               )}
 
               {/* Action Row 5: Passenger No Show */}
-              {(onPassengerNoShow || onConfirmException) && !isTerminal && (
+              {(handleNoShow || onConfirmException) && !isTerminal && (
                 <button
                   type="button"
-                  onClick={() => handleExceptionClick('No Show', onPassengerNoShow)}
+                  onClick={() => handleExceptionClick('No Show', handleNoShow)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-orange-200/80 bg-orange-50/40 hover:bg-orange-50 active:bg-orange-100/60 text-orange-800 transition-all text-sm font-semibold cursor-pointer active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3">
@@ -360,10 +373,10 @@ export const TripOptionsModal = ({
               )}
 
               {/* Action Row 6: Cancel Trip */}
-              {(onCancelTrip || onConfirmException) && !isTerminal && (
+              {(handleCancel || onConfirmException) && !isTerminal && (
                 <button
                   type="button"
-                  onClick={() => handleExceptionClick('Cancelled', onCancelTrip)}
+                  onClick={() => handleExceptionClick('Cancelled', handleCancel)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-rose-200/80 bg-rose-50/40 hover:bg-rose-50 active:bg-rose-100/60 text-rose-700 transition-all text-sm font-semibold cursor-pointer active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3">

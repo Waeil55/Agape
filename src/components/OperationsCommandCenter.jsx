@@ -22,6 +22,7 @@ import { compareStableRowOrder, createStableRowOrder } from '../utils/stableTabl
 import { resolveTripDriver } from '../utils/driverIdentity';
 import { openNavigation } from '../utils/nativeActions';
 import AdminQuickSmsSheet from './trips/AdminQuickSmsSheet';
+import { ManifestTripCard, getTripCountdown } from './trips/MobileTripManifest';
 
 
 const TERMINAL_STATUSES = ['Completed', 'Cancelled', 'No Show', 'Rerouted'];
@@ -1656,224 +1657,37 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
         ) : (
           <>
             {/* Trip Cards */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {visibleTrips.map((trip) => {
-                const isExpanded = isTripExpanded(trip.id);
                 const isSelected = selectedTasks.includes(trip.id);
                 const driver = drivers.find((d) => d.id === trip.driverId);
-                const urgency = getTripUrgencyLevel(trip);
-                const isLate = urgency === 'late';
-                const minsUntil = getMinutesUntil(trip.time);
                 const routeLegs = routeTripMap[trip.id] || [];
-                const distance = trip.directDistance || '—';
+                const clientPhone = getClientPhone(trip);
 
                 if (editingTripId === trip.id) return renderInlineTripCard(trip);
 
                 return (
-                  <div
-                    key={trip.id}
-                    className={`rounded-xl border shadow-sm overflow-hidden transition-all duration-150 ${
-                      isSelected
-                        ? 'border-blue-300 ring-2 ring-blue-500/20 bg-white'
-                        : isLate
-                          ? 'bg-rose-50 border-rose-200 hover:border-rose-300 hover:shadow-md'
-                          : isExpanded
-                            ? 'border-blue-300 ring-1 ring-blue-500/15 shadow-md bg-white'
-                            : 'border-slate-100/50 hover:shadow-md bg-white'
-                    }`}
-                  >
-                    {/* Header: Time + Urgency + Passenger + Distance */}
-                    <div className="px-4 pt-4 pb-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTasks((prev) =>
-                                prev.includes(trip.id)
-                                  ? prev.filter((id) => id !== trip.id)
-                                  : [...prev, trip.id]
-                              );
-                            }}
-                            className={`rounded p-0.5 shrink-0 transition-all duration-150 ${
-                              isSelected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-600'
-                            }`}
-                          >
-                            {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
-                          </button>
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Clock size={14} className="text-orange-500 shrink-0" />
-                            <span className={`font-semibold text-lg shrink-0 ${isLate ? 'text-rose-600' : urgency === 'soon' ? 'text-amber-500' : 'text-orange-600'}`}>
-                              {to12hr(trip.time)}
-                            </span>
-                            {minsUntil !== null && (
-                              <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
-                                in {minsUntil} min
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-slate-300 mx-0.5 shrink-0 hidden sm:inline">•</span>
-                          <span className="font-semibold text-slate-900 truncate text-sm">
-                            {trip.patient || 'Unnamed Client'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="text-xs text-slate-500">{distance !== '—' ? `${distance} mi` : '—'}</span>
-                          {routeLegs.length > 0 && (
-                            <span className="border border-slate-200 text-slate-600 text-xs px-2 py-0.5 rounded-md">
-                              {routeLegs.length} LEG{routeLegs.length !== 1 ? 'S' : ''}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Addresses */}
-                    <div className="px-4 pb-2 space-y-2">
-                      <div className="flex items-start gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1.5 shadow-sm" />
-                        <span className="text-sm font-medium text-slate-700 leading-relaxed">
-                          {trip.pickup || 'Missing pickup'}
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1.5 shadow-sm" />
-                        <span className="text-sm font-medium text-slate-700 leading-relaxed">
-                          {trip.dropoff || 'Missing dropoff'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Driver Info Row — Always Visible */}
-                    <div className="border-t border-slate-100 px-4 py-2.5 bg-slate-50/50">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <User size={12} className="text-slate-500 shrink-0" />
-                          <span className="text-xs text-slate-700 truncate">
-                            {driver?.name || trip.driverName || <span className="text-red-500 italic">Unassigned</span>}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Car size={12} className="text-slate-500 shrink-0" />
-                          <span className="text-xs text-slate-700 truncate">
-                            {driver?.vehicle || '—'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {driver ? (
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${getDriverLiveStatus(driver).color}`}>
-                              {getDriverLiveStatus(driver).label}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-500">—</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <MapIcon size={12} className="text-slate-500 shrink-0" />
-                          <span className="text-xs text-slate-700 truncate">
-                            {distance !== '—' ? `${distance} mi` : '—'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expandable Actions */}
-                    {isExpanded && (
-                      <div className="border-t border-slate-100 bg-white p-3 space-y-2">
-                        {/* Driver Workflow Row */}
-                        {driver && (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mr-1">Flow</span>
-                            {[
-                              { id: 'start', label: 'Start', icon: Navigation, color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100' },
-                              { id: 'pickup', label: 'Pickup', icon: MapPin, color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100' },
-                              { id: 'transport', label: 'Transport', icon: Truck, color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100' },
-                              { id: 'dropoff', label: 'Dropoff', icon: Flag, color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100' },
-                              { id: 'complete', label: 'Complete', icon: CheckCircle2, color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100' },
-                            ].map(({ id, label, icon: Icon, color }) => (
-                              <button
-                                key={id}
-                                type="button"
-                                disabled={TERMINAL_STATUSES.includes(trip.status) && id !== 'complete'}
-                                onClick={() => applyDriverWorkStep(trip, id)}
-                                className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${color}`}
-                              >
-                                <Icon size={12} /> {label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {/* Actions Dropdown */}
-                        <div className="relative" ref={actionsMenuTripId === trip.id ? actionsMenuRef : undefined}>
-                          <button
-                            type="button"
-                            onClick={() => setActionsMenuTripId(actionsMenuTripId === trip.id ? null : trip.id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-                          >
-                            <MoreVertical size={13} /> Actions
-                          </button>
-                          {actionsMenuTripId === trip.id && (
-                            <div className="absolute left-0 top-full mt-1 z-50 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                              <button onClick={() => { setActionsMenuTripId(null); setManualAssignTrip(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700">
-                                <UserPlus size={13} className="text-blue-500" /> {driver ? 'Reassign Driver' : 'Assign Driver'}
-                              </button>
-                              <button onClick={() => { setActionsMenuTripId(null); triggerSmartAssign(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
-                                <BrainCircuit size={13} className="text-indigo-500" /> AI Auto Assign
-                              </button>
-                              <div className="my-1 border-t border-slate-100" />
-                              <button onClick={() => { setActionsMenuTripId(null); startInlineEdit(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-800">
-                                <Edit2 size={13} className="text-slate-500" /> Edit Trip
-                              </button>
-                              <button onClick={() => { setActionsMenuTripId(null); makeCall(getClientPhone(trip), trip.patient); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <Phone size={13} className="text-emerald-500" /> Call Client
-                              </button>
-                              <button onClick={() => { setActionsMenuTripId(null); openSmsForTrip(trip); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700">
-                                <MessageSquare size={13} className="text-blue-500" /> SMS Client
-                              </button>
-                              <div className="my-1 border-t border-slate-100" />
-                              <button onClick={() => {
-                                setActionsMenuTripId(null);
-                                const nowInOut = !isInOutTrip(trip);
-                                updateTrip?.(trip.id, { inOutTrip: nowInOut, inOut: nowInOut, tripKind: nowInOut ? 'IN_OUT' : '', inOutStayWithClient: nowInOut, inOutWaitMinutes: nowInOut ? 5 : null, inOutLeg: nowInOut ? (trip.inOutLeg || 'A') : null });
-                              }} className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${isInOutTrip(trip) ? 'text-emerald-700 hover:bg-emerald-50' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'}`}>
-                                <RotateCcw size={13} className="text-emerald-500" /> {isInOutTrip(trip) ? 'Remove IN/OUT' : 'Mark IN/OUT'}
-                              </button>
-                              {hasPermission(role, 'canDeleteTrip') && (
-                                <>
-                                  <div className="my-1 border-t border-slate-100" />
-                                  <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'Rerouted'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-700">
-                                    <MapPin size={13} className="text-amber-500" /> Reroute
-                                  </button>
-                                  <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'No Show'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-800">
-                                    <AlertCircle size={13} className="text-slate-500" /> No Show
-                                  </button>
-                                  <button onClick={() => { setActionsMenuTripId(null); markTripException(trip, 'Cancelled'); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-rose-50 hover:text-rose-700">
-                                    <XCircle size={13} className="text-rose-500" /> Cancel Trip
-                                  </button>
-                                  <button onClick={() => { setActionsMenuTripId(null); requestDeleteTrip(trip.id); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-800">
-                                    <Archive size={13} className="text-slate-500" /> Archive
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Expand/Collapse Toggle */}
-                    <button
-                      onClick={() => toggleTripExpanded(trip.id)}
-                      className="w-full border-t border-slate-100 py-2.5 flex items-center justify-center text-xs text-slate-500 hover:bg-slate-50 transition-colors"
-                    >
-                      {isExpanded ? 'Hide Actions' : 'Show Actions'}
-                      {isExpanded ? (
-                        <ChevronUp size={14} className="ml-1.5" />
-                      ) : (
-                        <ChevronDown size={14} className="ml-1.5" />
+                  <div key={trip.id} className={`rounded-2xl transition-[border-color,box-shadow] ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}`}>
+                    <ManifestTripCard
+                      trip={trip}
+                      countdown={getTripCountdown(trip)}
+                      legs={routeLegs.length}
+                      mileage={trip.directDistance ? `${trip.directDistance} mi` : null}
+                      selected={isSelected}
+                      onSelect={() => setSelectedTasks((prev) =>
+                        prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]
                       )}
-                    </button>
+                      driverName={driver?.name || trip.driverName || 'Unassigned'}
+                      iconActions={[
+                        clientPhone && { id: 'call', onClick: () => makeCall(clientPhone, trip.patient) },
+                        clientPhone && { id: 'message', onClick: () => openSmsForTrip(trip) },
+                      ].filter(Boolean)}
+                      moreIcon={MoreVertical}
+                      onMore={() => setActionCenterTrip(trip)}
+                      moreLabel={`Options for ${trip.patient || trip.bookingId || 'trip'}`}
+                      onTimeEdit={() => startInlineEdit(trip)}
+                      onCardClick={() => openTripDetails(trip)}
+                    />
                   </div>
                 );
               })}
