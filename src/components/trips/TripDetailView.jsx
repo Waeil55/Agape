@@ -14,6 +14,7 @@ import { tripCalendarDateKey, timeToMinutes, localCalendarYmd } from '../../util
 import { resolveClientPhoneForTrip } from '../../utils/clientPhoneResolution';
 import { normalizeEmail } from '../../utils/accessControl';
 import { openNavigation, makeCall, sendSMS } from '../../utils/nativeActions';
+import { DestinationNavButtons } from '../shared/DestinationNavButtons';
 import { useHeader } from '../shared';
 
 const MessageThread = lazy(() => import('../shared/TripDetailMessageThread').then(m => ({ default: m.default || m.MessageThread })));
@@ -356,40 +357,30 @@ const TripDetailView = ({
           {/* Addresses Card */}
           <div className={`rounded-2xl border overflow-hidden ${tokens.elevation.sm} ${tokens.colors.background.secondary}`}>
             <div className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                  <MapPin size={18} className="text-emerald-600" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                    <MapPin size={18} className="text-emerald-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`${tokens.typography.caption2Upper} text-emerald-700`} style={{ letterSpacing: '0.08em' }}>Pickup</p>
+                    <p className={`${tokens.typography.callout} ${tokens.colors.foreground.primary} mt-0.5 truncate`}>{pickup || 'Not set'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className={`${tokens.typography.caption2Upper} text-emerald-700`} style={{ letterSpacing: '0.08em' }}>Pickup</p>
-                  <p className={`${tokens.typography.callout} ${tokens.colors.foreground.primary} mt-0.5 truncate`}>{pickup || 'Not set'}</p>
-                </div>
+                <DestinationNavButtons address={pickup} buttonClassName="h-8 w-8" />
               </div>
               <div className="h-px bg-slate-200 mx-4" />
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
-                  <MapPin size={18} className="text-rose-600" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                    <MapPin size={18} className="text-rose-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`${tokens.typography.caption2Upper} text-rose-700`} style={{ letterSpacing: '0.08em' }}>Dropoff</p>
+                    <p className={`${tokens.typography.callout} ${tokens.colors.foreground.primary} mt-0.5 truncate`}>{dropoff || 'Not set'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className={`${tokens.typography.caption2Upper} text-rose-700`} style={{ letterSpacing: '0.08em' }}>Dropoff</p>
-                  <p className={`${tokens.typography.callout} ${tokens.colors.foreground.primary} mt-0.5 truncate`}>{dropoff || 'Not set'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button 
-                  type="button" 
-                  onClick={() => openNavigation(pickup)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold touch-manipulation active:scale-[0.98]"
-                >
-                  <Navigation size={16} /> Navigate
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => openNavigation(dropoff)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold touch-manipulation active:scale-[0.98]"
-                >
-                  <MapPin size={16} /> Navigate
-                </button>
+                <DestinationNavButtons address={dropoff} buttonClassName="h-8 w-8" />
               </div>
             </div>
           </div>

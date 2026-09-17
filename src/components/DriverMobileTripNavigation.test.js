@@ -51,4 +51,29 @@ describe('driver mobile active-trip navigation regression', () => {
     expect(appDataSource).toContain("type: 'setDocs'");
     expect(firebaseSource).toContain('sanitizeFirestoreWriteData(data)');
   });
+
+  it('keeps address destination check separate from trip starting and provides Apple, Google, and Waze options', () => {
+    // Address navigation buttons must NOT start trip or advance workflow
+    expect(driverSource).toContain('import { DestinationNavButtons } from \'./shared\';');
+    expect(driverSource).not.toContain('await handleNavigateToPickup(trip);');
+    expect(driverSource).not.toContain('await handleNavigateToDropoff(trip);');
+
+    // Shared DestinationNavButtons component exports Apple, Google, and Waze buttons
+    const navButtonsSource = fs.readFileSync(path.join(here, 'shared', 'DestinationNavButtons.jsx'), 'utf8');
+    expect(navButtonsSource).toContain('AppleMapsIcon');
+    expect(navButtonsSource).toContain('GoogleMapsIcon');
+    expect(navButtonsSource).toContain('WazeIcon');
+    expect(navButtonsSource).toContain('openNavigation(address, app, origin)');
+
+    // TripDetailView also uses DestinationNavButtons
+    const detailSource = fs.readFileSync(path.join(here, 'trips', 'TripDetailView.jsx'), 'utf8');
+    expect(detailSource).toContain('<DestinationNavButtons address={pickup}');
+    expect(detailSource).toContain('<DestinationNavButtons address={dropoff}');
+  });
+
+  it('maintains the started trip on the navbar across page views until finished or replaced', () => {
+    expect(driverSource).toContain('const inProgressTrip = driverScopedTrips.find');
+    expect(driverSource).toContain('setStartedTripNavId(inProgressTrip.id);');
+    expect(driverSource).toContain('isWorkflowTerminalTrip(startedTripNav)');
+  });
 });

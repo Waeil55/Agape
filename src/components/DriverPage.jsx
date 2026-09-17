@@ -22,6 +22,7 @@ import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
 import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Upload } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
+import { DestinationNavButtons } from './shared';
 import { tripMatchesSearch } from '../utils/search';
 import { TIME_TRACKING_STATES, POLICY_MODES, calculateAnchor, calculateReturnToWorkFromPickup, estimateTravelTimeMinutes, classifyGap, buildTimeEvents } from '../utils/timeTracking';
 import { impact, selection } from '../utils/haptics';
@@ -1861,6 +1862,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       }
     }
   }, [me?.id, setStartedTripNavId, startedTripNav, startedTripNavId, workflowReadOnly]);
+  useEffect(() => {
+    if (workflowReadOnly || startedTripNavId) return;
+    const inProgressTrip = driverScopedTrips.find((t) => {
+      const s = normalizeWorkflowStatus(t.status);
+      return !isWorkflowTerminalTrip(t) && ['in progress', 'in mission', 'en route', 'navigating pickup', 'at pickup', 'in transit', 'navigating dropoff', 'at dropoff'].includes(s);
+    });
+    if (inProgressTrip?.id) {
+      setStartedTripNavId(inProgressTrip.id);
+    }
+  }, [driverScopedTrips, startedTripNavId, workflowReadOnly, setStartedTripNavId]);
   useEffect(() => {
     if (activeWorkTripId && trips.length > 0 && !driverScopedTrips.some((trip) => trip.id === activeWorkTripId)) {
       setActiveWorkTripId(null);
@@ -4147,20 +4158,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <p className="text-xs font-medium uppercase tracking-normal text-emerald-600">Pickup</p>
                   <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-600 break-words">{pickupAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="flex min-h-11 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800">
-                      <Copy size={14} /> Copy
-                    </button>
-                    <span className="text-xs font-medium text-slate-400">{trip.distance ? `${trip.distance} mi` : ''}</span>
-                    <button type="button" onClick={async () => {
-                      const status = normalizeWorkflowStatus(trip.status);
-                      if (!workflowReadOnly && ['assigned', 'unassigned', 'in progress', 'in mission', 'en route'].includes(status)) {
-                        await handleNavigateToPickup(trip);
-                        return;
-                      }
-                      openInNavApp(pickupAddress, suggestNavApp(pickupAddress));
-                    }} className="h-11 cursor-pointer text-xs font-semibold text-white">
-                      <span className="flex h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-3 shadow-sm hover:bg-blue-700"><Navigation size={16} strokeWidth={2.5} /> Navigate</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => copyText(pickupAddress, 'Pickup address')} className="flex h-9 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800 active:scale-95 transition-all">
+                        <Copy size={14} /> Copy
+                      </button>
+                      <span className="text-xs font-medium text-slate-400">{trip.distance ? `${trip.distance} mi` : ''}</span>
+                    </div>
+                    <DestinationNavButtons
+                      address={pickupAddress}
+                      onOpen={(addr, app) => openInNavApp(addr, app)}
+                    />
                   </div>
                 </div>
 
@@ -4170,19 +4177,15 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <p className="text-xs font-medium uppercase tracking-normal text-rose-600">Dropoff</p>
                   <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-600 break-words">{dropoffAddress || '--'}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="flex min-h-11 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800">
-                      <Copy size={14} /> Copy
-                    </button>
-                    <span className="text-xs font-medium text-slate-400" />
-                    <button type="button" onClick={async () => {
-                      if (!workflowReadOnly && normalizeWorkflowStatus(trip.status) === 'in transit') {
-                        await handleNavigateToDropoff(trip);
-                        return;
-                      }
-                      openInNavApp(dropoffAddress, suggestNavApp(dropoffAddress));
-                    }} className="h-11 cursor-pointer text-xs font-semibold text-white">
-                      <span className="flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 shadow-sm hover:bg-emerald-700"><Navigation size={16} strokeWidth={2.5} /> Navigate</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => copyText(dropoffAddress, 'Dropoff address')} className="flex h-9 cursor-pointer items-center gap-1 rounded-xl bg-slate-100 px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800 active:scale-95 transition-all">
+                        <Copy size={14} /> Copy
+                      </button>
+                    </div>
+                    <DestinationNavButtons
+                      address={dropoffAddress}
+                      onOpen={(addr, app) => openInNavApp(addr, app)}
+                    />
                   </div>
                 </div>
               </div>
@@ -5141,9 +5144,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           })()}
 
                           <div className="flex items-center gap-2 mt-3 mb-4">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); openInNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff, suggestNavApp(step.type === 'PU' ? trip.pickup : trip.dropoff)); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-1.5 rounded-xl flex items-center justify-center gap-2 transition-all" aria-label="Navigate"><Navigation size={16}/> Navigate</button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-100" aria-label="Call"><Phone size={16}/></button>
-                           <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="relative w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label="Text client from this phone"><MessageCircle size={16}/></button>
+                            <DestinationNavButtons
+                              address={step.type === 'PU' ? trip.pickup : trip.dropoff}
+                              onOpen={(addr, app) => openInNavApp(addr, app)}
+                              className="flex-1 justify-start"
+                            />
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartCall(trip); }} className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-100" aria-label="Call"><Phone size={16}/></button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleSmartSMS(trip); }} className="relative w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center transition-all hover:bg-blue-100" aria-label="Text client from this phone"><MessageCircle size={16}/></button>
                           </div>
 
                           {(() => {
