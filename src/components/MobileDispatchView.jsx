@@ -8,6 +8,7 @@ import { saveClientProfile } from "../utils/clientProfileUtils";
 import { openNavigation } from "../utils/nativeActions";
 import AdminQuickSmsSheet from "./trips/AdminQuickSmsSheet";
 import ScheduleEditorModal from "./trips/ScheduleEditorModal";
+import { TripOptionsModal } from "./shared";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 const timeToMinutes = (t) => {
@@ -64,8 +65,9 @@ const trunc = (str, n) => str && str.length > n ? str.slice(0, n) + "…" : str 
 const getAddr = (v) => typeof v === "object" ? v?.address || "" : v || "";
 
 /* ─── Admin Trip Card ─────────────────────────────────────────────── */
-const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role, onTimeEdit, onQuickSms }) => {
+const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripWorkflow, assignTripToDriver, makeCall, sendSMS, updateTrip, requestAuthAction, currentUser, addToast, role, onTimeEdit, onQuickSms, requestDeleteTrip }) => {
   const [showActions, setShowActions] = useState(false);
+  const [showReassign, setShowReassign] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
@@ -81,7 +83,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
   const dropoff = getAddr(trip.dropoff);
   const timeLabel = trip.time === "Will Call" || !trip.time ? "Will Call" : to12hr(trip.time);
 
-  const markException = (status) => {
+  const markException = (status, notes = '') => {
     const run = () => {
       if (updateTrip) {
         updateTrip(trip.id, {
@@ -91,6 +93,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
           exceptionAt: new Date().toISOString(),
           exceptionBy: currentUser,
           exceptionSource: role,
+          ...(notes ? { notes: trip.notes ? `${trip.notes}\n[${status}]: ${notes}` : `[${status}]: ${notes}` } : {}),
         });
       }
       addToast?.("Trip Updated", `${trip.patient || trip.id} marked as ${status}.`, "warning");
@@ -354,142 +357,85 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
         </div>
       </button>
 
-      {/* Actions Bottom Sheet */}
-      {showActions && (
-        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowActions(false)}>
-          <div className="absolute inset-0 bg-slate-950/60" />
-          <div className="relative w-full bg-white rounded-t-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-slate-200" />
+      {/* AUTHORITATIVE SHARED TRIP OPTIONS MODAL */}
+      <TripOptionsModal
+        isOpen={showActions}
+        onClose={() => setShowActions(false)}
+        trip={trip}
+        driverName={driver?.name || trip.driverName || 'Driver'}
+        role={role}
+        isAdmin={role === 'admin' || role === 'dispatcher'}
+        isDriver={role === 'driver'}
+        isDispatcher={role === 'dispatcher'}
+        onEditDetails={(t) => {
+          setDraft({ ...t, pickup: getAddr(t.pickup), dropoff: getAddr(t.dropoff) });
+          setEditing(true);
+          setShowActions(false);
+        }}
+        onReassign={() => {
+          setShowActions(false);
+          setShowReassign(true);
+        }}
+        onComplete={() => {
+          markException("Completed");
+          setShowActions(false);
+        }}
+        onRerouted={(t, reason, notes) => {
+          markException("Rerouted", notes || reason);
+          setShowActions(false);
+        }}
+        onNoShow={(t, reason, notes) => {
+          markException("No Show", notes || reason);
+          setShowActions(false);
+        }}
+        onCancel={(t, reason, notes) => {
+          markException("Cancelled", notes || reason);
+          setShowActions(false);
+        }}
+        onArchive={(t) => {
+          requestDeleteTrip?.(t.id, t.patient || 'trip');
+          setShowActions(false);
+        }}
+      />
+
+      {/* REASSIGN MODAL */}
+      {showReassign && availableDrivers.length > 0 && (
+        <div className="fixed inset-0 z-[110] bg-slate-900/40 flex items-end justify-center sm:items-center sm:p-4" onClick={() => setShowReassign(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b pb-2 border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Reassign to...</h3>
+              <button type="button" onClick={() => setShowReassign(false)} aria-label="Close reassign" className="flex min-h-11 min-w-11 items-center justify-center bg-slate-100 rounded-xl text-slate-500 active:scale-95"><X size={16} /></button>
             </div>
-            <div className="px-4 pt-2 pb-2 border-b border-slate-100">
-              <p className="text-sm font-black text-slate-900">{trip.patient || "Trip"}</p>
-              <p className="text-[11px] text-slate-400 font-semibold">{timeLabel} · {trip.status}</p>
-            </div>
-            <div className="px-4 py-3 space-y-2" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))" }}>
-              {/* Assign to driver */}
-              {!isTerminal && availableDrivers.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Assign to Driver</p>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {availableDrivers.map(d => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => {
-                          assignTripToDriver?.(trip.id, d.id);
-                          addToast?.("Trip Assigned", `Assigned to ${d.name}`, "success");
-                          setShowActions(false);
-                        }}
-                        className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors active:scale-[0.98] text-left ${
-                          d.id === trip.driverId
-                            ? "border-blue-200 bg-blue-50"
-                            : "border-slate-100 bg-white hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="w-11 h-11 rounded-xl bg-blue-100 text-blue-700 font-black text-sm flex items-center justify-center shrink-0">
-                          {(d.name || "D")[0]}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{d.name}</p>
-                          <p className="text-[11px] text-slate-400 font-semibold">{d.vehicle || "No vehicle"} · {d.currentZone || "--"}</p>
-                        </div>
-                        {d.id === trip.driverId && (
-                          <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide shrink-0">Current</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Exception actions */}
-              {!isTerminal && (
-                <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+              {availableDrivers.map(d => {
+                const isCurrent = trip.driverId === d.id;
+                return (
                   <button
+                    key={d.id}
                     type="button"
-                    onClick={() => markException("No Show")}
-                    className="min-h-11 flex flex-col items-center gap-1.5 py-3 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 text-[11px] font-semibold active:scale-95 transition-colors"
+                    disabled={isCurrent}
+                    onClick={() => {
+                      assignTripToDriver?.(trip.id, d.id);
+                      addToast?.("Trip Assigned", `Assigned to ${d.name}`, "success");
+                      setShowReassign(false);
+                    }}
+                    className={`min-h-11 w-full flex items-center justify-between p-2.5 rounded-xl border transition-colors text-left ${isCurrent ? 'border-blue-200 bg-blue-50 opacity-60' : 'border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98]'}`}
                   >
-                    <XCircle size={18} />
-                    No Show
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0">
+                        {(d.name || "D")[0]}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-slate-800">{d.name}</div>
+                        <div className="text-[10px] text-slate-500">{d.vehicle || 'No vehicle'}</div>
+                      </div>
+                    </div>
+                    <div className={`text-xs font-bold px-2 py-1 rounded ${isCurrent ? 'text-slate-400 bg-slate-100' : 'text-blue-600 bg-blue-50'}`}>
+                      {isCurrent ? 'Current' : 'Assign'}
+                    </div>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => markException("Cancelled")}
-                    className="min-h-11 flex flex-col items-center gap-1.5 py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-semibold active:scale-95 transition-colors"
-                  >
-                    <Ban size={18} />
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => markException("Rerouted")}
-                    className="min-h-11 flex flex-col items-center gap-1.5 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold active:scale-95 transition-colors"
-                  >
-                    <Repeat size={18} />
-                    Reroute
-                  </button>
-                </div>
-              )}
-              {/* Call patient */}
-              {clientPhone && (
-                <button
-                    type="button"
-                    onClick={() => { makeCall?.(clientPhone, trip.patient); setShowActions(false); }}
-                    className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold active:scale-95 transition-colors"
-                  >
-                    <Phone size={18} /> Call Patient
-                  </button>
-              )}
-              {/* Navigate GPS */}
-              {trip.pickup && (
-                <button
-                  type="button"
-                  onClick={() => { openNavigation(trip.pickup || ''); setShowActions(false); }}
-                  className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-sm font-semibold active:scale-95 transition-colors"
-                >
-                  <Navigation size={18} /> Navigate to Pickup
-                </button>
-              )}
-              {/* SMS patient */}
-              {clientPhone && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowActions(false);
-                    if (onQuickSms) onQuickSms(trip);
-                    else sendSMS?.(clientPhone, trip.patient);
-                  }}
-                  className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold active:scale-95 transition-colors"
-                >
-                  <MessageSquare size={18} /> SMS Patient
-                </button>
-              )}
-              {/* Edit trip */}
-              {!isTerminal && updateTrip && (
-                <button
-                  type="button"
-                  onClick={() => { setDraft({ ...trip, pickup: getAddr(trip.pickup), dropoff: getAddr(trip.dropoff) }); setEditing(true); setShowActions(false); }}
-                  className="w-full min-h-11 flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold active:scale-95 transition-colors"
-                >
-                  <Edit2 size={18} /> Edit Trip
-                </button>
-              )}
-              {/* Open full trip workflow */}
-              <button
-                type="button"
-                onClick={() => { onOpenTripWorkflow?.(trip); setShowActions(false); }}
-                className="w-full min-h-11 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold active:scale-95 transition-colors shadow-sm"
-              >
-                <Play size={16} /> Open Trip Workflow
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowActions(false)}
-                className="w-full text-center text-sm font-semibold text-slate-500 py-2"
-              >
-                Cancel
-              </button>
+                );
+              })}
             </div>
           </div>
         </div>

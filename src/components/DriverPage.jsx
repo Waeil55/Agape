@@ -5599,6 +5599,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         return (
           <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
             <div className="trip-window-panel trip-window-panel-odometer">
+              <button
+                type="button"
+                onClick={() => setShowOdometerPrompt(null)}
+                className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
                   <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
@@ -5654,6 +5662,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         return (
           <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
             <div className="trip-window-panel">
+              <button
+                type="button"
+                onClick={() => setRouteStopOdometerPrompt(null)}
+                className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
                   <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-1.5">
@@ -5707,6 +5723,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {routeStopSignaturePrompt && (
         <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
           <div className="trip-window-panel trip-window-panel-signature">
+            <button
+              type="button"
+              onClick={() => { setRouteStopSignaturePrompt(null); setRouteStopSignatureConfirmed(false); }}
+              className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
             <div className="trip-window-body p-5 flex flex-col justify-center">
               <div className="text-center">
                 <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
@@ -5737,6 +5761,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {showSignatureConfirm && (
         <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
           <div className="trip-window-panel trip-window-panel-signature">
+            <button
+              type="button"
+              onClick={() => { setShowSignatureConfirm(null); setSignatureConfirmed(false); }}
+              className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
             <div className="trip-window-body p-5 flex flex-col justify-center">
               <div className="text-center">
                 <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
@@ -5776,6 +5808,20 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
         return (
           <div className="trip-window-overlay bg-black/40" style={{ zIndex: 120 }}>
             <div className="trip-window-panel trip-window-panel-odometer">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCompleteModal(null);
+                  setCompletePickupOdometer('');
+                  setCompleteError('');
+                  setCompleteTimeNotice('');
+                  setCompleteAck(false);
+                }}
+                className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center active:scale-90 cursor-pointer shrink-0 z-10"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
               <div className="trip-window-body p-4">
                 <div className="text-center mb-3">
                   <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1.5">
