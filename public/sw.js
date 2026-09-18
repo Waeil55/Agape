@@ -1,9 +1,9 @@
-/* Agape Care PWA Service Worker v65
+/* Agape Care PWA Service Worker v66
    App shell + static assets. Network-first for navigation.
    Firestore onSnapshot listeners own all realtime data delivery.
 */
 
-const CACHE_VERSION = 'agape-v65';
+const CACHE_VERSION = 'agape-v66';
 const RUNTIME_CACHE = CACHE_VERSION + '-assets';
 const CORE_ASSETS = ['/index.html', '/manifest.webmanifest', '/agape.png', '/agape.svg'];
 
