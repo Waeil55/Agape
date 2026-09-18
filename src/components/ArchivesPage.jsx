@@ -211,6 +211,7 @@ function RetentionBadge({ trip }) {
   );
 }
 const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDriveTrip, updateTrashedTrip, onUpdateTrip, setShowUploadModal }) => {
+  const [expandedArchiveTripId, setExpandedArchiveTripId] = useState(null);
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_archiveSearch') || '');
   const [statusFilter, setStatusFilter] = useState('all');
   const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
@@ -395,89 +396,134 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
       ? { label: 'No Show', cls: 'bg-slate-100 text-slate-600 border-slate-200', icon: AlertTriangle }
       : { label: trip?.status || 'Archived', cls: 'bg-slate-50 text-slate-600 border-slate-200', icon: Archive };
     const StatusIcon = statusBadge.icon;
+    const isExpanded = expandedArchiveTripId === trip.id;
+    const driverName = getDriverLabel(trip, drivers);
 
     return (
-      <div key={trip.id} className="bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden">
-        {/* Header */}
-        <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
+      <div key={trip.id} className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all">
+        {/* Header - click to toggle expansion */}
+        <div
+          onClick={() => setExpandedArchiveTripId(isExpanded ? null : trip.id)}
+          className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/70 gap-2 cursor-pointer active:bg-slate-100/80 transition-colors"
+          role="button"
+          tabIndex={0}
+          aria-expanded={isExpanded}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedArchiveTripId(isExpanded ? null : trip.id); } }}
+        >
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-[17px] font-extrabold tracking-tight shrink-0 text-slate-400">{renderCellValue(trip, { key: 'time' }) || '—'}</span>
+            <span className="text-[17px] font-extrabold tracking-tight shrink-0 text-slate-700">{renderCellValue(trip, { key: 'time' }) || '—'}</span>
             <span className="text-slate-300 shrink-0 font-light">|</span>
             <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
-              <span className="text-[15px] font-bold text-slate-900 truncate">{renderCellValue(trip, { key: 'patient' })}</span>
+              <span className="text-[16px] font-bold text-slate-900 truncate">{renderCellValue(trip, { key: 'patient' })}</span>
             </div>
           </div>
-          <span className="text-[10px] font-bold text-slate-400 bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-300/60 tracking-wide shrink-0">
-            #{renderCellValue(trip, { key: 'bookingId' })}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[13px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-300/80 tracking-wide shrink-0">
+              #{renderCellValue(trip, { key: 'bookingId' })}
+            </span>
+            <ChevronDown size={17} className={`text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+          </div>
         </div>
 
-        {/* Route Timeline */}
-        <div className="px-3.5 py-2">
-          <div className="relative pl-3.5 space-y-1.5 before:content-[''] before:absolute before:left-[3.5px] before:top-2 before:bottom-2 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
-            <div className="relative flex items-center justify-between gap-1.5 text-xs">
-              <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-emerald-500 bg-white" />
-              <div className="flex items-baseline gap-1.5 truncate min-w-0">
-                <span className="text-[10px] font-black uppercase text-emerald-600 shrink-0">PU</span>
-                <span className="text-[12px] font-semibold text-slate-600 truncate">{pickupRaw || '—'}</span>
+        {/* Collapsed Summary Row (When NOT opened, addresses are hidden to reduce traffic & height) */}
+        {!isExpanded && (
+          <div
+            onClick={() => setExpandedArchiveTripId(trip.id)}
+            className="px-3.5 py-2 flex items-center justify-between gap-2 text-[13px] cursor-pointer hover:bg-slate-50/50 transition-colors"
+          >
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className={`inline-flex items-center gap-1 text-[12.5px] font-bold px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
+                <StatusIcon size={12} /> {statusBadge.label}
+              </span>
+              <span className="font-semibold text-slate-600 truncate max-w-[130px]">{driverName !== '—' ? driverName : 'Unassigned'}</span>
+            </div>
+            <span className="text-xs font-semibold text-blue-600 shrink-0">Details</span>
+          </div>
+        )}
+
+        {/* Expanded View (Addresses & Full Details shown only when opened) */}
+        {isExpanded && (
+          <div className="p-3 space-y-2.5 border-t border-slate-100 bg-white">
+            {/* Route Timeline with addresses */}
+            <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/80 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-black uppercase text-emerald-600 tracking-wider block">Pickup</span>
+                    <p className="text-[14px] font-semibold text-slate-800 leading-snug">{pickupRaw || '—'}</p>
+                  </div>
+                </div>
+                {pickupRaw && (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(pickupRaw); }} title="Copy Pickup" className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+                    <Copy size={13} />
+                  </button>
+                )}
               </div>
-              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(pickupRaw); }} title="Copy Pickup" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-                <Copy size={12} />
-              </button>
-            </div>
-            <div className="relative flex items-center justify-between gap-1.5 text-xs">
-              <div className="absolute -left-3.5 top-1.5 w-2 h-2 rounded-full border-2 border-rose-500 bg-white" />
-              <div className="flex items-baseline gap-1.5 truncate min-w-0">
-                <span className="text-[10px] font-black uppercase text-rose-600 shrink-0">DO</span>
-                <span className="text-[12px] font-semibold text-slate-600 truncate">{dropoffRaw || '—'}</span>
+              <div className="border-t border-slate-200/70" />
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-black uppercase text-rose-600 tracking-wider block">Dropoff</span>
+                    <p className="text-[14px] font-semibold text-slate-800 leading-snug">{dropoffRaw || '—'}</p>
+                  </div>
+                </div>
+                {dropoffRaw && (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(dropoffRaw); }} title="Copy Dropoff" className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+                    <Copy size={13} />
+                  </button>
+                )}
               </div>
-              <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(dropoffRaw); }} title="Copy Dropoff" className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-                <Copy size={12} />
-              </button>
+            </div>
+
+            {/* Compact Metrics Grid (2x2) */}
+            <div className="grid grid-cols-2 gap-1.5 text-xs">
+              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Driver</span>
+                <span className="font-bold text-slate-800 truncate max-w-[100px]">{driverName}</span>
+              </div>
+              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Vehicle</span>
+                <span className="font-bold text-slate-800 truncate max-w-[100px]">{renderCellValue(trip, { key: 'vehicle' })}</span>
+              </div>
+              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Distance</span>
+                <span className="font-bold text-slate-800">{renderCellValue(trip, { key: 'distance' })}</span>
+              </div>
+              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Signature</span>
+                <span className="font-bold text-slate-800">{renderCellValue(trip, { key: 'signature' })}</span>
+              </div>
+            </div>
+
+            {/* Compliance + Retention */}
+            <div>
+              <ComplianceTagBar trip={trip} />
+              <RetentionBadge trip={trip} />
+            </div>
+
+            {/* Footer: Status Badge + Actions */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${statusBadge.cls}`}>
+                <StatusIcon size={12} /> {statusBadge.label}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {(role === 'admin' || role === 'dispatcher') && restoreTrip && (
+                  <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                    <RotateCcw size={13} /> Restore
+                  </button>
+                )}
+                <button onClick={() => onDriveTrip ? onDriveTrip(trip) : setScheduleEditTrip(trip)} className="flex items-center gap-1 rounded-xl bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs">
+                  <Edit2 size={13} /> Edit
+                </button>
+                <button onClick={() => setActionTrip(trip)} className="flex items-center justify-center rounded-xl bg-slate-100 px-2.5 py-1.5 text-slate-600 border border-slate-200 shadow-2xs">
+                  <MoreHorizontal size={13} />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Info Grid: Driver, Vehicle, Miles, Signature */}
-        <div className="px-3.5 pb-2 grid grid-cols-2 gap-1.5 text-xs">
-          {[
-            { label: 'Driver', value: renderCellValue(trip, { key: 'driver' }) },
-            { label: 'Vehicle', value: renderCellValue(trip, { key: 'vehicle' }) },
-            { label: 'Miles', value: renderCellValue(trip, { key: 'distance' }) },
-            { label: 'Signature', value: renderCellValue(trip, { key: 'signature' }) },
-          ].filter(item => item.value && item.value !== '—').map((item) => (
-            <div key={item.label} className="bg-slate-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">{item.label}</span>
-              <span className="ml-1.5 text-[11px] font-semibold text-slate-700">{item.value}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Compliance + Retention */}
-        <div className="px-3.5 pb-2">
-          <ComplianceTagBar trip={trip} />
-          <RetentionBadge trip={trip} />
-        </div>
-
-        {/* Footer: Status Badge + Actions */}
-        <div className="px-3.5 py-2 border-t border-slate-100 flex items-center justify-between gap-2">
-          <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
-            <StatusIcon size={10} /> {statusBadge.label}
-          </span>
-          <div className="flex items-center gap-1.5">
-            {(role === 'admin' || role === 'dispatcher') && restoreTrip && (
-              <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                <RotateCcw size={11} /> Restore
-              </button>
-            )}
-            <button onClick={() => onDriveTrip ? onDriveTrip(trip) : setScheduleEditTrip(trip)} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-bold text-blue-700 border border-blue-200">
-              <Edit2 size={11} /> Edit
-            </button>
-            <button onClick={() => setActionTrip(trip)} className="flex items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-slate-600 border border-slate-200">
-              <MoreHorizontal size={11} />
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     );
   };

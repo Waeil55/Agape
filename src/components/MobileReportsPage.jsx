@@ -570,6 +570,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                 <div onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)} className="cursor-pointer" aria-expanded={isExpanded}>
                   <ManifestTripCard
                     trip={trip}
+                    showAddresses={false}
                     countdown={getTripCountdown(trip)}
                     driverName={driver ? driver.name : (trip.driverName || 'Unassigned')}
                     onTimeEdit={(t) => setScheduleEditTrip(t)}
@@ -589,32 +590,32 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                 </div>
 
                 {isExpanded && (
-                  <div className="mt-1 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="mt-1 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
                     {isEditing ? (
                       <div className="space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Patient</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Patient</label>
                             <input value={ie.patient} onChange={(e) => setEditingTripData(p => ({ ...p, patient: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Booking ID</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Booking ID</label>
                             <input value={ie.bookingId} onChange={(e) => setEditingTripData(p => ({ ...p, bookingId: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Date</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Date</label>
                             <input type="date" value={ie.date} onChange={(e) => setEditingTripData(p => ({ ...p, date: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Time</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Time</label>
                             <input value={ie.time} onChange={(e) => setEditingTripData(p => ({ ...p, time: e.target.value }))} className={inputCls} placeholder="8:30 AM" />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Service Type</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Service Type</label>
                             <input value={ie.type} onChange={(e) => setEditingTripData(p => ({ ...p, type: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Status</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Status</label>
                             <select value={ie.status} onChange={(e) => setEditingTripData(p => ({ ...p, status: e.target.value }))} className={inputCls}>
                               {['Assigned', 'Navigating Pickup', 'At Pickup', 'In Transit', 'At Dropoff', 'Completed', 'No Show', 'Cancelled', 'Rerouted'].map(s => (
                                 <option key={s} value={s}>{s}</option>
@@ -622,91 +623,113 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                             </select>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 bg-blue-50 border border-blue-100 rounded-xl p-2.5">
+                        <div className="grid grid-cols-2 gap-2 bg-blue-50/70 border border-blue-100 rounded-xl p-2.5">
                           <div>
-                            <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Time</label>
+                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Pickup Time</label>
                             <input type="time" value={ie._pickupTime} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupTime: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Odo</label>
+                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Pickup Odo</label>
                             <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Dropoff Time</label>
+                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Dropoff Time</label>
                             <input type="time" value={ie._dropoffTime} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffTime: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Dropoff Odo</label>
+                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Dropoff Odo</label>
                             <input type="number" min="0" step="1" placeholder="42750" value={ie._dropoffOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffOdometer: e.target.value }))} className={inputCls} />
                           </div>
                           <div className="col-span-2">
-                            <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Address</label>
+                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Pickup Address</label>
                             <PlacesAutocompleteInput value={ie.pickup} onChange={(val) => setEditingTripData(p => ({ ...p, pickup: val }))} className={inputCls} placeholder="Pickup address" />
                           </div>
                           <div className="col-span-2">
-                            <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Dropoff Address</label>
+                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Dropoff Address</label>
                             <PlacesAutocompleteInput value={ie.dropoff} onChange={(val) => setEditingTripData(p => ({ ...p, dropoff: val }))} className={inputCls} placeholder="Dropoff address" />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Pickup Phone</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Pickup Phone</label>
                             <input value={ie.pickupPhone} onChange={(e) => setEditingTripData(p => ({ ...p, pickupPhone: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Dropoff Phone</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Dropoff Phone</label>
                             <input value={ie.dropoffPhone} onChange={(e) => setEditingTripData(p => ({ ...p, dropoffPhone: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-rose-500 uppercase tracking-widest mb-0.5 block">Hospital Phone</label>
+                            <label className="text-xs font-semibold text-rose-600 uppercase tracking-wider mb-0.5 block">Hospital Phone</label>
                             <input value={ie.hospitalPhone || ''} onChange={(e) => setEditingTripData(p => ({ ...p, hospitalPhone: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Distance</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Distance</label>
                             <input value={ie.distance} onChange={(e) => setEditingTripData(p => ({ ...p, distance: e.target.value }))} className={inputCls} />
                           </div>
                         </div>
                         <div>
-                            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5 block">Notes</label>
+                          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5 block">Notes</label>
                           <textarea value={ie.notes} onChange={(e) => setEditingTripData(p => ({ ...p, notes: e.target.value }))} className={inputCls} rows="2" placeholder="Update notes..." />
                         </div>
                       </div>
                     ) : (
-                      <>
-                        <DetailRow label="TRIP ID" value={trip.bookingId || trip.id} valueColor="text-blue-700" />
-                        <DetailRow label="DATE" value={trip.date} />
-                        <DetailRow label="DRIVER" value={driver ? driver.name : (trip.driverName || '-')} />
-                        <DetailRow label="VEHICLE" value={trip.completedVehicle || (driver ? driver.vehicle : '-')} />
-                        <DetailRow label="SCHEDULED" value={formatClock(trip.time)} valueColor="text-blue-600" />
+                      <div className="space-y-2">
+                        {/* Compact Route Block (Addresses shown here when card is opened) */}
+                        <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/80 space-y-2">
+                          <div className="flex items-start gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[14px] font-semibold text-slate-900 leading-snug">{trip.pickup || '—'}</p>
+                              <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-emerald-700">
+                                <span>Arrived: {formatClock(trip.arrivalTime)}</span>
+                                {trip.pickupOdometer && <span>Odo: {trip.pickupOdometer}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="border-t border-slate-200/70" />
+                          <div className="flex items-start gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[14px] font-semibold text-slate-900 leading-snug">{trip.dropoff || '—'}</p>
+                              <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-rose-700">
+                                <span>Arrived: {formatClock(trip.arrivalDropoffTime)}</span>
+                                {trip.dropoffOdometer && <span>Odo: {trip.dropoffOdometer}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
 
-                        <div className="my-2 border-t border-slate-300/50"></div>
-
-                        <DetailRow label="PICKUP ADDRESS" value={trip.pickup} valueColor="text-emerald-600" />
-                        <DetailRow label="PICKUP ARRIVAL" value={formatClock(trip.arrivalTime)} valueColor="text-emerald-600" />
-                        <DetailRow label="START ODOMETER" value={trip.pickupOdometer || '-'} valueColor="text-emerald-600" />
-
-                        <div className="my-2 border-t border-slate-300/50"></div>
-
-                        <DetailRow label="DROPOFF ADDRESS" value={trip.dropoff} valueColor="text-red-600" />
-                        <DetailRow label="DROPOFF ARRIVAL" value={formatClock(trip.arrivalDropoffTime)} valueColor="text-red-600" />
-                        <DetailRow label="END ODOMETER" value={trip.dropoffOdometer || '-'} valueColor="text-red-600" />
-
-                        <div className="my-2 border-t border-slate-300/50"></div>
-
-                        <DetailRow label="DISTANCE" value={`${calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance)} mi`} />
-                        <DetailRow label="TRAVEL TIME" value={trip.travelTime ? `${trip.travelTime}m` : '-'} />
-                        <DetailRow label="SIGNATURE" value={trip.paperSignatureConfirmed ? 'Yes' : 'No'} />
-                        <DetailRow label="REVIEW STATUS" value={trip.reviewed ? 'Reviewed' : 'Pending'} valueColor={trip.reviewed ? 'text-emerald-600' : 'text-orange-600'} />
-                      </>
+                        {/* Compact Metrics Grid (2x2) */}
+                        <div className="grid grid-cols-2 gap-1.5 text-xs">
+                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Miles</span>
+                            <span className="font-bold text-slate-800">{calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance)} mi {trip.travelTime ? `(${trip.travelTime}m)` : ''}</span>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Vehicle</span>
+                            <span className="font-bold text-slate-800 truncate max-w-[90px]">{trip.completedVehicle || (driver ? driver.vehicle : '—')}</span>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Driver</span>
+                            <span className="font-bold text-slate-800 truncate max-w-[90px]">{driver ? driver.name : (trip.driverName || '—')}</span>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Signed</span>
+                            <span className={`font-bold ${trip.paperSignatureConfirmed ? 'text-emerald-700' : 'text-slate-600'}`}>
+                              {trip.paperSignatureConfirmed ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="grid grid-cols-2 gap-2 mt-3">
                       {isEditing ? (
                         <>
                           <button
                             onClick={saveInlineEdit}
                             disabled={savingTripId === trip.id}
-                            className="flex items-center justify-center gap-2 bg-blue-600 border border-blue-700 rounded-xl py-3 shadow-sm text-white font-bold text-sm disabled:opacity-50"
+                            className="flex items-center justify-center gap-2 bg-blue-600 border border-blue-700 rounded-xl py-2.5 shadow-sm text-white font-bold text-sm disabled:opacity-50"
                           >
                             <Check className="w-4 h-4" />
                             {savingTripId === trip.id ? 'Saving…' : 'Save'}
@@ -714,7 +737,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                           <button
                             onClick={cancelInlineEdit}
                             disabled={savingTripId === trip.id}
-                            className="flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-xl py-3 shadow-sm text-slate-700 font-bold text-sm disabled:opacity-50"
+                            className="flex items-center justify-center gap-2 bg-white border border-slate-200 rounded-xl py-2.5 shadow-sm text-slate-700 font-bold text-sm disabled:opacity-50"
                           >
                             <X className="w-4 h-4" />
                             Cancel
@@ -725,7 +748,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                           <button
                             onClick={() => startInlineEdit(trip)}
                             disabled={readOnly}
-                            className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-xl py-2.5 font-bold text-xs shadow-sm transition-colors"
+                            className="flex items-center justify-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-xl py-2 font-bold text-xs shadow-2xs transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             Edit Trip
@@ -734,7 +757,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                             <button
                               onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { status: 'Assigned', workflowUpdatedAt: new Date().toISOString() })}
                               disabled={readOnly}
-                              className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 border border-amber-600 text-white rounded-xl py-2.5 font-bold text-xs shadow-sm transition-colors"
+                              className="flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 border border-amber-600 text-white rounded-xl py-2 font-bold text-xs shadow-2xs transition-colors"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                               Restore Trip
@@ -743,9 +766,9 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                           <button
                             onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { reviewed: !trip.reviewed })}
                             disabled={readOnly}
-                            className={`${(trip.status === 'Cancelled' || trip.status === 'No Show' || trip.status === 'Rerouted' || trip.status === 'Cancelled / Rescheduled' || trip.status === 'Transferred') ? 'col-span-2' : ''} flex items-center justify-center gap-2 border rounded-xl py-2.5 shadow-sm font-bold text-xs transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
+                            className={`${(trip.status === 'Cancelled' || trip.status === 'No Show' || trip.status === 'Rerouted' || trip.status === 'Cancelled / Rescheduled' || trip.status === 'Transferred') ? 'col-span-2' : ''} flex items-center justify-center gap-1.5 border rounded-xl py-2 shadow-2xs font-bold text-xs transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
                           >
-                            <CheckCircle2 className={`w-4 h-4 ${trip.reviewed ? 'text-slate-500' : 'text-white'}`} />
+                            <CheckCircle2 className={`w-3.5 h-3.5 ${trip.reviewed ? 'text-slate-500' : 'text-white'}`} />
                             {trip.reviewed ? 'Un-Review' : 'Review'}
                           </button>
                         </>

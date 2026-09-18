@@ -434,34 +434,60 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
   const pickupOdometer = getFirstTripOdometer(trip, ['pickupOdometer', 'startOdometer', 'startMileage', 'pickupMileage']);
   const dropoffOdometer = getFirstTripOdometer(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'dropoffMileage']);
   const vehicle = resolveTripVehicle(trip, driver) || 'PENDING ASSIGNMENT';
-  const rows = [
-    { label: 'TRIP ID', value: formatTripDetailValue(trip.bookingId || trip.id), tone: 'blue' },
-    { label: 'DATE', value: formatTripDetailValue(getTripHistoryDateKey(trip) || trip.date) },
-    { label: 'DRIVER', value: formatTripDetailValue(driver?.name || trip.completedDriverName || trip.driverName || trip.driverId) },
-    { label: 'VEHICLE', value: formatTripDetailValue(vehicle) },
-    { label: 'PICKUP ARRIVAL', value: pickupClock, tone: 'green' },
-    { label: 'DROPOFF ARRIVAL', value: dropoffClock, tone: 'red' },
-    { label: 'START ODOMETER', value: pickupOdometer, tone: 'green' },
-    { label: 'END ODOMETER', value: dropoffOdometer, tone: 'red' },
-    { label: 'DISTANCE', value: formatTripDistance(trip.distance) },
-    { label: 'PICKUP ADDRESS', value: formatTripDetailValue(getFirstTripValue(trip, ['pickup', 'pickupAddress'])), tone: 'green' },
-    { label: 'DROPOFF ADDRESS', value: formatTripDetailValue(getFirstTripValue(trip, ['dropoff', 'dropoffAddress'])), tone: 'red' },
-    { label: 'SIGNATURE', value: trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No' },
-  ];
+  const pickupAddr = formatTripDetailValue(getFirstTripValue(trip, ['pickup', 'pickupAddress']));
+  const dropoffAddr = formatTripDetailValue(getFirstTripValue(trip, ['dropoff', 'dropoffAddress']));
+  const distance = formatTripDistance(trip.distance);
+  const signature = trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No';
+  const driverName = formatTripDetailValue(driver?.name || trip.completedDriverName || trip.driverName || trip.driverId);
+
   return (
-    <div className="app-table-frame border-t border-slate-200 bg-white">
-      <table className="driver-history-detail-table w-full table-fixed text-left">
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label} className="align-top border-b border-slate-150 last:border-b-0">
-              <td role="rowheader" className="driver-history-detail-label w-[36%] bg-slate-100/90 px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-slate-600">{row.label}</td>
-              <td className={`px-3 py-1.5 text-sm font-semibold break-words ${
-                row.tone === 'green' ? 'text-emerald-600' : row.tone === 'red' ? 'text-rose-600' : row.tone === 'blue' ? 'text-blue-600' : 'text-slate-950'
-              }`}>{row.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="driver-history-detail-table border-t border-slate-200 bg-white p-3 space-y-2.5">
+      {/* Route Timeline with Addresses */}
+      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/80 space-y-2">
+        <div className="flex items-start gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-black uppercase text-emerald-600 tracking-wider block">Pickup</span>
+            <p className="text-[14px] font-semibold text-slate-800 leading-snug">{pickupAddr}</p>
+            <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-emerald-700">
+              {pickupClock !== '—' && <span>Arrived: {pickupClock}</span>}
+              {pickupOdometer !== '—' && <span>Odo: {pickupOdometer}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-slate-200/70" />
+        <div className="flex items-start gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-black uppercase text-rose-600 tracking-wider block">Dropoff</span>
+            <p className="text-[14px] font-semibold text-slate-800 leading-snug">{dropoffAddr}</p>
+            <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-rose-700">
+              {dropoffClock !== '—' && <span>Arrived: {dropoffClock}</span>}
+              {dropoffOdometer !== '—' && <span>Odo: {dropoffOdometer}</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Metrics Grid */}
+      <div className="grid grid-cols-2 gap-1.5 text-xs">
+        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Distance</span>
+          <span className="font-bold text-slate-800">{distance}</span>
+        </div>
+        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Vehicle</span>
+          <span className="font-bold text-slate-800 truncate max-w-[90px]">{vehicle}</span>
+        </div>
+        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Driver</span>
+          <span className="font-bold text-slate-800 truncate max-w-[90px]">{driverName}</span>
+        </div>
+        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
+          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Signature</span>
+          <span className={`font-bold ${signature === 'Yes' ? 'text-emerald-700' : 'text-slate-600'}`}>{signature}</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -6409,18 +6435,18 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           }}
                         >
                           <div className="min-w-0 flex-1">
-                            <h3 className="text-sm font-bold text-slate-900">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
-                            <p className="text-[11px] font-semibold text-slate-500">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
+                            <h3 className="text-[16px] font-semibold text-slate-900">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
+                            <p className="text-[13px] font-medium text-slate-500">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
                             {!isEditing && (trip.pickupCity || trip.dropoffCity) && (
-                              <p className="text-[11px] text-slate-400 font-medium truncate flex items-center gap-1 mt-0.5">
-                                <MapPin size={10} />
+                              <p className="text-[12px] text-slate-400 font-medium truncate flex items-center gap-1 mt-0.5">
+                                <MapPin size={12} />
                                 <span>{trip.pickupCity || ''}{trip.pickupCity && trip.dropoffCity ? ' → ' : ''}{trip.dropoffCity || ''}</span>
                               </p>
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <div className="flex flex-col items-end">
-                              <span className="text-[12px] text-slate-500 font-medium">Driver: {me?.name || '-'}</span>
+                              <span className="text-[13px] text-slate-500 font-medium">Driver: {me?.name || '-'}</span>
                             </div>
                             <span className={`w-8 h-8 rounded-full flex items-center justify-center ${
                               historyTone === 'success' ? 'bg-emerald-100 text-emerald-600'
@@ -6597,13 +6623,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       className="flex items-center gap-3 px-3 py-3 cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-slate-900">{trip.patient || 'Trip'}</h3>
-                        <p className="text-[11px] font-semibold text-slate-500">#{trip.bookingId || trip.id}</p>
+                        <h3 className="text-[16px] font-semibold text-slate-900">{trip.patient || 'Trip'}</h3>
+                        <p className="text-[13px] font-medium text-slate-500">#{trip.bookingId || trip.id}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="flex flex-col items-end">
-                          <span className={`text-[15px] font-semibold ${historyTone === 'danger' ? 'text-rose-600' : historyTone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>{to12hr(trip.time)}</span>
-                          <span className="text-[12px] text-slate-500 mt-0.5 font-medium">Driver: {me?.name || '-'}</span>
+                          <span className={`text-[17px] font-semibold ${historyTone === 'danger' ? 'text-rose-600' : historyTone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>{to12hr(trip.time)}</span>
+                          <span className="text-[13px] text-slate-500 mt-0.5 font-medium">Driver: {me?.name || '-'}</span>
                         </div>
                         <span
                           className={`w-8 h-8 rounded-full flex items-center justify-center ${

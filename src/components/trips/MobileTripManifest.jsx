@@ -414,6 +414,7 @@ export function ManifestTripCard({
   moreLabel = 'More actions',
   onTimeEdit,
   onCardClick,
+  showAddresses = true,
 }) {
   const cd = countdown || getTripCountdown(trip);
   const displayStatus = getManifestDisplayStatus(trip);
@@ -466,14 +467,14 @@ export function ManifestTripCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
-              className={`text-[18.5px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer !min-h-0 ${timeColor}`}
+              className={`text-[17px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer !min-h-0 ${timeColor}`}
               title="Edit schedule"
               aria-label={`Edit schedule for ${trip?.patient || 'trip'}`}
             >
               {isInOut ? 'IN/OUT' : (trip?.time || '—')}
             </button>
           ) : (
-            <span className={`text-[18.5px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>
+            <span className={`text-[17px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>
               {isInOut ? 'IN/OUT' : (trip?.time || '—')}
             </span>
           )}
@@ -488,40 +489,42 @@ export function ManifestTripCard({
 
         {/* Trip ID */}
         <div className="flex items-center shrink-0">
-          <span className="bg-white/90 text-slate-900 text-[14px] font-bold px-2.5 py-0.5 rounded-md border border-slate-300/90 tracking-wide">
+          <span className="bg-white/90 text-slate-900 text-[13px] font-bold px-2.5 py-0.5 rounded-md border border-slate-300/90 tracking-wide">
             {trip?.bookingId || trip?.id || '—'}
           </span>
         </div>
       </div>
 
-      {/* ── CARD BODY: Addresses ── */}
-      <div className="px-3 py-2 space-y-1.5 text-[14px] leading-tight">
-        {/* Pickup Address */}
-        <div className="flex items-center space-x-2 min-w-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-          <span className="text-slate-600 font-normal tracking-tight truncate flex-1 min-w-0" title={pickupAddress}>
-            {pickupAddress}
-          </span>
-        </div>
+      {/* ── CARD BODY: Addresses (Hidden before opened in reports/history) ── */}
+      {showAddresses && (
+        <div className="px-3.5 py-2 space-y-1.5 text-[14px] leading-tight">
+          {/* Pickup Address */}
+          <div className="flex items-center space-x-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-slate-700 font-medium tracking-tight truncate flex-1 min-w-0" title={pickupAddress}>
+              {pickupAddress}
+            </span>
+          </div>
 
-        {/* Dropoff Address */}
-        <div className="flex items-center space-x-2 min-w-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-          <span className="text-slate-600 font-normal tracking-tight truncate flex-1 min-w-0" title={dropoffAddress}>
-            {dropoffAddress}
-          </span>
+          {/* Dropoff Address */}
+          <div className="flex items-center space-x-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+            <span className="text-slate-700 font-medium tracking-tight truncate flex-1 min-w-0" title={dropoffAddress}>
+              {dropoffAddress}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {assignSlot}
 
       {/* ── CARD FOOTER ── */}
-      <div className="px-3 py-1.5 bg-slate-50/20 border-t border-slate-100/70 flex items-center justify-between text-[12px]">
+      <div className="px-3 py-1.5 bg-slate-50/20 border-t border-slate-100/70 flex items-center justify-between text-[13px]">
         {/* Driver & Comm Icons */}
         <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1">
-            <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />
-            <span className="font-semibold text-slate-700 text-[12px] truncate max-w-[90px]">
+          <div className="flex items-center space-x-1.5">
+            <span className={`w-2 h-2 rounded-full ${statusPulseColor}`} />
+            <span className="font-semibold text-slate-700 text-[13px] truncate max-w-[100px]">
               {driverName || trip?.driverName || '—'}
             </span>
           </div>
@@ -568,7 +571,7 @@ export function ManifestTripCard({
 
         {/* Route Metrics & Status Pill */}
         <div className="flex items-center space-x-1.5 shrink-0">
-          <div className="inline-flex items-center text-[12px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+          <div className="inline-flex items-center text-[12.5px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
             <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
             <span>{cd?.label || 'No time'}</span>
             {mileage && (
@@ -581,7 +584,7 @@ export function ManifestTripCard({
 
           <button
             type="button"
-            className={`status-btn inline-flex items-center text-[12px] font-bold px-2 py-0.5 rounded border transition hover:opacity-90 ${statusBadge.cls}`}
+            className={`status-btn inline-flex items-center text-[13px] font-bold px-2 py-0.5 rounded border transition hover:opacity-90 ${statusBadge.cls}`}
             title={displayStatus}
             onClick={(e) => {
               if (primaryAction?.onClick) {
