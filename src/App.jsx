@@ -2876,7 +2876,7 @@ const App = () => {
       <div className="agape-login flex-1 relative overflow-y-auto px-4 py-6 bg-slate-100" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
         <div className="agape-login-backdrop absolute inset-0 pointer-events-none" aria-hidden="true" />
         <div className="agape-login-stage relative z-10 mx-auto grid w-full max-w-6xl items-start lg:items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="agape-login-mobile-intro flex flex-col items-center text-center">
+          <div className="agape-login-mobile-intro lg:hidden flex flex-col items-center text-center">
             <div className="agape-login-live-pill inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-200/90 bg-white/95 shadow-2xs text-[11px] font-bold text-slate-700 tracking-wider uppercase mb-3">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
               Live operations network
@@ -2885,15 +2885,15 @@ const App = () => {
             <p className="agape-login-mobile-copy text-sm font-medium text-slate-500 text-center mt-1 mb-2">Secure access for dispatch, fleet and field teams.</p>
           </div>
 
-          <aside className="agape-login-story hidden min-h-[620px] flex-col justify-between rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-md p-10 text-slate-800 lg:flex shadow-sm">
+          <aside className="agape-login-story hidden min-h-[540px] flex-col justify-between rounded-3xl border border-slate-200/90 bg-white/80 backdrop-blur-md p-8 lg:p-10 text-slate-800 lg:flex shadow-sm">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-emerald-800">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" /> Live operations network
               </div>
-              <h2 className="mt-8 max-w-xl text-5xl font-extrabold leading-[1.05] tracking-[-0.04em] text-slate-900">
+              <h2 className="mt-6 max-w-xl text-4xl lg:text-5xl font-extrabold leading-[1.08] tracking-[-0.04em] text-slate-900">
                 Every ride.<br />One calm command center.
               </h2>
-              <p className="mt-5 max-w-lg text-base font-medium leading-relaxed text-slate-600">
+              <p className="mt-4 max-w-lg text-base font-medium leading-relaxed text-slate-600">
                 Dispatch, drivers, fleet, reporting and field workflows connected in one secure transportation workspace.
               </p>
             </div>
@@ -2903,9 +2903,9 @@ const App = () => {
                 { label: 'Protected', detail: 'Role access', Icon: ShieldCheck },
                 { label: 'Responsive', detail: 'Field ready', Icon: Zap },
               ].map(({ label, detail, Icon }) => (
-                <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div key={label} className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3.5">
                   <Icon size={18} className="text-blue-600" />
-                  <p className="mt-4 text-sm font-bold text-slate-900">{label}</p>
+                  <p className="mt-3 text-sm font-bold text-slate-900">{label}</p>
                   <p className="mt-1 text-xs font-medium text-slate-500">{detail}</p>
                 </div>
               ))}
@@ -2915,7 +2915,7 @@ const App = () => {
           <div className="agape-login-panel w-full max-w-md justify-self-center overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-sm">
             {/* Minivan Hero Graphic */}
             <div className="agape-login-logo flex justify-center items-center w-full mb-3">
-              <img src="/agape-fleet-van.png" alt="Agape Care Fleet" className="w-64 sm:w-72 max-w-full h-auto object-contain" />
+              <img src="/agape-fleet-van.png" alt="Agape Care Fleet" className="w-56 sm:w-64 max-w-full h-auto object-contain" />
             </div>
 
             {/* Brand Logo & Tagline */}

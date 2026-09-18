@@ -5614,6 +5614,13 @@ textarea:focus,
   transform: translateY(-1px);
 }
 
+@media (min-width: 1024px) {
+  .agape-login {
+    overflow-y: auto !important;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 1023px) {
   .agape-login {
     justify-content: flex-start;
