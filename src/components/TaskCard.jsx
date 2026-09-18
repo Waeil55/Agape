@@ -224,7 +224,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
     ].filter(Boolean);
 
     return (
-      <div className={`relative mb-2 rounded-xl ${isSelected ? 'ring-2 ring-blue-300' : ''}`}>
+      <div className={`relative mb-1.5 rounded-xl transition-all [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 ${isSelected ? 'ring-2 ring-blue-300' : ''}`}>
         <ManifestTripCard
           trip={mobileTrip}
           countdown={getTripCountdown(mobileTrip)}
@@ -242,15 +242,14 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
               aria-checked={!!isSelected}
               aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${task.patient || task.patientName || 'trip'}`}
               onClick={(e) => { e.stopPropagation(); onSelect(task.id); }}
-              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl cursor-pointer"
+              className="shrink-0 !w-5 !h-5 !min-h-0 rounded-md border-2 flex items-center justify-center transition-colors cursor-pointer"
+              style={isSelected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
             >
-              <div
-                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                  isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-slate-400'
-                }`}
-              >
-                {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
-              </div>
+              {isSelected ? (
+                <div className="w-full h-full bg-blue-600 border-blue-600 flex items-center justify-center rounded-[3px]">
+                  <Check size={11} className="text-white" strokeWidth={3} />
+                </div>
+              ) : null}
             </button>
           ) : null}
           onCardClick={canOpenProgress ? () => onToggle(task.id) : undefined}

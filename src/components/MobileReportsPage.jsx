@@ -1,5 +1,5 @@
 import { useDeferredValue, useState, useMemo, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw, Pencil, RotateCcw, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw, Pencil, RotateCcw, List, SlidersHorizontal } from 'lucide-react';
 import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
@@ -566,7 +566,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             const displayStatus = isEditing ? ie.status : (trip.status || (trip.reviewed ? 'Reviewed' : 'Pending'));
 
             return (
-              <div key={trip.id} className="mb-2">
+              <div key={trip.id} className="mb-1.5 rounded-xl [&_button]:!min-h-0 max-md:[&_button]:!min-h-0">
                 <div onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)} className="cursor-pointer" aria-expanded={isExpanded}>
                   <ManifestTripCard
                     trip={trip}

@@ -129,6 +129,41 @@ const MobileEnterpriseDashboard = (props) => {
 
   const [activeDriverTripId, setActiveDriverTripId] = useState(null);
 
+  const activeDriverTrip = useMemo(() => {
+    if (!activeDriverTripId) return null;
+    return driverWorkTrips.find((t) => String(t.id) === String(activeDriverTripId)) || null;
+  }, [activeDriverTripId, driverWorkTrips]);
+
+  const activeDriverWorkDriver = useMemo(() => {
+    if (!activeDriverTrip) return null;
+    const normalizedEmail = String(activeDriverTrip.driverEmail || '').trim().toLowerCase();
+    const found = driverWorkDrivers.find((entry) => (
+      entry.id === activeDriverTrip.driverId
+      || (normalizedEmail && String(entry.email || '').trim().toLowerCase() === normalizedEmail)
+      || (activeDriverTrip.driverName && entry.name === activeDriverTrip.driverName)
+    ));
+    if (found) return found;
+    return {
+      id: activeDriverTrip.driverId || 'temp-driver',
+      name: activeDriverTrip.driverName || 'Driver',
+      email: activeDriverTrip.driverEmail || '',
+    };
+  }, [activeDriverTrip, driverWorkDrivers]);
+
+  const activeDriverWorkTrips = useMemo(() => {
+    if (!activeDriverTrip) return [];
+    if (!activeDriverWorkDriver) return [activeDriverTrip];
+    const driverEmail = String(activeDriverWorkDriver.email || '').trim().toLowerCase();
+    const list = driverWorkTrips.filter((trip) => {
+      const tripDriverEmail = String(trip.driverEmail || '').trim().toLowerCase();
+      return (activeDriverWorkDriver.id && trip.driverId === activeDriverWorkDriver.id) ||
+        (driverEmail && tripDriverEmail === driverEmail) ||
+        (activeDriverWorkDriver.name && trip.driverName === activeDriverWorkDriver.name) ||
+        String(trip.id) === String(activeDriverTrip.id);
+    });
+    return list.length > 0 ? list : [activeDriverTrip];
+  }, [activeDriverTrip, activeDriverWorkDriver, driverWorkTrips]);
+
   const handleSendToPlan = useCallback((selectedTripsList) => {
     const list = Array.isArray(selectedTripsList)
       ? (typeof selectedTripsList[0] === 'object' ? selectedTripsList : driverWorkTrips.filter(t => selectedTripsList.includes(t.id)))
@@ -553,10 +588,10 @@ const MobileEnterpriseDashboard = (props) => {
             <ErrorBoundary>
               <Suspense fallback={<MobileFallback />}>
                 <DriverPage
-                  currentUser={currentUser}
-                  role={role}
-                  drivers={driverWorkDrivers}
-                  trips={driverWorkTrips}
+                  currentUser={activeDriverWorkDriver?.email || activeDriverWorkDriver?.id || currentUser}
+                  role="driver"
+                  drivers={activeDriverWorkDriver ? [activeDriverWorkDriver] : driverWorkDrivers}
+                  trips={activeDriverWorkTrips}
                   vehicles={props.vehicles || []}
                   allDrivers={props.allDrivers || driverWorkDrivers}
                   dispatchers={props.dispatchers || []}
@@ -570,8 +605,10 @@ const MobileEnterpriseDashboard = (props) => {
                   onUpdateAppSettings={props.onUpdateAppSettings}
                   onUpdateDriverLocation={props.onUpdateDriverLocation}
                   defaultTripId={activeDriverTripId}
+                  activeTripId={activeDriverTripId}
                   isEmbedded={true}
                   onEmbeddedClose={closeActiveDriverTrip}
+                  onBack={closeActiveDriverTrip}
                   onDeleteTrip={props.requestDeleteTrip}
                 />
               </Suspense>

@@ -53,8 +53,13 @@ describe('TripsPage render smoke (dispatcher/admin portal entry)', () => {
     expect(html).toContain('On-time');
   });
 
-  it('shows empty state with no trips', () => {
-    const html = renderEl(<TripsPage trips={[]} role="dispatcher" drivers={drivers} />);
-    expect(html).toContain('No trips found');
+  it('renders bulk selection action bar with Route icon without ReferenceError', () => {
+    const html = renderEl(
+      <TripsPage trips={trips} role="admin" currentUser="boss@x.com" drivers={drivers} selectedTasks={['t1']} />
+    );
+    expect(html).toContain('Plan');
+    expect(html).toContain('Assign');
+    expect(html).toContain('Reassign');
   });
 });
+
