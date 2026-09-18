@@ -203,14 +203,13 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
               aria-checked={!!isSelected}
               onClick={(e) => { e.stopPropagation(); onSelect(); }}
               aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${trip.patient || trip.bookingId || 'trip'}`}
-              className="shrink-0 !w-5 !h-5 !min-h-0 rounded-md border-2 flex items-center justify-center transition-colors cursor-pointer"
-              style={isSelected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
+              className="shrink-0 !w-5 !h-5 !min-h-0 rounded border border-slate-300 flex items-center justify-center cursor-pointer transition-colors bg-white"
             >
-              {isSelected ? (
-                <div className="w-full h-full bg-blue-600 border-blue-600 flex items-center justify-center rounded-[3px]">
+              {isSelected && (
+                <div className="w-full h-full bg-blue-600 border-blue-600 flex items-center justify-center rounded-[2px]">
                   <Check size={11} className="text-white" strokeWidth={3} />
                 </div>
-              ) : null}
+              )}
             </button>
           ) : null}
           driverName={driver?.name || trip.driverName || 'Unassigned'}

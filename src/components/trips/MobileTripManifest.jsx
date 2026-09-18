@@ -58,29 +58,29 @@ export function getManifestDisplayStatus(trip) {
 // the only extension beyond the design (real trips need it; blue family).
 // Unknown statuses fail to neutral slate, never crash.
 const STATUS_STYLES = {
-  completed: { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: Check },
-  'in progress': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null, pulse: true },
-  'in mission': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null, pulse: true },
-  'at pickup': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: null, pulse: true },
-  'at dropoff': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: null, pulse: true },
-  'in transit': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null, pulse: true },
-  'en route': { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', icon: null },
-  'navigating pickup': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null },
-  'navigating dropoff': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null },
-  arrived: { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: null },
-  unassigned: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', icon: null },
-  'no show': { cls: 'bg-orange-50 text-orange-700 border border-orange-200/80', icon: User },
-  'trip rerouted': { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', icon: GitBranch },
-  rerouted: { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', icon: GitBranch },
-  cancelled: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', icon: Ban },
-  canceled: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', icon: Ban },
-  transferred: { cls: 'bg-slate-50 text-slate-700 border border-slate-200/80', icon: null },
-  no_show: { cls: 'bg-orange-50 text-orange-700 border border-orange-200/80', icon: User },
-  assigned: { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', icon: null },
-  pending: { cls: 'bg-purple-50 text-purple-700 border border-purple-200/80', icon: Clock },
+  completed: { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', dot: 'bg-emerald-600', icon: Check },
+  'in progress': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null, pulse: true },
+  'in mission': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null, pulse: true },
+  'at pickup': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', dot: 'bg-emerald-600', icon: null, pulse: true },
+  'at dropoff': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', dot: 'bg-emerald-600', icon: null, pulse: true },
+  'in transit': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null, pulse: true },
+  'en route': { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', dot: 'bg-amber-500', icon: null },
+  'navigating pickup': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null },
+  'navigating dropoff': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null },
+  arrived: { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', dot: 'bg-emerald-600', icon: null },
+  unassigned: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', dot: 'bg-rose-500', icon: null },
+  'no show': { cls: 'bg-orange-50 text-orange-700 border border-orange-200/80', dot: 'bg-orange-500', icon: User },
+  'trip rerouted': { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', dot: 'bg-amber-500', icon: GitBranch },
+  rerouted: { cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', dot: 'bg-amber-500', icon: GitBranch },
+  cancelled: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', dot: 'bg-rose-500', icon: Ban },
+  canceled: { cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', dot: 'bg-rose-500', icon: Ban },
+  transferred: { cls: 'bg-slate-50 text-slate-700 border border-slate-200/80', dot: 'bg-slate-500', icon: null },
+  no_show: { cls: 'bg-orange-50 text-orange-700 border border-orange-200/80', dot: 'bg-orange-500', icon: User },
+  assigned: { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null },
+  pending: { cls: 'bg-purple-50 text-purple-700 border border-purple-200/80', dot: 'bg-purple-500', icon: Clock },
 };
 export function getManifestStatusBadge(status) {
-  return STATUS_STYLES[String(status || '').trim().toLowerCase()] || { cls: 'bg-slate-100 text-slate-700', icon: null };
+  return STATUS_STYLES[String(status || '').trim().toLowerCase()] || { cls: 'bg-slate-100 text-slate-700 border border-slate-200/80', dot: 'bg-slate-400', icon: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -374,6 +374,18 @@ export function getManifestAddressLines(value, explicitCity = '') {
   return { street: parts[0], locality: parts.slice(1).join(', ') };
 }
 
+export function getFullAddress(value, explicitCity = '') {
+  const rawAddress = typeof value === 'object'
+    ? String(value?.address || value?.formattedAddress || '').trim()
+    : String(value || '').trim();
+  const city = String(explicitCity || (typeof value === 'object' ? value?.city || '' : '')).trim();
+  if (!rawAddress) return '—';
+  if (city && !rawAddress.toLowerCase().includes(city.toLowerCase())) {
+    return `${rawAddress} ${city}`;
+  }
+  return rawAddress;
+}
+
 // ---------------------------------------------------------------------------
 // ManifestTripCard — modern fleet-dispatch card matching reference design:
 // header (checkbox + time + name + ID), route timeline with dashed connector,
@@ -406,34 +418,15 @@ export function ManifestTripCard({
   const cd = countdown || getTripCountdown(trip);
   const displayStatus = getManifestDisplayStatus(trip);
   const statusBadge = getManifestStatusBadge(displayStatus);
-  const pickup = getManifestAddressLines(trip?.pickup, trip?.pickupCity);
-  const dropoff = getManifestAddressLines(trip?.dropoff, trip?.dropoffCity);
+  const pickupAddress = getFullAddress(trip?.pickup, trip?.pickupCity);
+  const dropoffAddress = getFullAddress(trip?.dropoff, trip?.dropoffCity);
   const isDone = isTripActionTerminal(trip);
-  const timeColor = trip?.urgent
-    ? 'text-rose-600'
-    : isDone
-      ? 'text-slate-400'
-      : cd.level === 'overdue'
-        ? 'text-rose-600'
-        : cd.level === 'critical'
-          ? 'text-rose-600'
-          : cd.level === 'soon'
-            ? 'text-amber-600'
-            : cd.level === 'later'
-              ? 'text-blue-600'
-              : 'text-slate-700';
-  const statusPulseColor = isDone
-    ? 'bg-emerald-500'
-    : cd.level === 'overdue' || cd.level === 'critical'
-      ? 'bg-rose-500'
-      : cd.level === 'soon'
-        ? 'bg-amber-500'
-        : cd.level === 'later'
-          ? 'bg-blue-600'
-          : 'bg-slate-400';
+  const isInOut = String(trip?.time || '').toUpperCase().includes('IN/OUT') || trip?.inOut || trip?.tripIsInOut;
+  const timeColor = isInOut ? 'text-slate-900' : 'text-red-600';
+  const statusPulseColor = statusBadge.dot || (isDone ? 'bg-emerald-600' : 'bg-rose-500');
 
   const handleArticleClick = (e) => {
-    if (e.target.closest('button, a, input, select, textarea, [role="button"], [role="checkbox"]')) {
+    if (e.target.closest('button, a, input, select, textarea, [role="button"], [role="checkbox"], label')) {
       return;
     }
     if (onCardClick) {
@@ -442,169 +435,186 @@ export function ManifestTripCard({
   };
 
   return (
-    <article onClick={onCardClick ? handleArticleClick : undefined} className={`bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all duration-150 [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 ${onCardClick ? 'cursor-pointer active:scale-[0.985]' : ''}`} aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}>
-
-      {/* ── HEADER: Checkbox + Time | Passenger Name + Trip ID ── */}
-      <div className="px-3 py-1.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {selectSlot || (onSelect && (
+    <article
+      onClick={onCardClick ? handleArticleClick : undefined}
+      className={`bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition duration-150 overflow-hidden [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 ${
+        selected ? 'ring-2 ring-blue-500' : ''
+      } ${onCardClick ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+      aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}
+    >
+      {/* ── CARD HEADER ── */}
+      <div className="px-3 py-1.5 flex items-center justify-between border-b border-slate-300 bg-slate-200 gap-2">
+        <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+          {selectSlot ? (
+            selectSlot
+          ) : onSelect ? (
             <button
               type="button"
               role="checkbox"
               aria-checked={!!selected}
               aria-label={`Select trip ${trip?.patient || trip?.bookingId || ''}`}
               onClick={(e) => { e.stopPropagation(); onSelect(trip); }}
-              className="shrink-0 !w-5 !h-5 !min-h-0 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer"
-              style={selected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
+              className={`shrink-0 !w-5 !h-5 !min-h-0 rounded border flex items-center justify-center transition-colors cursor-pointer ${
+                selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
+              }`}
             >
               {selected && <Check size={11} className="text-white" strokeWidth={3} />}
             </button>
-          ))}
+          ) : null}
+
+          {/* Scheduled Time in Red or IN/OUT */}
           {onTimeEdit ? (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
-              className={`text-[15px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer !min-h-0 ${timeColor}`}
-              title="Edit schedule" aria-label={`Edit schedule for ${trip?.patient || 'trip'}`}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onTimeEdit(trip); }}
+              className={`text-[18.5px] font-extrabold tracking-tight shrink-0 hover:underline cursor-pointer !min-h-0 ${timeColor}`}
+              title="Edit schedule"
+              aria-label={`Edit schedule for ${trip?.patient || 'trip'}`}
+            >
               {trip?.time || '—'}
             </button>
           ) : (
-            <span className={`text-[15px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>{trip?.time || '—'}</span>
+            <span className={`text-[18.5px] font-extrabold tracking-tight shrink-0 ${timeColor}`}>
+              {trip?.time || '—'}
+            </span>
           )}
-          <span className="text-slate-300 shrink-0 font-light">|</span>
-          <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
-            <span className="text-sm font-bold text-slate-900 truncate">{trip?.patient || 'Unknown client'}</span>
-            {legs > 0 && (
-              onLegsClick ? (
-                <button type="button" onClick={(e) => { e.stopPropagation(); onLegsClick(e); }} className="text-[10px] text-slate-500 hidden sm:inline shrink-0 !min-h-0"
-                  aria-label={`View ${legs} legs for ${trip?.patient || 'trip'}`}>
-                  ({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})
-                </button>
-              ) : (
-                <span className="text-[10px] text-slate-500 hidden sm:inline shrink-0">({legsLabel || `${legs} ${legs === 1 ? 'leg' : 'legs'}`})</span>
-              )
-            )}
-          </div>
+
+          <span className="text-slate-300 text-base font-normal">|</span>
+
+          {/* Passenger Name */}
+          <span className="text-[16px] font-bold text-slate-900 tracking-tight truncate uppercase">
+            {trip?.patient || trip?.patientName || 'Unknown client'}
+          </span>
+          {legs > 1 && (
+            <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline shrink-0">
+              ({legsLabel || `${legs} legs`})
+            </span>
+          )}
         </div>
-        <div className="flex items-center shrink-0 gap-1.5">
+
+        {/* Trip ID */}
+        <div className="flex items-center shrink-0 space-x-1.5">
           {(trip?.notes || trip?.driverNotes || trip?.specialInstructions || trip?.instructions) && (
             <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700" title="Has driver notes">
               <Pencil size={9} />
             </span>
           )}
           <PriorityBadge trip={trip} />
-          <span className="text-[11px] font-bold text-slate-600 bg-slate-200/80 px-1.5 py-0.5 rounded border border-slate-300/60 tracking-wide">
-            #{trip?.bookingId || trip?.id || '—'}
+          <span className="bg-white/90 text-slate-900 text-[14px] font-bold px-2.5 py-0.5 rounded-md border border-slate-300/90 tracking-wide">
+            {trip?.bookingId || trip?.id || '—'}
           </span>
         </div>
       </div>
 
-      {/* ── ROUTE TIMELINE: Pickup → Dropoff with dashed connector ── */}
-      <div className="px-3 py-1">
-        <div className="relative pl-3 space-y-0.5 before:content-[''] before:absolute before:left-[3px] before:top-1.5 before:bottom-1.5 before:w-[1.5px] before:border-l-[1.5px] before:border-dashed before:border-slate-300">
+      {/* ── CARD BODY: Addresses ── */}
+      <div className="px-3 py-2 space-y-1.5 text-[14px] leading-tight">
+        {/* Pickup Address */}
+        <div className="flex items-center space-x-2 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+          <span className="text-slate-600 font-normal tracking-tight truncate flex-1 min-w-0" title={pickupAddress}>
+            {pickupAddress}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(pickupAddress); }}
+            title="Copy Pickup"
+            className="text-slate-400 hover:text-slate-600 p-0.5 shrink-0 opacity-40 hover:opacity-100 transition-opacity"
+          >
+            <Copy size={12} />
+          </button>
+        </div>
 
-          {/* Pickup Line */}
-          <div className="relative flex items-center justify-between gap-1.5 text-xs">
-            <div className="absolute -left-3 top-1.5 w-1.5 h-1.5 rounded-full border-2 border-emerald-500 bg-white" />
-            <div className="flex items-baseline gap-1.5 truncate min-w-0">
-              <span className="text-[9px] font-black uppercase text-emerald-600 shrink-0">PU</span>
-              <span className="text-[12px] font-semibold text-slate-700 truncate">{pickup.street}</span>
-              {pickup.locality && <span className="text-[11px] text-slate-400 truncate hidden xs:inline">• {pickup.locality}</span>}
-            </div>
-            <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.pickup || ''}${pickup.locality ? ', ' + pickup.locality : ''}`); }}
-              title="Copy Pickup" className="p-0.5 !min-h-0 !h-auto !w-auto text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-              <Copy size={12} />
-            </button>
-          </div>
-
-          {/* Dropoff Line */}
-          <div className="relative flex items-center justify-between gap-1.5 text-xs">
-            <div className="absolute -left-3 top-1.5 w-1.5 h-1.5 rounded-full border-2 border-rose-500 bg-white" />
-            <div className="flex items-baseline gap-1.5 truncate min-w-0">
-              <span className="text-[9px] font-black uppercase text-rose-600 shrink-0">DO</span>
-              <span className="text-[12px] font-semibold text-slate-700 truncate">{dropoff.street}</span>
-              {dropoff.locality && <span className="text-[11px] text-slate-400 truncate hidden xs:inline">• {dropoff.locality}</span>}
-            </div>
-            <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${trip?.dropoff || ''}${dropoff.locality ? ', ' + dropoff.locality : ''}`); }}
-              title="Copy Dropoff" className="p-0.5 !min-h-0 !h-auto !w-auto text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-              <Copy size={12} />
-            </button>
-          </div>
-
+        {/* Dropoff Address */}
+        <div className="flex items-center space-x-2 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+          <span className="text-slate-600 font-normal tracking-tight truncate flex-1 min-w-0" title={dropoffAddress}>
+            {dropoffAddress}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(dropoffAddress); }}
+            title="Copy Dropoff"
+            className="text-slate-400 hover:text-slate-600 p-0.5 shrink-0 opacity-40 hover:opacity-100 transition-opacity"
+          >
+            <Copy size={12} />
+          </button>
         </div>
       </div>
 
       {assignSlot}
 
-      {/* ── FOOTER: Driver pill + Action icons + Telemetry + Status ── */}
-      <div className="px-3 py-1 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-1">
-
-        {/* Left: Driver Pill + Call/SMS/Options buttons */}
-        <div className="flex items-center gap-1 min-w-0">
-          {/* Driver Pill */}
-          <div className="flex items-center gap-1 h-6.5 px-2 rounded-md bg-white border border-slate-200/80 text-[11px] font-semibold text-slate-700 shadow-2xs">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusPulseColor}`} />
-            <span className="truncate max-w-[100px]">{driverName || trip?.driverName || '—'}</span>
+      {/* ── CARD FOOTER ── */}
+      <div className="px-3 py-1 bg-slate-50/80 border-t border-slate-100/70 flex items-center justify-between text-[12px]">
+        {/* Driver & Comm Icons */}
+        <div className="flex items-center space-x-2 min-w-0">
+          <div className="flex items-center space-x-1 shrink-0">
+            <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />
+            <span className="font-semibold text-slate-700 text-[12px] truncate max-w-[90px]">
+              {driverName || trip?.driverName || '—'}
+            </span>
           </div>
 
           {/* Call Button */}
           {iconActions.find(a => a.id === 'call') ? (
-            <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'call')?.onClick?.(e); }}
-              title="Call" className="!w-6.5 !h-6.5 !min-h-0 rounded-md bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer">
-              <Phone size={12} className="text-emerald-600" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'call')?.onClick?.(e); }}
+              className="text-slate-400 hover:text-blue-600 p-0.5 transition-colors cursor-pointer"
+              title="Call Passenger"
+              aria-label="Call Passenger"
+            >
+              <Phone className="w-3.5 h-3.5 text-blue-600" />
             </button>
           ) : null}
 
-          {/* SMS Button */}
+          {/* Chat / SMS Button */}
           {iconActions.find(a => a.id === 'message') ? (
-            <button type="button" onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'message')?.onClick?.(e); }}
-              title="Text" className="!w-6.5 !h-6.5 !min-h-0 rounded-md bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer">
-              <MessageSquare size={12} className="text-blue-500" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'message')?.onClick?.(e); }}
+              className="text-slate-400 hover:text-blue-600 p-0.5 transition-colors cursor-pointer"
+              title="Chat Passenger"
+              aria-label="Chat Passenger"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
             </button>
           ) : null}
 
-          {/* More / Options Button */}
+          {/* More options Button */}
           {onMore && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onMore(e); }}
-              aria-label={typeof moreLabel === 'string' ? moreLabel : 'More actions'}
-              title={typeof moreLabel === 'string' ? moreLabel : undefined}
-              className="!w-6.5 !h-6.5 !min-h-0 rounded-md bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors shadow-2xs shrink-0 cursor-pointer">
-              <MoreHorizontal size={12} />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onMore(e); }}
+              className="text-slate-400 hover:text-slate-600 p-0.5 transition-colors cursor-pointer"
+              title={typeof moreLabel === 'string' ? moreLabel : 'More options'}
+              aria-label={typeof moreLabel === 'string' ? moreLabel : 'More options'}
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* Right: Telemetry (countdown/time away + distance) + Status Badge */}
-        <div className="flex items-center gap-1 shrink-0 justify-end">
-          {/* Telemetry Pill */}
-          <div className="flex items-center h-6.5 rounded-md border border-slate-200 bg-white overflow-hidden text-[10px] font-semibold shadow-2xs">
-            {!isDone ? (
-              <div className={`flex items-center gap-1 px-1.5 h-full border-r border-slate-200 whitespace-nowrap ${
-                trip?.urgent ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'
-              }`}>
-                <Navigation size={9} className="text-blue-500 fill-current" />
-                <span>{cd.label}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 px-1.5 h-full bg-emerald-50 text-emerald-700 border-r border-slate-200 whitespace-nowrap">
-                <CheckCircle2 size={9} className="text-emerald-500" />
-              </div>
-            )}
+        {/* Route Metrics & Status Pill */}
+        <div className="flex items-center space-x-1.5 shrink-0">
+          <div className="inline-flex items-center text-[12px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+            <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
+            <span>{cd.label}</span>
             {mileage && (
-              <div className="flex items-center gap-1 px-1.5 h-full text-slate-700 whitespace-nowrap font-bold">
+              <>
+                <span className="mx-1 text-slate-400">•</span>
                 <span>{mileage}</span>
-              </div>
+              </>
             )}
           </div>
 
-          {/* Status Badge */}
-          <span title={displayStatus} className={`inline-flex items-center h-6.5 gap-1 px-2 rounded-md text-[10px] font-bold whitespace-nowrap ${statusBadge.cls}`}>
-            {isDone && <Check size={10} />}
-            {!isDone && statusBadge.pulse && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
-            {!isDone && !statusBadge.pulse && statusBadge.icon && <statusBadge.icon size={10} />}
-            {!isDone && !statusBadge.pulse && !statusBadge.icon && <span className={`w-1.5 h-1.5 rounded-full ${statusPulseColor}`} />}
-            {displayStatus}
+          <span
+            className={`status-btn inline-flex items-center text-[12px] font-bold px-2 py-0.5 rounded border transition ${statusBadge.cls}`}
+            title={displayStatus}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full mr-1 ${statusBadge.dot || statusPulseColor}`} />
+            <span className="status-label">{displayStatus}</span>
           </span>
         </div>
-
       </div>
     </article>
   );

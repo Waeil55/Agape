@@ -242,14 +242,13 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
               aria-checked={!!isSelected}
               aria-label={`${isSelected ? 'Deselect' : 'Select'} trip for ${task.patient || task.patientName || 'trip'}`}
               onClick={(e) => { e.stopPropagation(); onSelect(task.id); }}
-              className="shrink-0 !w-5 !h-5 !min-h-0 rounded-md border-2 flex items-center justify-center transition-colors cursor-pointer"
-              style={isSelected ? { backgroundColor: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1', backgroundColor: 'white' }}
+              className="w-[18px] h-[18px] rounded border border-slate-300 flex items-center justify-center cursor-pointer transition-colors bg-white shrink-0"
             >
-              {isSelected ? (
-                <div className="w-full h-full bg-blue-600 border-blue-600 flex items-center justify-center rounded-[3px]">
+              {isSelected && (
+                <div className="w-full h-full bg-blue-600 border-blue-600 flex items-center justify-center rounded-[2px]">
                   <Check size={11} className="text-white" strokeWidth={3} />
                 </div>
-              ) : null}
+              )}
             </button>
           ) : null}
           onCardClick={canOpenProgress ? () => onToggle(task.id) : undefined}
