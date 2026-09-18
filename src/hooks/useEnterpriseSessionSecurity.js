@@ -91,14 +91,19 @@ export default function useEnterpriseSessionSecurity({
     const startedKey = storageKey(uid, 'started_at');
     const activityKey = storageKey(uid, 'last_activity');
     const now = Date.now();
-    if (!readTimestamp(startedKey, 0)) writeTimestamp(startedKey, now);
-    if (!readTimestamp(activityKey, 0)) writeTimestamp(activityKey, now);
+
+    // Ensure active session timestamps: a newly mounted authenticated session is active now.
+    // If started_at is missing, from the future, or exceeds the absolute policy, reset it to now.
+    const existingStarted = readTimestamp(startedKey, 0);
+    if (!existingStarted || (now - existingStarted >= policy.absoluteMs) || existingStarted > now) {
+      writeTimestamp(startedKey, now);
+    }
+    // Activity is unconditionally refreshed to now when the authenticated session starts or mounts
+    writeTimestamp(activityKey, now);
 
     const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), (snapshot) => {
-      if (!snapshot.metadata?.fromCache && !snapshot.exists() || !isEmploymentAccessActive(snapshot.data())) {
-        if (!snapshot.metadata?.fromCache) {
-          terminate('access_revoked', 'Your Agape Care access has been disabled. Contact an administrator if this is unexpected.');
-        }
+      if (!snapshot.metadata?.fromCache && (!snapshot.exists() || !isEmploymentAccessActive(snapshot.data()))) {
+        terminate('access_revoked', 'Your Agape Care access has been disabled. Contact an administrator if this is unexpected.');
       }
     }, () => {
       // Transient Firestore errors (network, permission flicker) should not

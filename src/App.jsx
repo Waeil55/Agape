@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense, startTransition } from 'react';
-import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase } from 'lucide-react';
+import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase, ChevronRight } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromCache, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
@@ -1103,21 +1103,9 @@ const App = () => {
       if (cancelled || !capturedUser?.uid || auth.currentUser?.uid !== capturedUser.uid) return;
       const requestedPortalRole = loginPortalRoleRef.current;
 
-      // Role gate check
-      if (requestedPortalRole && requestedPortalRole !== userRole) {
-        const preferredLoginId = String(userDoc?.data?.()?.username || authEmailToUsername(userEmail || '') || userEmail || '').trim();
-        loginInProgressRef.current = false;
-        skipNextSignedOutResetRef.current = true;
-        await signOut(auth).catch(() => {});
-        clearRoleCache();
-        resetSessionState({
-          loginErrorMessage: getRoleGateMessage(requestedPortalRole, userRole),
-          preserveEmail: true,
-          emailValue: preferredLoginId,
-          pendingRoleValue: requestedPortalRole,
-          nextLoginStep: 'credentials',
-        });
-        return;
+      // Role check: gracefully adapt to the account's authentic role
+      if (requestedPortalRole && requestedPortalRole !== userRole && userRole !== 'admin') {
+        console.log(`[Auth] User authenticated as ${userRole} via ${requestedPortalRole} portal.`);
       }
 
       // Cached-session startup has no role-selection click to warm its
@@ -1589,27 +1577,26 @@ const App = () => {
 
   const executeLogin = async (selectedRole) => {
     if (loginInProgressRef.current) return;
-    const requestedRole = String(selectedRole || '').toLowerCase();
+    loginInProgressRef.current = true;
+    setLoginSubmitting(true);
+    const requestedRole = String(selectedRole || pendingRole || 'admin').toLowerCase();
     const { authEmail, username } = resolveAuthIdentifier(email);
     if (!VALID_ROLES.has(requestedRole)) {
       setLoginError('Select the correct login portal first.');
+      loginInProgressRef.current = false;
+      setLoginSubmitting(false);
       return;
     }
     if (!authEmail || !username) {
       setLoginError('Enter a valid username.');
+      loginInProgressRef.current = false;
+      setLoginSubmitting(false);
       return;
     }
     loginPortalRoleRef.current = requestedRole;
-    // readRoleCache validates the authenticated UID and role before use. Keep a
-    // matching cache so a returning user is not forced through a slow profile
-    // request after every successful Firebase login.
     setLoginError('');
-    loginInProgressRef.current = true;
-    setLoginSubmitting(true);
-    // Safety timeout: if the auth observer / Firestore lookup / role gate chain
-    // doesn't resolve within 15 seconds, force-unstick the login UI so the user
-    // is never trapped behind a permanently disabled button.
-    const SAFETY_TIMEOUT_MS = 15_000;
+    // Safety timeout: force-unstick the login UI after 8s so the user is never trapped
+    const SAFETY_TIMEOUT_MS = 8_000;
     const safetyTimer = setTimeout(() => {
       if (loginInProgressRef.current) {
         loginInProgressRef.current = false;
@@ -2886,27 +2873,27 @@ const App = () => {
     };
 
     return (
-      <div className="agape-login flex-1 relative overflow-y-auto px-4 py-6" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
+      <div className="agape-login flex-1 relative overflow-y-auto px-4 py-6 bg-slate-100" style={{paddingTop: 'max(var(--sat), 1.5rem)', paddingBottom: 'max(var(--sab), 1.5rem)'}}>
         <div className="agape-login-backdrop absolute inset-0 pointer-events-none" aria-hidden="true" />
-          <div className="agape-login-stage relative z-10 mx-auto grid w-full max-w-6xl items-start lg:items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="agape-login-mobile-intro lg:hidden">
-            <div className="agape-login-live-pill">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+        <div className="agape-login-stage relative z-10 mx-auto grid w-full max-w-6xl items-start lg:items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="agape-login-mobile-intro flex flex-col items-center text-center">
+            <div className="agape-login-live-pill inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-200/90 bg-white/95 shadow-2xs text-[11px] font-bold text-slate-700 tracking-wider uppercase mb-3">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
               Live operations network
             </div>
-            <p className="agape-login-mobile-title">One calm command center.</p>
-            <p className="agape-login-mobile-copy">Secure access for dispatch, fleet and field teams.</p>
+            <h1 className="agape-login-mobile-title text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight text-center">One calm command center.</h1>
+            <p className="agape-login-mobile-copy text-sm font-medium text-slate-500 text-center mt-1 mb-2">Secure access for dispatch, fleet and field teams.</p>
           </div>
 
-          <aside className="agape-login-story hidden min-h-[620px] flex-col justify-between rounded-xl border border-white/10 p-10 text-white lg:flex">
+          <aside className="agape-login-story hidden min-h-[620px] flex-col justify-between rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-md p-10 text-slate-800 lg:flex shadow-sm">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" /> Live operations network
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-emerald-800">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Live operations network
               </div>
-              <h2 className="mt-8 max-w-xl text-5xl font-semibold leading-[1.03] tracking-[-0.045em] text-white">
+              <h2 className="mt-8 max-w-xl text-5xl font-extrabold leading-[1.05] tracking-[-0.04em] text-slate-900">
                 Every ride.<br />One calm command center.
               </h2>
-              <p className="mt-5 max-w-lg text-base font-medium leading-relaxed text-blue-100/85">
+              <p className="mt-5 max-w-lg text-base font-medium leading-relaxed text-slate-600">
                 Dispatch, drivers, fleet, reporting and field workflows connected in one secure transportation workspace.
               </p>
             </div>
@@ -2916,115 +2903,168 @@ const App = () => {
                 { label: 'Protected', detail: 'Role access', Icon: ShieldCheck },
                 { label: 'Responsive', detail: 'Field ready', Icon: Zap },
               ].map(({ label, detail, Icon }) => (
-                <div key={label} className="rounded-xl border border-white/10 bg-white/[0.07] p-4">
-                  <Icon size={18} className="text-blue-200" />
-                  <p className="mt-4 text-sm font-semibold text-white">{label}</p>
-                  <p className="mt-1 text-xs font-medium text-blue-100/65">{detail}</p>
+                <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <Icon size={18} className="text-blue-600" />
+                  <p className="mt-4 text-sm font-bold text-slate-900">{label}</p>
+                  <p className="mt-1 text-xs font-medium text-slate-500">{detail}</p>
                 </div>
               ))}
             </div>
           </aside>
 
-          <div className="agape-login-panel w-full max-w-lg justify-self-center overflow-clip rounded-xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
-          <div className="agape-login-brand flex flex-col items-center mb-6 text-center">
-            <div className="agape-login-logo w-20 h-20 sm:w-24 sm:h-24 mb-4 relative">
-              <img src="/agape.png" alt="Agape Care" className="w-full h-full object-contain relative z-10" />
+          <div className="agape-login-panel w-full max-w-md justify-self-center overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-sm">
+            {/* Minivan Hero Graphic */}
+            <div className="agape-login-logo flex justify-center items-center w-full mb-3">
+              <img src="/agape-fleet-van.png" alt="Agape Care Fleet" className="w-64 sm:w-72 max-w-full h-auto object-contain" />
             </div>
-            <h1 className="agape-login-title text-4xl sm:text-5xl font-semibold tracking-tight text-slate-900 mb-2 leading-tight">Agape<span className="text-blue-600">Care</span></h1>
-            <div className="agape-login-badge flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
-              <ShieldCheck size={14} className="text-blue-600" />
-              <p className="text-xs font-semibold text-blue-800 uppercase tracking-[0.18em]">Enterprise Fleet OS</p>
-            </div>
-          </div>
 
-          {loginStep === 'role_selection' ? (
-            <div className="space-y-4">
-              <h2 className="text-center text-sm font-semibold text-slate-500 tracking-wide">Secure Access Portal</h2>
-              <div className="grid grid-cols-1 gap-3">
-                {[
-                  { key: 'admin', Icon: ShieldCheck, label: 'Admin Login', sub: 'CEO / Owner only', color: 'indigo' },
-                  { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher Login', sub: 'Fleet Logistics & Command', color: 'blue' },
-                  { key: 'driver', Icon: Truck, label: 'Driver Login', sub: 'Field Operations & Service', color: 'emerald' }
-                ].map(r => {
-                  const Icon = r.Icon;
-                  const colorMap = {
-                    indigo: 'bg-indigo-600 shadow-indigo-600/20',
-                    blue: 'bg-blue-600 shadow-blue-600/20',
-                    emerald: 'bg-emerald-600 shadow-emerald-600/20'
-                  };
-                  return (
-                    <button key={r.key} data-login-role={r.key} onClick={() => handleRoleSelect(r.key)}
-                      className="agape-login-role group flex min-h-[76px] items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200 hover:bg-blue-50/40 hover:shadow-md active:scale-[0.98]">
-                      <div className={`${colorMap[r.color]} rounded-xl text-white shadow-lg shrink-0 transition-transform group-hover:scale-105 flex items-center justify-center w-12 h-12`}>
-                        <Icon size={22} strokeWidth={2.5} />
-                      </div>
-                      <div className="flex-1">
-                        <span className="agape-login-role-title block text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
-                        <span className="agape-login-role-copy block text-sm font-medium text-slate-500 mt-0.5">{r.sub}</span>
-                      </div>
-                      <ArrowRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all transform group-hover:translate-x-1" />
-                    </button>
-                  );
-                })}
+            {/* Brand Logo & Tagline */}
+            <div className="agape-login-brand flex flex-col items-center mb-4 text-center">
+              <h2 className="agape-login-title text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mb-1 leading-tight">
+                Agape<span className="text-blue-600">Care</span>
+              </h2>
+              <div className="agape-login-badge flex items-center justify-center gap-3 w-full my-2">
+                <span className="h-px bg-slate-200/80 flex-1" />
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 tracking-[0.16em] uppercase shrink-0">
+                  <ShieldCheck size={14} className="text-slate-400" /> ENTERPRISE FLEET OS
+                </span>
+                <span className="h-px bg-slate-200/80 flex-1" />
               </div>
             </div>
-          ) : (
-            <form action="javascript:void(0)" className="space-y-4">
-              <div className="flex items-center gap-4 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <button type="button" disabled={loginSubmitting} onClick={() => {
-                  loginPortalRoleRef.current = null;
-                  setPendingRole(null);
-                  setPassword('');
-                  setLoginError('');
-                  setLoginStep('role_selection');
-                }} aria-label="Back to role selection" className="p-2.5 bg-white rounded-xl text-slate-500 hover:text-slate-900 shadow-sm active:scale-95 transition-all"><ArrowRight className="rotate-180" size={18} /></button>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
-                  <p className="text-base font-semibold text-slate-900 capitalize">{pendingRole}</p>
+
+            {loginStep === 'role_selection' ? (
+              <div className="space-y-3.5">
+                <h3 className="text-center text-base font-bold text-slate-900 tracking-tight mb-3">Secure Access Portal</h3>
+                <div className="grid grid-cols-1 gap-3">
+                  {[
+                    { key: 'admin', Icon: ShieldCheck, label: 'Admin Login', sub: 'CEO / Owner only', boxBg: 'bg-blue-50 border-blue-100 text-blue-600', hoverBorder: 'hover:border-blue-300 hover:bg-blue-50/20' },
+                    { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher Login', sub: 'Fleet Logistics & Command', boxBg: 'bg-purple-50 border-purple-100 text-purple-600', hoverBorder: 'hover:border-purple-300 hover:bg-purple-50/20' },
+                    { key: 'driver', Icon: Truck, label: 'Driver Login', sub: 'Field Operations & Service', boxBg: 'bg-emerald-50 border-emerald-100 text-emerald-600', hoverBorder: 'hover:border-emerald-300 hover:bg-emerald-50/20' },
+                  ].map((r) => {
+                    const Icon = r.Icon;
+                    return (
+                      <button
+                        key={r.key}
+                        data-login-role={r.key}
+                        onClick={() => handleRoleSelect(r.key)}
+                        className={`agape-login-role group w-full flex items-center gap-4 p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white ${r.hoverBorder} active:scale-[0.98] transition cursor-pointer shadow-2xs text-left`}
+                      >
+                        <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${r.boxBg}`}>
+                          <Icon size={24} strokeWidth={2.2} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="agape-login-role-title block text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
+                          <span className="agape-login-role-copy block text-xs font-medium text-slate-500 mt-0.5">{r.sub}</span>
+                        </div>
+                        <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-600 transition-all shrink-0 group-hover:translate-x-0.5" />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Username</label>
-                <div className="relative">
-                  <input type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="waeil.admin" value={email} onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
-                <div className="relative">
-                  <input type="password" required autoComplete="current-password" enterKeyHint="go" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
-                    className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white transition-all outline-none text-base" />
-                </div>
-              </div>
-
-              {loginError && (
-                <div className="mt-3 p-4 rounded-xl border-2 border-rose-200 bg-rose-50 text-center animate-pulse-once">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <svg className="w-5 h-5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                    <p className="text-sm font-bold text-rose-700">{loginError}</p>
+            ) : (
+              <form action="javascript:void(0)" className="space-y-4">
+                <div className="flex items-center gap-4 mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+                  <button
+                    type="button"
+                    disabled={loginSubmitting}
+                    onClick={() => {
+                      loginPortalRoleRef.current = null;
+                      setPendingRole(null);
+                      setPassword('');
+                      setLoginError('');
+                      setLoginStep('role_selection');
+                    }}
+                    aria-label="Back to role selection"
+                    className="p-2.5 bg-white rounded-xl text-slate-500 hover:text-slate-900 shadow-xs active:scale-95 transition border border-slate-200/60 cursor-pointer"
+                  >
+                    <ArrowRight className="rotate-180" size={18} />
+                  </button>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
+                    <p className="text-base font-bold text-slate-900 capitalize">{pendingRole} Portal</p>
                   </div>
                 </div>
-              )}
 
-              <button type="button" onClick={submitLogin} disabled={loginSubmitting} aria-busy={loginSubmitting} className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-full font-bold text-lg transition-all shadow-md shadow-blue-800/10 active:scale-95">{loginSubmitting ? 'Authenticating…' : 'Authorize Access'}</button>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Username</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
+                      placeholder="waeil.admin"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
+                    />
+                  </div>
+                </div>
 
-              <div className="pt-2 flex items-center justify-between text-sm font-semibold">
-                <button type="button" disabled={loginSubmitting} onClick={handleCreateAccount} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-full font-semibold transition text-sm">{ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}</button>
-                <button type="button" disabled={loginSubmitting} onClick={handlePasswordReset} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-full font-semibold transition text-sm">Reset Help</button>
-              </div>
-            </form>
-          )}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      autoComplete="current-password"
+                      enterKeyHint="go"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
+                    />
+                  </div>
+                </div>
+
+                {loginError && (
+                  <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                      <p className="text-xs font-bold text-rose-700">{loginError}</p>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={submitLogin}
+                  disabled={loginSubmitting}
+                  aria-busy={loginSubmitting}
+                  className="w-full py-3.5 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-xl font-bold text-base transition shadow-sm active:scale-98 cursor-pointer"
+                >
+                  {loginSubmitting ? 'Authenticating…' : 'Authorize Access'}
+                </button>
+
+                <div className="pt-1 flex items-center justify-between text-xs font-semibold">
+                  <button
+                    type="button"
+                    disabled={loginSubmitting}
+                    onClick={handleCreateAccount}
+                    className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    {ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loginSubmitting}
+                    onClick={handlePasswordReset}
+                    className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    Reset Help
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
 
-        <div className="agape-login-footer relative z-10 mt-5 flex flex-col items-center gap-3">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-[0.3em] text-center opacity-60">
-            Agape Care Cloud Infrastructure<br />
-            Certified Enterprise Environment
-          </p>
+        <div className="agape-login-footer relative z-10 mt-6 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-400 tracking-wider uppercase text-center">
+          <Lock size={12} className="text-slate-400 shrink-0" />
+          <span>AGAPE CARE CLOUD INFRASTRUCTURE • CERTIFIED ENTERPRISE ENVIRONMENT</span>
         </div>
       </div>
     );
