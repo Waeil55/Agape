@@ -8,7 +8,7 @@ describe('Enterprise Route Planner & Compact Card Contracts', () => {
     const cardSource = readComponent('trips/MobileTripManifest.jsx');
     expect(cardSource).toContain('[&_button]:!min-h-0');
     expect(cardSource).toContain('max-md:[&_button]:!min-h-0');
-    expect(cardSource).toContain('px-3.5 py-2.5 bg-slate-200 border-b border-slate-300 flex items-center justify-between');
+    expect(cardSource).toContain('px-3.5 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between');
     expect(cardSource).toContain('px-3 py-1.5 bg-slate-50/20 border-t border-slate-100/70');
   });
 

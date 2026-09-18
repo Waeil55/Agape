@@ -443,7 +443,7 @@ export function ManifestTripCard({
       aria-label={`Trip for ${trip?.patient || trip?.bookingId || 'unknown'}`}
     >
       {/* ── CARD HEADER ── */}
-      <div className="px-3.5 py-2.5 bg-slate-200 border-b border-slate-300 flex items-center justify-between">
+      <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
         <div className="flex items-center space-x-2.5 min-w-0">
           {selectSlot ? (
             selectSlot
