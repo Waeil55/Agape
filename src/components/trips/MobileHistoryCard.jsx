@@ -37,7 +37,7 @@ export function MobileHistoryCardHeader({
         <div className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 text-[16px] font-bold tracking-tight tabular-nums text-emerald-700">{time || 'Will Call'}</span>
           <span className="h-3.5 w-[1.5px] shrink-0 bg-slate-400/80" aria-hidden="true" />
-          <span className="min-w-0 truncate text-[16px] font-bold tracking-[-0.35px] text-slate-950">{patient}</span>
+          <span className="min-w-0 truncate text-[14px] font-semibold tracking-[-0.2px] text-slate-950">{patient}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <button type="button" onClick={copyId} className="flex max-w-[112px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[13.5px] font-bold text-slate-900 shadow-xs" title="Click to copy Trip ID"><span className="truncate tracking-tight">{bookingId}</span>{copied && <Check size={13} className="text-emerald-600" />}</button>

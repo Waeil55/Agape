@@ -29,6 +29,7 @@ describe('mobile history card design', () => {
     expect(view.host.textContent).toContain('9:30 AM');
     expect(view.host.textContent).toContain('12.4 mi');
     expect(view.host.textContent).toContain('Ann Driver');
+    expect([...view.host.querySelectorAll('span')].find((span) => span.textContent === 'Jane Doe')?.className).toContain('text-[14px]');
     act(() => view.host.querySelector('button[aria-label="Open trip"]').click());
     expect(onToggle).toHaveBeenCalledOnce();
     view.cleanup();
