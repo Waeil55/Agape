@@ -3037,25 +3037,28 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const handleNavigateToPickup = async (trip) => {
     impact('heavy');
+    preloadGeofence(trip);
+    // Native navigation is a direct user action and must open immediately.
+    // The optimistic workflow overlay already paints the pending status while
+    // the durable local outbox transaction completes.
+    openInNavApp(trip.pickup, navApp);
     const saved = await advanceWorkflow(trip, 'Navigating Pickup', {});
     if (!saved) {
       setShowToast({ type: 'error', message: 'Navigation status could not be saved. Check the connection and retry.' });
       return false;
     }
-    preloadGeofence(trip);
-    openInNavApp(trip.pickup, navApp);
     return true;
   };
 
   const handleNavigateToDropoff = async (trip) => {
     impact('heavy');
+    preloadGeofence(trip);
+    openInNavApp(trip.dropoff, navApp);
     const saved = await advanceWorkflow(trip, 'Navigating Dropoff', {});
     if (!saved) {
       setShowToast({ type: 'error', message: 'Navigation status could not be saved. Check the connection and retry.' });
       return false;
     }
-    preloadGeofence(trip);
-    openInNavApp(trip.dropoff, navApp);
     return true;
   };
 
@@ -3326,19 +3329,21 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           : Promise.resolve(null);
       }
 
-      const saved = await advanceWorkflow(pickupTrip, 'At Pickup', {
+      const persistence = advanceWorkflow(pickupTrip, 'At Pickup', {
         pickupOdometer: odo,
         arrivalTime: nowIso,
         startTime: nowIso,
       });
-      if (!saved) {
-        setOdometerError('The pickup odometer was not saved. Your entry is preserved; check the connection and retry.');
-        return;
-      }
-
       setLastOdometer(odo);
       setShowOdometerPrompt(null);
       setOdometerValue('');
+      const saved = await persistence;
+      if (!saved) {
+        setShowOdometerPrompt(pickupTrip);
+        setOdometerValue(String(odo));
+        setOdometerError('The pickup odometer was not saved. Your entry is preserved; check the connection and retry.');
+        return;
+      }
 
       void (async () => {
         let autoStartedShift = false;
@@ -3414,10 +3419,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   };
 
   const handleArriveDropoff = async (trip) => {
-    const saved = await advanceWorkflow(trip, 'At Dropoff', {
+    const persistence = advanceWorkflow(trip, 'At Dropoff', {
       arrivalDropoffTime: new Date().toISOString(),
     });
+    openCompleteModal(trip);
+    const saved = await persistence;
     if (!saved) {
+      setShowCompleteModal(null);
       setShowToast({ type: 'error', message: 'Dropoff arrival could not be saved. Check the connection and retry.' });
       return false;
     }
@@ -3425,7 +3433,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
       ttLogTripEvent('TRIP_ARRIVED_DROPOFF', trip.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
     }
-    openCompleteModal(trip);
     return true;
   };
 
@@ -3444,11 +3451,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     tripActionInFlightRef.current = true;
     try {
       const signatureTrip = showSignatureConfirm;
-      const saved = await advanceWorkflow(signatureTrip, 'In Transit', {
+      const persistence = advanceWorkflow(signatureTrip, 'In Transit', {
         departedPickupTime: new Date().toISOString(),
         paperSignatureConfirmed: true,
       });
+      setShowSignatureConfirm(null);
+      const saved = await persistence;
       if (!saved) {
+        setShowSignatureConfirm(signatureTrip);
         setShowToast({ type: 'error', message: 'The signature confirmation was not saved. Check the connection and retry.' });
         return;
       }
@@ -3456,7 +3466,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       if (ttStateRef.current === TT.ON_SHIFT_ACTIVE || ttStateRef.current === TT.ON_BREAK) {
         ttLogTripEvent('TRIP_DEPARTED_PICKUP', signatureTrip.id, driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null);
       }
-      setShowSignatureConfirm(null);
       setSignatureConfirmed(false);
     } finally {
       tripActionInFlightRef.current = false;
@@ -4062,13 +4071,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const startTripAndOpen = async (trip) => {
     if (workflowReadOnly) return;
     impact('heavy');
-    const saved = await advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() });
+    // Paint the focused workflow immediately. advanceWorkflow applies its
+    // optimistic overlay synchronously and rolls it back if durable staging
+    // fails, so the operator is never left waiting on the previous screen.
+    const persistence = advanceWorkflow(trip, 'In Progress', { startedAt: new Date().toISOString() });
+    setStartedTripNavId(trip.id);
+    openTripWorkPage(trip.id);
+    const saved = await persistence;
     if (!saved) {
       setShowToast({ type: 'error', message: 'The trip could not be started. Check the connection and retry.' });
       return false;
     }
-    setStartedTripNavId(trip.id);
-    openTripWorkPage(trip.id);
     return true;
   };
 

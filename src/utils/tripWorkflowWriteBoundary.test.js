@@ -53,7 +53,7 @@ describe('driver trip workflow write boundary', () => {
     expect(completionBoundary).not.toContain('await calculateBoundaryTravel');
   });
 
-  it('keeps odometer dialogs open when persistence fails', () => {
+  it('restores odometer input when optimistic persistence fails', () => {
     const driverPage = readSource('../components/DriverPage.jsx');
     const pickupStart = driverPage.indexOf('const submitOdometer = async () =>');
     const pickupEnd = driverPage.indexOf('const handleArriveDropoff', pickupStart);
@@ -62,8 +62,10 @@ describe('driver trip workflow write boundary', () => {
     const completionEnd = driverPage.indexOf('const startTripAndOpen', completionStart);
     const completionBoundary = driverPage.slice(completionStart, completionEnd);
 
-    expect(pickupBoundary).toContain('const saved = await advanceWorkflow');
-    expect(pickupBoundary.indexOf('if (!saved)')).toBeLessThan(pickupBoundary.indexOf('setShowOdometerPrompt(null)'));
+    expect(pickupBoundary).toContain('const persistence = advanceWorkflow');
+    expect(pickupBoundary.indexOf('setShowOdometerPrompt(null)')).toBeLessThan(pickupBoundary.indexOf('const saved = await persistence'));
+    expect(pickupBoundary.indexOf('if (!saved)')).toBeLessThan(pickupBoundary.indexOf('setShowOdometerPrompt(pickupTrip)'));
+    expect(pickupBoundary).toContain('setOdometerValue(String(odo))');
     expect(completionBoundary).toContain('const saved = await advanceWorkflow');
     expect(completionBoundary.indexOf('if (saved === false)')).toBeLessThan(completionBoundary.indexOf('setShowCompleteModal(null)'));
   });

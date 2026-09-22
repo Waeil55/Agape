@@ -125,4 +125,30 @@ describe('interaction latency regression contract', () => {
     expect(appSource).toContain('preloadWorkspaceForRole(roleKey)');
     expect(appSource).not.toContain('// Warm the driver/admin page chunks while the user is on the login screen');
   });
+
+  it('warms the shared mobile driver workflow and never delays native navigation on persistence', () => {
+    const mobileSource = readFileSync(
+      new URL('../components/MobileEnterpriseDashboard.jsx', import.meta.url),
+      'utf8',
+    );
+    const pickupStart = driverPageSource.indexOf('const handleNavigateToPickup = async');
+    const pickupEnd = driverPageSource.indexOf('const handleNavigateToDropoff = async', pickupStart);
+    const pickup = driverPageSource.slice(pickupStart, pickupEnd);
+    const startStart = driverPageSource.indexOf('const startTripAndOpen = async');
+    const startEnd = driverPageSource.indexOf('const getPrimaryTripAction', startStart);
+    const start = driverPageSource.slice(startStart, startEnd);
+    const pickupOdometerStart = driverPageSource.indexOf('const submitOdometer = async');
+    const pickupOdometerEnd = driverPageSource.indexOf('const handleArriveDropoff', pickupOdometerStart);
+    const pickupOdometer = driverPageSource.slice(pickupOdometerStart, pickupOdometerEnd);
+    const dropoffStart = driverPageSource.indexOf('const handleArriveDropoff = async');
+    const dropoffEnd = driverPageSource.indexOf('const handleSkipNav', dropoffStart);
+    const dropoff = driverPageSource.slice(dropoffStart, dropoffEnd);
+
+    expect(appSource).toContain("import('./components/DriverPage')");
+    expect(mobileSource).toContain("void import('./DriverPage')");
+    expect(pickup.indexOf('openInNavApp(')).toBeLessThan(pickup.indexOf('await advanceWorkflow('));
+    expect(start.indexOf('openTripWorkPage(trip.id)')).toBeLessThan(start.indexOf('await persistence'));
+    expect(pickupOdometer.indexOf('setShowOdometerPrompt(null)')).toBeLessThan(pickupOdometer.indexOf('await persistence'));
+    expect(dropoff.indexOf('openCompleteModal(trip)')).toBeLessThan(dropoff.indexOf('await persistence'));
+  });
 });

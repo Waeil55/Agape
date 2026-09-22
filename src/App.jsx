@@ -116,6 +116,10 @@ const preloadWorkspaceForRole = (selectedRole) => {
         import('./components/EnterpriseDashboard'),
         import('./components/MobileEnterpriseDashboard'),
         import('./components/TripsPage'),
+        // Admin and dispatcher mobile portals execute the same authoritative
+        // Driver workflow. Warm it after role resolution so opening a trip
+        // never pays the large workflow chunk download on the first tap.
+        import('./components/DriverPage'),
       ]
     : [
         import('./components/EnterpriseDashboard'),

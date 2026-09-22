@@ -14,7 +14,7 @@ const SHARED_MENU_SECTIONS = [
     title: 'Workforce & records',
     items: [
       { id: 'payroll', icon: CreditCard, label: 'Payroll', desc: 'Driver earnings, review and approvals', color: 'text-emerald-700', bg: 'bg-emerald-50' },
-      { id: 'activity', icon: Clock3, label: 'Time & Activity', desc: 'Driver time records and operational activity', color: 'text-violet-700', bg: 'bg-violet-50' },
+      { id: 'activity', icon: Clock3, label: 'Time, Activity & Pay', desc: 'Set hourly wages and manage driver time records', color: 'text-violet-700', bg: 'bg-violet-50' },
       { id: 'map', icon: MapPin, label: 'Live Map', desc: 'Fleet location and route view', color: 'text-sky-600', bg: 'bg-sky-50' },
     ],
   },

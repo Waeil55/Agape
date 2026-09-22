@@ -19,16 +19,17 @@ describe('mobile Drive workspace role and persistence contract', () => {
     expect(observer).toContain('drivers={driverWorkDrivers}');
   });
 
-  it('blocks observer workflow writes and keeps active driver writes save-first', () => {
+  it('blocks observer workflow writes and keeps active driver writes durably staged with optimistic feedback', () => {
     const source = readSource('./DriverPage.jsx');
 
     expect(source).toContain('if (workflowReadOnly || !trip?.id || !status) return Promise.resolve(false);');
     expect(source).toContain('if (workflowReadOnly || isEmbedded || !driverId) return;');
     expect(source).toContain('enabled: Boolean(me?.id) && !isEmbedded && !workflowReadOnly');
-    expect(source).toContain("const saved = await advanceWorkflow(trip, 'In Progress'");
+    expect(source).toContain("const persistence = advanceWorkflow(trip, 'In Progress'");
+    expect(source).toContain('const saved = await persistence;');
     expect(source).toContain("const saved = await advanceWorkflow(trip, 'Navigating Pickup'");
-    expect(source).toContain("const saved = await advanceWorkflow(signatureTrip, 'In Transit'");
-    expect(source).toContain("const saved = await advanceWorkflow(trip, 'At Dropoff'");
+    expect(source).toContain("const persistence = advanceWorkflow(signatureTrip, 'In Transit'");
+    expect(source).toContain("const persistence = advanceWorkflow(trip, 'At Dropoff'");
   });
 
   it('persists transfer requests and restores the sender step on decline', () => {
@@ -82,4 +83,3 @@ describe('mobile Drive workspace role and persistence contract', () => {
     expect(swSource).toMatch(/const CACHE_VERSION = 'agape-v(?:5[3-9]|[6-9]\d+)';/);
   });
 });
-

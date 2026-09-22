@@ -125,6 +125,13 @@ const MobileEnterpriseDashboard = (props) => {
 
   const { clearHeader } = useHeader();
 
+  React.useEffect(() => {
+    if (role !== 'admin' && role !== 'dispatcher') return;
+    void import('./DriverPage').catch((error) => {
+      console.warn('[mobile-workflow-preload] Driver workflow preload skipped:', error?.message || error);
+    });
+  }, [role]);
+
   const driverWorkDrivers = Array.isArray(props.driverWorkDrivers) ? props.driverWorkDrivers : drivers;
   const driverWorkTrips = Array.isArray(props.driverWorkTrips) ? props.driverWorkTrips : trips;
 
@@ -371,7 +378,7 @@ const MobileEnterpriseDashboard = (props) => {
           {subView === 'activity' && (
             <ErrorBoundary>
               <Suspense fallback={<SubViewFallback />}>
-                <TimeTrackingAdmin drivers={drivers} trips={trips} driverTelemetry={driverTelemetry} timeTrackingDeclarations={timeTrackingDeclarations} role={role} />
+                <TimeTrackingAdmin drivers={drivers} trips={trips} driverTelemetry={driverTelemetry} timeTrackingDeclarations={timeTrackingDeclarations} role={role} onUpdateHourlyRate={props.onUpdateHourlyRate} />
               </Suspense>
             </ErrorBoundary>
           )}
