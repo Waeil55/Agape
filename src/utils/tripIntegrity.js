@@ -57,6 +57,21 @@ export const textValue = (value) => {
   return String(value).trim();
 };
 
+// Older locally staged records and a historical workflow write path can carry
+// a status wrapper (for example, `{ status: 'Completed' }`) instead of the
+// scalar status that every trip consumer expects.  Resolve only recognised
+// display fields, with a bounded walk, so untrusted Firestore data can never
+// become a React child or reach string-only workflow operations.
+export const normalizeTripStatusValue = (value) => {
+  let candidate = value;
+  for (let depth = 0; depth < 3 && candidate && typeof candidate === 'object'; depth += 1) {
+    candidate = candidate.status ?? candidate.value ?? candidate.label ?? candidate.name ?? '';
+  }
+  return typeof candidate === 'string' || typeof candidate === 'number'
+    ? String(candidate).trim()
+    : '';
+};
+
 const normalized = (value) => textValue(value).toLowerCase().replace(/\s+/g, ' ').trim();
 
 export const isRouteKeyIdentifier = (value) => {

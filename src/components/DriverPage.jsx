@@ -48,6 +48,7 @@ import { queueSyncOperation } from '../utils/localDB';
 import { normalizeTenantId } from '../utils/tenantScope';
 import { sanitizeOdometerInput } from '../utils/odometerInput';
 import { isWorkflowOverlayConfirmed, shouldApplyWorkflowOverlay } from '../utils/workflowOptimisticOverlay';
+import { normalizeTripStatusValue } from '../utils/tripIntegrity';
 import { getTransferReturnStatus, isPendingTripTransferRecipient } from '../utils/tripTransferPolicy';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import DriverQuickSmsSheet from './DriverQuickSmsSheet';
@@ -259,7 +260,8 @@ const buildFallbackDriverProfile = (email = '') => ({
 });
 
 const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show', 'Rerouted', 'Transferred']);
-const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerCase();
+const displayWorkflowStatus = (status, fallback = 'Unknown') => normalizeTripStatusValue(status) || fallback;
+const normalizeWorkflowStatus = (status) => displayWorkflowStatus(status, '').toLowerCase();
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const getTripHistoryDateKey = (trip) => {
   const dateKey = tripCalendarDateKey(trip?.date);
@@ -301,7 +303,7 @@ const HISTORY_STATUS_META = {
   cancelled: { label: 'Cancelled', Icon: XCircle, bg: 'bg-rose-100 text-rose-700', iconBg: 'bg-rose-100 text-rose-700', border: 'border-l-rose-400' },
   rerouted: { label: 'Rerouted', Icon: Repeat, bg: 'bg-purple-100 text-purple-700', iconBg: 'bg-purple-100 text-purple-700', border: 'border-l-purple-400' },
 };
-const getHistoryStatusMeta = (status) => HISTORY_STATUS_META[normalizeWorkflowStatus(status)] || { label: status || 'Unknown', Icon: AlertTriangle, bg: 'bg-slate-100 text-slate-700', iconBg: 'bg-slate-100 text-slate-700', border: 'border-l-slate-400' };
+const getHistoryStatusMeta = (status) => HISTORY_STATUS_META[normalizeWorkflowStatus(status)] || { label: displayWorkflowStatus(status), Icon: AlertTriangle, bg: 'bg-slate-100 text-slate-700', iconBg: 'bg-slate-100 text-slate-700', border: 'border-l-slate-400' };
 const formatTripDetailClock = (value) => {
   if (!value) return '--';
   if (typeof value === 'object' && typeof value.toDate === 'function') {
@@ -4197,7 +4199,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <p className="mt-0.5 text-2xl font-semibold tracking-tight leading-none text-slate-950">{scheduledTime}</p>
                 </div>
                 <span className={`shrink-0 max-w-[40%] truncate rounded-lg border px-2 py-1 text-xs font-medium uppercase tracking-wide text-center shadow-sm ${getTripWorkStatusClass(trip.status)}`}>
-                  {trip.status || 'Assigned'}
+                  {displayWorkflowStatus(trip.status, 'Assigned')}
                 </span>
               </div>
 
@@ -5286,7 +5288,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                       tags: [
                         trip.urgentTrip ? 'URGENT' : null,
                         trip.urgentTrip && trip.urgentDeadlineTime ? `DEADLINE ${to12hrFromTimeInput(trip.urgentDeadlineTime)}` : null,
-                        trip.urgentTrip && urgentCountdown ? urgentCountdown.toUpperCase() : null,
+                        trip.urgentTrip && urgentCountdown ? String(urgentCountdown).toUpperCase() : null,
                         tripIsInOut ? 'IN/OUT' : null,
                         tripIsInOut && trip.inOutLeg ? `${trip.inOutLeg} LEG` : null,
                         tripIsInOut ? `STAY ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} MIN` : null,
@@ -5487,7 +5489,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                               tags: [
                                 trip.urgentTrip ? 'URGENT' : null,
                                 trip.urgentTrip && trip.urgentDeadlineTime ? `DEADLINE ${to12hrFromTimeInput(trip.urgentDeadlineTime)}` : null,
-                                trip.urgentTrip && urgentCountdown ? urgentCountdown.toUpperCase() : null,
+                                trip.urgentTrip && urgentCountdown ? String(urgentCountdown).toUpperCase() : null,
                                 tripIsInOut ? 'IN/OUT' : null,
                                 tripIsInOut && trip.inOutLeg ? `${trip.inOutLeg} LEG` : null,
                                 tripIsInOut ? `STAY ${trip.inOutWaitMinutes || IN_OUT_WAIT_MINUTES} MIN` : null,
@@ -7229,7 +7231,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-medium ${cancelPrompt.type === 'noshow' ? 'bg-amber-100 text-amber-600' : cancelPrompt.type === 'reroute' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'}`}>L{idx + 1}</span>
                           <span className="text-sm     font-semibold text-slate-900 truncate">{leg.patient}</span>
                           {leg.bookingId && <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-xs font-semibold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${normalizeWorkflowStatus(leg.status) === 'completed' ? 'bg-emerald-50 text-emerald-600' : normalizeWorkflowStatus(leg.status) === 'cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{displayWorkflowStatus(leg.status)}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
@@ -7303,7 +7305,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-medium">L{idx + 1}</span>
                           <span className="text-sm     font-semibold text-slate-900 truncate">{leg.patient}</span>
                           {leg.bookingId && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-semibold shrink-0">{leg.bookingId}</span>}
-                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${leg.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : leg.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{leg.status}</span>
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${normalizeWorkflowStatus(leg.status) === 'completed' ? 'bg-emerald-50 text-emerald-600' : normalizeWorkflowStatus(leg.status) === 'cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{displayWorkflowStatus(leg.status)}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-micro text-slate-500 mt-0.5">
                           <span className="truncate">{leg.pickup}</span>
@@ -7781,7 +7783,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <div key={leg.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-micro font-semibold uppercase tracking-wide text-slate-500">Leg {idx + 1}</span>
-                      <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${leg.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : leg.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{leg.status}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${normalizeWorkflowStatus(leg.status) === 'completed' ? 'bg-emerald-100 text-emerald-700' : normalizeWorkflowStatus(leg.status) === 'in transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{displayWorkflowStatus(leg.status)}</span>
                     </div>
                     <p className="text-slate-500 text-xs font-semibold mb-1">Booking: {leg.bookingId || '—'}</p>
                     <div className="space-y-1.5">
@@ -7852,7 +7854,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <span className="text-xs font-semibold bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">{leg.wheelchair}</span>
                         )}
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${statusColor(leg.status)}`}>{leg.status}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${statusColor(displayWorkflowStatus(leg.status))}`}>{displayWorkflowStatus(leg.status)}</span>
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-start gap-2 text-xs">

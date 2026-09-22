@@ -11,6 +11,7 @@ import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import {
   filterValidTripRecords,
   isCorruptedTripRecord,
+  normalizeTripStatusValue,
 } from '../utils/tripIntegrity';
 import {
   applyFirestoreDocumentChanges,
@@ -90,12 +91,17 @@ const sanitizeForFirestore = sanitizeFirestorePayload;
 
 function normalizeTrip(trip) {
   if (!trip) return trip;
-  const cleanValue = String(trip.bookingId || '').trim();
-  if (!cleanValue) return trip;
-  if (/^BK-\d+-\d+$/i.test(cleanValue)) return { ...trip, bookingId: null };
-  if (/^TRP-\d+$/i.test(cleanValue)) return { ...trip, bookingId: null };
-  if (/^TRIP-\d{10,}-\d+$/i.test(cleanValue)) return { ...trip, bookingId: null };
-  return trip;
+  const normalizedStatus = normalizeTripStatusValue(trip.status);
+  const hasInvalidStatusShape = trip.status !== undefined && trip.status !== null && typeof trip.status === 'object';
+  const statusNormalizedTrip = (normalizedStatus !== trip.status || hasInvalidStatusShape)
+    ? { ...trip, status: normalizedStatus || 'Unknown' }
+    : trip;
+  const cleanValue = String(statusNormalizedTrip.bookingId || '').trim();
+  if (!cleanValue) return statusNormalizedTrip;
+  if (/^BK-\d+-\d+$/i.test(cleanValue)) return { ...statusNormalizedTrip, bookingId: null };
+  if (/^TRP-\d+$/i.test(cleanValue)) return { ...statusNormalizedTrip, bookingId: null };
+  if (/^TRIP-\d{10,}-\d+$/i.test(cleanValue)) return { ...statusNormalizedTrip, bookingId: null };
+  return statusNormalizedTrip;
 }
 
 import {
