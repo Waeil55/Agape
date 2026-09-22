@@ -1401,13 +1401,15 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const getPrimaryContactForTrip = (trip) => getPrimaryContact(trip, trips, phoneNumbers);
   const getContactsForTrip = (trip) => tripContacts[trip?.id] || [];
 
-  // Count legs per patient for today/tomorrow
+  // Count legs by patient and exact service date. Never merge a tomorrow leg
+  // into today's card merely because the passenger name matches.
   const patientLegs = useMemo(() => {
     const counts = {};
     driverScopedTrips.forEach(t => {
-      if (!isTripDateToday(t.date)) return;
-      const key = (t.patient || '').trim().toLowerCase();
-      if (!key) return;
+      const patientKey = (t.patient || '').trim().toLowerCase();
+      const dateKey = tripCalendarDateKey(t.date);
+      if (!patientKey || !dateKey) return;
+      const key = `${dateKey}|${patientKey}`;
       counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
@@ -3530,8 +3532,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const handleShowLegs = (task) => {
     const patientKey = (task.patient || task.patientName || '').trim().toLowerCase();
+    const dateKey = tripCalendarDateKey(task.date);
     const allLegs = driverScopedTrips
-      .filter(t => isTripDateToday(t.date) && (t.patient || '').trim().toLowerCase() === patientKey)
+      .filter(t => tripCalendarDateKey(t.date) === dateKey && (t.patient || '').trim().toLowerCase() === patientKey)
       .map(t => ({
         id: t.id,
         bookingId: t.bookingId,
@@ -5214,7 +5217,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 const urgentCountdown = getUrgentCountdownText(trip);
                 const isSelected = selectedTrips.includes(trip.id);
                 const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
-                const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
+                const legsCount = patientLegs[`${tripCalendarDateKey(trip.date)}|${(trip.patient || '').trim().toLowerCase()}`] || 1;
                 const isTerminal = isWorkflowTerminalTrip(trip);
                 const isActiveTrip = trip.id === me?.activeTripId;
 
@@ -5422,7 +5425,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                     const urgentCountdown = getUrgentCountdownText(trip);
                     const isSelected = selectedTrips.includes(trip.id);
                     const isSequenced = assignedSequence?.sequence?.some(s => s.clientId === trip.id);
-                    const legsCount = patientLegs[(trip.patient || '').trim().toLowerCase()];
+                    const legsCount = patientLegs[`${tripCalendarDateKey(trip.date)}|${(trip.patient || '').trim().toLowerCase()}`] || 1;
                     const isTerminal = isWorkflowTerminalTrip(trip);
                     const isActiveTrip = trip.id === me?.activeTripId;
 

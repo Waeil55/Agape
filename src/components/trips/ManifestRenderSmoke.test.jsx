@@ -98,6 +98,21 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
     expect(html.indexOf('aria-label="Trip options"')).toBeLessThan(html.indexOf('1 Main St'));
   });
 
+  it('places the leg-details control after the SMS action', () => {
+    const html = renderEl(
+      <ManifestTripCard
+        trip={{ id: 't1', patient: 'Jane', pickup: '1 Main St', dropoff: '2 Main St' }}
+        iconActions={[{ id: 'message', onClick: () => {} }]}
+        legs={2}
+        legsLabel="2 Legs"
+        onLegsClick={() => {}}
+      />
+    );
+    expect(html).toContain('aria-label="Chat Passenger"');
+    expect(html).toContain('aria-label="View 2 Legs details"');
+    expect(html.indexOf('aria-label="Chat Passenger"')).toBeLessThan(html.indexOf('aria-label="View 2 Legs details"'));
+  });
+
   it('keeps addresses dark by default and mutes them on compact mobile trips cards', () => {
     const trip = { id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' };
     const defaultHtml = renderEl(<ManifestTripCard trip={trip} primaryAction={null} iconActions={[]} />);

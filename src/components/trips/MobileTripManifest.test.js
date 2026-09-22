@@ -6,6 +6,7 @@ import {
   getTripCountdown,
   buildInlineTripActions,
   getManifestAddressLines,
+  getManifestLegs,
   getOnTimeStats,
   isActiveManifestTrip,
   isCompletedManifestTrip,
@@ -47,6 +48,18 @@ describe('getManifestStatusBadge — design tokens', () => {
 });
 
 describe('manifest card data formatting', () => {
+  it('counts legs only for the same passenger and exact service date', () => {
+    const selected = trip({ id: 'a', patient: 'Jane Doe', date: '2026-09-13', time: '14:00' });
+    const legs = getManifestLegs(selected, [
+      selected,
+      trip({ id: 'b', patient: ' jane doe ', date: '2026-09-13', time: '09:00' }),
+      trip({ id: 'c', patient: 'Jane Doe', date: '2026-09-14', time: '08:00' }),
+      trip({ id: 'd', patient: 'Another Rider', date: '2026-09-13', time: '07:00' }),
+    ]);
+
+    expect(legs.map((entry) => entry.id)).toEqual(['b', 'a']);
+  });
+
   it('splits a comma-delimited address without inventing a city', () => {
     expect(getManifestAddressLines('8402 Harcourt Rd, Indianapolis, IN 46260')).toEqual({
       street: '8402 Harcourt Rd',

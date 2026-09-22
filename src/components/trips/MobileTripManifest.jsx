@@ -91,6 +91,18 @@ export function formatManifestMileage(mileage, trip = {}) {
   return /\bmi(?:les)?\b/i.test(text) ? text : `${text} mi`;
 }
 
+export function getManifestLegs(trip, trips = []) {
+  const patientKey = String(trip?.patient || trip?.patientName || '').trim().toLowerCase();
+  const dateKey = tripCalendarDateKey(trip?.date);
+  if (!patientKey || !dateKey) return trip ? [trip] : [];
+  return (Array.isArray(trips) ? trips : [])
+    .filter((entry) => (
+      String(entry?.patient || entry?.patientName || '').trim().toLowerCase() === patientKey
+      && tripCalendarDateKey(entry?.date) === dateKey
+    ))
+    .sort((a, b) => timeToMinutes(a?.time) - timeToMinutes(b?.time));
+}
+
 // The footer status is also the mobile workflow action box. Once work has
 // started, use a solid color so drivers can identify the current phase at a
 // glance without reading small text.
@@ -588,6 +600,20 @@ export function ManifestTripCard({
               aria-label="Chat Passenger"
             >
               <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+            </button>
+          ) : null}
+
+          {/* Date-scoped leg details — always follows the SMS action. */}
+          {onLegsClick && Number(legs) > 0 ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onLegsClick(trip); }}
+              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 transition-colors hover:bg-indigo-100 cursor-pointer"
+              title={`View ${legsLabel || `${legs} ${Number(legs) === 1 ? 'leg' : 'legs'}`} details`}
+              aria-label={`View ${legsLabel || `${legs} ${Number(legs) === 1 ? 'leg' : 'legs'}`} details`}
+            >
+              <Layers className="h-3 w-3" />
+              <span>{legsLabel || `${legs} ${Number(legs) === 1 ? 'Leg' : 'Legs'}`}</span>
             </button>
           ) : null}
 

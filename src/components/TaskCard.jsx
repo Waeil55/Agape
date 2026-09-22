@@ -229,7 +229,7 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
           trip={mobileTrip}
           countdown={getTripCountdown(mobileTrip)}
           legs={legs}
-          legsLabel={`${legs} ${legs === 1 ? 'leg' : 'legs'}`}
+          legsLabel={`${legs} ${legs === 1 ? 'Leg' : 'Legs'}`}
           onLegsClick={actions?.onShowLegs ? () => actions.onShowLegs(task) : undefined}
           mileage={task.details?.distance || null}
           driverName={task.driverName || 'You'}

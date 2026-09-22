@@ -25,6 +25,7 @@ import {
   isCompletedManifestTrip,
   isTripActionTerminal,
   getOnTimeStats,
+  getManifestLegs,
   getTripCountdown,
 } from './trips/MobileTripManifest';
 import { getTripActionCapabilities } from './trips/tripActionPolicy';
@@ -594,7 +595,7 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     // terminal statuses). Drivers never see assign/reassign/remove; those stay
     // dispatcher/admin-only. Everything else lives in the ⋯ sheet.
     const countdown = getTripCountdown(trip);
-    const legsCount = filteredTrips.filter((entry) => (entry.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
+    const legsCount = getManifestLegs(trip, filteredTrips).length || 1;
     const inline = buildInlineTripActions({
       trip,
       driver,
@@ -617,12 +618,13 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
     };
 
     return (
-      <div key={trip.id} className={`rounded-xl transition-all [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 mb-1.5 ${isSelected ? 'ring-2 ring-blue-300' : countdown.level === 'overdue' ? 'ring-1 ring-rose-200' : ''}`}>
+      <div key={trip.id} className={`mx-1.5 rounded-xl transition-all [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 mb-1.5 ${isSelected ? 'ring-2 ring-blue-300' : countdown.level === 'overdue' ? 'ring-1 ring-rose-200' : ''}`}>
       <ManifestTripCard
         trip={displayTrip}
         countdown={countdown}
         legs={legsCount}
-        onLegsClick={() => setLegsDetailPatient(trip.patient)}
+        legsLabel={`${legsCount} ${legsCount === 1 ? 'Leg' : 'Legs'}`}
+        onLegsClick={() => setLegsDetailPatient(trip)}
         selected={isSelected}
         onSelect={canOperateTrips ? () => toggleTaskSelection(trip.id) : undefined}
         selectSlot={canOperateTrips ? (
@@ -1417,8 +1419,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
 
       {/* Legs Detail Modal */}
       {legsDetailPatient && (() => {
-        const patientName = legsDetailPatient;
-        const legs = filteredTrips.filter(t => (t.patient || '').trim().toLowerCase() === patientName.trim().toLowerCase());
+        const patientName = legsDetailPatient.patient || legsDetailPatient.patientName || 'Trip';
+        const legs = getManifestLegs(legsDetailPatient, filteredTrips);
         return (
           <div className="fixed inset-0 z-[130] flex items-end justify-center sm:items-center sm:p-4" onClick={() => setLegsDetailPatient(null)}>
             <div className="absolute inset-0 bg-slate-950/60" />

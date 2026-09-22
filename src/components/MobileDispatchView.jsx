@@ -9,7 +9,7 @@ import { openNavigation } from "../utils/nativeActions";
 import AdminQuickSmsSheet from "./trips/AdminQuickSmsSheet";
 import ScheduleEditorModal from "./trips/ScheduleEditorModal";
 import { TripOptionsModal } from "./shared";
-import { ManifestTripCard, getTripCountdown } from "./trips/MobileTripManifest";
+import { ManifestTripCard, getManifestLegs, getTripCountdown } from "./trips/MobileTripManifest";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 const timeToMinutes = (t) => {
@@ -73,6 +73,7 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
   const [saveAsProfile, setSaveAsProfile] = useState(false);
+  const [showLegDetails, setShowLegDetails] = useState(false);
   const [draft, setDraft] = useState(() => ({ ...trip, pickup: getAddr(trip.pickup), dropoff: getAddr(trip.dropoff) }));
   const statusCfg = getStatusConfig(trip.status);
   const urgency = getUrgency(trip);
@@ -83,7 +84,8 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
   const pickup = getAddr(trip.pickup);
   const dropoff = getAddr(trip.dropoff);
   const timeLabel = trip.time === "Will Call" || !trip.time ? "Will Call" : to12hr(trip.time);
-  const legsCount = (allTrips || []).filter(t => (t.patient || '').toLowerCase() === (trip.patient || '').toLowerCase()).length;
+  const relatedLegs = getManifestLegs(trip, allTrips);
+  const legsCount = relatedLegs.length || 1;
 
   const markException = (status, notes = '') => {
     const run = () => {
@@ -193,6 +195,9 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
         <ManifestTripCard
           trip={trip}
           countdown={getTripCountdown(trip)}
+          legs={legsCount}
+          legsLabel={`${legsCount} ${legsCount === 1 ? 'Leg' : 'Legs'}`}
+          onLegsClick={() => setShowLegDetails(true)}
           mileage={trip.distance || trip.mileage ? `${trip.distance || trip.mileage}${String(trip.distance || trip.mileage).includes('mi') ? '' : ' mi'}` : null}
           selected={isSelected}
           onSelect={onSelect ? () => onSelect(trip) : undefined}
@@ -223,6 +228,35 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
           onCardClick={() => (onOpenTripDetails ? onOpenTripDetails(trip) : onOpenTripWorkflow?.(trip))}
         />
       </div>
+
+      {showLegDetails && (
+        <div className="fixed inset-0 z-[130] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`Leg details for ${trip.patient || 'trip'}`}>
+          <button type="button" className="absolute inset-0 bg-slate-950/60" onClick={() => setShowLegDetails(false)} aria-label="Close leg details" />
+          <div className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="truncate text-lg font-semibold text-slate-900">{trip.patient || 'Trip'}</h3>
+                <p className="text-xs font-semibold text-slate-500">{legsCount} {legsCount === 1 ? 'leg' : 'legs'}</p>
+              </div>
+              <button type="button" autoFocus onClick={() => setShowLegDetails(false)} className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-600" aria-label="Close leg details"><X size={18} /></button>
+            </div>
+            <div className="space-y-2">
+              {relatedLegs.map((leg, index) => (
+                <div key={leg.id || `${leg.bookingId}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wide text-indigo-700">Leg {index + 1}</span>
+                    <span className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">{leg.status || 'Unknown'}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-500">{leg.time || 'No time'} · {leg.bookingId || leg.id || 'No booking ID'}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-800">Pickup: {getAddr(leg.pickup) || 'Not set'}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">Dropoff: {getAddr(leg.dropoff) || 'Not set'}</p>
+                  {leg.driverName && <p className="mt-2 text-xs font-semibold text-slate-500">Driver: {leg.driverName}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AUTHORITATIVE SHARED TRIP OPTIONS MODAL */}
       <TripOptionsModal
