@@ -409,7 +409,7 @@ export function getFullAddress(value, explicitCity = '') {
 
 // ---------------------------------------------------------------------------
 // ManifestTripCard — modern fleet-dispatch card matching reference design:
-// header (checkbox + time + name + ID), route timeline with dashed connector,
+// header (checkbox + time + name + ID + options), route timeline with dashed connector,
 // compact footer (driver pill + action icons + telemetry + status badge).
 // Slots: selectSlot (bulk checkbox), assignSlot, primaryAction, iconActions, onMore.
 // ---------------------------------------------------------------------------
@@ -449,6 +449,7 @@ export function ManifestTripCard({
   const isInOut = String(trip?.time || '').toUpperCase().includes('IN/OUT') || trip?.inOut || trip?.tripIsInOut;
   const timeColor = isInOut ? 'text-slate-900' : 'text-red-600';
   const statusPulseColor = statusBadge.dot || (isDone ? 'bg-emerald-600' : 'bg-rose-500');
+  const HeaderMoreIcon = MoreIcon || MoreHorizontal;
 
   const handleArticleClick = (e) => {
     if (e.target.closest('button, a, input, select, textarea, [role="button"], [role="checkbox"], label')) {
@@ -511,11 +512,22 @@ export function ManifestTripCard({
           </span>
         </div>
 
-        {/* Trip ID */}
-        <div className="flex items-center shrink-0">
+        {/* Trip ID + globally consistent top-right options */}
+        <div className="flex items-center gap-1 shrink-0">
           <span className="bg-white/90 text-slate-900 text-[13px] font-bold px-2.5 py-0.5 rounded-md border border-slate-300/90 tracking-wide">
             {trip?.bookingId || trip?.id || '—'}
           </span>
+          {onMore && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onMore(e); }}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
+              title={typeof moreLabel === 'string' ? moreLabel : 'More options'}
+              aria-label={typeof moreLabel === 'string' ? moreLabel : 'More options'}
+            >
+              <HeaderMoreIcon className="h-[18px] w-[18px]" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -579,18 +591,6 @@ export function ManifestTripCard({
             </button>
           ) : null}
 
-          {/* More options Button */}
-          {onMore && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onMore(e); }}
-              className="text-slate-400 hover:text-slate-600 p-0.5 transition-colors cursor-pointer"
-              title={typeof moreLabel === 'string' ? moreLabel : 'More options'}
-              aria-label={typeof moreLabel === 'string' ? moreLabel : 'More options'}
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
 
         {/* Route Metrics & Status Pill */}

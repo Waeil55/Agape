@@ -86,6 +86,18 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
     expect(html).toContain('6 mi');
   });
 
+  it('places the shared options menu in the top-right header exactly once', () => {
+    const html = renderEl(
+      <ManifestTripCard
+        trip={{ id: 't1', bookingId: 'BK-1', pickup: '1 Main St', dropoff: '2 Main St' }}
+        onMore={() => {}}
+        moreLabel="Trip options"
+      />
+    );
+    expect(html.match(/aria-label="Trip options"/g)).toHaveLength(1);
+    expect(html.indexOf('aria-label="Trip options"')).toBeLessThan(html.indexOf('1 Main St'));
+  });
+
   it('keeps addresses dark by default and mutes them on compact mobile trips cards', () => {
     const trip = { id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' };
     const defaultHtml = renderEl(<ManifestTripCard trip={trip} primaryAction={null} iconActions={[]} />);
