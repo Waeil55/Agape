@@ -27,8 +27,9 @@ describe('mobile history card design', () => {
       />
     );
     expect(view.host.textContent).toContain('9:30 AM');
-    expect(view.host.textContent).toContain('12.4 mi · Ann Driver');
-    act(() => view.host.querySelector('[role="button"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(view.host.textContent).toContain('12.4 mi');
+    expect(view.host.textContent).toContain('Ann Driver');
+    act(() => view.host.querySelector('button[aria-label="Open trip"]').click());
     expect(onToggle).toHaveBeenCalledOnce();
     view.cleanup();
   });
@@ -51,9 +52,7 @@ describe('mobile history card design', () => {
         />
       </>
     );
-    expect(view.host.textContent).toContain('2026-09-22 · Ambulatory');
-    expect(view.host.textContent).toContain('Avon → Indy');
-    expect(view.host.textContent).toContain('Arrived: 9:35 AMOdo: 42,500');
+    expect(view.host.textContent).toContain('9:35 AMOdo: 42,500');
     expect(view.host.querySelectorAll('[data-testid="mobile-history-stops"] > div')).toHaveLength(2);
     view.cleanup();
   });

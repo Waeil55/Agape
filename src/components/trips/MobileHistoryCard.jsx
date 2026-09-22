@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronRight, MapPin } from 'lucide-react';
+import { useState } from 'react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 const valueOrDash = (value) => {
   if (value === undefined || value === null || value === '') return '—';
@@ -8,7 +9,6 @@ const valueOrDash = (value) => {
 export function MobileHistoryCardHeader({
   trip,
   expanded = false,
-  detailed = false,
   driverName,
   vehicleName,
   miles,
@@ -16,48 +16,35 @@ export function MobileHistoryCardHeader({
   status,
   onToggle,
 }) {
+  const [copied, setCopied] = useState(false);
   const patient = trip?.patient || 'Trip';
   const bookingId = trip?.bookingId || trip?.id || '—';
-  const route = [trip?.pickupCity, trip?.dropoffCity].filter(Boolean).join(' → ');
   const resolvedMiles = valueOrDash(miles);
+  const copyId = (event) => {
+    event.stopPropagation();
+    navigator.clipboard?.writeText(String(bookingId));
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  };
 
   return (
     <div
-      className="cursor-pointer px-3 py-2.5"
-      role="button"
-      tabIndex={0}
+      className="w-full cursor-pointer select-none rounded-xl px-3 py-2.5 transition-colors hover:bg-slate-50/60 active:bg-slate-50"
       aria-expanded={expanded}
       onClick={onToggle}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onToggle?.();
-        }
-      }}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-[13px] font-semibold tabular-nums text-emerald-700">{time || 'Will Call'}</span>
-        <span className="h-4 w-px shrink-0 bg-slate-200" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-slate-950">{patient}</span>
-        <span className="max-w-[92px] shrink-0 truncate rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">#{bookingId}</span>
-        {expanded ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
-      </div>
-      <div className="mt-1.5 flex min-w-0 items-center justify-between gap-3 text-[11px] font-semibold text-slate-500">
-        <span className="min-w-0 truncate"><span className="text-slate-800">{resolvedMiles} mi</span> · {driverName || 'Unassigned'}</span>
-        <span className="max-w-[42%] shrink-0 truncate text-right">{vehicleName || 'No vehicle'}</span>
-      </div>
-      {detailed && (
-        <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[10px] font-semibold text-slate-500">
-          <span className="min-w-0 truncate">{trip?.date || 'No date'}{trip?.type ? ` · ${trip.type}` : ''}</span>
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">{status || trip?.status || 'Pending'}</span>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-[16px] font-bold tracking-tight tabular-nums text-emerald-700">{time || 'Will Call'}</span>
+          <span className="h-3.5 w-[1.5px] shrink-0 bg-slate-400/80" aria-hidden="true" />
+          <span className="min-w-0 truncate text-[16px] font-bold tracking-[-0.35px] text-slate-950">{patient}</span>
         </div>
-      )}
-      {detailed && route && (
-        <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] font-medium text-slate-400">
-          <MapPin size={11} className="shrink-0" />
-          <span className="truncate">{route}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button type="button" onClick={copyId} className="flex max-w-[112px] items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[13.5px] font-bold text-slate-900 shadow-xs" title="Click to copy Trip ID"><span className="truncate tracking-tight">{bookingId}</span>{copied && <Check size={13} className="text-emerald-600" />}</button>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onToggle?.(); }} className={`flex h-7 w-7 items-center justify-center rounded-lg border shadow-xs ${expanded ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-600'}`} aria-label={expanded ? 'Collapse trip' : 'Open trip'}>{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button>
         </div>
-      )}
+      </div>
+      <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[13px] font-normal tracking-[-0.1px] text-slate-500"><div className="flex min-w-0 items-center gap-2"><span className="shrink-0 tabular-nums">{resolvedMiles} mi</span><span className="shrink-0 text-slate-300">•</span><span className="truncate">{driverName || '—'}</span></div><span className="max-w-[130px] shrink-0 truncate pr-8 text-right text-[12.5px]">{vehicleName || '—'}</span></div>
     </div>
   );
 }
@@ -65,22 +52,22 @@ export function MobileHistoryCardHeader({
 function Stop({ tone, label, address, clock, odometer }) {
   const pickup = tone === 'pickup';
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className={`text-[10px] font-semibold uppercase tracking-wider ${pickup ? 'text-emerald-700' : 'text-rose-700'}`}>{label}</span>
-        <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums text-slate-600">
-          <span>Arrived: {valueOrDash(clock)}</span>
-          <span>Odo: {valueOrDash(odometer)}</span>
+    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5"><span className={`h-2 w-2 shrink-0 rounded-full ${pickup ? 'bg-emerald-500' : 'bg-rose-500'}`} /><span className={`text-[11px] font-bold uppercase tracking-wider ${pickup ? 'text-emerald-800' : 'text-rose-800'}`}>{label}</span></div>
+        <div className="flex items-center gap-1.5 text-[12px] text-slate-600">
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-800">{valueOrDash(clock)}</span>
+          <span className={`rounded border px-1.5 py-0.5 font-mono text-[11px] font-medium ${pickup ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>Odo: <strong className="font-bold text-slate-950">{valueOrDash(odometer)}</strong></span>
         </div>
       </div>
-      <p className="mt-1 text-[13px] font-semibold leading-snug text-slate-900">{valueOrDash(address)}</p>
+      <p className="truncate text-[13.5px] font-semibold leading-snug tracking-[-0.24px] text-slate-900" title={valueOrDash(address)}>{valueOrDash(address)}</p>
     </div>
   );
 }
 
 export function MobileHistoryStops({ pickupAddress, dropoffAddress, pickupClock, dropoffClock, pickupOdometer, dropoffOdometer }) {
   return (
-    <div className="grid grid-cols-1 gap-1.5" data-testid="mobile-history-stops">
+    <div className="grid grid-cols-1 gap-2" data-testid="mobile-history-stops">
       <Stop tone="pickup" label="Pickup" address={pickupAddress} clock={pickupClock} odometer={pickupOdometer} />
       <Stop tone="dropoff" label="Dropoff" address={dropoffAddress} clock={dropoffClock} odometer={dropoffOdometer} />
     </div>

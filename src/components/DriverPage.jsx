@@ -38,6 +38,7 @@ import ErrorBoundary from './ErrorBoundary';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
+import MobileHistoryFilters from './trips/MobileHistoryFilters';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
 import { deriveVehicleOdometerState, evaluateOdometerEntry } from '../utils/vehicleOdometer';
@@ -445,12 +446,8 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
   const dropoffClock = getFirstTripClock(trip, ['arrivalDropoffTime', 'dropoffArrival', 'dropoffArrivalTime', 'actualDropoffTime', 'dropoffTime']);
   const pickupOdometer = getFirstTripOdometer(trip, ['pickupOdometer', 'startOdometer', 'startMileage', 'pickupMileage']);
   const dropoffOdometer = getFirstTripOdometer(trip, ['dropoffOdometer', 'endOdometer', 'endMileage', 'dropoffMileage']);
-  const vehicle = resolveTripVehicle(trip, driver) || 'PENDING ASSIGNMENT';
   const pickupAddr = formatTripDetailValue(getFirstTripValue(trip, ['pickup', 'pickupAddress']));
   const dropoffAddr = formatTripDetailValue(getFirstTripValue(trip, ['dropoff', 'dropoffAddress']));
-  const distance = formatTripDistance(trip.distance);
-  const signature = trip.paperSignatureConfirmed || trip.signature || trip.signatureUrl ? 'Yes' : 'No';
-  const driverName = formatTripDetailValue(driver?.name || trip.completedDriverName || trip.driverName || trip.driverId);
 
   return (
     <div className="driver-history-detail-table border-t border-slate-200 bg-white p-3 space-y-2.5">
@@ -463,25 +460,6 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
         dropoffOdometer={dropoffOdometer}
       />
 
-      {/* Compact Metrics Grid */}
-      <div className="grid grid-cols-2 gap-1.5 text-xs">
-        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Distance</span>
-          <span className="font-bold text-slate-800">{distance}</span>
-        </div>
-        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Vehicle</span>
-          <span className="font-bold text-slate-800 truncate max-w-[90px]">{vehicle}</span>
-        </div>
-        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Driver</span>
-          <span className="font-bold text-slate-800 truncate max-w-[90px]">{driverName}</span>
-        </div>
-        <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Signature</span>
-          <span className={`font-bold ${signature === 'Yes' ? 'text-emerald-700' : 'text-slate-600'}`}>{signature}</span>
-        </div>
-      </div>
     </div>
   );
 };
@@ -820,12 +798,13 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const savedFilter = localStorage.getItem(`agape_drvHistFilter_${userKey}`);
     // History is a completed-work view. Do not reopen the broad legacy "all"
     // selection on every login; drivers can still choose it for the current session.
-    return savedFilter && savedFilter !== 'all' ? savedFilter : 'completed';
+    return savedFilter || 'all';
   });
   // Search is intentionally session-only: a stale persisted term silently hid
   // trips after relogin and looked like missing history.
   const [historySearch, setHistorySearch] = useState('');
   const [historyDate, setHistoryDate] = useState(() => localCalendarYmd());
+  const [historyEndDate, setHistoryEndDate] = useState(null);
 
   useEffect(() => {
     if (isEmbedded || workflowReadOnly) return;
@@ -1869,6 +1848,10 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       ? historyWindowEnd
       : historyDate;
   const selectedHistoryDayTrips = useMemo(() => historyWindowTrips.filter((trip) => getTripHistoryDateKey(trip) === selectedHistoryDate), [historyWindowTrips, selectedHistoryDate]);
+  const selectedHistoryTrips = useMemo(() => historyWindowTrips.filter((trip) => {
+    const key = getTripHistoryDateKey(trip);
+    return key === selectedHistoryDate || (historyEndDate && key >= selectedHistoryDate && key <= historyEndDate);
+  }), [historyWindowTrips, selectedHistoryDate, historyEndDate]);
   const historyStatusCounts = useMemo(() => ({
     all: selectedHistoryDayTrips.length,
     completed: selectedHistoryDayTrips.filter(t => normalizeWorkflowStatus(t.status) === 'completed').length,
@@ -2729,7 +2712,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     return () => clearInterval(timer);
   }, [activeNav, activeTrips.length, calculateEta]);
 
-  const filteredHistory = useMemo(() => selectedHistoryDayTrips.filter(t => {
+  const filteredHistory = useMemo(() => selectedHistoryTrips.filter(t => {
     const status = normalizeWorkflowStatus(t.status);
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? status === 'completed' :
@@ -2737,7 +2720,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       true;
     if (!matchFilter) return false;
     return tripMatchesSearch(t, historySearch);
-  }), [selectedHistoryDayTrips, historyFilter, historySearch]);
+  }), [selectedHistoryTrips, historyFilter, historySearch]);
 
   const sortedFilteredHistory = useMemo(
     () => [...filteredHistory].sort((a, b) => compareTripsByCompletionAscending(a, b, historySortKeyOverrides)),
@@ -6302,74 +6285,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {/* ===== HISTORY PAGE ===== */}
       {activeNav === 'history' && (
         <div className="flex-1 overflow-y-auto bg-slate-50 pb-24">
-          <div className="shrink-0 border-b border-slate-200 bg-white">
-            <div className="flex items-center gap-2 px-2 py-1.5">
-
-              <button
-                type="button"
-                onClick={() => goToHistoryDay(-1)}
-                disabled={selectedHistoryDate <= historyWindowStart}
-                className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600 disabled:opacity-30"
-                aria-label="Previous history day"
-              >
-                <ChevronLeft size={15} />
-              </button>
-
-              <button className="flex items-center gap-1 px-3 min-h-11 rounded-xl border border-slate-200 bg-white shadow-sm text-[11px] font-bold text-slate-700" title={formatHistoryDayLabel(selectedHistoryDate)}>
-                <span>{formatHistoryCompactDayLabel(selectedHistoryDate)}</span>
-                <span>({selectedHistoryDayTrips.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => goToHistoryDay(1)}
-                disabled={selectedHistoryDate >= historyWindowEnd}
-                className="min-h-11 w-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 transition-transform shadow-sm text-slate-600 disabled:opacity-30"
-                aria-label="Next history day"
-              >
-                <ChevronRight size={15} />
-              </button>
-
-              {[
-                { id: 'all', label: 'All', Icon: Clock },
-                { id: 'completed', label: 'Completed', Icon: CheckCircle2 },
-                { id: 'cancelled', label: 'Cancelled', Icon: XCircle },
-              ].map(f => {
-                const FilterIcon = f.Icon;
-                const active = historyFilter === f.id;
-                const activeClass = f.id === 'completed'
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : f.id === 'cancelled'
-                    ? 'bg-rose-600 text-white border-rose-600'
-                    : 'bg-blue-600 text-white border-blue-600';
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => { setHistoryFilter(f.id); setHistoryExpandedId(null); }}
-                    className={`min-h-11 w-11 rounded-xl border flex items-center justify-center active:scale-95 transition-all shadow-sm relative ${active ? activeClass : 'border-slate-200 bg-white text-slate-600'}`}
-                    title={`${f.label} (${historyStatusCounts[f.id] || 0})`}
-                    aria-label={`${f.label} filter, ${historyStatusCounts[f.id] || 0} trips`}
-                  >
-                    <FilterIcon size={13} />
-                  </button>
-                );
-              })}
-
-              {filteredHistory.length > 0 && (
-                <button
-                  type="button"
-                  onClick={exportDailyLog}
-                  className="min-h-11 w-11 rounded-xl bg-blue-600 text-white flex items-center justify-center active:scale-95 transition-transform shadow-sm"
-                  title="Export"
-                  aria-label="Export history"
-                >
-                  <Download size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-
           <div className="shrink-0 px-3 py-2 border-b border-slate-200 bg-white">
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm">
               <Search size={16} className="text-slate-400 shrink-0" />
@@ -6378,6 +6293,17 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             {historySearch && <button onClick={() => { setHistorySearch(''); setHistoryExpandedId(null); }} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>}
             </div>
           </div>
+          <MobileHistoryFilters
+            startDate={selectedHistoryDate}
+            endDate={historyEndDate}
+            onDateChange={(start, end) => { setHistoryDate(start); setHistoryEndDate(end); setHistoryExpandedId(null); }}
+            status={historyFilter}
+            onStatusChange={(value) => { setHistoryFilter(value); setHistoryExpandedId(null); }}
+            driver="all"
+            onDriverChange={() => {}}
+            drivers={me?.name ? [me.name] : []}
+            count={filteredHistory.length}
+          />
 
           <div className="px-4 pt-1 pb-0.5">
             <p className="text-[10px] font-semibold text-slate-400" data-testid="history-sync-line">
@@ -6546,7 +6472,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           <HistoryTripDetailTable trip={trip} driver={me} />
                         )}
                       </div>
-                      {canManageTripRecords && <div className={`grid gap-2 ${isEditing ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                      {canManageTripRecords && <div className={`flex items-center ${isEditing ? 'grid grid-cols-2' : 'justify-end'} gap-1.5`}>
                         {isEditing ? (
                           <>
                             <button type="button" onClick={handleSaveInlineEdit} disabled={inlineEditSaving} className="h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm disabled:opacity-50"><CheckCircle2 size={14} /> {inlineEditSaving ? 'Saving…' : 'Save'}</button>
@@ -6554,8 +6480,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                           </>
                         ) : (
                           <>
-                            <button type="button" onClick={() => handleStartInlineEdit(trip)} className="h-7 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><Edit2 size={16} /> Edit</button>
-                            <button type="button" onClick={() => restoreHistoryTrip(trip)} className="h-7 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs shadow-sm"><RotateCcw size={14} /> Restore</button>
+                            <button type="button" onClick={() => setHistoryExpandedId(trip.id)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">Details</button>
+                            <button type="button" onClick={() => handleStartInlineEdit(trip)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">Edit</button>
+                            <button type="button" onClick={() => restoreHistoryTrip(trip)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">Restore</button>
                           </>
                         )}
                       </div>}

@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Upload, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw, Navigation } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
-import { tripCalendarDateKey } from '../utils/tripDate';
+import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
 import { resolveTripDriver } from '../utils/driverIdentity';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
 import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
+import MobileHistoryFilters from './trips/MobileHistoryFilters';
 
 const formatClock24 = (value) => {
   if (!value) return '—';
@@ -215,6 +216,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
   const [expandedArchiveTripId, setExpandedArchiveTripId] = useState(null);
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('agape_archiveSearch') || '');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [driverFilter, setDriverFilter] = useState('all');
   const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
   const [sortColumn] = useState(() => localStorage.getItem('agape_archiveSortCol') || 'time');
   const [sortDirection] = useState(() => localStorage.getItem('agape_archiveSortDir') || 'asc');
@@ -347,6 +349,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
         return s.includes('cancel') || s.includes('no show') || s.includes('reroute') || s.includes('transfer');
       });
     }
+    if (driverFilter !== 'all') list = list.filter((trip) => getDriverLabel(trip, drivers) === driverFilter);
 
     list.sort((a, b) => {
       let cmp = 0;
@@ -359,7 +362,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
     });
 
     return list;
-  }, [trashedTrips, searchQuery, statusFilter, sortColumn, sortDirection, startDate, endDate, drivers]);
+  }, [trashedTrips, searchQuery, statusFilter, driverFilter, sortColumn, sortDirection, startDate, endDate, drivers]);
 
   const grouped = useMemo(() => {
     const groups = filtered.reduce((acc, trip) => {
@@ -426,50 +429,14 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
               dropoffOdometer={renderCellValue(trip, { key: 'dropoffOdometer' })}
             />
 
-            {/* Compact Metrics Grid (2x2) */}
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Driver</span>
-                <span className="font-bold text-slate-800 truncate max-w-[100px]">{driverName}</span>
-              </div>
-              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Vehicle</span>
-                <span className="font-bold text-slate-800 truncate max-w-[100px]">{renderCellValue(trip, { key: 'vehicle' })}</span>
-              </div>
-              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Distance</span>
-                <span className="font-bold text-slate-800">{renderCellValue(trip, { key: 'distance' })}</span>
-              </div>
-              <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Signature</span>
-                <span className="font-bold text-slate-800">{renderCellValue(trip, { key: 'signature' })}</span>
-              </div>
-            </div>
-
-            {/* Compliance + Retention */}
-            <div>
-              <ComplianceTagBar trip={trip} />
-              <RetentionBadge trip={trip} />
-            </div>
-
-            {/* Footer: Status Badge + Actions */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-              <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${statusBadge.cls}`}>
-                <StatusIcon size={12} /> {statusBadge.label}
-              </span>
-              <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                <button type="button" onClick={() => setActionTrip(trip)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">Details</button>
+                <button onClick={() => onDriveTrip ? onDriveTrip(trip) : setScheduleEditTrip(trip)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">
+                  Edit
+                </button>
                 {(role === 'admin' || role === 'dispatcher') && restoreTrip && (
-                  <button onClick={() => restoreTrip(trip.id)} className="flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
-                    <RotateCcw size={13} /> Restore
-                  </button>
+                  <button onClick={() => restoreTrip(trip.id)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">Restore</button>
                 )}
-                <button onClick={() => onDriveTrip ? onDriveTrip(trip) : setScheduleEditTrip(trip)} className="flex items-center gap-1 rounded-xl bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs">
-                  <Edit2 size={13} /> Edit
-                </button>
-                <button onClick={() => setActionTrip(trip)} className="flex items-center justify-center rounded-xl bg-slate-100 px-2.5 py-1.5 text-slate-600 border border-slate-200 shadow-2xs">
-                  <MoreHorizontal size={13} />
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -481,7 +448,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
     <div aria-label="Archived trips" className="flex flex-col flex-1 min-h-0 bg-slate-100 overflow-hidden">
       {/* ENHANCED TOOLBAR */}
       <div role="toolbar" aria-label="Archived trip controls" data-testid="archives-toolbar" className="shrink-0 sticky top-0 z-20 border-b border-slate-200 bg-white">
-        <div className="app-filter-bar !flex-nowrap gap-1.5 px-3 py-1.5">
+        <div className="app-filter-bar !flex-nowrap hidden gap-1.5 px-3 py-1.5 sm:flex">
           <label className="flex h-8 !min-w-[100px] max-w-[260px] flex-1 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2">
             <Search size={11} className="text-slate-500 shrink-0" />
             <input aria-label="Search archived trips" type="text" placeholder="Search archived trips…" value={searchQuery}
@@ -527,6 +494,20 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
           <button onClick={() => setShowExportModal(true)} className="h-8 px-2 rounded-xl bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 transition-colors" title="Export">
             <Download size={13} />
           </button>
+        </div>
+        <div className="sm:hidden">
+          <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2"><div className="relative min-w-0 flex-1"><Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-slate-400" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2.5 text-[13px] font-medium outline-none focus:border-indigo-500 focus:bg-white" /></div></div>
+          <MobileHistoryFilters
+            startDate={startDate || localCalendarYmd()}
+            endDate={endDate || null}
+            onDateChange={(start, end) => { setStartDate(start); setEndDate(end || ''); setExpandedArchiveTripId(null); }}
+            status={statusFilter}
+            onStatusChange={(value) => { setStatusFilter(value); setExpandedArchiveTripId(null); }}
+            driver={driverFilter}
+            onDriverChange={(value) => { setDriverFilter(value); setExpandedArchiveTripId(null); }}
+            drivers={[...new Set(trashedTrips.map((trip) => getDriverLabel(trip, drivers)).filter((name) => name && name !== '—'))]}
+            count={filtered.length}
+          />
         </div>
 
         {/* Enterprise: Analytics + Filters Row */}

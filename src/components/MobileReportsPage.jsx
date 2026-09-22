@@ -1,6 +1,6 @@
 import { useDeferredValue, useState, useMemo, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Search, Clock, CheckCircle2, XCircle, AlertTriangle, Edit2, Check, ChevronUp, X, Download, Repeat, Upload, BarChart3, TrendingUp, TrendingDown, Minus, Target, Users, MapPin, DollarSign, Timer, Filter, Bookmark, Share2, FileText, RefreshCw, Pencil, RotateCcw, List, SlidersHorizontal } from 'lucide-react';
-import { localCalendarYmd, tripMatchesServiceDate } from '../utils/tripDate';
+import { localCalendarYmd, tripCalendarDateKey, tripMatchesServiceDate } from '../utils/tripDate';
 import { tripMatchesSearch } from '../utils/search';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
@@ -8,6 +8,7 @@ import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
 import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
+import MobileHistoryFilters from './trips/MobileHistoryFilters';
 
 const MOBILE_REPORT_PAGE_SIZE = 40;
 
@@ -187,7 +188,7 @@ const normalizeStatus = (status) => {
 const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUploadModal, isLoading = false, readOnly = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
-  const [allDates, setAllDates] = useState(false);
+  const [endDate, setEndDate] = useState(null);
   const [expandedTripId, setExpandedTripId] = useState(null);
   const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
   const [editingTripId, setEditingTripId] = useState(null);
@@ -195,25 +196,30 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   const [savingTripId, setSavingTripId] = useState(null);
   const [editMessage, setEditMessage] = useState('');
   const [sortKeyOverrides, setSortKeyOverrides] = useState({});
-  const [statusFilter, setStatusFilter] = useState('completed');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('All Drivers');
   const [renderLimit, setRenderLimit] = useState(MOBILE_REPORT_PAGE_SIZE);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [activePreset, setActivePreset] = useState(null);
   const [showExportPanel, setShowExportPanel] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const driverIndex = useMemo(() => buildDriverIndex(drivers), [drivers]);
 
   const uniqueDrivers = useMemo(() => ['All Drivers', ...new Set(
-    trips.filter(t => allDates || tripMatchesServiceDate(t, dateStr)).map(t => {
+    trips.filter(t => {
+      const key = tripCalendarDateKey(t);
+      return endDate ? key >= dateStr && key <= endDate : tripMatchesServiceDate(t, dateStr);
+    }).map(t => {
       const d = findDriverInIndex(driverIndex, t);
       return d ? d.name : (t.driverName || '');
     }).filter(Boolean)
-  )], [trips, driverIndex, dateStr, allDates]);
+  )], [trips, driverIndex, dateStr, endDate]);
 
   const filteredTrips = useMemo(() => {
-    let filtered = trips.filter(t => allDates || tripMatchesServiceDate(t, dateStr));
+    let filtered = trips.filter(t => {
+      const key = tripCalendarDateKey(t);
+      return endDate ? key >= dateStr && key <= endDate : tripMatchesServiceDate(t, dateStr);
+    });
     if (deferredSearchQuery) {
       const q = deferredSearchQuery.toLowerCase();
       filtered = filtered.filter(t => {
@@ -235,14 +241,14 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       });
     }
     return filtered.sort((a, b) => compareTripsByCompletionAscending(a, b, sortKeyOverrides));
-  }, [trips, dateStr, allDates, deferredSearchQuery, statusFilter, driverFilter, driverIndex, sortKeyOverrides]);
+  }, [trips, dateStr, endDate, deferredSearchQuery, statusFilter, driverFilter, driverIndex, sortKeyOverrides]);
   const visibleTrips = useMemo(() => filteredTrips.slice(0, renderLimit), [filteredTrips, renderLimit]);
   const kpis = useMemo(() => computeKPIs(trips, filteredTrips), [trips, filteredTrips]);
 
   const applyPreset = useCallback((preset) => {
     setActivePreset(preset.id);
     setStatusFilter(preset.status);
-    setAllDates(preset.allDates);
+    setEndDate(null);
     setExpandedTripId(null);
   }, []);
 
@@ -251,7 +257,13 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
     setShowExportPanel(false);
   }, [filteredTrips]);
 
-  useEffect(() => setRenderLimit(MOBILE_REPORT_PAGE_SIZE), [dateStr, allDates, deferredSearchQuery, statusFilter, driverFilter]);
+  const markPendingReviewed = useCallback(async () => {
+    const pendingTrips = filteredTrips.filter((trip) => !trip.reviewed);
+    if (!onUpdateTrip || pendingTrips.length === 0) return;
+    await forEachWithConcurrency(pendingTrips, (trip) => onUpdateTrip(trip.id, { reviewed: true }), 4);
+  }, [filteredTrips, onUpdateTrip]);
+
+  useEffect(() => setRenderLimit(MOBILE_REPORT_PAGE_SIZE), [dateStr, endDate, deferredSearchQuery, statusFilter, driverFilter]);
 
   useEffect(() => {
     if (!editingTripId && Object.keys(sortKeyOverrides).length > 0) {
@@ -259,13 +271,6 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       return () => clearTimeout(timer);
     }
   }, [editingTripId, sortKeyOverrides]);
-
-  const shiftDate = (days) => {
-    setExpandedTripId(null);
-    const d = new Date(dateStr + 'T12:00:00');
-    d.setDate(d.getDate() + days);
-    setDateStr(localCalendarYmd(d));
-  };
 
   const getDriverRecord = (driverId) => findDriverInIndex(driverIndex, { driverId });
   const formatClock = (value) => value ? String(value) : '-';
@@ -369,110 +374,21 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         {editMessage && <div role={editMessage.includes('not saved') ? 'alert' : 'status'} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
       </div>
 
-      {/* 1-Line Header Bar */}
-      <div className="shrink-0 border-b border-slate-200 bg-white px-2 py-1.5 flex items-center gap-1 min-h-11">
-        {showSearch ? (
-          <div className="flex-1 flex items-center gap-1">
-            <div className="relative flex-1 flex items-center">
-              <Search className="w-4 h-4 text-slate-400 absolute left-2.5 pointer-events-none" />
-              <input
-                type="text"
-                autoFocus
-                placeholder="Search patient, ID, phone…"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setExpandedTripId(null); }}
-                className="w-full min-h-11 h-11 pl-8 pr-7 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:bg-white focus:border-blue-600"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 p-1 text-slate-400 hover:text-slate-600"
-                  aria-label="Clear search"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-              className="min-h-11 w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 shrink-0"
-              aria-label="Close search"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Date Stepper */}
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button onClick={() => shiftDate(-1)} className="min-h-11 w-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 shadow-xs text-slate-600 shrink-0" aria-label="Previous date">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setAllDates(!allDates)}
-                className="flex items-center justify-center px-1.5 min-h-11 max-w-[85px] truncate rounded-xl border border-slate-200 bg-white shadow-xs text-[11px] font-bold text-slate-700 shrink-0"
-                title={allDates ? 'Showing all dates' : 'Toggle date'}
-              >
-                {allDates ? 'All Dates' : new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}
-              </button>
-              <button onClick={() => shiftDate(1)} className="min-h-11 w-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 shadow-xs text-slate-600 shrink-0" aria-label="Next date">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Status Dropdown */}
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setExpandedTripId(null); }}
-              aria-label="Filter by status"
-              className="min-h-11 h-11 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 truncate transition-colors"
-            >
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="all">All Status</option>
-            </select>
-
-            {/* Driver Dropdown */}
-            <select
-              value={driverFilter}
-              onChange={(e) => { setDriverFilter(e.target.value); setExpandedTripId(null); }}
-              aria-label="Filter by driver"
-              className="min-h-11 h-11 flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-600 truncate transition-colors"
-            >
-              {uniqueDrivers.map(driver => (
-                <option key={driver} value={driver}>{driver}</option>
-              ))}
-            </select>
-
-            {/* Search Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setShowSearch(true)}
-              className="min-h-11 w-11 h-11 rounded-xl border border-slate-200 bg-white flex items-center justify-center active:scale-95 shadow-xs text-slate-600 shrink-0"
-              aria-label="Search"
-              title="Search reports"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-
-            {/* Tools / Options Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setShowExportPanel(!showExportPanel)}
-              className={`min-h-11 w-11 h-11 rounded-xl border flex items-center justify-center active:scale-95 shadow-xs transition-colors shrink-0 ${
-                showExportPanel ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'
-              }`}
-              aria-label="Tools & Export"
-              title="Export, upload & analytics"
-            >
-              <SlidersHorizontal size={16} />
-            </button>
-          </>
-        )}
+      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
+        <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2 text-slate-400" size={14} /><input type="text" placeholder="Search..." value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setExpandedTripId(null); }} className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2.5 text-[13px] font-medium text-slate-900 outline-none focus:border-indigo-500 focus:bg-white" /></div>
+        <button type="button" onClick={() => setShowExportPanel(!showExportPanel)} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${showExportPanel ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'}`} aria-label="Tools & Export"><SlidersHorizontal size={15} /></button>
       </div>
+      <MobileHistoryFilters
+        startDate={dateStr}
+        endDate={endDate}
+        onDateChange={(start, end) => { setDateStr(start); setEndDate(end); setExpandedTripId(null); }}
+        status={statusFilter}
+        onStatusChange={(value) => { setStatusFilter(value); setExpandedTripId(null); }}
+        driver={driverFilter === 'All Drivers' ? 'all' : driverFilter}
+        onDriverChange={(value) => { setDriverFilter(value === 'all' ? 'All Drivers' : value); setExpandedTripId(null); }}
+        drivers={uniqueDrivers.filter((name) => name !== 'All Drivers')}
+        count={filteredTrips.length}
+      />
 
       {/* Collapsible Tools & Analytics Drawer */}
       {showExportPanel && (
@@ -505,6 +421,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             >
               <BarChart3 size={14} /> Analytics
             </button>
+            <button type="button" onClick={markPendingReviewed} disabled={readOnly || isLoading} className="min-h-10 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 disabled:opacity-50">Review day</button>
           </div>
           {showAnalytics && (
             <div className="mt-2 space-y-2 animate-in fade-in duration-150">
@@ -517,27 +434,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       {/* MAIN SCROLLABLE CONTENT */}
       <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50 relative">
 
-        {/* DAILY SUMMARY BAR */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-white shadow-sm">
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">{filteredTrips.length} trips</span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-700">{filteredTrips.filter(t => t.reviewed).length}/{filteredTrips.length} reviewed</span>
-          </div>
-          <button
-            disabled={readOnly || isLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold shadow-sm active:scale-95 transition-transform disabled:opacity-50"
-            onClick={async () => {
-              const pendingTrips = filteredTrips.filter((trip) => !trip.reviewed);
-              if (!onUpdateTrip || pendingTrips.length === 0) return;
-              await forEachWithConcurrency(pendingTrips, (trip) => onUpdateTrip(trip.id, { reviewed: true }), 4);
-            }}
-          >
-            <Check className="w-4 h-4" />
-            Mark Day Reviewed
-          </button>
-        </div>
-
-        <div className="space-y-3 px-3 py-3">
+        <div className="space-y-2.5 px-2 py-3">
           {isLoading && (
             <div role="status" className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm font-semibold text-slate-600">Loading reports…</div>
           )}
@@ -550,7 +447,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
 
             return (
               <div key={trip.id} className="mb-1.5 rounded-xl [&_button]:!min-h-0 max-md:[&_button]:!min-h-0">
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-expanded={isExpanded}>
+                <div className={`overflow-hidden rounded-xl bg-white transition-all ${isExpanded ? 'border border-indigo-400/90 ring-4 ring-indigo-50/80 shadow-md' : 'border border-slate-200/90 shadow-xs'}`} aria-expanded={isExpanded}>
                   <MobileHistoryCardHeader
                     trip={trip}
                     driverName={driver ? driver.name : (trip.driverName || 'Unassigned')}
@@ -575,7 +472,7 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                 </div>
 
                 {isExpanded && (
-                  <div className="mt-1 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                  <div className="mt-1 rounded-xl border-t border-slate-100 bg-slate-50/80 p-2 shadow-xs">
                     {isEditing ? (
                       <div className="space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
@@ -668,27 +565,6 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                           dropoffOdometer={trip.dropoffOdometer}
                         />
 
-                        {/* Compact Metrics Grid (2x2) */}
-                        <div className="grid grid-cols-2 gap-1.5 text-xs">
-                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Miles</span>
-                            <span className="font-bold text-slate-800">{calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance)} mi {trip.travelTime ? `(${trip.travelTime}m)` : ''}</span>
-                          </div>
-                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Vehicle</span>
-                            <span className="font-bold text-slate-800 truncate max-w-[90px]">{trip.completedVehicle || (driver ? driver.vehicle : '—')}</span>
-                          </div>
-                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Driver</span>
-                            <span className="font-bold text-slate-800 truncate max-w-[90px]">{driver ? driver.name : (trip.driverName || '—')}</span>
-                          </div>
-                          <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200/70 flex items-center justify-between">
-                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Signed</span>
-                            <span className={`font-bold ${trip.paperSignatureConfirmed ? 'text-emerald-700' : 'text-slate-600'}`}>
-                              {trip.paperSignatureConfirmed ? 'Yes' : 'No'}
-                            </span>
-                          </div>
-                        </div>
                       </div>
                     )}
 
@@ -714,32 +590,17 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                         </>
                       ) : (
                         <>
-                          <button
-                            onClick={() => startInlineEdit(trip)}
-                            disabled={readOnly}
-                            className="flex items-center justify-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-xl py-2 font-bold text-xs shadow-2xs transition-colors"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            Edit Trip
-                          </button>
+                          <button type="button" onClick={() => setExpandedTripId(trip.id)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">Details</button>
+                          <button onClick={() => startInlineEdit(trip)} disabled={readOnly} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs">Edit</button>
                           {(trip.status === 'Cancelled' || trip.status === 'No Show' || trip.status === 'Rerouted' || trip.status === 'Cancelled / Rescheduled' || trip.status === 'Transferred') && (
                             <button
                               onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { status: 'Assigned', workflowUpdatedAt: new Date().toISOString() })}
                               disabled={readOnly}
-                              className="flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 border border-amber-600 text-white rounded-xl py-2 font-bold text-xs shadow-2xs transition-colors"
+                              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-xs"
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              Restore Trip
+                              Restore
                             </button>
                           )}
-                          <button
-                            onClick={() => onUpdateTrip && onUpdateTrip(trip.id, { reviewed: !trip.reviewed })}
-                            disabled={readOnly}
-                            className={`${(trip.status === 'Cancelled' || trip.status === 'No Show' || trip.status === 'Rerouted' || trip.status === 'Cancelled / Rescheduled' || trip.status === 'Transferred') ? 'col-span-2' : ''} flex items-center justify-center gap-1.5 border rounded-xl py-2 shadow-2xs font-bold text-xs transition-colors ${trip.reviewed ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}`}
-                          >
-                            <CheckCircle2 className={`w-3.5 h-3.5 ${trip.reviewed ? 'text-slate-500' : 'text-white'}`} />
-                            {trip.reviewed ? 'Un-Review' : 'Review'}
-                          </button>
                         </>
                       )}
                     </div>
