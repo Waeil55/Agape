@@ -59,8 +59,8 @@ export function getManifestDisplayStatus(trip) {
 // Unknown statuses fail to neutral slate, never crash.
 const STATUS_STYLES = {
   completed: { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', dot: 'bg-emerald-600', icon: Check },
-  'in progress': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null, pulse: true },
-  'in mission': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null, pulse: true },
+  'in progress': { cls: 'bg-emerald-600 text-white border border-emerald-700', dot: 'bg-white', icon: null, pulse: true },
+  'in mission': { cls: 'bg-emerald-600 text-white border border-emerald-700', dot: 'bg-white', icon: null, pulse: true },
   'at pickup': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', dot: 'bg-emerald-600', icon: null, pulse: true },
   'at dropoff': { cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', dot: 'bg-emerald-600', icon: null, pulse: true },
   'in transit': { cls: 'bg-blue-50 text-blue-700 border border-blue-200/80', dot: 'bg-blue-600', icon: null, pulse: true },

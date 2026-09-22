@@ -36,7 +36,8 @@ describe('getManifestStatusBadge — design tokens', () => {
     expect(getManifestStatusBadge('Trip rerouted').cls).toContain('amber');
     expect(getManifestStatusBadge('Cancelled').cls).toContain('rose');
     expect(getManifestStatusBadge('Assigned').cls).toContain('blue');
-    expect(getManifestStatusBadge('In Progress').cls).toContain('blue');
+    expect(getManifestStatusBadge('In Progress').cls).toContain('bg-emerald-600');
+    expect(getManifestStatusBadge('In Progress').cls).toContain('text-white');
     expect(getManifestStatusBadge('At Pickup').cls).toContain('emerald');
     expect(getManifestStatusBadge('Navigating Pickup').cls).toContain('blue');
     expect(getManifestStatusBadge('Arrived').cls).toContain('emerald');
