@@ -81,6 +81,23 @@ describe('authentication startup recovery', () => {
     expect(app).toContain('disabled={loginSubmitting}');
   });
 
+  it('fails closed when credentials are entered through the wrong role portal', () => {
+    const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+
+    expect(app).toContain('requestedPortalRole && requestedPortalRole !== userRole');
+    expect(app).toContain('getRoleGateMessage(requestedPortalRole, userRole)');
+    expect(app).toContain("nextLoginStep: 'credentials'");
+    expect(app).not.toContain('requestedPortalRole !== userRole && userRole !== \'admin\'');
+  });
+
+  it('does not race the profile verification timeout with an earlier login timer', () => {
+    const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+
+    expect(app).toContain('const LOGIN_ATTEMPT_RECOVERY_MS = AUTH_PROFILE_SERVER_TIMEOUT_MS + 8_000;');
+    expect(app).toContain('}, LOGIN_ATTEMPT_RECOVERY_MS);');
+    expect(app).not.toContain('const SAFETY_TIMEOUT_MS = 8_000;');
+  });
+
   it('acknowledges the matching Firebase auth event and times out a missing event', async () => {
     await expect(waitForMatchingAuthObserver(
       Promise.resolve('user-1'),

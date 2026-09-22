@@ -166,6 +166,7 @@ const withoutLegacyTheme = (settings = {}) => {
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
 const LOGIN_LOCK_EXPIRY_MS = 15_000;
+const LOGIN_ATTEMPT_RECOVERY_MS = AUTH_PROFILE_SERVER_TIMEOUT_MS + 8_000;
 
 function normalizeUsername(value = '') {
   return String(value || '')
@@ -1107,9 +1108,22 @@ const App = () => {
       if (cancelled || !capturedUser?.uid || auth.currentUser?.uid !== capturedUser.uid) return;
       const requestedPortalRole = loginPortalRoleRef.current;
 
-      // Role check: gracefully adapt to the account's authentic role
-      if (requestedPortalRole && requestedPortalRole !== userRole && userRole !== 'admin') {
-        console.log(`[Auth] User authenticated as ${userRole} via ${requestedPortalRole} portal.`);
+      // Portal selection is an authorization boundary, not a cosmetic hint.
+      // Never open a different workspace after valid credentials were entered
+      // through the wrong portal; sign out and keep the entered username ready.
+      if (requestedPortalRole && requestedPortalRole !== userRole) {
+        loginInProgressRef.current = false;
+        skipNextSignedOutResetRef.current = true;
+        clearRoleCache();
+        await signOut(auth).catch(() => {});
+        resetSessionState({
+          loginErrorMessage: getRoleGateMessage(requestedPortalRole, userRole),
+          preserveEmail: true,
+          emailValue: isInternalAuthEmail(userEmail) ? authEmailToUsername(userEmail) : userEmail,
+          pendingRoleValue: requestedPortalRole,
+          nextLoginStep: 'credentials',
+        });
+        return false;
       }
 
       // Cached-session startup has no role-selection click to warm its
@@ -1177,6 +1191,7 @@ const App = () => {
       } catch (notificationError) {
         console.warn('[Auth] Notification setup skipped:', notificationError);
       }
+      return true;
     };
 
     const verifyAppliedSessionInBackground = (capturedUser, cachedRole, cachedTenantId) => {
@@ -1243,7 +1258,8 @@ const App = () => {
         if (cached && cached.role && (!requestedPortalRole || requestedPortalRole === cached.role)) {
           // Apply session immediately — loading clears in milliseconds
           loginInProgressRef.current = false;
-          applySession(cached.role, userEmail, null, user, cached.tenantId);
+          const sessionApplied = await applySession(cached.role, userEmail, null, user, cached.tenantId);
+          if (!sessionApplied) return;
           verifyAppliedSessionInBackground(user, cached.role, cached.tenantId);
           return;
         }
@@ -1267,7 +1283,8 @@ const App = () => {
         ) {
           const cachedTenantId = tenantIdFromProfile(cachedProfileDoc.data());
           loginInProgressRef.current = false;
-          applySession(cachedProfileRole, userEmail, cachedProfileDoc, user, cachedTenantId);
+          const sessionApplied = await applySession(cachedProfileRole, userEmail, cachedProfileDoc, user, cachedTenantId);
+          if (!sessionApplied) return;
           verifyAppliedSessionInBackground(user, cachedProfileRole, cachedTenantId);
           return;
         }
@@ -1356,7 +1373,8 @@ const App = () => {
         }
 
         loginInProgressRef.current = false;
-        applySession(userRole, userEmail, userDoc, user);
+        const sessionApplied = await applySession(userRole, userEmail, userDoc, user);
+        if (!sessionApplied) return;
 
         try {
           const r = roleRef.current;
@@ -1607,18 +1625,31 @@ const App = () => {
       setLoginSubmitting(false);
       return;
     }
+    if (!password) {
+      setLoginError('Enter your password.');
+      loginInProgressRef.current = false;
+      setLoginSubmitting(false);
+      return;
+    }
     loginPortalRoleRef.current = requestedRole;
     setLoginError('');
-    // Safety timeout: force-unstick the login UI after 8s so the user is never trapped
-    const SAFETY_TIMEOUT_MS = 8_000;
+    // Profile verification is allowed its complete bounded server window before
+    // presenting recovery. The older 8-second timer raced the 12-second profile
+    // check and could return an authenticated user to the login form mid-boot.
     const safetyTimer = setTimeout(() => {
       if (loginInProgressRef.current) {
         loginInProgressRef.current = false;
         setLoginSubmitting(false);
-        setIsLoading(false);
-        setLoginError('Login is taking longer than expected. Please try again.');
+        if (auth.currentUser) {
+          setStartupIssue('Account verification is still pending. Your sign-in is preserved; retry when the connection is stable.');
+          setShowLoadingRecovery(true);
+          setIsLoading(true);
+        } else {
+          setIsLoading(false);
+          setLoginError('Login is taking longer than expected. Check the connection and try again.');
+        }
       }
-    }, SAFETY_TIMEOUT_MS);
+    }, LOGIN_ATTEMPT_RECOVERY_MS);
     let acknowledgeLogin;
     const observerAcknowledgement = new Promise((resolve) => {
       acknowledgeLogin = resolve;
@@ -3015,6 +3046,8 @@ const App = () => {
                       placeholder="waeil.admin"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      aria-invalid={Boolean(loginError)}
+                      aria-describedby={loginError ? 'login-feedback' : undefined}
                       className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
                     />
                   </div>
@@ -3031,13 +3064,15 @@ const App = () => {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      aria-invalid={Boolean(loginError)}
+                      aria-describedby={loginError ? 'login-feedback' : undefined}
                       className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
                     />
                   </div>
                 </div>
 
                 {loginError && (
-                  <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-center">
+                  <div id="login-feedback" role="alert" aria-live="assertive" className="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
                       <p className="text-xs font-bold text-rose-700">{loginError}</p>
