@@ -6329,7 +6329,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   const ie = isEditing ? editingTripData : null;
                   const inputCls = "w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs focus:border-blue-500 focus:bg-white outline-none transition-all";
                   return (
-                    <div key={trip.id} className="space-y-3">
+                    <div key={trip.id} data-expanded-frame="true" className="space-y-3 rounded-xl ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-50 shadow-md">
                       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                         <MobileHistoryCardHeader
                           trip={isEditing ? { ...trip, patient: ie.patient, bookingId: ie.bookingId } : trip}

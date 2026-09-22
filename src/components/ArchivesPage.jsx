@@ -404,7 +404,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
     const driverName = getDriverLabel(trip, drivers);
 
     return (
-      <div key={trip.id} className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all">
+      <div key={trip.id} data-expanded-frame={isExpanded || undefined} className={`overflow-hidden rounded-xl bg-white transition-all ${isExpanded ? 'border border-indigo-300 ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-50 shadow-md' : 'border border-slate-200/90 shadow-xs'}`}>
         <MobileHistoryCardHeader
           trip={trip}
           expanded={isExpanded}

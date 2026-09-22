@@ -446,8 +446,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             const displayStatus = isEditing ? ie.status : (trip.status || (trip.reviewed ? 'Reviewed' : 'Pending'));
 
             return (
-              <div key={trip.id} className="mb-1.5 rounded-xl [&_button]:!min-h-0 max-md:[&_button]:!min-h-0">
-                <div className={`overflow-hidden rounded-xl bg-white transition-all ${isExpanded ? 'border border-indigo-400/90 ring-4 ring-indigo-50/80 shadow-md' : 'border border-slate-200/90 shadow-xs'}`} aria-expanded={isExpanded}>
+              <div key={trip.id} data-expanded-frame={isExpanded || undefined} className={`mb-2 rounded-xl transition-all [&_button]:!min-h-0 max-md:[&_button]:!min-h-0 ${isExpanded ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-50 shadow-md' : ''}`}>
+                <div className={`overflow-hidden rounded-xl bg-white transition-all ${isExpanded ? 'border border-indigo-300' : 'border border-slate-200/90 shadow-xs'}`} aria-expanded={isExpanded}>
                   <MobileHistoryCardHeader
                     trip={trip}
                     driverName={driver ? driver.name : (trip.driverName || 'Unassigned')}
