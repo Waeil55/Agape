@@ -4,6 +4,7 @@ import {
   getManifestStatusBadge,
   getManifestDisplayStatus,
   getTripCountdown,
+  getManifestTimeColor,
   buildInlineTripActions,
   getManifestAddressLines,
   getManifestLegs,
@@ -127,6 +128,22 @@ describe('getTripCountdown — deterministic urgency', () => {
   it('formats long waits as hours', () => {
     expect(getTripCountdown(trip({ time: '14:00' }), NOON).label).toBe('2h away');
     expect(getTripCountdown(trip({ time: '14:30' }), NOON).label).toBe('2h 30m away');
+  });
+});
+
+describe('getManifestTimeColor — mobile Trips schedule thresholds', () => {
+  it('is black normally, orange within an hour, and red within 30 minutes', () => {
+    expect(getManifestTimeColor({ level: 'later', minutes: 61 })).toBe('text-slate-900');
+    expect(getManifestTimeColor({ level: 'soon', minutes: 60 })).toBe('text-orange-600');
+    expect(getManifestTimeColor({ level: 'soon', minutes: 31 })).toBe('text-orange-600');
+    expect(getManifestTimeColor({ level: 'soon', minutes: 30 })).toBe('text-red-600');
+    expect(getManifestTimeColor({ level: 'critical', minutes: 0 })).toBe('text-red-600');
+    expect(getManifestTimeColor({ level: 'overdue', minutes: -1 })).toBe('text-red-600');
+    expect(getManifestTimeColor({ level: 'unscheduled', minutes: null })).toBe('text-slate-900');
+  });
+
+  it('keeps in/out trip times black', () => {
+    expect(getManifestTimeColor({ level: 'critical', minutes: 10 }, true)).toBe('text-slate-900');
   });
 });
 

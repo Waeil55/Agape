@@ -285,6 +285,17 @@ export const COUNTDOWN_TIME_TEXT = {
   unscheduled: 'text-slate-500',
 };
 
+// Mobile Trips card schedule emphasis: calm by default, escalating only as
+// the pickup window approaches. This is intentionally independent from the
+// countdown badge's 20-minute "critical" wording.
+export function getManifestTimeColor(countdown, isInOut = false) {
+  if (isInOut) return 'text-slate-900';
+  const minutes = countdown?.minutes;
+  if (countdown?.level === 'overdue' || (typeof minutes === 'number' && Number.isFinite(minutes) && minutes <= 30)) return 'text-red-600';
+  if (typeof minutes === 'number' && Number.isFinite(minutes) && minutes <= 60) return 'text-orange-600';
+  return 'text-slate-900';
+}
+
 export const COUNTDOWN_BADGE = {
   done: 'bg-emerald-50 text-emerald-700',
   overdue: 'bg-rose-100 text-rose-700',
@@ -459,7 +470,7 @@ export function ManifestTripCard({
   const dropoffAddress = getFullAddress(trip?.dropoff, trip?.dropoffCity);
   const isDone = isTripActionTerminal(trip);
   const isInOut = String(trip?.time || '').toUpperCase().includes('IN/OUT') || trip?.inOut || trip?.tripIsInOut;
-  const timeColor = isInOut ? 'text-slate-900' : 'text-red-600';
+  const timeColor = getManifestTimeColor(cd, isInOut);
   const statusPulseColor = statusBadge.dot || (isDone ? 'bg-emerald-600' : 'bg-rose-500');
   const HeaderMoreIcon = MoreIcon || MoreHorizontal;
 
