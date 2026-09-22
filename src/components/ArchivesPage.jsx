@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Upload, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw, Copy, Navigation } from 'lucide-react';
+import { Archive, Calendar, Search, X, ChevronDown, ChevronRight, MoreHorizontal, Edit2, RotateCcw, Download, Upload, Shield, AlertTriangle, Clock, CheckCircle2, Tag, Filter, Bookmark, Trash2, Lock, Eye, FileText, BarChart3, Users, MapPin, RefreshCw, Navigation } from 'lucide-react';
 import { tripMatchesSearch } from '../utils/search';
 import { tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
 import { resolveTripDriver } from '../utils/driverIdentity';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
+import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
 
 const formatClock24 = (value) => {
   if (!value) return '—';
@@ -401,81 +402,29 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
 
     return (
       <div key={trip.id} className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all">
-        {/* Header - click to toggle expansion */}
-        <div
-          onClick={() => setExpandedArchiveTripId(isExpanded ? null : trip.id)}
-          className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/70 gap-2 cursor-pointer active:bg-slate-100/80 transition-colors"
-          role="button"
-          tabIndex={0}
-          aria-expanded={isExpanded}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedArchiveTripId(isExpanded ? null : trip.id); } }}
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-[17px] font-extrabold tracking-tight shrink-0 text-slate-700">{renderCellValue(trip, { key: 'time' }) || '—'}</span>
-            <span className="text-slate-300 shrink-0 font-light">|</span>
-            <div className="flex items-baseline gap-1.5 min-w-0 flex-1 truncate">
-              <span className="text-[16px] font-bold text-slate-900 truncate">{renderCellValue(trip, { key: 'patient' })}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[13px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-300/80 tracking-wide shrink-0">
-              #{renderCellValue(trip, { key: 'bookingId' })}
-            </span>
-            <ChevronDown size={17} className={`text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
-          </div>
-        </div>
-
-        {/* Collapsed Summary Row (When NOT opened, addresses are hidden to reduce traffic & height) */}
-        {!isExpanded && (
-          <div
-            onClick={() => setExpandedArchiveTripId(trip.id)}
-            className="px-3.5 py-2 flex items-center justify-between gap-2 text-[13px] cursor-pointer hover:bg-slate-50/50 transition-colors"
-          >
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className={`inline-flex items-center gap-1 text-[12.5px] font-bold px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
-                <StatusIcon size={12} /> {statusBadge.label}
-              </span>
-              <span className="font-semibold text-slate-600 truncate max-w-[130px]">{driverName !== '—' ? driverName : 'Unassigned'}</span>
-            </div>
-            <span className="text-xs font-semibold text-blue-600 shrink-0">Details</span>
-          </div>
-        )}
+        <MobileHistoryCardHeader
+          trip={trip}
+          expanded={isExpanded}
+          detailed
+          driverName={driverName !== '—' ? driverName : 'Unassigned'}
+          vehicleName={renderCellValue(trip, { key: 'vehicle' })}
+          miles={renderCellValue(trip, { key: 'distance' })}
+          time={renderCellValue(trip, { key: 'time' })}
+          status={statusBadge.label}
+          onToggle={() => setExpandedArchiveTripId(isExpanded ? null : trip.id)}
+        />
 
         {/* Expanded View (Addresses & Full Details shown only when opened) */}
         {isExpanded && (
           <div className="p-3 space-y-2.5 border-t border-slate-100 bg-white">
-            {/* Route Timeline with addresses */}
-            <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/80 space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0 flex-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <span className="text-xs font-black uppercase text-emerald-600 tracking-wider block">Pickup</span>
-                    <p className="text-[14px] font-semibold text-slate-800 leading-snug">{pickupRaw || '—'}</p>
-                  </div>
-                </div>
-                {pickupRaw && (
-                  <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(pickupRaw); }} title="Copy Pickup" className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-                    <Copy size={13} />
-                  </button>
-                )}
-              </div>
-              <div className="border-t border-slate-200/70" />
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0 flex-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <span className="text-xs font-black uppercase text-rose-600 tracking-wider block">Dropoff</span>
-                    <p className="text-[14px] font-semibold text-slate-800 leading-snug">{dropoffRaw || '—'}</p>
-                  </div>
-                </div>
-                {dropoffRaw && (
-                  <button type="button" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(dropoffRaw); }} title="Copy Dropoff" className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-                    <Copy size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
+            <MobileHistoryStops
+              pickupAddress={pickupRaw}
+              dropoffAddress={dropoffRaw}
+              pickupClock={renderCellValue(trip, { key: 'arrivalTime' })}
+              dropoffClock={renderCellValue(trip, { key: 'arrivalDropoffTime' })}
+              pickupOdometer={renderCellValue(trip, { key: 'pickupOdometer' })}
+              dropoffOdometer={renderCellValue(trip, { key: 'dropoffOdometer' })}
+            />
 
             {/* Compact Metrics Grid (2x2) */}
             <div className="grid grid-cols-2 gap-1.5 text-xs">

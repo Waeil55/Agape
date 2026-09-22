@@ -6,8 +6,8 @@ import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '.
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
-import { ManifestTripCard, getTripCountdown } from './trips/MobileTripManifest';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
+import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
 
 const MOBILE_REPORT_PAGE_SIZE = 40;
 
@@ -175,21 +175,6 @@ const parseOdometerInput = (value) => {
   if (!/^\d+$/.test(cleaned)) return null;
   const n = parseInt(cleaned, 10);
   return Number.isFinite(n) && n > 0 ? n : null;
-};
-
-const getReportTripTone = (trip) => {
-  const status = String(trip?.status || '').trim().toLowerCase();
-  if (trip?.reviewed || status === 'completed') return 'success';
-  if (status.includes('cancel') || status.includes('no show')) return 'danger';
-  if (status.includes('reroute')) return 'warning';
-  return 'pending';
-};
-
-const getReportStatusIcon = (tone) => {
-  if (tone === 'success') return CheckCircle2;
-  if (tone === 'danger') return XCircle;
-  if (tone === 'warning') return AlertTriangle;
-  return Clock;
 };
 
 const normalizeStatus = (status) => {
@@ -561,21 +546,21 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
             const isEditing = editingTripId === trip.id;
             const isExpanded = expandedTripId === trip.id || isEditing;
             const ie = isEditing ? editingTripData : null;
-            const tone = getReportTripTone(trip);
-            const StatusIcon = getReportStatusIcon(tone);
             const displayStatus = isEditing ? ie.status : (trip.status || (trip.reviewed ? 'Reviewed' : 'Pending'));
 
             return (
               <div key={trip.id} className="mb-1.5 rounded-xl [&_button]:!min-h-0 max-md:[&_button]:!min-h-0">
-                <div onClick={() => setExpandedTripId(current => current === trip.id ? null : trip.id)} className="cursor-pointer" aria-expanded={isExpanded}>
-                  <ManifestTripCard
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-expanded={isExpanded}>
+                  <MobileHistoryCardHeader
                     trip={trip}
-                    showAddresses={false}
-                    countdown={getTripCountdown(trip)}
                     driverName={driver ? driver.name : (trip.driverName || 'Unassigned')}
-                    onTimeEdit={(t) => setScheduleEditTrip(t)}
-                    onMore={() => setExpandedTripId(current => current === trip.id ? null : trip.id)}
-                    moreLabel={isExpanded ? 'Hide details' : 'View details'}
+                    vehicleName={trip.completedVehicle || driver?.vehicle}
+                    miles={calcMiles(trip.pickupOdometer, trip.dropoffOdometer, trip.distance)}
+                    time={trip.time || 'Will Call'}
+                    status={displayStatus}
+                    expanded={isExpanded}
+                    detailed
+                    onToggle={() => setExpandedTripId(current => current === trip.id ? null : trip.id)}
                   />
                   {!isEditing && !readOnly && (
                     <button
@@ -674,30 +659,14 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {/* Compact Route Block (Addresses shown here when card is opened) */}
-                        <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/80 space-y-2">
-                          <div className="flex items-start gap-2.5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[14px] font-semibold text-slate-900 leading-snug">{trip.pickup || '—'}</p>
-                              <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-emerald-700">
-                                <span>Arrived: {formatClock(trip.arrivalTime)}</span>
-                                {trip.pickupOdometer && <span>Odo: {trip.pickupOdometer}</span>}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="border-t border-slate-200/70" />
-                          <div className="flex items-start gap-2.5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[14px] font-semibold text-slate-900 leading-snug">{trip.dropoff || '—'}</p>
-                              <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-rose-700">
-                                <span>Arrived: {formatClock(trip.arrivalDropoffTime)}</span>
-                                {trip.dropoffOdometer && <span>Odo: {trip.dropoffOdometer}</span>}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <MobileHistoryStops
+                          pickupAddress={trip.pickup}
+                          dropoffAddress={trip.dropoff}
+                          pickupClock={formatClock(trip.arrivalTime)}
+                          dropoffClock={formatClock(trip.arrivalDropoffTime)}
+                          pickupOdometer={trip.pickupOdometer}
+                          dropoffOdometer={trip.dropoffOdometer}
+                        />
 
                         {/* Compact Metrics Grid (2x2) */}
                         <div className="grid grid-cols-2 gap-1.5 text-xs">

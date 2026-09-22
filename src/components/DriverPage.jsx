@@ -37,6 +37,7 @@ import { getDriverLiveStatus } from '../constants/statuses';
 import ErrorBoundary from './ErrorBoundary';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
+import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
 import { deriveVehicleOdometerState, evaluateOdometerEntry } from '../utils/vehicleOdometer';
@@ -357,6 +358,15 @@ const formatTripDistance = (value) => {
   const s = String(value);
   return /\bmi\b/i.test(s) ? s : `${s} mi`;
 };
+const getHistoryTripMiles = (trip) => {
+  const stored = String(trip?.distance ?? '').replace(/\bmi(?:les)?\b/gi, '').trim();
+  const storedMiles = Number(stored);
+  if (stored && Number.isFinite(storedMiles) && storedMiles >= 0) return storedMiles.toFixed(1);
+  const pickup = Number(String(trip?.pickupOdometer ?? '').replace(/,/g, ''));
+  const dropoff = Number(String(trip?.dropoffOdometer ?? '').replace(/,/g, ''));
+  const difference = dropoff - pickup;
+  return Number.isFinite(difference) && difference >= 0 ? difference.toFixed(1) : '—';
+};
 const formatTripDetailValue = (value) => {
   if (value === undefined || value === null || value === '') return '--';
   if (typeof value === 'object') {
@@ -444,32 +454,14 @@ const HistoryTripDetailTable = ({ trip, driver }) => {
 
   return (
     <div className="driver-history-detail-table border-t border-slate-200 bg-white p-3 space-y-2.5">
-      {/* Route Timeline with Addresses */}
-      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/80 space-y-2">
-        <div className="flex items-start gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <span className="text-xs font-black uppercase text-emerald-600 tracking-wider block">Pickup</span>
-            <p className="text-[14px] font-semibold text-slate-800 leading-snug">{pickupAddr}</p>
-            <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-emerald-700">
-              {pickupClock !== '—' && <span>Arrived: {pickupClock}</span>}
-              {pickupOdometer !== '—' && <span>Odo: {pickupOdometer}</span>}
-            </div>
-          </div>
-        </div>
-        <div className="border-t border-slate-200/70" />
-        <div className="flex items-start gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <span className="text-xs font-black uppercase text-rose-600 tracking-wider block">Dropoff</span>
-            <p className="text-[14px] font-semibold text-slate-800 leading-snug">{dropoffAddr}</p>
-            <div className="flex items-center gap-3 mt-0.5 text-xs font-medium text-rose-700">
-              {dropoffClock !== '—' && <span>Arrived: {dropoffClock}</span>}
-              {dropoffOdometer !== '—' && <span>Odo: {dropoffOdometer}</span>}
-            </div>
-          </div>
-        </div>
-      </div>
+      <MobileHistoryStops
+        pickupAddress={pickupAddr}
+        dropoffAddress={dropoffAddr}
+        pickupClock={pickupClock}
+        dropoffClock={dropoffClock}
+        pickupOdometer={pickupOdometer}
+        dropoffOdometer={dropoffOdometer}
+      />
 
       {/* Compact Metrics Grid */}
       <div className="grid grid-cols-2 gap-1.5 text-xs">
@@ -6405,17 +6397,6 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             ) : (
               sortedFilteredHistory.map(trip => {
                 const statusMeta = getHistoryStatusMeta(trip.status);
-                const StatusIcon = statusMeta.Icon;
-                const normalizedHistoryStatus = normalizeWorkflowStatus(trip.status);
-                const historyTone = normalizedHistoryStatus === 'completed'
-                  ? 'success'
-                  : normalizedHistoryStatus === 'cancelled'
-                    ? 'danger'
-                    : normalizedHistoryStatus === 'no show'
-                      ? 'warning'
-                      : normalizedHistoryStatus === 'rerouted'
-                        ? 'info'
-                        : 'pending';
                 const isEditing = editingTripId === trip.id;
                 const isExpanded = historyExpandedId === trip.id || isEditing;
                 if (isExpanded) {
@@ -6424,47 +6405,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   return (
                     <div key={trip.id} className="space-y-3">
                       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div
-                          className="flex items-center gap-3 px-3 py-3 border-b border-slate-100 cursor-pointer"
-                          role={!isEditing ? 'button' : undefined}
-                          tabIndex={!isEditing ? 0 : undefined}
-                          aria-expanded={isExpanded}
-                          onClick={() => {
-                            if (!isEditing) setHistoryExpandedId(null);
-                          }}
-                          onKeyDown={(event) => {
-                            if (!isEditing && (event.key === 'Enter' || event.key === ' ')) {
-                              event.preventDefault();
-                              setHistoryExpandedId(null);
-                            }
-                          }}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-[16px] font-semibold text-slate-900">{isEditing ? ie.patient : trip.patient || 'Trip'}</h3>
-                            <p className="text-[13px] font-medium text-slate-500">#{isEditing ? ie.bookingId : trip.bookingId || trip.id}</p>
-                            {!isEditing && (trip.pickupCity || trip.dropoffCity) && (
-                              <p className="text-[12px] text-slate-400 font-medium truncate flex items-center gap-1 mt-0.5">
-                                <MapPin size={12} />
-                                <span>{trip.pickupCity || ''}{trip.pickupCity && trip.dropoffCity ? ' → ' : ''}{trip.dropoffCity || ''}</span>
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="flex flex-col items-end">
-                              <span className="text-[13px] text-slate-500 font-medium">Driver: {me?.name || '-'}</span>
-                            </div>
-                            <span className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              historyTone === 'success' ? 'bg-emerald-100 text-emerald-600'
-                              : historyTone === 'danger' ? 'bg-rose-100 text-rose-600'
-                              : historyTone === 'warning' ? 'bg-amber-100 text-amber-600'
-                              : historyTone === 'info' ? 'bg-blue-100 text-blue-600'
-                              : 'bg-slate-100 text-slate-600'
-                            }`} title={statusMeta.label} aria-label={statusMeta.label}>
-                              <StatusIcon size={15} />
-                            </span>
-                            {!isEditing && <ChevronDown size={17} className="text-slate-400" />}
-                          </div>
-                        </div>
+                        <MobileHistoryCardHeader
+                          trip={isEditing ? { ...trip, patient: ie.patient, bookingId: ie.bookingId } : trip}
+                          expanded
+                          driverName={me?.name}
+                          vehicleName={resolveTripVehicle(trip, me)}
+                          miles={getHistoryTripMiles(trip)}
+                          time={to12hr(isEditing ? ie.time : trip.time)}
+                          status={statusMeta.label}
+                          onToggle={!isEditing ? () => setHistoryExpandedId(null) : undefined}
+                        />
                         {isEditing ? (
                           <div className="p-3 space-y-2.5">
                             <div className="grid grid-cols-2 gap-2">
@@ -6613,46 +6563,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   );
                 }
                 return (
-                  <div key={trip.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div
-                      onClick={() => setHistoryExpandedId(trip.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          setHistoryExpandedId(trip.id);
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={false}
-                      className="flex items-center gap-3 px-3 py-3 cursor-pointer"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-[16px] font-semibold text-slate-900">{trip.patient || 'Trip'}</h3>
-                        <p className="text-[13px] font-medium text-slate-500">#{trip.bookingId || trip.id}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex flex-col items-end">
-                          <span className={`text-[17px] font-semibold ${historyTone === 'danger' ? 'text-rose-600' : historyTone === 'success' ? 'text-emerald-600' : 'text-blue-600'}`}>{to12hr(trip.time)}</span>
-                          <span className="text-[13px] text-slate-500 mt-0.5 font-medium">Driver: {me?.name || '-'}</span>
-                        </div>
-                        <span
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            historyTone === 'success' ? 'bg-emerald-100 text-emerald-600'
-                            : historyTone === 'danger' ? 'bg-rose-100 text-rose-600'
-                            : historyTone === 'warning' ? 'bg-amber-100 text-amber-600'
-                            : historyTone === 'info' ? 'bg-blue-100 text-blue-600'
-                            : 'bg-slate-100 text-slate-600'
-                          }`}
-                          title={statusMeta.label}
-                          aria-label={statusMeta.label}
-                        >
-                          <StatusIcon size={15} />
-                        </span>
-                        {isExpanded ? <ChevronDown size={17} className="text-slate-400" /> : <ChevronRight size={17} className="text-slate-400" />}
-                      </div>
-                    </div>
-
+                  <div key={trip.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <MobileHistoryCardHeader
+                      trip={trip}
+                      driverName={me?.name}
+                      vehicleName={resolveTripVehicle(trip, me)}
+                      miles={getHistoryTripMiles(trip)}
+                      time={to12hr(trip.time)}
+                      status={statusMeta.label}
+                      onToggle={() => setHistoryExpandedId(trip.id)}
+                    />
                   </div>
                 );
               })
