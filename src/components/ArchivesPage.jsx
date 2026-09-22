@@ -496,7 +496,7 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
           </button>
         </div>
         <div className="sm:hidden">
-          <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2"><div className="relative min-w-0 flex-1"><Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-slate-400" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2.5 text-[13px] font-medium outline-none focus:border-indigo-500 focus:bg-white" /></div></div>
+          <div className="flex items-center border-b border-slate-200 px-3 py-1.5"><div className="relative min-w-0 flex-1"><Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-7 w-full rounded-lg border border-slate-200 bg-slate-50 pl-7 pr-2.5 text-xs font-medium outline-none focus:border-indigo-500 focus:bg-white" /></div></div>
           <MobileHistoryFilters
             startDate={startDate || localCalendarYmd()}
             endDate={endDate || null}

@@ -374,9 +374,9 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
         {editMessage && <div role={editMessage.includes('not saved') ? 'alert' : 'status'} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${editMessage.includes('not saved') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{editMessage}</div>}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
-        <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2 text-slate-400" size={14} /><input type="text" placeholder="Search..." value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setExpandedTripId(null); }} className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2.5 text-[13px] font-medium text-slate-900 outline-none focus:border-indigo-500 focus:bg-white" /></div>
-        <button type="button" onClick={() => setShowExportPanel(!showExportPanel)} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${showExportPanel ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'}`} aria-label="Tools & Export"><SlidersHorizontal size={15} /></button>
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-slate-200 bg-white px-3 py-1.5">
+        <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} /><input type="text" placeholder="Search..." value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setExpandedTripId(null); }} className="h-7 w-full rounded-lg border border-slate-200 bg-slate-50 pl-7 pr-2.5 text-xs font-medium text-slate-900 outline-none focus:border-indigo-500 focus:bg-white" /></div>
+        <button type="button" onClick={() => setShowExportPanel(!showExportPanel)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${showExportPanel ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'}`} aria-label="Tools & Export"><SlidersHorizontal size={13} /></button>
       </div>
       <MobileHistoryFilters
         startDate={dateStr}

@@ -6285,12 +6285,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       {/* ===== HISTORY PAGE ===== */}
       {activeNav === 'history' && (
         <div className="flex-1 overflow-y-auto bg-slate-50 pb-24">
-          <div className="shrink-0 px-3 py-2 border-b border-slate-200 bg-white">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm">
-              <Search size={16} className="text-slate-400 shrink-0" />
+          <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5">
+            <div className="flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5">
+              <Search size={13} className="shrink-0 text-slate-400" />
             <input type="text" placeholder="Search by patient, booking ID, address..." value={historySearch} onChange={(e) => { setHistorySearch(e.target.value); setHistoryExpandedId(null); }}
-              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400" />
-            {historySearch && <button onClick={() => { setHistorySearch(''); setHistoryExpandedId(null); }} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>}
+              className="min-w-0 flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-400" />
+            {historySearch && <button onClick={() => { setHistorySearch(''); setHistoryExpandedId(null); }} className="grid h-6 w-6 shrink-0 place-items-center text-slate-400 hover:text-slate-600" aria-label="Clear history search"><X size={12} /></button>}
             </div>
           </div>
           <MobileHistoryFilters
