@@ -272,7 +272,8 @@ const DesktopAdminPage = ({
   assignTripToDriver, requestAuthAction, onViewTrip, appSettings = {}, onUpdateAppSettings
 }) => {
   const { unreadCount } = useChat({ alerts: true });
-  const [activeSection, setActiveSection] = useState('overview');
+  const adminSectionStorageKey = `agape_desktopAdminSection_${role || 'unknown'}`;
+  const [activeSection, setActiveSection] = useState(() => localStorage.getItem(adminSectionStorageKey) || 'overview');
 
   const [createUserRole, setCreateUserRole] = useState(null);
   const [createForm, setCreateForm] = useState({ username: '', password: '', phone: '' });
@@ -631,6 +632,14 @@ const DesktopAdminPage = ({
 
   const visibleSections = sections.filter((section) => !section.roles || section.roles.includes(role));
 
+  useEffect(() => {
+    if (!visibleSections.some((section) => section.id === activeSection)) {
+      setActiveSection(visibleSections[0]?.id || 'overview');
+      return;
+    }
+    localStorage.setItem(adminSectionStorageKey, activeSection);
+  }, [activeSection, adminSectionStorageKey, visibleSections]);
+
   const nav = [{
     label: 'Command',
     items: visibleSections.map(s => ({
@@ -645,6 +654,16 @@ const DesktopAdminPage = ({
 
   const activeSectionConfig = visibleSections.find(s => s.id === activeSection) || visibleSections[0];
   const activeTitle = activeSectionConfig?.title || 'Admin';
+  const activeSubtitle = {
+    overview: 'Live operations, staffing, fleet readiness, and priority work.',
+    drivers: 'Driver profiles, vehicle assignments, maintenance, and availability.',
+    people: 'Accounts, employment details, and role-based access.',
+    time: 'Driver time records, notes, corrections, and hourly rates.',
+    activity: 'Auditable operational changes and export tools.',
+    system: 'Security, compliance, performance, and service health.',
+    payroll: 'Verified driver time and trip-based payroll reporting.',
+    chat: 'Internal team communication for active operations.',
+  }[activeSectionConfig?.id] || '';
 
   return (
     <AdminShell
@@ -655,8 +674,8 @@ const DesktopAdminPage = ({
       mobileActive={activeSection}
       onMobileNavigate={setActiveSection}
       title={activeTitle}
-      subtitle=""
-      eyebrow=""
+      subtitle={activeSubtitle}
+      eyebrow={role === 'admin' ? 'Administration' : 'Dispatch'}
       hideBrand
       navInline
     >

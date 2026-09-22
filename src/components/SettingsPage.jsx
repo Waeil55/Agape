@@ -122,7 +122,7 @@ const SettingsPage = ({
   const _updateSettings = onUpdateAppSettings || updateAppSettingsAlias;
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
-  const personalSectionIds = ['profile', 'appearance', 'accessibility', 'navigation', 'notifications', 'security'];
+  const personalSectionIds = ['profile', 'accessibility', 'navigation', 'notifications', 'security'];
   if (role === 'admin' || role === 'dispatcher') personalSectionIds.push('overrides', 'business-sms');
   if (role === 'dispatcher') personalSectionIds.unshift('activity');
   const resolvedInitialSection = personalSectionIds.includes(initialSection) ? initialSection : 'profile';
@@ -920,8 +920,13 @@ const SettingsPage = ({
   return (
     <div aria-label="Settings workspace" className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain touch-pan-y pb-24 lg:flex-row lg:gap-6 lg:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Sidebar */}
-      <nav aria-label="Settings sections" className="w-56 flex-shrink-0 hidden lg:block">
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm sticky top-4">
+      <nav aria-label="Settings sections" className="hidden w-64 flex-shrink-0 lg:block">
+        <div className="sticky top-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-slate-50 px-4 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">Workspace settings</p>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-900">{currentUser || 'Agape Care account'}</p>
+            <p className="mt-0.5 text-xs font-medium capitalize text-slate-500">{role || 'user'} access</p>
+          </div>
           {navItems.map((group, gi) => (
             <div key={gi}>
               <div className="px-4 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">{group.group}</div>
@@ -931,7 +936,9 @@ const SettingsPage = ({
                 return (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => setActiveSection(item.id)}
+                    aria-current={isActive ? 'page' : undefined}
                     className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-all text-sm ${isActive ? 'bg-blue-50 text-blue-700 font-semibold border-r-2 border-blue-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
                   >
                     <Icon size={15} className={isActive ? 'text-blue-600' : 'text-slate-400'} />
@@ -959,7 +966,7 @@ const SettingsPage = ({
       </div>
 
       {/* Content */}
-      <div className="w-full flex-1 min-w-0">
+      <div className="w-full min-w-0 flex-1">
         {saveStatus && <div role="status" className={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-bold ${saveStatus === 'All changes saved.' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : saveStatus.includes('Saving') ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{saveStatus.includes('Saving') ? <RefreshCw size={14} className="animate-spin" /> : saveStatus === 'All changes saved.' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}{saveStatus}</div>}
         {sectionContent()}
       </div>
