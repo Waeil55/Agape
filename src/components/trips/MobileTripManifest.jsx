@@ -415,6 +415,8 @@ export function ManifestTripCard({
   onTimeEdit,
   onCardClick,
   showAddresses = true,
+  hideCountdown = false,
+  mutedAddress = false,
 }) {
   const cd = countdown || getTripCountdown(trip);
   const displayStatus = getManifestDisplayStatus(trip);
@@ -501,7 +503,7 @@ export function ManifestTripCard({
           {/* Pickup Address */}
           <div className="flex items-center space-x-2 min-w-0">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-            <span className="text-slate-700 font-medium tracking-tight truncate flex-1 min-w-0" title={pickupAddress}>
+            <span className={`${mutedAddress ? 'text-slate-500' : 'text-slate-700'} font-medium tracking-tight truncate flex-1 min-w-0`} title={pickupAddress}>
               {pickupAddress}
             </span>
           </div>
@@ -509,7 +511,7 @@ export function ManifestTripCard({
           {/* Dropoff Address */}
           <div className="flex items-center space-x-2 min-w-0">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-            <span className="text-slate-700 font-medium tracking-tight truncate flex-1 min-w-0" title={dropoffAddress}>
+            <span className={`${mutedAddress ? 'text-slate-500' : 'text-slate-700'} font-medium tracking-tight truncate flex-1 min-w-0`} title={dropoffAddress}>
               {dropoffAddress}
             </span>
           </div>
@@ -571,16 +573,29 @@ export function ManifestTripCard({
 
         {/* Route Metrics & Status Pill */}
         <div className="flex items-center space-x-1.5 shrink-0">
-          <div className="inline-flex items-center text-[12.5px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
-            <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
-            <span>{cd?.label || 'No time'}</span>
-            {mileage && (
-              <>
-                <span className="mx-1 text-slate-400">•</span>
-                <span>{mileage}</span>
-              </>
-            )}
-          </div>
+          {hideCountdown && !mileage ? null : (
+            <div className="inline-flex items-center text-[12.5px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+              {hideCountdown ? (
+                mileage ? (
+                  <>
+                    <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
+                    <span>{mileage}</span>
+                  </>
+                ) : null
+              ) : (
+                <>
+                  <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
+                  <span>{cd?.label || 'No time'}</span>
+                  {mileage && (
+                    <>
+                      <span className="mx-1 text-slate-400">•</span>
+                      <span>{mileage}</span>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           <button
             type="button"

@@ -258,6 +258,8 @@ const TaskCard = ({ task, expandedId, onToggle, isSelected, onSelect, actions, r
           onMore={actions?.onOptions ? () => actions.onOptions(task) : (menuActions.length > 0 ? () => setMenuOpen(true) : null)}
           moreLabel={`More actions for ${task.patient || task.patientName || 'trip'}`}
           onTimeEdit={actions?.onTimeEdit || actions?.onScheduleEdit}
+          hideCountdown={isMobile}
+          mutedAddress={isMobile}
         />
         {menuOpen && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={`Trip actions for ${task.patient || task.patientName || 'trip'}`}>

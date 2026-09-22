@@ -32,4 +32,49 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
     );
     expect(html).toContain('All');
   });
+
+  it('shows the minutes-away countdown pill by default', () => {
+    const html = renderEl(
+      <ManifestTripCard trip={{ id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' }} primaryAction={null} iconActions={[]} />
+    );
+    expect(html).toContain('away');
+  });
+
+  it('hides the minutes-away countdown pill on compact mobile trips cards', () => {
+    const html = renderEl(
+      <ManifestTripCard
+        trip={{ id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' }}
+        primaryAction={null}
+        iconActions={[]}
+        hideCountdown
+      />
+    );
+    expect(html).not.toContain('away');
+  });
+
+  it('keeps mileage visible when the countdown is hidden on compact mobile trips cards', () => {
+    const html = renderEl(
+      <ManifestTripCard
+        trip={{ id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' }}
+        primaryAction={null}
+        iconActions={[]}
+        mileage="12 mi"
+        hideCountdown
+      />
+    );
+    expect(html).toContain('12 mi');
+    expect(html).not.toContain('away');
+  });
+
+  it('keeps addresses dark by default and mutes them on compact mobile trips cards', () => {
+    const trip = { id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' };
+    const defaultHtml = renderEl(<ManifestTripCard trip={trip} primaryAction={null} iconActions={[]} />);
+    const mutedHtml = renderEl(<ManifestTripCard trip={trip} primaryAction={null} iconActions={[]} mutedAddress />);
+    const addressClass = (html) => {
+      const matches = html.match(/<span class="([^"]*text-slate-\d+[^"]*)" title="1 Main St">/);
+      return matches ? matches[1] : '';
+    };
+    expect(addressClass(defaultHtml)).toContain('text-slate-700');
+    expect(addressClass(mutedHtml)).toContain('text-slate-500');
+  });
 });

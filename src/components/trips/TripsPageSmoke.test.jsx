@@ -61,5 +61,14 @@ describe('TripsPage render smoke (dispatcher/admin portal entry)', () => {
     expect(html).toContain('Assign');
     expect(html).toContain('Reassign');
   });
+
+  it('compact mobile trips cards hide the minutes-away countdown and mute addresses', () => {
+    const html = renderEl(
+      <TripsPage trips={trips} role="dispatcher" currentUser="boss@x.com" drivers={drivers} isMobile />
+    );
+    expect(html).not.toContain('away');
+    expect(html).toMatch(/(?:title="1 Main St")/);
+    expect(html).toContain('text-slate-500');
+  });
 });
 

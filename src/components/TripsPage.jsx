@@ -654,6 +654,8 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
         moreLabel={`${isTerminal ? 'Review' : 'Update'} ${trip.patient || trip.bookingId || 'trip'}`}
         onTimeEdit={(t) => setScheduleEditTrip(t)}
         onCardClick={onOpenTrip || onDriveTrip || null}
+        hideCountdown={isMobile}
+        mutedAddress={isMobile}
       />
       </div>
     );
