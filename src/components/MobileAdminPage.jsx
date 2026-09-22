@@ -243,11 +243,8 @@ const MobileAdminPage = ({
 }) => {
   const [pwResetMsg, setPwResetMsg] = useState({});
   const [activeTab, setActiveTab] = useState('overview');
-  const [driverQuery, setDriverQuery] = useState('');
   const [peopleQuery, setPeopleQuery] = useState('');
-  const [driverLimit, setDriverLimit] = useState(MOBILE_ADMIN_LIST_PAGE_SIZE);
   const [peopleLimit, setPeopleLimit] = useState(MOBILE_ADMIN_LIST_PAGE_SIZE);
-  const deferredDriverQuery = useDeferredValue(driverQuery);
   const deferredPeopleQuery = useDeferredValue(peopleQuery);
   const driverIndex = useMemo(() => buildDriverIndex(drivers), [drivers]);
   const serviceDate = localCalendarYmd();
@@ -308,14 +305,6 @@ const MobileAdminPage = ({
       })
   ), [drivers, activeTripsByDriver]);
 
-  const filteredDrivers = useMemo(() => {
-    const q = deferredDriverQuery.trim().toLowerCase();
-    if (!q) return sortedDrivers;
-    return sortedDrivers.filter(driver => recordMatchesSearch(driver, q, [
-      'name', 'email', 'phone', 'vehicle', 'currentZone',
-    ]));
-  }, [deferredDriverQuery, sortedDrivers]);
-
   const filteredUsers = useMemo(() => {
     const q = deferredPeopleQuery.trim().toLowerCase();
     if (!q) return allUsers;
@@ -323,10 +312,8 @@ const MobileAdminPage = ({
       'name', 'email', 'phone', 'vehicle', '_role',
     ]));
   }, [allUsers, deferredPeopleQuery]);
-  const visibleDrivers = useMemo(() => filteredDrivers.slice(0, driverLimit), [driverLimit, filteredDrivers]);
   const visibleUsers = useMemo(() => filteredUsers.slice(0, peopleLimit), [filteredUsers, peopleLimit]);
 
-  useEffect(() => setDriverLimit(MOBILE_ADMIN_LIST_PAGE_SIZE), [deferredDriverQuery]);
   useEffect(() => setPeopleLimit(MOBILE_ADMIN_LIST_PAGE_SIZE), [deferredPeopleQuery]);
 
   const timeoutRefs = useRef([]);
@@ -464,18 +451,14 @@ const MobileAdminPage = ({
         )}
 
         {activeTab === 'drivers' && (
-          <>
-            <AdminSearch icon={Search} value={driverQuery} onChange={setDriverQuery} placeholder="Search drivers, vehicle, zone..." />
-            <div className="space-y-3 px-3 py-3">
-              {visibleDrivers.map(driver => (
-                <MobileDriverCard key={driver.id || driver.email || driver.name} driver={driver} activeTrip={activeTripsByDriver.get(driver.id)} />
-              ))}
-              {filteredDrivers.length === 0 && <AdminEmpty icon={Truck} title="No matching drivers" hint="Try another name, vehicle, or zone" />}
-              {visibleDrivers.length < filteredDrivers.length && (
-                <AdminButton variant="secondary" onClick={() => setDriverLimit(limit => limit + MOBILE_ADMIN_LIST_PAGE_SIZE)}>Load more drivers</AdminButton>
-              )}
-            </div>
-          </>
+          <DriversVehiclesPage
+            role={role} drivers={drivers} setDrivers={setDrivers}
+            upsertDriverProfile={upsertDriverProfile} assignVehicleToDriver={assignVehicleToDriver}
+            dispatchers={dispatchers} addAuditLog={addAuditLog} currentUser={currentUser}
+            trips={trips} onAssignTrip={onAssignTrip} onUploadForDriver={onUploadForDriver}
+            requestAuthAction={requestAuthAction} vehicles={vehicles} setVehicles={setVehicles}
+            appSettings={appSettings} onUpdateAppSettings={onUpdateAppSettings || updateAppSettings} mode="drivers"
+          />
         )}
 
         {activeTab === 'fleet' && (

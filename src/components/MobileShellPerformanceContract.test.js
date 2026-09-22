@@ -17,8 +17,8 @@ describe('mobile shell interaction performance contract', () => {
     expect(lookupBlock).toContain('findDriverInIndex(driverIndex, trip)');
     expect(lookupBlock).not.toContain('drivers.find');
     expect(adminSource).toContain('const MOBILE_ADMIN_LIST_PAGE_SIZE = 40');
-    expect(adminSource).toContain('useDeferredValue(driverQuery)');
-    expect(adminSource).toContain('visibleDrivers.map');
+    expect(adminSource).toContain('<DriversVehiclesPage');
+    expect(adminSource).toContain('mode="drivers"');
     expect(adminSource).toContain('visibleUsers.map');
     expect(adminSource).toContain('export default React.memo(MobileAdminPage)');
   });

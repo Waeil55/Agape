@@ -595,7 +595,7 @@ const [form, setForm] = useState({
                       <button onClick={() => analyzeDriver(d)} className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
                       <button onClick={() => openScheduleEditor(d)} className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
                       <button onClick={() => openEdit(d)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" aria-label="Edit driver"><Edit2 size={14} /></button>
-                      {(role === 'admin' || role === 'dispatcher') && (
+                      {role === 'admin' && (
                         <button onClick={() => deleteDriver(d)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" aria-label="Delete driver"><Trash2 size={14} /></button>
                       )}
                     </div>
@@ -697,7 +697,7 @@ const [form, setForm] = useState({
                           <button onClick={() => analyzeDriver(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="AI Analyze" aria-label="AI Analyze"><BrainCircuit size={14} /></button>
                           <button onClick={() => openScheduleEditor(d)} className="p-1.5 sm:p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Edit Schedule" aria-label="Edit Schedule"><Clock size={14} /></button>
                           <button onClick={() => openEdit(d)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" aria-label="Edit driver"><Edit2 size={14} /></button>
-                          {(role === 'admin' || role === 'dispatcher') && (
+                          {role === 'admin' && (
                             <button onClick={() => deleteDriver(d)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" aria-label="Delete driver"><Trash2 size={14} /></button>
                           )}
                         </td>
@@ -797,7 +797,7 @@ const [form, setForm] = useState({
                       <button onClick={() => recordMaintenanceService(v, 'oil')} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">Reset oil cycle</button>
                       <button onClick={() => recordMaintenanceService(v, 'filter')} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">Reset filter cycle</button>
                       <button onClick={() => openVEdit(v)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50" title="Edit" aria-label="Edit"><Edit2 size={14} /></button>
-                      {(role === 'admin' || role === 'dispatcher') && (
+                      {role === 'admin' && (
                         <button onClick={() => deleteVehicle(v)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" title="Delete" aria-label="Delete"><Trash2 size={14} /></button>
                       )}
                     </div>
@@ -863,7 +863,7 @@ const [form, setForm] = useState({
                             <button onClick={() => recordMaintenanceService(v, 'oil')} className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100" title="Password-confirmed oil service reset">Oil done</button>
                             <button onClick={() => recordMaintenanceService(v, 'filter')} className="rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100" title="Password-confirmed filter service reset">Filter done</button>
                             <button onClick={() => openVEdit(v)} className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit" aria-label="Edit"><Edit2 size={14} /></button>
-                            {(role === 'admin' || role === 'dispatcher') && (
+                            {role === 'admin' && (
                               <button onClick={() => deleteVehicle(v)} className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete" aria-label="Delete"><Trash2 size={14} /></button>
                             )}
                           </div>

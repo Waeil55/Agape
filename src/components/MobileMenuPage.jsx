@@ -1,20 +1,21 @@
 import React from 'react';
-import { ChevronRight, Settings, Users, LogOut, Shield, Truck, MapPin, Activity, CreditCard, Zap } from 'lucide-react';
+import { ChevronRight, Settings, Users, LogOut, Shield, Truck, MapPin, CreditCard, Zap, Clock3, Wrench } from 'lucide-react';
 
 const SHARED_MENU_SECTIONS = [
   {
     title: 'Workspace',
     items: [
       { id: 'tools', icon: Zap, label: 'Dispatch Tools', desc: 'Optimize routes and driver work', color: 'text-blue-700', bg: 'bg-blue-50' },
-      { id: 'fleet', icon: Truck, label: 'Fleet & Drivers', desc: 'Vehicles, schedules, assignments', color: 'text-blue-600', bg: 'bg-blue-50' },
-      { id: 'payroll', icon: CreditCard, label: 'Payroll', desc: 'Earnings & approvals', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      { id: 'drivers', icon: Truck, label: 'Drivers', desc: 'Add, edit, schedule, assign, contact or remove', color: 'text-blue-700', bg: 'bg-blue-50' },
+      { id: 'fleet', icon: Wrench, label: 'Vehicles', desc: 'Add, assign, edit, service or remove', color: 'text-indigo-700', bg: 'bg-indigo-50' },
     ],
   },
   {
-    title: 'Data & Records',
+    title: 'Workforce & records',
     items: [
+      { id: 'payroll', icon: CreditCard, label: 'Payroll', desc: 'Driver earnings, review and approvals', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+      { id: 'activity', icon: Clock3, label: 'Time & Activity', desc: 'Driver time records and operational activity', color: 'text-violet-700', bg: 'bg-violet-50' },
       { id: 'map', icon: MapPin, label: 'Live Map', desc: 'Fleet location and route view', color: 'text-sky-600', bg: 'bg-sky-50' },
-      { id: 'activity', icon: Activity, label: 'Activity Log', desc: 'Audit trail and time records', color: 'text-violet-600', bg: 'bg-violet-50' },
     ],
   },
   {
@@ -30,7 +31,7 @@ const ADMIN_MENU_SECTIONS = Object.freeze([
   {
     title: 'Organization',
     items: [
-      { id: 'admin', icon: Users, label: 'People & Access', desc: 'Roles, users and account controls', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+      { id: 'admin', icon: Users, label: 'People & Access', desc: 'Accounts, roles and password controls', color: 'text-indigo-600', bg: 'bg-indigo-50' },
     ],
   },
   ...SHARED_MENU_SECTIONS,

@@ -945,19 +945,17 @@ const SettingsPage = ({
         </div>
       </nav>
 
-      {/* Mobile nav */}
-      <div className="-mx-1 w-full px-1 pb-2 touch-manipulation lg:hidden">
-        <div className="flex flex-wrap gap-1.5">
-          {mobileNavItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-            return (
-              <button key={item.id} onClick={() => setActiveSection(item.id)} className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl whitespace-nowrap text-xs font-semibold transition-all active:scale-[0.97] touch-manipulation ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 active:bg-slate-300'}`}>
-                <Icon size={14} /> {item.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* One accessible mobile section control replaces the multi-row button wall. */}
+      <div className="sticky top-0 z-20 w-full border-b border-slate-200 bg-slate-50 px-1 pb-3 pt-1 lg:hidden">
+        <label htmlFor="mobile-settings-section" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Settings section</label>
+        <select
+          id="mobile-settings-section"
+          value={activeSection}
+          onChange={(event) => setActiveSection(event.target.value)}
+          className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+        >
+          {mobileNavItems.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select>
       </div>
 
       {/* Content */}

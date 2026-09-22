@@ -90,9 +90,10 @@ const SUB_VIEW_TITLES = {
   archives: 'Reports & Records',
   settings: 'App Settings',
   fleet: 'Fleet Management',
+  drivers: 'Driver Management',
   map: 'Live Map',
   payroll: 'Payroll',
-  activity: 'Activity Log',
+  activity: 'Time & Activity',
   welltrans: 'Reports & Records',
 };
 
@@ -342,7 +343,14 @@ const MobileEnterpriseDashboard = (props) => {
           {subView === 'fleet' && (
             <ErrorBoundary>
               <Suspense fallback={<SubViewFallback />}>
-                <DriversVehiclesPage {...props} />
+                <DriversVehiclesPage {...props} mode="vehicles" />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {subView === 'drivers' && (
+            <ErrorBoundary>
+              <Suspense fallback={<SubViewFallback />}>
+                <DriversVehiclesPage {...props} mode="drivers" />
               </Suspense>
             </ErrorBoundary>
           )}
@@ -384,8 +392,16 @@ const MobileEnterpriseDashboard = (props) => {
           role={role}
           onNavigate={handleNavClick}
           onPreload={preloadMobileView}
-          headerConfig={{ title, rightActions }}
-          showBottomNav={true}
+          headerConfig={{
+            title,
+            showBack: true,
+            onBack: () => {
+              clearHeader();
+              setSubView(null);
+            },
+            rightActions,
+          }}
+          showBottomNav={false}
         >
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
             {content}
