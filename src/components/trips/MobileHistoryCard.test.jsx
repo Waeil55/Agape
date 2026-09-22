@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react-dom/test-utils';
-import { MobileHistoryCardHeader, MobileHistoryStops } from './MobileHistoryCard';
+import { getHistoryTimeTone, MobileHistoryCardHeader, MobileHistoryStops } from './MobileHistoryCard';
 
 function render(element) {
   const host = document.createElement('div');
@@ -14,6 +14,14 @@ function render(element) {
 }
 
 describe('mobile history card design', () => {
+  it('colors terminal trip times by status', () => {
+    expect(getHistoryTimeTone('Cancelled')).toBe('text-rose-600');
+    expect(getHistoryTimeTone('Cancelled / Rescheduled')).toBe('text-rose-600');
+    expect(getHistoryTimeTone('Rerouted')).toBe('text-purple-600');
+    expect(getHistoryTimeTone('No Show')).toBe('text-orange-600');
+    expect(getHistoryTimeTone('Completed')).toBe('text-emerald-700');
+  });
+
   it('renders the compact driver summary and toggles with keyboard', () => {
     const onToggle = vi.fn();
     const view = render(

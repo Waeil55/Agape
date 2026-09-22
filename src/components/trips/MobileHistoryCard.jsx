@@ -6,6 +6,14 @@ const valueOrDash = (value) => {
   return String(value);
 };
 
+export const getHistoryTimeTone = (status) => {
+  const normalized = String(status || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  if (normalized.includes('cancel')) return 'text-rose-600';
+  if (normalized.includes('rerout')) return 'text-purple-600';
+  if (normalized.includes('no show') || normalized.includes('noshow')) return 'text-orange-600';
+  return 'text-emerald-700';
+};
+
 export function MobileHistoryCardHeader({
   trip,
   expanded = false,
@@ -20,6 +28,7 @@ export function MobileHistoryCardHeader({
   const patient = trip?.patient || 'Trip';
   const bookingId = trip?.bookingId || trip?.id || '—';
   const resolvedMiles = valueOrDash(miles);
+  const timeTone = getHistoryTimeTone(status || trip?.status);
   const copyId = (event) => {
     event.stopPropagation();
     navigator.clipboard?.writeText(String(bookingId));
@@ -35,7 +44,7 @@ export function MobileHistoryCardHeader({
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-[16px] font-bold tracking-tight tabular-nums text-emerald-700">{time || 'Will Call'}</span>
+          <span className={`shrink-0 text-[16px] font-bold tracking-tight tabular-nums ${timeTone}`}>{time || 'Will Call'}</span>
           <span className="h-3.5 w-[1.5px] shrink-0 bg-slate-400/80" aria-hidden="true" />
           <span className="min-w-0 truncate text-[14px] font-semibold tracking-[-0.2px] text-slate-950">{patient}</span>
         </div>

@@ -17,6 +17,16 @@ function renderEl(el) {
 }
 
 const sparse = { id: 'x1' };
+const futureTrip = () => {
+  const scheduled = new Date(Date.now() + 30 * 60 * 1000);
+  return {
+    id: 't1',
+    time: `${String(scheduled.getHours()).padStart(2, '0')}:${String(scheduled.getMinutes()).padStart(2, '0')}`,
+    date: scheduled.toISOString(),
+    pickup: '1 Main St',
+    dropoff: '2 Main St',
+  };
+};
 
 describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
   it('renders a card with almost no fields without crashing', () => {
@@ -35,7 +45,7 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
 
   it('shows the minutes-away countdown pill by default', () => {
     const html = renderEl(
-      <ManifestTripCard trip={{ id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' }} primaryAction={null} iconActions={[]} />
+      <ManifestTripCard trip={futureTrip()} primaryAction={null} iconActions={[]} />
     );
     expect(html).toContain('away');
   });
@@ -43,7 +53,7 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
   it('hides the minutes-away countdown pill on compact mobile trips cards', () => {
     const html = renderEl(
       <ManifestTripCard
-        trip={{ id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' }}
+        trip={futureTrip()}
         primaryAction={null}
         iconActions={[]}
         hideCountdown
@@ -56,7 +66,7 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
   it('keeps mileage visible when the countdown is hidden on compact mobile trips cards', () => {
     const html = renderEl(
       <ManifestTripCard
-        trip={{ id: 't1', time: '14:00', date: new Date().toISOString(), pickup: '1 Main St', dropoff: '2 Main St' }}
+        trip={futureTrip()}
         primaryAction={null}
         iconActions={[]}
         mileage="12 mi"
