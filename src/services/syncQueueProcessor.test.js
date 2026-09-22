@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const firebaseMock = vi.hoisted(() => ({
+  auth: { currentUser: null },
   db: {},
   deleteDoc: vi.fn(),
   doc: vi.fn((_db, collectionName, docId) => `${collectionName}/${docId}`),
@@ -300,7 +301,7 @@ describe('SyncQueueProcessor ownership and terminal failure handling', () => {
   it('dead-letters permanent permission failures instead of retrying forever', async () => {
     const processor = authenticatedStartedProcessor();
     const permissionError = Object.assign(new Error('Denied'), { code: 'permission-denied' });
-    localDBMock.getPendingSyncOperations.mockResolvedValue([operation()]);
+    localDBMock.getPendingSyncOperations.mockResolvedValue([operation({ attempts: 3 })]);
     firebaseMock.setDoc.mockRejectedValue(permissionError);
 
     await processor.processNow();
@@ -311,6 +312,18 @@ describe('SyncQueueProcessor ownership and terminal failure handling', () => {
       'permanent_validation_or_permission',
     );
     expect(localDBMock.failSyncOperation).not.toHaveBeenCalled();
+  });
+
+  it('retries a first permission failure with a fresh token before dead-lettering', async () => {
+    const processor = authenticatedStartedProcessor();
+    const permissionError = Object.assign(new Error('Denied'), { code: 'permission-denied' });
+    localDBMock.getPendingSyncOperations.mockResolvedValue([operation({ attempts: 0 })]);
+    firebaseMock.setDoc.mockRejectedValue(permissionError);
+
+    await processor.processNow();
+
+    expect(localDBMock.failSyncOperation).toHaveBeenCalledWith(1, permissionError);
+    expect(localDBMock.deadLetterSyncOperation).not.toHaveBeenCalled();
   });
 
   it('keeps transient availability failures in the retry queue', async () => {

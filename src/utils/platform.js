@@ -47,5 +47,14 @@ export function isAndroid() {
 
 export async function initPlatform() {
   await getPlatform();
-  isNativeShell();
+  const native = isNativeShell();
+  if (!native) return;
+  try {
+    const [{ Keyboard, KeyboardResize }] = await Promise.all([
+      import('@capacitor/keyboard'),
+    ]);
+    await Keyboard.setResizeMode({ mode: KeyboardResize.None });
+  } catch (error) {
+    console.warn('[Platform] Native keyboard resize configuration skipped:', error?.message || error);
+  }
 }

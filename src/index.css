@@ -5951,3 +5951,45 @@ textarea:focus,
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* ===== SMOOTH WINDOW OPEN (shared overlays / sheets) =====
+   Every full-screen scrim and its panel eases in instead of popping. Fill mode
+   is `backwards` on purpose: no transform is retained after the animation, so
+   fixed descendants and the keyboard-avoidance layout are never re-anchored.
+   Driver trip windows own their motion in tripWindows.css. */
+@keyframes agape-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes agape-panel-in {
+  from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.fixed.inset-0:not([class*="trip-window"]):not([class*="animate"]):not([class*="anim-"]):not([class*="fade"]) {
+  animation: agape-overlay-in 140ms ease-out backwards;
+  overscroll-behavior: contain;
+}
+.fixed.inset-0:not([class*="trip-window"]) > :is([class*="rounded-t-"], [class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[2"]):not([class*="animate"]):not([class*="anim-"]):not([class*="slide"]):not([class*="zoom"]) {
+  animation: agape-panel-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fixed.inset-0:not([class*="trip-window"]),
+  .fixed.inset-0:not([class*="trip-window"]) > * {
+    animation-duration: 1ms !important;
+  }
+}
+
+/* Keep focused fields clear of the keyboard when the browser scrolls them. */
+input, textarea, select { scroll-margin-block: 96px; }
+[data-agape-kb="open"] { overscroll-behavior: none; }
+
+/* Full-screen blurred scrims force the phone GPU to re-blur the entire screen
+   every frame while a window animates in. Use a solid scrim on touch-size
+   viewports; the blur is kept on desktop where it is cheap. */
+@media (max-width: 1023px) {
+  .fixed.inset-0[class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}

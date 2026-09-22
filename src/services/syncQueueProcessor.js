@@ -1,4 +1,4 @@
-import { db, doc, getDoc, setDoc, serverTimestamp, deleteDoc, writeBatch } from '../config/firebase';
+import { auth, db, doc, getDoc, setDoc, serverTimestamp, deleteDoc, writeBatch } from '../config/firebase';
 import {
   completeSyncOperation,
   deadLetterSyncOperation,
@@ -17,6 +17,18 @@ const PERMANENT_FIREBASE_CODES = new Set([
   'already-exists', 'failed-precondition', 'invalid-argument', 'not-found',
   'out-of-range', 'permission-denied', 'unauthenticated', 'unimplemented',
 ]);
+
+// A stale or not-yet-refreshed ID token (app resumed from background, App Check
+// warming up) surfaces as permission-denied/unauthenticated even though the
+// write is valid. Retry those a few times with a fresh token before treating
+// them as a real rules denial.
+const AUTH_RACE_CODES = new Set(['permission-denied', 'unauthenticated']);
+export const AUTH_RACE_RETRY_LIMIT = 3;
+
+export function isRetryableAuthRace(error, operation = {}) {
+  const normalizedCode = String(error?.code || '').replace(/^firestore\//, '');
+  return AUTH_RACE_CODES.has(normalizedCode) && Number(operation?.attempts || 0) < AUTH_RACE_RETRY_LIMIT;
+}
 
 export class PermanentSyncError extends Error {
   constructor(message, code = 'invalid-sync-operation') {
@@ -155,7 +167,11 @@ export class SyncQueueProcessor {
           await completeSyncOperation(operation.id);
           this._onProcess?.({ type: 'completed', op: operation });
         } catch (error) {
-          if (isPermanentSyncFailure(error)) {
+          if (isRetryableAuthRace(error, operation)) {
+            try { await auth?.currentUser?.getIdToken(true); } catch { /* next retry re-attempts the refresh */ }
+            await failSyncOperation(operation.id, error);
+            this._onProcess?.({ type: 'failed', op: operation, error: error.message });
+          } else if (isPermanentSyncFailure(error)) {
             await deadLetterSyncOperation(operation.id, error, 'permanent_validation_or_permission');
             this._onProcess?.({ type: 'blocked', op: operation, error: error.message });
           } else {

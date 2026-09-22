@@ -31,7 +31,7 @@ import { useFirestoreAppData } from './hooks/useFirestoreAppData';
 import { useRealtimeReliability } from './hooks/useRealtimeReliability';
 import { useDriverLiveState, useDriverLivenessMonitor } from './hooks/useDriverLiveState';
 import { useDriverAssignments } from './hooks/useDriverAssignments';
-import useLoginKeyboardStability from './hooks/useLoginKeyboardStability';
+import useOverlayKeyboardAvoidance from './hooks/useOverlayKeyboardAvoidance';
 import useEnterpriseSessionSecurity, { beginSecuritySession, clearSecuritySession, isEmploymentAccessActive } from './hooks/useEnterpriseSessionSecurity';
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from './components/pwa';
 import { DEFAULT_TENANT_ID, tenantIdFromProfile } from './utils/tenantScope';
@@ -165,6 +165,7 @@ const withoutLegacyTheme = (settings = {}) => {
 };
 
 const INTERNAL_AUTH_DOMAIN = 'auth.agapecare.local';
+const LOGIN_LOCK_EXPIRY_MS = 15_000;
 
 function normalizeUsername(value = '') {
   return String(value || '')
@@ -399,6 +400,7 @@ const App = () => {
   const authBootResolvedRef = useRef(false);
   const loginPortalRoleRef = useRef(null);
   const loginInProgressRef = useRef(false);
+  const loginStartedAtRef = useRef(0);
   const loginObserverAckRef = useRef(null);
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
@@ -425,11 +427,13 @@ const App = () => {
   const [timeTrackingDeclarations, setTimeTrackingDeclarations] = useState([]);
   const driverTelemetryRef = useRef([]);
   const realtimeReliability = useRealtimeReliability({ enabled: isAuthenticated });
-  useLoginKeyboardStability(!isAuthenticated);
+  useOverlayKeyboardAvoidance(isAuthenticated);
 
   // Platform initialization only. Firestore reliability is handled by useRealtimeReliability.
   useEffect(() => {
-    initPlatform();
+    void initPlatform().catch((error) => {
+      console.warn('[Platform] Native initialization skipped:', error?.message || error);
+    });
   }, []);
 
   // Clear SW reload flag after successful boot to allow future SW updates
@@ -1111,7 +1115,7 @@ const App = () => {
       // Cached-session startup has no role-selection click to warm its
       // workspace. Start the exact role/viewport download before mounting the
       // heavy page so repeat launches remain responsive.
-      preloadWorkspaceForRole(userRole);
+      try { preloadWorkspaceForRole(userRole); } catch (preloadError) { console.warn('[Auth] Workspace preload skipped:', preloadError); }
 
       // Cache the role so next boot is instant
       const profile = userDoc && userDoc.exists?.() ? userDoc.data() : {};
@@ -1148,25 +1152,31 @@ const App = () => {
         setAppSettings(prev => ({ ...prev, ...withoutLegacyTheme(userSettings) }));
       }
 
-      requestNotificationPermission().then(token => {
-        if (token) { setNotificationsEnabled(true); }
-      });
-
-      unsubFcm = onForegroundMessage((payload) => {
-        // Chat snapshots own foreground Messenger alerts; avoid duplicate sound/toast from FCM.
-        if ((payload.data?.type || '') === 'message') return;
-        const title = payload.notification?.title || payload.data?.title || 'Agape Care';
-        const body = payload.notification?.body || payload.data?.body || '';
-        if (title && body) {
-          playNotificationSound();
-          showLocalNotification(title, body, 'notification');
-        }
-      });
-
       authBootResolvedRef.current = true;
       // Never hold an authenticated user behind an artificial splash delay.
       // Firestore continues hydrating and listening in the mounted workspace.
       setIsLoading(false);
+
+      // Optional push wiring runs after the workspace is released so it can
+      // never block or crash session open (e.g. in an iOS PWA).
+      try {
+        requestNotificationPermission().then(token => {
+          if (token) { setNotificationsEnabled(true); }
+        }).catch(() => {});
+
+        unsubFcm = onForegroundMessage((payload) => {
+          // Chat snapshots own foreground Messenger alerts; avoid duplicate sound/toast from FCM.
+          if ((payload.data?.type || '') === 'message') return;
+          const title = payload.notification?.title || payload.data?.title || 'Agape Care';
+          const body = payload.notification?.body || payload.data?.body || '';
+          if (title && body) {
+            playNotificationSound();
+            showLocalNotification(title, body, 'notification');
+          }
+        });
+      } catch (notificationError) {
+        console.warn('[Auth] Notification setup skipped:', notificationError);
+      }
     };
 
     const verifyAppliedSessionInBackground = (capturedUser, cachedRole, cachedTenantId) => {
@@ -1576,8 +1586,12 @@ const App = () => {
   };
 
   const executeLogin = async (selectedRole) => {
-    if (loginInProgressRef.current) return;
+    // Block overlapping sign-ins, but never let an interrupted attempt (app
+    // suspended, auth observer re-subscribed mid-login) lock the form until the
+    // PWA is force-closed: a stale in-progress flag expires.
+    if (loginInProgressRef.current && Date.now() - loginStartedAtRef.current < LOGIN_LOCK_EXPIRY_MS) return;
     loginInProgressRef.current = true;
+    loginStartedAtRef.current = Date.now();
     setLoginSubmitting(true);
     const requestedRole = String(selectedRole || pendingRole || 'admin').toLowerCase();
     const { authEmail, username } = resolveAuthIdentifier(email);
@@ -2858,7 +2872,9 @@ const App = () => {
 
   const renderLoginScreen = () => {
     const handleRoleSelect = (roleKey) => {
-      preloadWorkspaceForRole(roleKey);
+      try { preloadWorkspaceForRole(roleKey); } catch (preloadError) {
+        console.warn('[Auth] Login workspace preload skipped:', preloadError);
+      }
       loginPortalRoleRef.current = roleKey;
       setPendingRole(roleKey);
       setPassword('');
@@ -2963,7 +2979,7 @@ const App = () => {
                 </div>
               </div>
             ) : (
-              <form action="javascript:void(0)" className="space-y-4">
+              <form onSubmit={submitLogin} className="space-y-4">
                 <div className="flex items-center gap-4 mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
                   <button
                     type="button"
@@ -3030,8 +3046,7 @@ const App = () => {
                 )}
 
                 <button
-                  type="button"
-                  onClick={submitLogin}
+                  type="submit"
                   disabled={loginSubmitting}
                   aria-busy={loginSubmitting}
                   className="w-full py-3.5 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-xl font-bold text-base transition shadow-sm active:scale-98 cursor-pointer"

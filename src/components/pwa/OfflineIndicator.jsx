@@ -90,6 +90,12 @@ const OfflineIndicator = ({ compact = false }) => {
     };
   }, []);
 
+  const retrySync = () => {
+    void syncQueueProcessor.recoverRepairableWrites()
+      .catch(() => 0)
+      .finally(() => void syncQueueProcessor.processNow());
+  };
+
   const hasSyncFailure = syncStatus.deadLetter > 0;
   const hasPendingWrites = syncStatus.pending > 0;
 
@@ -101,8 +107,10 @@ const OfflineIndicator = ({ compact = false }) => {
         : hasPendingWrites
           ? `Saving ${syncStatus.pending}`
           : recentlyRestored ? 'Back online' : 'Synced';
+    const Wrapper = hasSyncFailure && isOnline ? 'button' : 'span';
     return (
-      <span
+      <Wrapper
+        {...(Wrapper === 'button' ? { type: 'button', onClick: retrySync, 'aria-label': 'Sync issue. Tap to retry.' } : {})}
         className={`inline-flex min-h-5 shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
           isOnline && !hasSyncFailure ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
         }`}
@@ -111,7 +119,7 @@ const OfflineIndicator = ({ compact = false }) => {
       >
         <span className={`h-1.5 w-1.5 rounded-full ${isOnline && !hasSyncFailure ? 'bg-emerald-500' : 'bg-rose-500'}`} aria-hidden="true" />
         {label}
-      </span>
+      </Wrapper>
     );
   }
 

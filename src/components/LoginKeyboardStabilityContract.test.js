@@ -18,13 +18,18 @@ describe('login keyboard stability contract', () => {
     expect(loginBlock).not.toContain('translate3d');
   });
 
-  it('scrolls focused input into view without locking scrollTop', () => {
-    const hook = read('src/hooks/useLoginKeyboardStability.js');
-    expect(hook).toContain('visualViewport');
-    expect(hook).toContain('resize');
-    expect(hook).toContain('scrollIntoView');
-    expect(hook).not.toContain('el.scrollTop = 0');
-    expect(hook).not.toContain('Keyboard.setResizeMode');
-    expect(hook).not.toContain('isNativeShell');
+  it('uses native resize-none without a login visualViewport scroll listener', () => {
+    const app = read('src/App.jsx');
+    const platform = read('src/utils/platform.js');
+    expect(app).not.toContain('useLoginKeyboardStability');
+    expect(platform).toContain('Keyboard.setResizeMode({ mode: KeyboardResize.None })');
+    expect(platform).not.toContain('visualViewport');
+  });
+
+  it('keeps keyboard Go submission and role selection fail-safe', () => {
+    const app = read('src/App.jsx');
+    expect(app).toContain('<form onSubmit={submitLogin}');
+    expect(app).toContain('type="submit"');
+    expect(app).toContain("console.warn('[Auth] Login workspace preload skipped:'");
   });
 });

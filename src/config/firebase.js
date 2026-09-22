@@ -29,7 +29,7 @@ import {
   enableNetwork,
   onSnapshot,
 } from 'firebase/firestore';
-import { initializeAuth, getAuth, browserSessionPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
+import { initializeAuth, getAuth, indexedDBLocalPersistence, browserSessionPersistence, browserLocalPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -123,7 +123,7 @@ if (appWasInitialized) {
 let auth;
 try {
   auth = initializeAuth(app, {
-    persistence: [browserLocalPersistence, browserSessionPersistence]
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence]
   });
 } catch (err) {
   auth = getAuth(app);

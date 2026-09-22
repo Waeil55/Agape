@@ -122,10 +122,29 @@ export default function useEnterpriseSessionSecurity({
     };
     window.addEventListener('pageshow', handlePageShow);
 
+    // A phone PWA is suspended when backgrounded: timers stop and the first
+    // tick after resume would see a huge "idle" gap that was never real idle
+    // time in front of the screen. Treat a resume as activity so the user is
+    // not signed out the moment they reopen the app. The absolute session
+    // limit below is still enforced.
+    let lastCheckAt = Date.now();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        recordActivity();
+        lastCheckAt = Date.now();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     const checkSecurityState = async () => {
       const currentUser = auth.currentUser;
       if (!currentUser || terminatingRef.current) return;
       const checkedAt = Date.now();
+      const wasSuspended = checkedAt - lastCheckAt > CHECK_INTERVAL_MS * 3;
+      lastCheckAt = checkedAt;
+      if (wasSuspended || document.visibilityState === 'hidden') {
+        writeTimestamp(activityKey, checkedAt);
+      }
       const startedAt = readTimestamp(startedKey, checkedAt);
       const lastActivityAt = readTimestamp(activityKey, checkedAt);
       const idleProtectionEnabled = !(role === 'driver' && driverWorking);
@@ -150,7 +169,8 @@ export default function useEnterpriseSessionSecurity({
         setWarning(null);
       }
 
-      if (checkedAt - lastTokenRefreshRef.current >= TOKEN_REFRESH_INTERVAL_MS) {
+      const canRefreshToken = document.visibilityState !== 'hidden' && navigator.onLine !== false;
+      if (canRefreshToken && checkedAt - lastTokenRefreshRef.current >= TOKEN_REFRESH_INTERVAL_MS) {
         lastTokenRefreshRef.current = checkedAt;
         try {
           await currentUser.getIdToken(true);
@@ -171,6 +191,7 @@ export default function useEnterpriseSessionSecurity({
       window.clearInterval(interval);
       activityEvents.forEach((eventName) => window.removeEventListener(eventName, recordActivity));
       window.removeEventListener('pageshow', handlePageShow);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [driverWorking, enabled, policy.absoluteMs, policy.idleMs, recordActivity, role, terminate]);
 

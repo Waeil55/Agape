@@ -74,9 +74,9 @@ describe('authentication startup recovery', () => {
     const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
     const firebase = readFileSync(new URL('../config/firebase.js', import.meta.url), 'utf8');
 
-    expect(firebase).toContain('persistence: [browserLocalPersistence, browserSessionPersistence]');
+    expect(firebase).toContain('persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence]');
     expect(app).not.toContain('await setPersistence(auth');
-    expect(app).toContain('if (loginInProgressRef.current) return;');
+    expect(app).toContain('if (loginInProgressRef.current && Date.now() - loginStartedAtRef.current < LOGIN_LOCK_EXPIRY_MS) return;');
     expect(app).not.toContain('Session went null after boot — waiting 5s');
     expect(app).toContain('disabled={loginSubmitting}');
   });
