@@ -15,6 +15,13 @@ describe('override policy Firestore contract', () => {
     expect(rules).toMatch(/match \/systemConfig\/\{document\}[\s\S]*?allow delete: if isAdmin\(\);/);
   });
 
+  it('lets every authenticated portal verify the shared non-secret policy without a second role lookup', () => {
+    const rules = readFileSync('firestore.rules', 'utf8');
+    expect(rules).toContain("document == 'overrideCostPolicy'");
+    expect(rules).toContain("document == 'phoneNumbers' || document == 'overrideCostPolicy'");
+    expect(rules).toContain("document == 'overrideCostPolicy' && isDispatcher() && validOverrideCostPolicy()");
+  });
+
   it('requires the same validated schema for administrator and dispatcher policy writes', () => {
     const rules = readFileSync('firestore.rules', 'utf8');
     expect(rules).not.toMatch(/allow create, update: if isAdmin\(\)\s*\n\s*\|\| \(isDispatcher\(\)/);

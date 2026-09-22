@@ -869,6 +869,34 @@ const App = () => {
   const [loginError, setLoginError] = useState('');
   const [loginSubmitting, setLoginSubmitting] = useState(false);
 
+  const clearStaleLoginAttempt = useCallback(() => {
+    if (!loginInProgressRef.current) return false;
+    if (Date.now() - loginStartedAtRef.current < LOGIN_LOCK_EXPIRY_MS) return false;
+    loginInProgressRef.current = false;
+    loginStartedAtRef.current = 0;
+    loginObserverAckRef.current = null;
+    setLoginSubmitting(false);
+    if (!auth.currentUser) setIsLoading(false);
+    return true;
+  }, []);
+
+  // Mobile PWAs can suspend JavaScript while Firebase is signing in. When the
+  // app resumes, release only an expired UI attempt so the user can retry
+  // immediately without force-quitting; Firebase's durable auth session stays
+  // intact and remains the authentication authority.
+  useEffect(() => {
+    const handleResume = () => {
+      if (document.visibilityState === 'hidden') return;
+      clearStaleLoginAttempt();
+    };
+    window.addEventListener('pageshow', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
+    return () => {
+      window.removeEventListener('pageshow', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
+    };
+  }, [clearStaleLoginAttempt]);
+
   const resetSessionState = useCallback((options = {}) => {
     const {
       loginErrorMessage = '',
@@ -1607,7 +1635,11 @@ const App = () => {
     // Block overlapping sign-ins, but never let an interrupted attempt (app
     // suspended, auth observer re-subscribed mid-login) lock the form until the
     // PWA is force-closed: a stale in-progress flag expires.
-    if (loginInProgressRef.current && Date.now() - loginStartedAtRef.current < LOGIN_LOCK_EXPIRY_MS) return;
+    clearStaleLoginAttempt();
+    if (loginInProgressRef.current) return;
+    // An explicit login must verify the current profile instead of trusting an
+    // app-owned role cache left by an older PWA lifecycle or changed account.
+    clearRoleCache();
     loginInProgressRef.current = true;
     loginStartedAtRef.current = Date.now();
     setLoginSubmitting(true);
@@ -1616,18 +1648,21 @@ const App = () => {
     if (!VALID_ROLES.has(requestedRole)) {
       setLoginError('Select the correct login portal first.');
       loginInProgressRef.current = false;
+      loginStartedAtRef.current = 0;
       setLoginSubmitting(false);
       return;
     }
     if (!authEmail || !username) {
       setLoginError('Enter a valid username.');
       loginInProgressRef.current = false;
+      loginStartedAtRef.current = 0;
       setLoginSubmitting(false);
       return;
     }
     if (!password) {
       setLoginError('Enter your password.');
       loginInProgressRef.current = false;
+      loginStartedAtRef.current = 0;
       setLoginSubmitting(false);
       return;
     }
@@ -1639,6 +1674,7 @@ const App = () => {
     const safetyTimer = setTimeout(() => {
       if (loginInProgressRef.current) {
         loginInProgressRef.current = false;
+        loginStartedAtRef.current = 0;
         setLoginSubmitting(false);
         if (auth.currentUser) {
           setStartupIssue('Account verification is still pending. Your sign-in is preserved; retry when the connection is stable.');
@@ -1677,6 +1713,7 @@ const App = () => {
       }
     } catch (err) {
       loginInProgressRef.current = false;
+      loginStartedAtRef.current = 0;
       setLoginSubmitting(false);
       loginPortalRoleRef.current = requestedRole;
       setIsLoading(false);

@@ -76,7 +76,11 @@ describe('authentication startup recovery', () => {
 
     expect(firebase).toContain('persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence]');
     expect(app).not.toContain('await setPersistence(auth');
-    expect(app).toContain('if (loginInProgressRef.current && Date.now() - loginStartedAtRef.current < LOGIN_LOCK_EXPIRY_MS) return;');
+    expect(app).toContain('clearStaleLoginAttempt();');
+    expect(app).toContain('if (loginInProgressRef.current) return;');
+    expect(app).toContain("window.addEventListener('pageshow', handleResume)");
+    expect(app).toContain("document.addEventListener('visibilitychange', handleResume)");
+    expect(app).toContain('clearRoleCache();');
     expect(app).not.toContain('Session went null after boot — waiting 5s');
     expect(app).toContain('disabled={loginSubmitting}');
   });

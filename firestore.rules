@@ -354,7 +354,12 @@ service cloud.firestore {
       allow write: if signedIn() && isDispatcher();
     }
     match /systemConfig/{document} {
-      allow read: if signedIn() && (isDispatcher() || document == 'phoneNumbers');
+      // The override policy is shared, non-secret operational configuration.
+      // Reading it must not depend on a second profile lookup: a temporarily
+      // stale/missing role profile otherwise blocks verified cost reports even
+      // after Firebase Authentication has succeeded. The UI still exposes cost
+      // reports only to admin/dispatcher roles and writes remain role-gated.
+      allow read: if signedIn() && (isDispatcher() || document == 'phoneNumbers' || document == 'overrideCostPolicy');
       allow create, update: if (document == 'overrideCostPolicy' && isDispatcher() && validOverrideCostPolicy())
         || (document != 'overrideCostPolicy' && isAdmin());
       allow delete: if isAdmin();

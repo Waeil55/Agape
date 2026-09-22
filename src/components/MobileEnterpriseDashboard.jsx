@@ -596,7 +596,7 @@ const MobileEnterpriseDashboard = (props) => {
                   allDrivers={props.allDrivers || driverWorkDrivers}
                   dispatchers={props.dispatchers || []}
                   phoneNumbers={props.phoneNumbers || {}}
-                  onUpdateTrip={onUpdateTrip || onUpdateDriverTrip}
+                  onUpdateTrip={onUpdateDriverTrip}
                   onDriverStatusUpdate={props.onDriverStatusUpdate}
                   onAddAuditLog={props.onAddAuditLog}
                   onLogout={props.onLogout}
