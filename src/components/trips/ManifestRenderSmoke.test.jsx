@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react-dom/test-utils';
-import { ManifestTripCard, ManifestKpiStrip } from './MobileTripManifest';
+import { ManifestTripCard, ManifestKpiStrip, formatManifestMileage, getManifestActionBox } from './MobileTripManifest';
 
 function renderEl(el) {
   const host = document.createElement('div');
@@ -50,6 +50,7 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
       />
     );
     expect(html).not.toContain('away');
+    expect(html).toContain('— mi');
   });
 
   it('keeps mileage visible when the countdown is hidden on compact mobile trips cards', () => {
@@ -64,6 +65,25 @@ describe('MobileTripManifest render smoke (sparse real-world trips)', () => {
     );
     expect(html).toContain('12 mi');
     expect(html).not.toContain('away');
+  });
+
+  it('falls back to trip distance and never duplicates the miles unit', () => {
+    expect(formatManifestMileage(undefined, { distance: 8 })).toBe('8 mi');
+    expect(formatManifestMileage('12 miles', {})).toBe('12 miles');
+    expect(formatManifestMileage(undefined, {})).toBe('— mi');
+  });
+
+  it('uses a solid green action box when a trip is in progress', () => {
+    expect(getManifestActionBox('In Progress').cls).toContain('bg-emerald-600');
+    const html = renderEl(
+      <ManifestTripCard
+        trip={{ id: 't1', status: 'In Progress', distance: 6, pickup: '1 Main St', dropoff: '2 Main St' }}
+        primaryAction={{ label: 'Drive', onClick: () => {} }}
+        hideCountdown
+      />
+    );
+    expect(html).toContain('bg-emerald-600');
+    expect(html).toContain('6 mi');
   });
 
   it('keeps addresses dark by default and mutes them on compact mobile trips cards', () => {

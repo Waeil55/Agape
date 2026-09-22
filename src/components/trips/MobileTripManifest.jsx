@@ -83,6 +83,27 @@ export function getManifestStatusBadge(status) {
   return STATUS_STYLES[String(status || '').trim().toLowerCase()] || { cls: 'bg-slate-100 text-slate-700 border border-slate-200/80', dot: 'bg-slate-400', icon: null };
 }
 
+export function formatManifestMileage(mileage, trip = {}) {
+  const value = mileage ?? trip?.distance ?? trip?.mileage ?? trip?.distanceMiles;
+  if (value === undefined || value === null || value === '') return '— mi';
+  const text = String(value).trim();
+  if (!text) return '— mi';
+  return /\bmi(?:les)?\b/i.test(text) ? text : `${text} mi`;
+}
+
+// The footer status is also the mobile workflow action box. Once work has
+// started, use a solid color so drivers can identify the current phase at a
+// glance without reading small text.
+export function getManifestActionBox(status) {
+  const key = String(status || '').trim().toLowerCase();
+  if (key === 'in progress' || key === 'in mission') return { cls: 'bg-emerald-600 text-white border-emerald-700', dot: 'bg-white' };
+  if (key === 'en route' || key === 'navigating pickup') return { cls: 'bg-cyan-600 text-white border-cyan-700', dot: 'bg-white' };
+  if (key === 'at pickup') return { cls: 'bg-amber-500 text-white border-amber-600', dot: 'bg-white' };
+  if (key === 'in transit' || key === 'navigating dropoff') return { cls: 'bg-indigo-600 text-white border-indigo-700', dot: 'bg-white' };
+  if (key === 'at dropoff' || key === 'arrived') return { cls: 'bg-purple-600 text-white border-purple-700', dot: 'bg-white' };
+  return getManifestStatusBadge(status);
+}
+
 // ---------------------------------------------------------------------------
 // Enterprise: SLA tracking, priority badges, risk indicators, workflow viz
 // ---------------------------------------------------------------------------
@@ -420,7 +441,8 @@ export function ManifestTripCard({
 }) {
   const cd = countdown || getTripCountdown(trip);
   const displayStatus = getManifestDisplayStatus(trip);
-  const statusBadge = getManifestStatusBadge(displayStatus);
+  const statusBadge = getManifestActionBox(displayStatus);
+  const mileageLabel = formatManifestMileage(mileage, trip);
   const pickupAddress = getFullAddress(trip?.pickup, trip?.pickupCity);
   const dropoffAddress = getFullAddress(trip?.dropoff, trip?.dropoffCity);
   const isDone = isTripActionTerminal(trip);
@@ -573,29 +595,21 @@ export function ManifestTripCard({
 
         {/* Route Metrics & Status Pill */}
         <div className="flex items-center space-x-1.5 shrink-0">
-          {hideCountdown && !mileage ? null : (
-            <div className="inline-flex items-center text-[12.5px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+          <div className="inline-flex items-center text-[12.5px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200" aria-label={`Trip mileage ${mileageLabel}`}>
               {hideCountdown ? (
-                mileage ? (
-                  <>
-                    <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
-                    <span>{mileage}</span>
-                  </>
-                ) : null
+                <>
+                  <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
+                  <span>{mileageLabel}</span>
+                </>
               ) : (
                 <>
                   <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
                   <span>{cd?.label || 'No time'}</span>
-                  {mileage && (
-                    <>
-                      <span className="mx-1 text-slate-400">•</span>
-                      <span>{mileage}</span>
-                    </>
-                  )}
+                  <span className="mx-1 text-slate-400">•</span>
+                  <span>{mileageLabel}</span>
                 </>
               )}
-            </div>
-          )}
+          </div>
 
           <button
             type="button"
