@@ -389,6 +389,10 @@ const DriverRow = ({ driver, trips }) => {
   );
 };
 
+const TRIP_RENDER_BATCH = 25;
+// Off-screen cards skip layout/paint until scrolled near, keeping long manifests smooth.
+const CARD_CONTAIN_STYLE = { contentVisibility: 'auto', containIntrinsicSize: 'auto 190px' };
+
 /* ─── Main Component ──────────────────────────────────────────────── */
 const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assignTripToDriver, setBulkAssignModal, requestDeleteTrip, updateTrip, makeCall, sendSMS, requestAuthAction, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onSendToPlan, onOpenLiveMap, searchQuery, setSearchQuery, addToast, onOpenTripDetails, onOpenTripWorkflow, workspaceControls = null, activeTab = "trips" }) => {
   const [filter, setFilter] = useState("all");
@@ -401,6 +405,8 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
   const [quickSmsTrip, setQuickSmsTrip] = useState(null);
   const [scheduleEditTrip, setScheduleEditTrip] = useState(null);
   const searchInputRef = useRef(null);
+  const listEndRef = useRef(null);
+  const [visibleCount, setVisibleCount] = useState(TRIP_RENDER_BATCH);
 
   useEffect(() => { const t = setTimeout(() => setSearchQuery?.(localSearch), 250); return () => clearTimeout(t); }, [localSearch, setSearchQuery]);
 
@@ -441,19 +447,48 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
     return r;
   }, [todayTrips, filter, driverFilter, localSearch]);
 
-  const unassignedN = todayTrips.filter(t => t.status === "Unassigned").length;
-  const activeN = todayTrips.filter(t => IN_PROGRESS.includes(t.status)).length;
-  const doneN = todayTrips.filter(t => t.status === "Completed").length;
-  const cancelledN = todayTrips.filter(t => t.status === "Cancelled" || t.status === "No Show" || t.status === "Rerouted").length;
+  // One pass for every queue/driver count instead of a filter per chip and a
+  // full trip scan for each driver option on every render.
+  const { unassignedN, activeN, doneN, cancelledN, willCallN, driverCounts } = useMemo(() => {
+    const counts = { unassignedN: 0, activeN: 0, doneN: 0, cancelledN: 0, willCallN: 0, driverCounts: new Map() };
+    todayTrips.forEach((t) => {
+      if (t.status === "Unassigned") counts.unassignedN += 1;
+      if (IN_PROGRESS.includes(t.status)) counts.activeN += 1;
+      if (t.status === "Completed") counts.doneN += 1;
+      if (t.status === "Cancelled" || t.status === "No Show" || t.status === "Rerouted") counts.cancelledN += 1;
+      if (t.time === "Will Call") counts.willCallN += 1;
+      [t.driverId, t.driverName].filter(Boolean).forEach((key) => {
+        counts.driverCounts.set(key, (counts.driverCounts.get(key) || 0) + 1);
+      });
+    });
+    return counts;
+  }, [todayTrips]);
 
   const CHIPS = [
     { id: "all", label: "All", n: todayTrips.length },
     { id: "unassigned", label: "Unassigned", n: unassignedN },
     { id: "active", label: "Active", n: activeN },
-    { id: "willcall", label: "Will Call", n: todayTrips.filter(t => t.time === "Will Call").length },
+    { id: "willcall", label: "Will Call", n: willCallN },
     { id: "completed", label: "Done", n: doneN },
     ...(cancelledN > 0 ? [{ id: "cancelled", label: "Exceptions", n: cancelledN }] : []),
   ];
+
+  // Render trip cards progressively. Each card is heavy (actions, editors,
+  // countdowns); mounting a full day's manifest at once blocks the main thread.
+  useEffect(() => { setVisibleCount(TRIP_RENDER_BATCH); }, [filter, driverFilter, localSearch, todayStr]);
+  const visibleTrips = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const hasMoreTrips = filtered.length > visibleCount;
+  useEffect(() => {
+    const sentinel = listEndRef.current;
+    if (!hasMoreTrips || !sentinel || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleCount((count) => count + TRIP_RENDER_BATCH);
+      }
+    }, { rootMargin: '600px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreTrips, visibleCount]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden pb-24">
@@ -521,7 +556,7 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
               <option value="all">All Drivers ({todayTrips.length})</option>
               <option value="unassigned">Unassigned ({unassignedN})</option>
               {drivers.map(d => {
-                const count = todayTrips.filter(t => t.driverId === d.id || t.driverName === d.name).length;
+                const count = Math.max(driverCounts.get(d.id) || 0, driverCounts.get(d.name) || 0);
                 return (
                   <option key={d.id} value={d.id}>
                     {d.name} ({count})
@@ -639,9 +674,9 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
                 </button>
               </div>
             )}
-            {filtered.map(trip => (
+            {visibleTrips.map(trip => (
+              <div key={trip.id} style={CARD_CONTAIN_STYLE}>
               <AdminTripCard
-                key={trip.id}
                 trip={trip}
                 allTrips={trips}
                 drivers={drivers}
@@ -668,7 +703,19 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
                 isSelected={selectedTripIds.includes(trip.id)}
                 onSelect={() => toggleSelectTrip(trip.id)}
               />
+              </div>
             ))}
+            {hasMoreTrips && (
+              <div ref={listEndRef} className="py-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((count) => count + TRIP_RENDER_BATCH)}
+                  className="min-h-11 px-4 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600 active:scale-95 transition-colors"
+                >
+                  Show more ({filtered.length - visibleCount})
+                </button>
+              </div>
+            )}
           </div>
         )}
 

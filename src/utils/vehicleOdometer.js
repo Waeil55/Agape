@@ -1,4 +1,5 @@
 import { tripBelongsToVehicle } from './fleetMaintenance';
+import { resolveDriverVehicle } from './vehiclePersistence';
 
 // A mechanical odometer above ten million miles is not a plausible reading
 // for this fleet; anything beyond it is treated as a data-entry error.
@@ -166,4 +167,23 @@ export function evaluateOdometerEntry({
 
   const status = errors.length ? 'blocked' : warnings.length ? 'confirm' : 'ok';
   return { value, status, errors, warnings, distance };
+}
+
+/**
+ * The same global, device-independent odometer baseline the driver's own
+ * workflow prefills, made available to desktop/dispatcher trip editors so
+ * filling in a trip's odometer starts from the vehicle's last known reading
+ * instead of a blank field.
+ */
+export function suggestTripPickupOdometer({ driverId, drivers = [], vehicles = [], trips = [] } = {}) {
+  if (!driverId) return null;
+  const driver = (drivers || []).find((entry) => String(entry?.id) === String(driverId));
+  if (!driver) return null;
+  const vehicleName = resolveDriverVehicle(driver, '', { allowRemembered: false });
+  const vehicleRecord = (vehicles || []).find((vehicle) => (
+    (driver.vehicleId && vehicle.id === driver.vehicleId)
+    || (vehicleName && String(vehicle.name || '').trim().toLowerCase() === String(vehicleName).trim().toLowerCase())
+  )) || {};
+  const state = deriveVehicleOdometerState({ vehicle: vehicleRecord, trips, drivers });
+  return state.miles > 0 ? state.miles : null;
 }

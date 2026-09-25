@@ -23,6 +23,7 @@ export default function MobileHistoryFilters({
   onDriverChange,
   drivers = [],
   count = 0,
+  statusOptions: statusOptionsProp = null,
 }) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -62,7 +63,7 @@ export default function MobileHistoryFilters({
     else if (iso === startDate) onDateChange?.(iso, null);
     else onDateChange?.(startDate, iso);
   };
-  const statusOptions = [
+  const statusOptions = statusOptionsProp || [
     { value: 'all', label: 'All Trips' },
     { value: 'completed', label: 'Completed' },
     { value: 'cancelled', label: 'Cancelled' },

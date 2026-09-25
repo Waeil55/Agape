@@ -61,6 +61,18 @@ const normalizedErrorCode = (result) => String(result?.error?.code || result?.er
   .trim()
   .toLowerCase();
 
+/**
+ * True only for the specific Firestore codes a stale/not-yet-refreshed ID
+ * token produces (permission-denied, unauthenticated). Used to gate one
+ * silent token-refresh-and-retry before falling back to the normal
+ * recoverable/terminal handling in isRecoverableAuthVerificationFailure.
+ */
+export function isAuthRaceVerificationFailure(result) {
+  if (!result || result.ok || result.timeout) return false;
+  const code = normalizedErrorCode(result).replace(/^firestore\//, '');
+  return code === 'permission-denied' || code === 'unauthenticated';
+}
+
 export function isRecoverableAuthVerificationFailure(result) {
   if (!result || result.ok) return false;
   if (result.timeout) return true;

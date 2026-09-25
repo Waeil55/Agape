@@ -250,12 +250,12 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     }
   }, [drivers, editingTrip, onUpdateTrip, savingTripId]);
 
-  const autoCorrectSelected = useCallback(async () => {
-    if (!selectedIds.length || !onUpdateTrip || busy) return;
+  const runAutoCorrect = useCallback(async (tripIds) => {
+    if (!tripIds.length || !onUpdateTrip || busy) return;
     setBusy('auto-correct');
     setNotice('');
     try {
-      const selected = hydratedTrips.filter(trip => selectedIds.includes(trip.id));
+      const selected = hydratedTrips.filter(trip => tripIds.includes(trip.id));
       const results = autoCorrectTripsBatch(selected);
       let corrected = 0;
       let skipped = 0;
@@ -310,7 +310,7 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
           } catch { skipped++; }
         } else { skipped++; }
       }
-      setSelectedIds([]);
+      setSelectedIds((current) => current.filter((id) => !tripIds.includes(id)));
       const parts = [];
       if (corrected > 0) parts.push(`Fixed ${corrected} trip(s)`);
       if (unfixable.length > 0) parts.push(`${unfixable.length} need manual fix: ${unfixable.slice(0, 3).join('; ')}${unfixable.length > 3 ? ` +${unfixable.length - 3} more` : ''}`);
@@ -321,7 +321,15 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
     } finally {
       setBusy('');
     }
-  }, [selectedIds, hydratedTrips, onUpdateTrip, busy]);
+  }, [hydratedTrips, onUpdateTrip, busy]);
+
+  const autoCorrectSelected = useCallback(() => runAutoCorrect(selectedIds), [runAutoCorrect, selectedIds]);
+  // Same mechanical swap/fill correction as the bulk action, scoped to one
+  // trip and triggered right from its validation error — no manual checkbox
+  // selection needed to fix the exact row the dispatcher is looking at. It
+  // never invents a value: it only reorders the two already-recorded
+  // timestamps or copies one into a missing paired field.
+  const autoCorrectSingle = useCallback((tripId) => runAutoCorrect([tripId]), [runAutoCorrect]);
 
   useEffect(() => {
     let active = true;
@@ -1212,11 +1220,19 @@ const WellTransSyncPage = ({ trips = [], drivers = [], vehicles = [], role = 'di
                         ) : trip._valid ? (
                           <span className="text-[10px] font-semibold text-emerald-600">Valid</span>
                         ) : (
-                          <button type="button" onClick={(event) => { event.stopPropagation(); beginTripEdit(trip); }}
-                            className="text-left text-[10px] font-semibold text-rose-600 underline decoration-rose-200 underline-offset-2 hover:text-rose-800"
-                            title={`${trip._errors?.join('; ') || 'Invalid'} — click to correct`}>
-                            {trip._errors?.[0] || 'Invalid'}
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button type="button" onClick={(event) => { event.stopPropagation(); beginTripEdit(trip); }}
+                              className="text-left text-[10px] font-semibold text-rose-600 underline decoration-rose-200 underline-offset-2 hover:text-rose-800"
+                              title={`${trip._errors?.join('; ') || 'Invalid'} — click to correct manually`}>
+                              {trip._errors?.[0] || 'Invalid'}
+                            </button>
+                            <button type="button" disabled={Boolean(busy)}
+                              onClick={(event) => { event.stopPropagation(); autoCorrectSingle(trip.id); }}
+                              className="flex shrink-0 items-center gap-0.5 rounded-md border border-amber-200 bg-amber-50 px-1 py-0.5 text-[9px] font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-40"
+                              title="Auto-fix this trip: swap times, fix odometer order, fill a missing timestamp from its paired value">
+                              <Sparkles size={9} /> Fix
+                            </button>
+                          </div>
                         )}
                       </td>
                       <td className="px-2 py-2">

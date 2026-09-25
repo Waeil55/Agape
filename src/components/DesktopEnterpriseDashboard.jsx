@@ -1058,6 +1058,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
         currentUser={currentUser}
         trips={trips}
         drivers={drivers}
+        vehicles={vehicles}
         dispatchers={dispatchers}
         logs={logs}
         selectedTasks={selectedTasks}

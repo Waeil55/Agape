@@ -19,6 +19,8 @@ import { OPERATIONAL_VIEW_PRESETS, getOperationalViewPreset } from '../utils/ope
 import TableCheckbox from './ui/TableCheckbox';
 import { resolveClientPhoneForTrip } from '../utils/clientPhoneResolution';
 import { compareStableRowOrder, createStableRowOrder } from '../utils/stableTableOrder';
+import { suggestTripPickupOdometer } from '../utils/vehicleOdometer';
+import { evaluateTripLegGap } from '../utils/tripTimeSanity';
 import { resolveTripDriver } from '../utils/driverIdentity';
 import { openNavigation } from '../utils/nativeActions';
 import AdminQuickSmsSheet from './trips/AdminQuickSmsSheet';
@@ -401,7 +403,7 @@ const readOperationsLayoutPreference = () => {
 
 
 
-const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatchers, selectedTasks, setSelectedTasks, searchQuery, setSearchQuery, operationsTab, setOperationsTab, setManualAssignTrip, addToast, addAuditLog, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, requestDeleteTrip, updateTrip, makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onDriveTrip, logs = [] }) => {
+const OperationsCommandCenter = ({ role, currentUser, trips, drivers, vehicles = [], dispatchers, selectedTasks, setSelectedTasks, searchQuery, setSearchQuery, operationsTab, setOperationsTab, setManualAssignTrip, addToast, addAuditLog, hasPermission, requestAuthAction, triggerSmartAssign, triggerFleetOptimization, requestDeleteTrip, updateTrip, makeCall, sendSMS, setTripDetails, setShowAddTripModal, setShowUploadModal, onOpenSequencer, onDriveTrip, logs = [] }) => {
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('agape_opsFilterStatus') || 'all');
   const [filterUrgency, setFilterUrgency] = useState(() => localStorage.getItem('agape_opsFilterUrgency') || 'all');
   const [filterInOut, setFilterInOut] = useState(() => localStorage.getItem('agape_opsFilterInOut') || 'all');
@@ -882,6 +884,16 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
 
   const startInlineEdit = useCallback((trip) => {
     const original = trips.find(t => t.id === trip.id) || trip;
+    // Prefill from the vehicle's last known reading (across any driver/trip)
+    // instead of leaving the field blank for the admin/dispatcher to type
+    // the full odometer number from scratch.
+    const suggestedPickupOdometer = original.pickupOdometer
+      ? null
+      : suggestTripPickupOdometer({ driverId: original.driverId, drivers, vehicles, trips });
+    // Flag (never rewrite) an already-recorded arrival/departure pair that
+    // looks wrong together, so the admin notices before it reaches WellTrans.
+    const pickupGapWarning = evaluateTripLegGap(original.arrivalTime, original.departedPickupTime);
+    const dropoffGapWarning = evaluateTripLegGap(original.arrivalDropoffTime, original.completedAt);
     setEditingTripId(original.id);
     setSaveAsProfile(false);
     setEditingTripData({
@@ -898,16 +910,19 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
       dropoffPhone: original.dropoffPhone || '',
       distance: original.distance || '',
       _pickupTime: isoToTimeInput(original.arrivalTime || original.startTime || original.pickupArrival || original.departedPickupTime),
-      _pickupOdometer: original.pickupOdometer || '',
+      _pickupOdometer: original.pickupOdometer || (suggestedPickupOdometer ? String(suggestedPickupOdometer) : ''),
+      _pickupOdometerSuggested: Boolean(suggestedPickupOdometer),
+      _pickupGapWarning: pickupGapWarning,
       _dropoffTime: isoToTimeInput(original.arrivalDropoffTime || original.dropoffArrival || original.dropoffTime),
       _dropoffOdometer: original.dropoffOdometer || '',
+      _dropoffGapWarning: dropoffGapWarning,
       notes: original.notes || '',
     });
     setInlineEditError('');
     setStableManifestOrder(createStableRowOrder(filteredTrips));
     setStableManifestContext(manifestContextKey);
     setActiveTripRow(original.id);
-  }, [filteredTrips, manifestContextKey, trips]);
+  }, [drivers, filteredTrips, manifestContextKey, trips, vehicles]);
 
   const cancelInlineEdit = useCallback(() => {
     setEditingTripId(null);
@@ -1317,9 +1332,32 @@ const OperationsCommandCenter = ({ role, currentUser, trips, drivers, dispatcher
           <textarea value={draft.pickup} onChange={event => setEditingTripData(current => ({ ...current, pickup: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Pickup address" aria-label="Pickup address" />
           <textarea value={draft.dropoff} onChange={event => setEditingTripData(current => ({ ...current, dropoff: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Dropoff address" aria-label="Dropoff address" />
           <input type="time" value={draft._pickupTime} onChange={event => setEditingTripData(current => ({ ...current, _pickupTime: event.target.value }))} className={fieldClass} aria-label="Pickup arrival" />
-          <input type="number" min="0" value={draft._pickupOdometer} onChange={event => setEditingTripData(current => ({ ...current, _pickupOdometer: event.target.value }))} className={fieldClass} placeholder="Start odometer" aria-label="Start odometer" />
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              value={draft._pickupOdometer}
+              onChange={event => setEditingTripData(current => ({ ...current, _pickupOdometer: event.target.value, _pickupOdometerSuggested: false }))}
+              className={`${fieldClass} ${draft._pickupOdometerSuggested ? 'border-indigo-300 bg-indigo-50/60' : ''}`}
+              placeholder="Start odometer"
+              aria-label="Start odometer"
+            />
+            {draft._pickupOdometerSuggested && (
+              <span className="pointer-events-none absolute -bottom-4 left-0.5 text-[9px] font-bold uppercase tracking-wide text-indigo-500">Suggested from last reading</span>
+            )}
+          </div>
           <input type="time" value={draft._dropoffTime} onChange={event => setEditingTripData(current => ({ ...current, _dropoffTime: event.target.value }))} className={fieldClass} aria-label="Dropoff arrival" />
           <input type="number" min="0" value={draft._dropoffOdometer} onChange={event => setEditingTripData(current => ({ ...current, _dropoffOdometer: event.target.value }))} className={fieldClass} placeholder="End odometer" aria-label="End odometer" />
+          {(draft._pickupGapWarning || draft._dropoffGapWarning) && (
+            <div className={`sm:col-span-2 xl:col-span-4 rounded-lg border px-3 py-2 text-[11px] font-semibold ${
+              draft._pickupGapWarning?.severity === 'invalid' || draft._dropoffGapWarning?.severity === 'invalid'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-amber-200 bg-amber-50 text-amber-700'
+            }`}>
+              {draft._pickupGapWarning && <p>Pickup: {draft._pickupGapWarning.message} Retype Pickup Time above to resync it.</p>}
+              {draft._dropoffGapWarning && <p>Dropoff: {draft._dropoffGapWarning.message} Retype Dropoff Time above to resync it.</p>}
+            </div>
+          )}
           <input value={draft.pickupPhone} onChange={event => setEditingTripData(current => ({ ...current, pickupPhone: event.target.value }))} className={fieldClass} placeholder="Pickup phone" aria-label="Pickup phone" />
           <input value={draft.dropoffPhone} onChange={event => setEditingTripData(current => ({ ...current, dropoffPhone: event.target.value }))} className={fieldClass} placeholder="Dropoff phone" aria-label="Dropoff phone" />
           <textarea value={draft.notes} onChange={event => setEditingTripData(current => ({ ...current, notes: event.target.value }))} className={`${fieldClass} col-span-2`} rows="2" placeholder="Notes" aria-label="Notes" />

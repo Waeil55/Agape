@@ -46,6 +46,7 @@ import {
   getAuthVerificationIssue,
   getLoginFailurePresentation,
   isRecoverableAuthVerificationFailure,
+  isAuthRaceVerificationFailure,
   signInWithTransientRetry,
   waitForMatchingAuthObserver,
 } from './utils/authStartup';
@@ -407,6 +408,12 @@ const App = () => {
   const loginInProgressRef = useRef(false);
   const loginStartedAtRef = useRef(0);
   const loginObserverAckRef = useRef(null);
+  // A freshly restored session (app reopened/refreshed) can have an ID token
+  // that has not finished silently refreshing yet, so the very first
+  // Firestore read after boot can fail with permission-denied/unauthenticated
+  // even though the sign-in itself is valid. Force one token refresh and
+  // retry before treating that as a real access denial and signing out.
+  const authRaceRetryUidRef = useRef('');
   const lastTrailWriteRef = useRef(0);
   const skipNextSignedOutResetRef = useRef(false);
   const postLoginGraceRef = useRef(false);
@@ -902,6 +909,7 @@ const App = () => {
   }, [clearStaleLoginAttempt]);
 
   const resetSessionState = useCallback((options = {}) => {
+    authRaceRetryUidRef.current = '';
     const {
       loginErrorMessage = '',
       preserveEmail = false,
@@ -1322,12 +1330,24 @@ const App = () => {
         }
 
         // ── FIRST LOGIN or EXPLICIT ROLE CHECK: verify from Firestore ────────
-        const userDocResult = await withTimeout(
+        let userDocResult = await withTimeout(
           getDocFromServer(userProfileRef),
           AUTH_PROFILE_SERVER_TIMEOUT_MS,
           'user profile'
         );
         if (cancelled || auth.currentUser?.uid !== user.uid) return;
+
+        if (!userDocResult.ok && isAuthRaceVerificationFailure(userDocResult) && authRaceRetryUidRef.current !== user.uid) {
+          authRaceRetryUidRef.current = user.uid;
+          try { await user.getIdToken(true); } catch { /* retry below reflects any persisting failure */ }
+          if (cancelled || auth.currentUser?.uid !== user.uid) return;
+          userDocResult = await withTimeout(
+            getDocFromServer(userProfileRef),
+            AUTH_PROFILE_SERVER_TIMEOUT_MS,
+            'user profile'
+          );
+          if (cancelled || auth.currentUser?.uid !== user.uid) return;
+        }
 
         if (!userDocResult.ok) {
           if (isRecoverableAuthVerificationFailure(userDocResult)) {

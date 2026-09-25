@@ -6,6 +6,7 @@ import {
   AUTH_PROFILE_SERVER_TIMEOUT_MS,
   getAuthVerificationIssue,
   getLoginFailurePresentation,
+  isAuthRaceVerificationFailure,
   isRecoverableAuthVerificationFailure,
   signInWithTransientRetry,
   waitForMatchingAuthObserver,
@@ -32,6 +33,21 @@ describe('authentication startup recovery', () => {
 
     expect(isRecoverableAuthVerificationFailure(denied)).toBe(false);
     expect(getAuthVerificationIssue(denied)).toContain('No workspace data was opened');
+  });
+
+  it('flags permission-denied/unauthenticated as a token-race worth one silent retry', () => {
+    expect(isAuthRaceVerificationFailure({ ok: false, error: { code: 'permission-denied' } })).toBe(true);
+    expect(isAuthRaceVerificationFailure({ ok: false, error: { code: 'firestore/unauthenticated' } })).toBe(true);
+    expect(isAuthRaceVerificationFailure({ ok: false, error: { code: 'unavailable' } })).toBe(false);
+    expect(isAuthRaceVerificationFailure({ ok: true })).toBe(false);
+    expect(isAuthRaceVerificationFailure({ ok: false, timeout: true })).toBe(false);
+  });
+
+  it('retries the boot profile verification with a fresh token before signing out on permission-denied', () => {
+    const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+
+    expect(app).toContain('isAuthRaceVerificationFailure(userDocResult) && authRaceRetryUidRef.current !== user.uid');
+    expect(app).toContain('await user.getIdToken(true);');
   });
 
   it('uses cached profile recovery and never converts a short timeout into forced sign-in', () => {

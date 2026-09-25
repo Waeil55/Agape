@@ -41,7 +41,8 @@ import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHisto
 import MobileHistoryFilters from './trips/MobileHistoryFilters';
 import { resolveDriverVehicle, resolveTripVehicle } from '../utils/vehiclePersistence';
 import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus } from '../utils/fleetMaintenance';
-import { deriveVehicleOdometerState, evaluateOdometerEntry } from '../utils/vehicleOdometer';
+import { deriveVehicleOdometerState, evaluateOdometerEntry, suggestTripPickupOdometer } from '../utils/vehicleOdometer';
+import { evaluateTripLegGap } from '../utils/tripTimeSanity';
 import { saveClientProfile } from '../utils/clientProfileUtils';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
@@ -265,6 +266,12 @@ const WORKFLOW_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'No Show',
 const displayWorkflowStatus = (status, fallback = 'Unknown') => normalizeTripStatusValue(status) || fallback;
 const normalizeWorkflowStatus = (status) => displayWorkflowStatus(status, '').toLowerCase();
 const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
+const HISTORY_PAGE_STATUS_OPTIONS = [
+  { value: 'all', label: 'All Trips' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'notCompleted', label: 'Not Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 const getTripHistoryDateKey = (trip) => {
   const dateKey = tripCalendarDateKey(trip?.date);
   const completedKey = tripCalendarDateKey(trip?.completedAt);
@@ -305,7 +312,18 @@ const HISTORY_STATUS_META = {
   cancelled: { label: 'Cancelled', Icon: XCircle, bg: 'bg-rose-100 text-rose-700', iconBg: 'bg-rose-100 text-rose-700', border: 'border-l-rose-400' },
   rerouted: { label: 'Rerouted', Icon: Repeat, bg: 'bg-purple-100 text-purple-700', iconBg: 'bg-purple-100 text-purple-700', border: 'border-l-purple-400' },
 };
-const getHistoryStatusMeta = (status) => HISTORY_STATUS_META[normalizeWorkflowStatus(status)] || { label: displayWorkflowStatus(status), Icon: AlertTriangle, bg: 'bg-slate-100 text-slate-700', iconBg: 'bg-slate-100 text-slate-700', border: 'border-l-slate-400' };
+const HISTORY_TERMINAL_STATUS_KEYS = new Set([...WORKFLOW_TERMINAL_STATUSES].map((value) => value.toLowerCase()));
+const getHistoryStatusMeta = (status) => {
+  const key = normalizeWorkflowStatus(status);
+  if (HISTORY_STATUS_META[key]) return HISTORY_STATUS_META[key];
+  if (!HISTORY_TERMINAL_STATUS_KEYS.has(key)) {
+    // A past trip that never reached a terminal status (dispatcher/admin filled
+    // pickup/dropoff times or odometer but the driver never marked it done)
+    // still needs to surface in history instead of only sitting in the live queue.
+    return { label: 'Not Completed', Icon: AlertTriangle, bg: 'bg-amber-100 text-amber-700', iconBg: 'bg-amber-100 text-amber-700', border: 'border-l-amber-400' };
+  }
+  return { label: displayWorkflowStatus(status), Icon: AlertTriangle, bg: 'bg-slate-100 text-slate-700', iconBg: 'bg-slate-100 text-slate-700', border: 'border-l-slate-400' };
+};
 const formatTripDetailClock = (value) => {
   if (!value) return '--';
   if (typeof value === 'object' && typeof value.toDate === 'function') {
@@ -1831,8 +1849,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
 
   const historyWindowEnd = localCalendarYmd();
   const historyWindowStart = calendarDateKeyDaysAgo(DRIVER_HISTORY_LOOKBACK_DAYS - 1);
+  // A past-dated trip that never reached a terminal status must still surface
+  // here (marked "Not Completed") instead of disappearing from the driver's
+  // record once it is no longer today's trip.
+  const isPastDueIncompleteTrip = (trip) => (
+    !isWorkflowTerminalTrip(trip) && Boolean(trip?.date) && tripCalendarDateKey(trip.date) < localCalendarYmd()
+  );
   const allHistory = useMemo(() => filteredDriverScopedTrips
-    .filter(isWorkflowTerminalTrip)
+    .filter((trip) => isWorkflowTerminalTrip(trip) || isPastDueIncompleteTrip(trip))
     .sort((a, b) => {
       const dateCompare = String(getTripHistoryDateKey(a) || '').localeCompare(String(getTripHistoryDateKey(b) || ''));
       if (dateCompare !== 0) return dateCompare;
@@ -1859,6 +1883,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       const s = normalizeWorkflowStatus(t.status);
       return s === 'cancelled' || s === 'no show' || s === 'rerouted';
     }).length,
+    notCompleted: selectedHistoryDayTrips.filter((t) => !isWorkflowTerminalTrip(t)).length,
   }), [selectedHistoryDayTrips]);
   useEffect(() => {
     if (historyDate !== selectedHistoryDate) setHistoryDate(selectedHistoryDate);
@@ -2717,6 +2742,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
     const matchFilter = historyFilter === 'all' ? true :
       historyFilter === 'completed' ? status === 'completed' :
       historyFilter === 'cancelled' ? (status === 'cancelled' || status === 'no show' || status === 'rerouted') :
+      historyFilter === 'notCompleted' ? !isWorkflowTerminalTrip(t) :
       true;
     if (!matchFilter) return false;
     return tripMatchesSearch(t, historySearch);
@@ -3540,6 +3566,20 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const handleStartInlineEdit = (trip) => {
     if (!canManageTripRecords) return;
     const original = trips.find(t => t.id === trip.id) || trip;
+    // Prefill from the vehicle's last known reading instead of leaving the
+    // field blank for the admin/dispatcher to type the full number from scratch.
+    const suggestedPickupOdometer = original.pickupOdometer
+      ? null
+      : suggestTripPickupOdometer({
+        driverId: original.driverId || me?.id,
+        drivers: allDrivers?.length ? allDrivers : drivers,
+        vehicles,
+        trips,
+      });
+    // Flag (never rewrite) an already-recorded arrival/departure pair that
+    // looks wrong together, so the admin notices before it reaches WellTrans.
+    const pickupGapWarning = evaluateTripLegGap(original.arrivalTime, original.departedPickupTime);
+    const dropoffGapWarning = evaluateTripLegGap(original.arrivalDropoffTime, original.completedAt);
     setHistoryExpandedId(original.id);
     setEditingTripId(original.id);
     setInlineEditError('');
@@ -3557,9 +3597,12 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
       hospitalPhone: original.hospitalPhone || '',
       distance: original.distance || '',
       _pickupTime: isoToTimeInput(original.arrivalTime || original.startTime || original.pickupArrival || original.departedPickupTime),
-      _pickupOdometer: original.pickupOdometer || '',
+      _pickupOdometer: original.pickupOdometer || (suggestedPickupOdometer ? String(suggestedPickupOdometer) : ''),
+      _pickupOdometerSuggested: Boolean(suggestedPickupOdometer),
+      _pickupGapWarning: pickupGapWarning,
       _dropoffTime: isoToTimeInput(original.arrivalDropoffTime || original.dropoffArrival || original.dropoffTime),
       _dropoffOdometer: original.dropoffOdometer || '',
+      _dropoffGapWarning: dropoffGapWarning,
       _clientSigned: original.paperSignatureConfirmed || false,
       editScope: 'one-time',
       notes: original.notes || '',
@@ -6316,6 +6359,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             onDriverChange={() => {}}
             drivers={me?.name ? [me.name] : []}
             count={filteredHistory.length}
+            statusOptions={HISTORY_PAGE_STATUS_OPTIONS}
           />
 
           <div className="px-4 pt-1 pb-0.5">
@@ -6331,7 +6375,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                   <Clock size={28} className="text-slate-300" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-900">{historySearch ? 'No matching trips' : 'No history'}</h3>
-                <p className="text-slate-500 text-xs font-semibold mt-1">{historySearch ? 'Try a different search term.' : `No completed, cancelled, no-show, or rerouted trips found for ${formatHistoryDayLabel(selectedHistoryDate)}.`}</p>
+                <p className="text-slate-500 text-xs font-semibold mt-1">{historySearch ? 'Try a different search term.' : `No completed, cancelled, no-show, rerouted, or not-completed trips found for ${formatHistoryDayLabel(selectedHistoryDate)}.`}</p>
               </div>
             ) : (
               sortedFilteredHistory.map(trip => {
@@ -6392,8 +6436,8 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                                 <input type="time" value={ie._pickupTime} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupTime: e.target.value }))} className={inputCls} />
                               </div>
                               <div>
-                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Ruler size={10} /> Pickup Odo</label>
-                                <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value }))} className={inputCls} />
+                                <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Ruler size={10} /> Pickup Odo{ie._pickupOdometerSuggested ? ' (suggested)' : ''}</label>
+                                <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value, _pickupOdometerSuggested: false }))} className={`${inputCls} ${ie._pickupOdometerSuggested ? 'border-indigo-300 bg-indigo-50' : ''}`} />
                               </div>
                               <div>
                                 <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Clock size={10} /> Dropoff Time</label>
@@ -6403,6 +6447,16 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                                 <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block flex items-center gap-1"><Ruler size={10} /> Dropoff Odo</label>
                                 <input type="number" min="0" step="1" placeholder="42750" value={ie._dropoffOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffOdometer: e.target.value }))} className={inputCls} />
                               </div>
+                              {(ie._pickupGapWarning || ie._dropoffGapWarning) && (
+                                <div className={`col-span-2 rounded-lg border px-2.5 py-2 text-[11px] font-semibold ${
+                                  ie._pickupGapWarning?.severity === 'invalid' || ie._dropoffGapWarning?.severity === 'invalid'
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                                }`}>
+                                  {ie._pickupGapWarning && <p>Pickup: {ie._pickupGapWarning.message} Retype Pickup Time above to resync it.</p>}
+                                  {ie._dropoffGapWarning && <p>Dropoff: {ie._dropoffGapWarning.message} Retype Dropoff Time above to resync it.</p>}
+                                </div>
+                              )}
                               <div className="col-span-2">
                                 <label className="text-[10px] font-semibold text-blue-700 uppercase tracking-widest mb-0.5 block">Pickup Address</label>
                                 <PlacesAutocompleteInput

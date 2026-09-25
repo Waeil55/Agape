@@ -8,6 +8,8 @@ import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
 import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
+import { suggestTripPickupOdometer } from '../utils/vehicleOdometer';
+import { evaluateTripLegGap } from '../utils/tripTimeSanity';
 import MobileHistoryFilters from './trips/MobileHistoryFilters';
 
 const MOBILE_REPORT_PAGE_SIZE = 40;
@@ -185,7 +187,7 @@ const normalizeStatus = (status) => {
   return 'other';
 };
 
-const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUploadModal, isLoading = false, readOnly = false }) => {
+const MobileReportsPage = ({ trips = [], drivers = [], vehicles = [], onUpdateTrip, setShowUploadModal, isLoading = false, readOnly = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStr, setDateStr] = useState(localCalendarYmd());
   const [endDate, setEndDate] = useState(null);
@@ -284,6 +286,15 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
   };
 
   const startInlineEdit = (trip) => {
+    // Prefill from the vehicle's last known reading instead of leaving the
+    // field blank for the admin/dispatcher to type the full number from scratch.
+    const suggestedPickupOdometer = trip.pickupOdometer
+      ? null
+      : suggestTripPickupOdometer({ driverId: trip.driverId, drivers, vehicles, trips });
+    // Flag (never rewrite) an already-recorded arrival/departure pair that
+    // looks wrong together, so the admin notices before it reaches WellTrans.
+    const pickupGapWarning = evaluateTripLegGap(trip.arrivalTime, trip.departedPickupTime);
+    const dropoffGapWarning = evaluateTripLegGap(trip.arrivalDropoffTime, trip.completedAt);
     setExpandedTripId(trip.id);
     setEditingTripId(trip.id);
     setEditingTripData({
@@ -300,9 +311,12 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
       hospitalPhone: trip.hospitalPhone || '',
       distance: trip.distance || '',
       _pickupTime: isoToTimeInput(trip.arrivalTime || trip.startTime || trip.pickupArrival || trip.departedPickupTime),
-      _pickupOdometer: trip.pickupOdometer || '',
+      _pickupOdometer: trip.pickupOdometer || (suggestedPickupOdometer ? String(suggestedPickupOdometer) : ''),
+      _pickupOdometerSuggested: Boolean(suggestedPickupOdometer),
+      _pickupGapWarning: pickupGapWarning,
       _dropoffTime: isoToTimeInput(trip.arrivalDropoffTime || trip.dropoffArrival || trip.dropoffTime),
       _dropoffOdometer: trip.dropoffOdometer || '',
+      _dropoffGapWarning: dropoffGapWarning,
       notes: trip.notes || '',
     });
     setSortKeyOverrides(() => {
@@ -511,8 +525,8 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                             <input type="time" value={ie._pickupTime} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupTime: e.target.value }))} className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Pickup Odo</label>
-                            <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value }))} className={inputCls} />
+                            <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Pickup Odo{ie._pickupOdometerSuggested ? ' (suggested)' : ''}</label>
+                            <input type="number" min="0" step="1" placeholder="42500" value={ie._pickupOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _pickupOdometer: e.target.value, _pickupOdometerSuggested: false }))} className={`${inputCls} ${ie._pickupOdometerSuggested ? 'border-indigo-300 bg-indigo-50/60' : ''}`} />
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Dropoff Time</label>
@@ -522,6 +536,16 @@ const MobileReportsPage = ({ trips = [], drivers = [], onUpdateTrip, setShowUplo
                             <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Dropoff Odo</label>
                             <input type="number" min="0" step="1" placeholder="42750" value={ie._dropoffOdometer} onChange={(e) => setEditingTripData(p => ({ ...p, _dropoffOdometer: e.target.value }))} className={inputCls} />
                           </div>
+                          {(ie._pickupGapWarning || ie._dropoffGapWarning) && (
+                            <div className={`col-span-2 rounded-lg border px-2.5 py-2 text-[11px] font-semibold ${
+                              ie._pickupGapWarning?.severity === 'invalid' || ie._dropoffGapWarning?.severity === 'invalid'
+                                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                : 'border-amber-200 bg-amber-50 text-amber-700'
+                            }`}>
+                              {ie._pickupGapWarning && <p>Pickup: {ie._pickupGapWarning.message} Retype Pickup Time above to resync it.</p>}
+                              {ie._dropoffGapWarning && <p>Dropoff: {ie._dropoffGapWarning.message} Retype Dropoff Time above to resync it.</p>}
+                            </div>
+                          )}
                           <div className="col-span-2">
                             <label className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-0.5 block">Pickup Address</label>
                             <PlacesAutocompleteInput value={ie.pickup} onChange={(val) => setEditingTripData(p => ({ ...p, pickup: val }))} className={inputCls} placeholder="Pickup address" />
