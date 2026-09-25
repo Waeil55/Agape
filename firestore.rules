@@ -282,6 +282,21 @@ service cloud.firestore {
       allow update: if signedIn();
       allow delete: if signedIn() && isAdmin();
     }
+    match /flaggedClients/{clientKey} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if signedIn() && isAdmin();
+    }
+    // A shared, append-only cache of looked-up site names for bare
+    // addresses (never a source of truth — only avoids re-querying the
+    // Places API for the same address from every device).
+    match /placeNameCache/{addressKey} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if signedIn() && isAdmin();
+    }
     match /assignments/{assignmentId} {
       allow read: if signedIn() && (
         isDispatcher()

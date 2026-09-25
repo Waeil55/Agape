@@ -7,6 +7,7 @@ import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { buildDriverIndex, findDriverInIndex } from '../utils/driverIndex';
 import { forEachWithConcurrency } from '../utils/boundedConcurrency';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
+import { saveClientProfile } from '../utils/clientProfileUtils';
 import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
 import { suggestTripPickupOdometer } from '../utils/vehicleOdometer';
 import { evaluateTripLegGap } from '../utils/tripTimeSanity';
@@ -655,6 +656,12 @@ const MobileReportsPage = ({ trips = [], drivers = [], vehicles = [], onUpdateTr
           trip={scheduleEditTrip}
           onSave={(payload) => {
             onUpdateTrip?.(scheduleEditTrip.id, payload);
+            // "Permanent" must actually persist: save as the client's default
+            // so every future trip for them picks up this schedule, not just
+            // this one occurrence.
+            if (payload.saveAsProfile && scheduleEditTrip.patient) {
+              saveClientProfile(scheduleEditTrip.patient, payload, '').catch(() => {});
+            }
             setScheduleEditTrip(null);
           }}
           onClose={() => setScheduleEditTrip(null)}

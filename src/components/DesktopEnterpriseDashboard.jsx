@@ -3,6 +3,7 @@ import { Users, MapPin, Settings, BarChart2, Archive, MessageCircle, Bell, Check
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 
 import { isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
+import SiteNameLine from './shared/SiteNameLine';
 import { getDriverLiveStatus } from '../constants/statuses';
 import { toValidDate } from '../utils/safeDate';
 import { useChat } from '../hooks/useChat';
@@ -815,14 +816,14 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                       <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0 ring-1 ring-emerald-500/20" />
                       <div>
                         <p className="text-xs text-slate-700">{tripDetails.pickup || '—'}</p>
-                        {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-0.5">{tripDetails.pickupSiteName}</p>}
+                        <SiteNameLine siteName={tripDetails.pickupSiteName} address={tripDetails.pickup} className="text-xs text-emerald-700 mt-0.5" />
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <div className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0 ring-1 ring-rose-500/20" />
                       <div>
                         <p className="text-xs text-slate-700">{tripDetails.dropoff || '—'}</p>
-                        {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-0.5">{tripDetails.dropoffSiteName}</p>}
+                        <SiteNameLine siteName={tripDetails.dropoffSiteName} address={tripDetails.dropoff} className="text-xs text-rose-700 mt-0.5" />
                       </div>
                     </div>
                   </div>
@@ -1561,7 +1562,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pickup</p>
                     <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.pickup || '—'}</p>
-                    {tripDetails.pickupSiteName && <p className="text-xs text-emerald-700 mt-1">{tripDetails.pickupSiteName}</p>}
+                    <SiteNameLine siteName={tripDetails.pickupSiteName} address={tripDetails.pickup} className="text-xs text-emerald-700 mt-1" />
                     {formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700 mt-1">Client phone: {formatPhoneDisplay(getClientPhoneGlobal(tripDetails))}</p>}
                     {formatPhoneDisplay(tripDetails.pickupPhone) && formatPhoneDisplay(tripDetails.pickupPhone) !== formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-emerald-700">Pickup phone: {formatPhoneDisplay(tripDetails.pickupPhone)}</p>}
                   </div>
@@ -1573,7 +1574,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Dropoff</p>
                     <p className="text-xs font-medium text-slate-700 mt-0.5">{tripDetails.dropoff || '—'}</p>
-                    {tripDetails.dropoffSiteName && <p className="text-xs text-rose-700 mt-1">{tripDetails.dropoffSiteName}</p>}
+                    <SiteNameLine siteName={tripDetails.dropoffSiteName} address={tripDetails.dropoff} className="text-xs text-rose-700 mt-1" />
                     {formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone) && formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone) !== formatPhoneDisplay(getClientPhoneGlobal(tripDetails)) && <p className="text-xs text-rose-700 mt-1">Hospital phone: {formatPhoneDisplay(tripDetails.hospitalPhone || tripDetails.dropoffPhone)}</p>}
                   </div>
                 </div>

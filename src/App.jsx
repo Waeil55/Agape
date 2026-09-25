@@ -4,7 +4,7 @@ import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, s
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
 import { hasPermission } from './constants/roles';
-import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd, isoToLocalDateKey } from './utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey, isTripDateToday, isCalendarDateKeyWithinLastDays, localCalendarYmd, isoToLocalDateKey, getTripHistoryDateKey, resolveTripCompletionTimestamp } from './utils/tripDate';
 import { resolveClientPhoneForTrip } from './utils/clientPhoneResolution';
 import { filterDriversForRole, filterTripsForRole, getDispatcherForUser, getUploadScopeForRole, isDriverAssignedToDispatcher, isDriverTripOwner, isTripInDispatcherScope, isTripInUploadScope, normalizeEmail } from './utils/accessControl';
 import { isTerminalTripStatus, tripImportKey } from './utils/tripLifecycle';
@@ -138,13 +138,6 @@ const DRIVER_HISTORY_LOOKBACK_DAYS = 14;
 const DRIVER_HISTORY_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'no show', 'no_show', 'rerouted', 'transferred']);
 const DRIVER_ACTIVE_WORK_STATUSES = new Set(['in progress', 'at pickup', 'navigating pickup', 'en route', 'navigating dropoff', 'in transit']);
 const normalizeTripStatus = (status) => String(status || '').trim().toLowerCase();
-const getTripHistoryDateKey = (trip) => {
-  const dateKey = tripCalendarDateKey(trip?.date);
-  const completedKey = tripCalendarDateKey(trip?.completedAt);
-  if (!dateKey) return completedKey;
-  if (!completedKey) return dateKey;
-  return dateKey > completedKey ? dateKey : completedKey;
-};
 const isRecentDriverHistoryTrip = (trip) => (
   DRIVER_HISTORY_STATUSES.has(normalizeTripStatus(trip?.status))
   && isCalendarDateKeyWithinLastDays(getTripHistoryDateKey(trip), DRIVER_HISTORY_LOOKBACK_DAYS)
@@ -2090,7 +2083,20 @@ const App = () => {
     if (nextTripState.dropoffOdometer !== undefined && nextTripState.dropoffOdometer !== '' && nextTripState.dropoffOdometer !== null) {
       if (!isTerminal && !nextTripState.completedAt) {
         nextTripState.status = 'Completed';
-        nextTripState.completedAt = new Date().toISOString();
+        // A backdated correction (admin filling in a past trip's odometer
+        // today) did not just finish "now" — stamping completedAt with the
+        // current moment moved it into today's history/reports. Anchor it to
+        // the trip's own service date instead; only a same-day completion
+        // gets the live timestamp.
+        nextTripState.completedAt = resolveTripCompletionTimestamp(nextTripState);
+      } else if (
+        nextTripState.completedAt
+        && tripCalendarDateKey(nextTripState.completedAt) === localCalendarYmd()
+        && tripCalendarDateKey(nextTripState.date) < localCalendarYmd()
+      ) {
+        // Repair a trip whose completedAt was already mis-stamped with
+        // "today" by the bug above, the moment it is touched again.
+        nextTripState.completedAt = resolveTripCompletionTimestamp(nextTripState);
       }
     }
 

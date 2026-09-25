@@ -16,6 +16,8 @@ import { normalizeEmail } from '../../utils/accessControl';
 import { openNavigation, makeCall, sendSMS } from '../../utils/nativeActions';
 import { DestinationNavButtons } from '../shared/DestinationNavButtons';
 import { useHeader } from '../shared';
+import SiteNameLine from '../shared/SiteNameLine';
+import { summarizeTripPassengerConfig } from '../../utils/tripPassengerConfig';
 
 const MessageThread = lazy(() => import('../shared/TripDetailMessageThread').then(m => ({ default: m.default || m.MessageThread })));
 const AuditHistory = lazy(() => import('../shared/TripDetailAuditHistory').then(m => ({ default: m.default || m.AuditHistory })));
@@ -312,6 +314,7 @@ const TripDetailView = ({
   const timeLabel = t.time === 'Will Call' || !t.time ? 'Will Call' : formatTime12hr(t.time);
   const dateLabel = t.date ? (() => { try { return new Date(t.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); } catch { return t.date; } })() : 'No date';
   const clientPhone = resolveClientPhoneForTrip(t, []);
+  const passengerConfig = summarizeTripPassengerConfig(t);
 
   const sections = [
     { id: 'summary', label: 'Summary', icon: FileText },
@@ -365,6 +368,7 @@ const TripDetailView = ({
                   <div className="min-w-0">
                     <p className={`${tokens.typography.caption2Upper} text-emerald-700`} style={{ letterSpacing: '0.08em' }}>Pickup</p>
                     <p className={`${tokens.typography.callout} ${tokens.colors.foreground.primary} mt-0.5 truncate`}>{pickup || 'Not set'}</p>
+                    <SiteNameLine siteName={t.pickupSiteName} address={pickup} className="text-xs text-emerald-700 mt-0.5 truncate" />
                   </div>
                 </div>
                 <DestinationNavButtons address={pickup} buttonClassName="h-8 w-8" />
@@ -378,6 +382,7 @@ const TripDetailView = ({
                   <div className="min-w-0">
                     <p className={`${tokens.typography.caption2Upper} text-rose-700`} style={{ letterSpacing: '0.08em' }}>Dropoff</p>
                     <p className={`${tokens.typography.callout} ${tokens.colors.foreground.primary} mt-0.5 truncate`}>{dropoff || 'Not set'}</p>
+                    <SiteNameLine siteName={t.dropoffSiteName} address={dropoff} className="text-xs text-rose-700 mt-0.5 truncate" />
                   </div>
                 </div>
                 <DestinationNavButtons address={dropoff} buttonClassName="h-8 w-8" />
@@ -397,6 +402,15 @@ const TripDetailView = ({
                   <p className={`${tokens.typography.calloutEmphasized} ${tokens.colors.foreground.primary}`}>{buildTripTitle(t)}</p>
                 </div>
               </div>
+              {passengerConfig.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {passengerConfig.map((label) => (
+                    <span key={label} className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 {clientPhone && (
                   <button 

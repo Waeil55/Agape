@@ -6,6 +6,7 @@ import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 
 import { makeCall, sendSMS, openNavigation } from '../utils/nativeActions';
 import { saveClientProfile } from '../utils/clientProfileUtils';
+import { reportBadClient } from '../utils/flaggedClients';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
 import AdminQuickSmsSheet from './trips/AdminQuickSmsSheet';
 
@@ -107,6 +108,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
   // updates below. Replaces the generic action sheet for this manifest.
   const [detailModalTrip, setDetailModalTrip] = useState(null);
   const [modalForm, setModalForm] = useState({ status: '', reason: '', note: '' });
+  const saveBadClientReport = (trip, details) => (
+    reportBadClient(trip.patient, { ...details, tripId: trip.id, bookingId: trip.bookingId }, currentUser)
+  );
   const [modalSaving, setModalSaving] = useState(false);
   const [modalError, setModalError] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
@@ -704,6 +708,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           return markTripException(trip, status, details);
         } : null}
         onArchiveTrip={canArchiveDetail ? (trip) => onDeleteTrip(trip.id) : null}
+        onReportBadClient={detailModalTrip?.patient ? async (trip, details) => {
+          await saveBadClientReport(trip, details);
+        } : null}
       />
       {/* HEADER CONTROLS — 44px mobile buttons kept here (filters/upload/new).
           Manifest cards + manifest modals below follow the approved compact
@@ -1477,8 +1484,14 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
           trip={scheduleEditTrip}
           onSave={(payload) => {
             onUpdateTrip?.(scheduleEditTrip.id, payload);
+            // "Permanent" must actually persist: save as the client's default
+            // so every future trip for them picks up this schedule, not just
+            // this one occurrence.
+            if (payload.saveAsProfile && scheduleEditTrip.patient) {
+              saveClientProfile(scheduleEditTrip.patient, payload, currentUser).catch(() => {});
+            }
             setScheduleEditTrip(null);
-            showToast('Schedule updated');
+            showToast(payload.saveAsProfile ? 'Schedule updated permanently for this client' : 'Schedule updated');
           }}
           onClose={() => setScheduleEditTrip(null)}
         />
@@ -1542,6 +1555,9 @@ const TripsPage = ({ trips = [], role, currentUser = '', drivers = [], selectedT
             onDeleteTrip?.(t.id);
             setDetailModalTrip(null);
           }}
+          onReportBadClient={detailModalTrip?.patient ? async (t, details) => {
+            await saveBadClientReport(t, details);
+          } : null}
         />
         );
       })()}

@@ -16,6 +16,7 @@ import { tripCalendarDateKey } from '../utils/tripDate';
 import { resolveDriverVehicle } from '../utils/vehiclePersistence';
 import { isCompanyDriverPlaceholder } from '../utils/driverIdentity';
 import { findTripFareColumn, readImportedTripFare, TRIP_FARE_HEADER_ALIASES } from '../utils/tripFare';
+import { detectWheelchairFromPassengerConfig } from '../utils/tripPassengerConfig';
 import {
   analyzePhoneOwnershipForTrips,
   isValidPhoneDigits,
@@ -943,6 +944,16 @@ const FileUploadTrips = ({ onTripsCreated, drivers = [], allowedDrivers, lockedD
 
           // --- TYPE & NOTES ---
           type: extract(m.type, row['Space Types'], row['Type'], row['Service Type'], row['Req'], row['req']),
+          // Broker rider/mobility codes (e.g. "ADULT1", "WC1", "CANE"), kept
+          // raw so the trip detail view can render a readable summary and
+          // the wheelchair flag below can be derived from them.
+          passengerTypes: extract(row['Passenger Types'], row['passengerTypes']),
+          spaceTypes: extract(row['Space Types'], row['spaceTypes']),
+          mobilityAids: extract(row['Mobility Aids'], row['mobilityAids']),
+          wheelchair: detectWheelchairFromPassengerConfig({
+            spaceTypes: extract(row['Space Types'], row['spaceTypes']),
+            mobilityAids: extract(row['Mobility Aids'], row['mobilityAids']),
+          }),
           purpose: extract(row['Purpose'], row['purpose']),
           providerName: extract(row['Provider Name'], row['providerName']),
           directDistance: extract(row['Direct Distance'], row['directDistance']),

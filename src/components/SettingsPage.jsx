@@ -1,10 +1,11 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge, MessageSquare } from 'lucide-react';
+import { LogOut, AlertCircle, Database, Eye, EyeOff, Save, Navigation, Type, Route, Phone, CheckCircle2, XCircle, TextSelect, Accessibility, Smartphone, Maximize2, Minus, Plus, Users, Activity, User, Bell, KeyRound, Truck, RefreshCw, Trash2, RotateCcw, Gauge, MessageSquare, Flag } from 'lucide-react';
 import { makeCall } from '../utils/nativeActions';
 import { auth, db, doc, functions, httpsCallable, setDoc, onSnapshot, updatePassword } from '../config/firebase';
 import { DEFAULT_OVERRIDE_POLICY, normalizeOverridePolicy } from '../utils/tripCostOverrides';
 import OverrideHomeAddressEditor, { verifyOverrideHomePolicy } from './OverrideHomeAddressEditor';
 import OverrideExclusionRulesEditor from './OverrideExclusionRulesEditor';
+import FlaggedClientsSection from './FlaggedClientsSection';
 import { AGAPE_BUSINESS_SMS_NUMBER, businessSmsErrorMessage } from '../utils/clientSms';
 
 const LazySystemHealth = lazy(() => import('./SystemHealthDashboard'));
@@ -123,7 +124,7 @@ const SettingsPage = ({
   const _updatePhone = onUpdatePhoneNumbers || ((updates) => { setPhoneNumbersAlias?.(prev => ({ ...prev, ...updates })); persistState?.(); });
   const userKey = (currentUser || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
   const personalSectionIds = ['profile', 'accessibility', 'navigation', 'notifications', 'security'];
-  if (role === 'admin' || role === 'dispatcher') personalSectionIds.push('overrides', 'business-sms');
+  if (role === 'admin' || role === 'dispatcher') personalSectionIds.push('overrides', 'business-sms', 'flagged-clients');
   if (role === 'dispatcher') personalSectionIds.unshift('activity');
   const resolvedInitialSection = personalSectionIds.includes(initialSection) ? initialSection : 'profile';
   const [activeSection, setActiveSection] = useState(() => {
@@ -251,6 +252,7 @@ const SettingsPage = ({
   if ((role === 'admin' || role === 'dispatcher') && !personalNav.find(p => p.id === 'overrides')) {
     personalNav.push({ id: 'overrides', label: 'Override Pricing', icon: Gauge });
     personalNav.push({ id: 'business-sms', label: 'Business SMS', icon: MessageSquare });
+    personalNav.push({ id: 'flagged-clients', label: 'Reported Clients', icon: Flag });
   }
 
   const navItems = [
@@ -912,6 +914,9 @@ const SettingsPage = ({
             </div>
           </div>
         );
+
+      case 'flagged-clients':
+        return <FlaggedClientsSection role={role} />;
 
       default: return null;
     }

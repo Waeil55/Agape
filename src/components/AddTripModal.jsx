@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Plus, MapPin, Clock, User, Phone, FileText, Calendar, Repeat, Hash, Truck, Navigation } from 'lucide-react';
+import { X, Plus, MapPin, Clock, User, Phone, FileText, Calendar, Repeat, Hash, Truck, Navigation, Flag } from 'lucide-react';
 import PlacesAutocompleteInput from './PlacesAutocompleteInput';
 import { getClientProfile, prefillFromProfile } from '../utils/clientProfileUtils';
+import { getFlaggedClient } from '../utils/flaggedClients';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const WEEKDAY_SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
@@ -73,16 +74,22 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
     setErrors(prev => (prev[field] ? { ...prev, [field]: '' } : prev));
   }, []);
 
+  const [flaggedClient, setFlaggedClient] = useState(null);
   const profileTimerRef = useRef(null);
   const handlePatientChange = useCallback((value) => {
     update('patient', value);
+    setFlaggedClient(null);
     clearTimeout(profileTimerRef.current);
     if (!value || value.length < 2) return;
     profileTimerRef.current = setTimeout(async () => {
-      const profile = await getClientProfile(value);
+      const [profile, flagged] = await Promise.all([
+        getClientProfile(value),
+        getFlaggedClient(value),
+      ]);
       if (profile) {
         setForm(prev => prefillFromProfile(profile, prev));
       }
+      setFlaggedClient(flagged);
     }, 500);
   }, [update]);
 
@@ -228,6 +235,14 @@ const AddTripModal = ({ onClose, onAddTrip, role, currentUser, drivers = [] }) =
                     autoFocus
                   />
                   {errors.patient && <p className="text-xs text-rose-600 mt-1 font-medium">{errors.patient}</p>}
+                  {flaggedClient && (
+                    <div className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5">
+                      <Flag size={12} className="mt-0.5 shrink-0 text-rose-600" />
+                      <p className="text-xs font-semibold text-rose-700">
+                        Reported client{flaggedClient.lastReason ? `: ${flaggedClient.lastReason}` : ''}{flaggedClient.lastNote ? ` — ${flaggedClient.lastNote}` : ''}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div>

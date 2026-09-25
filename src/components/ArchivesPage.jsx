@@ -5,6 +5,7 @@ import { localCalendarYmd, tripCalendarDateKey } from '../utils/tripDate';
 import TripActionCenter from './trips/TripActionCenter';
 import { resolveTripDriver } from '../utils/driverIdentity';
 import ScheduleEditorModal from './trips/ScheduleEditorModal';
+import { saveClientProfile } from '../utils/clientProfileUtils';
 import { MobileHistoryCardHeader, MobileHistoryStops } from './trips/MobileHistoryCard';
 import MobileHistoryFilters from './trips/MobileHistoryFilters';
 
@@ -738,6 +739,12 @@ const ArchivesPage = ({ trashedTrips = [], restoreTrip, drivers = [], role, onDr
               updateTrashedTrip(scheduleEditTrip.id, payload);
             } else if (onUpdateTrip) {
               onUpdateTrip(scheduleEditTrip.id, payload);
+            }
+            // "Permanent" must actually persist: save as the client's default
+            // so every future trip for them picks up this schedule, not just
+            // this one occurrence.
+            if (payload.saveAsProfile && scheduleEditTrip.patient) {
+              saveClientProfile(scheduleEditTrip.patient, payload, '').catch(() => {});
             }
             setScheduleEditTrip(null);
           }}

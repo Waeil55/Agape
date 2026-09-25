@@ -5,6 +5,7 @@ import { tripCalendarDateKey, localCalendarYmd } from "../utils/tripDate";
 import { tripMatchesSearch } from "../utils/search";
 import { resolveClientPhoneForTrip } from "../utils/clientPhoneResolution";
 import { saveClientProfile } from "../utils/clientProfileUtils";
+import { reportBadClient } from "../utils/flaggedClients";
 import { openNavigation } from "../utils/nativeActions";
 import AdminQuickSmsSheet from "./trips/AdminQuickSmsSheet";
 import ScheduleEditorModal from "./trips/ScheduleEditorModal";
@@ -301,6 +302,9 @@ const AdminTripCard = ({ trip, allTrips, drivers, onOpenTripDetails, onOpenTripW
           requestDeleteTrip?.(t.id, t.patient || 'trip');
           setShowActions(false);
         }}
+        onReportBadClient={trip.patient ? async (t, details) => {
+          await reportBadClient(t.patient, { ...details, tripId: t.id, bookingId: t.bookingId }, currentUser);
+        } : null}
       />
 
       {/* REASSIGN MODAL */}
@@ -857,8 +861,14 @@ const MobileDispatchView = ({ role, currentUser, trips = [], drivers = [], assig
           trip={scheduleEditTrip}
           onSave={(payload) => {
             updateTrip?.(scheduleEditTrip.id, payload);
+            // "Permanent" must actually persist: save as the client's default
+            // so every future trip for them picks up this schedule, not just
+            // this one occurrence.
+            if (payload.saveAsProfile && scheduleEditTrip.patient) {
+              saveClientProfile(scheduleEditTrip.patient, payload, currentUser).catch(() => {});
+            }
             setScheduleEditTrip(null);
-            addToast?.('Schedule updated');
+            addToast?.(payload.saveAsProfile ? 'Schedule updated permanently for this client' : 'Schedule updated');
           }}
           onClose={() => setScheduleEditTrip(null)}
         />

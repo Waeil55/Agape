@@ -1,16 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { 
-  X, 
-  ChevronRight, 
+import {
+  X,
+  ChevronRight,
   ChevronLeft,
-  Edit2, 
-  UserCheck, 
-  CheckCircle2, 
-  Route, 
-  AlertCircle, 
-  XCircle, 
+  Edit2,
+  UserCheck,
+  CheckCircle2,
+  Route,
+  AlertCircle,
+  XCircle,
   Archive,
-  ArrowRight
+  ArrowRight,
+  Flag,
 } from 'lucide-react';
 
 const getStatusBadgeStyle = (status) => {
@@ -73,6 +74,7 @@ export const TripOptionsModal = ({
   onConfirmException,
   onArchiveTrip: onArchiveTripProp,
   onArchive,
+  onReportBadClient,
 }) => {
   const panelRef = useRef(null);
   const [selectedException, setSelectedException] = useState(null);
@@ -80,6 +82,12 @@ export const TripOptionsModal = ({
   const [exceptionNote, setExceptionNote] = useState('');
   const [savingException, setSavingException] = useState(false);
   const [exceptionError, setExceptionError] = useState('');
+  const [reportingBadClient, setReportingBadClient] = useState(false);
+  const [badClientReason, setBadClientReason] = useState('');
+  const [badClientNote, setBadClientNote] = useState('');
+  const [savingBadClientReport, setSavingBadClientReport] = useState(false);
+  const [badClientError, setBadClientError] = useState('');
+  const [badClientReported, setBadClientReported] = useState(false);
 
   const onReassignDriver = onReassignDriverProp || onReassign;
   const onArchiveTrip = onArchiveTripProp || onArchive;
@@ -95,6 +103,12 @@ export const TripOptionsModal = ({
     setExceptionNote('');
     setSavingException(false);
     setExceptionError('');
+    setReportingBadClient(false);
+    setBadClientReason('');
+    setBadClientNote('');
+    setSavingBadClientReport(false);
+    setBadClientError('');
+    setBadClientReported(false);
   }, [isOpen, trip?.id]);
 
   useEffect(() => {
@@ -152,6 +166,23 @@ export const TripOptionsModal = ({
     }
   };
 
+  const handleReportBadClientSubmit = async () => {
+    if (!onReportBadClient || savingBadClientReport) return;
+    setSavingBadClientReport(true);
+    setBadClientError('');
+    try {
+      await onReportBadClient(trip, {
+        reason: badClientReason,
+        note: badClientNote.trim(),
+      });
+      setBadClientReported(true);
+    } catch (err) {
+      setBadClientError(err?.message || 'Failed to save this report');
+    } finally {
+      setSavingBadClientReport(false);
+    }
+  };
+
   return (
     <div
       className="trip-window-overlay bg-black/40"
@@ -168,10 +199,10 @@ export const TripOptionsModal = ({
       >
         {/* Header: Title / Back + Close Button */}
         <div className="flex items-center justify-between pb-3.5 shrink-0">
-          {selectedException ? (
+          {selectedException || reportingBadClient ? (
             <button
               type="button"
-              onClick={() => setSelectedException(null)}
+              onClick={() => { setSelectedException(null); setReportingBadClient(false); }}
               className="flex items-center gap-1 -ml-1.5 px-2 py-1 text-sm font-semibold text-blue-600 hover:text-blue-700 active:scale-95 transition-all rounded-lg cursor-pointer"
             >
               <ChevronLeft size={18} />
@@ -216,7 +247,76 @@ export const TripOptionsModal = ({
             </span>
           </div>
 
-          {selectedException ? (
+          {reportingBadClient ? (
+            /* Report as Bad Client form (Reason + Note) */
+            <div className="space-y-3 pt-1">
+              {badClientReported ? (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 flex items-center gap-2.5">
+                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                  <p className="text-sm font-semibold text-emerald-800">Reported. You can review it anytime in Settings.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl bg-rose-50 border border-rose-200 p-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-rose-600 mb-1">Report as Bad Client</p>
+                    <p className="text-sm font-bold text-slate-900">{passengerName}</p>
+                    <p className="text-xs text-slate-500 mt-1">This flags the client for every operator, so future bookings can be reviewed or avoided.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                      Reason
+                    </label>
+                    <select
+                      value={badClientReason}
+                      onChange={(e) => setBadClientReason(e.target.value)}
+                      className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-medium rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="">Select reason</option>
+                      <option value="Repeated No-Shows">Repeated No-Shows</option>
+                      <option value="Abusive or Unsafe Behavior">Abusive or Unsafe Behavior</option>
+                      <option value="Payment / Billing Issue">Payment / Billing Issue</option>
+                      <option value="Frequent Late Cancellations">Frequent Late Cancellations</option>
+                      <option value="False Complaint Against Driver">False Complaint Against Driver</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                      Note (optional)
+                    </label>
+                    <textarea
+                      placeholder="Add details other dispatchers/drivers should know..."
+                      value={badClientNote}
+                      onChange={(e) => setBadClientNote(e.target.value)}
+                      rows={2}
+                      className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-medium rounded-xl px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
+                    />
+                  </div>
+                  {badClientError && (
+                    <p className="text-xs font-semibold text-rose-600">{badClientError}</p>
+                  )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setReportingBadClient(false)}
+                      disabled={savingBadClientReport}
+                      className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReportBadClientSubmit}
+                      disabled={savingBadClientReport || !badClientReason}
+                      className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+                    >
+                      {savingBadClientReport ? 'Saving…' : 'Submit Report'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : selectedException ? (
             /* Exception confirmation form (Reason + Note) */
             <div className="space-y-3 pt-1">
               <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
@@ -398,6 +498,21 @@ export const TripOptionsModal = ({
                   <div className="flex items-center gap-3">
                     <XCircle size={18} className="shrink-0 text-rose-600" />
                     <span>Cancel Trip</span>
+                  </div>
+                  <ChevronRight size={18} className="shrink-0 opacity-60 text-rose-700" />
+                </button>
+              )}
+
+              {/* Action Row: Report as Bad Client */}
+              {onReportBadClient && (
+                <button
+                  type="button"
+                  onClick={() => setReportingBadClient(true)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-rose-200/80 bg-rose-50/40 hover:bg-rose-50 active:bg-rose-100/60 text-rose-700 transition-all text-sm font-semibold cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3">
+                    <Flag size={18} className="shrink-0 text-rose-600" />
+                    <span>Report as Bad Client</span>
                   </div>
                   <ChevronRight size={18} className="shrink-0 opacity-60 text-rose-700" />
                 </button>

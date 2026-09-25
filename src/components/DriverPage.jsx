@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday } from '../utils/tripDate';
+import { timeToMinutes, tripCalendarDateKey, calendarDateKeyDaysAgo, localCalendarYmd, isTripDateToday, getTripHistoryDateKey, addDaysToDateKey } from '../utils/tripDate';
 import { buildDriverServiceDateBuckets } from '../utils/portalSelectors';
 import { latestWorkflowTimestamp, minuteEpoch } from '../utils/tripCompletionTimes';
 import {
@@ -44,6 +44,7 @@ import { formatFilterRemaining, formatOilRemaining, getVehicleMaintenanceStatus 
 import { deriveVehicleOdometerState, evaluateOdometerEntry, suggestTripPickupOdometer } from '../utils/vehicleOdometer';
 import { evaluateTripLegGap } from '../utils/tripTimeSanity';
 import { saveClientProfile } from '../utils/clientProfileUtils';
+import { reportBadClient } from '../utils/flaggedClients';
 import { compareTripsByCompletionAscending, getTripCompletionSortValue } from '../utils/tripChronology';
 import { getDriverTelemetryBreadcrumbs } from '../utils/driverTelemetry';
 import { safeDateMillis, toSafeIso, toValidDate } from '../utils/safeDate';
@@ -272,19 +273,6 @@ const HISTORY_PAGE_STATUS_OPTIONS = [
   { value: 'notCompleted', label: 'Not Completed' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
-const getTripHistoryDateKey = (trip) => {
-  const dateKey = tripCalendarDateKey(trip?.date);
-  const completedKey = tripCalendarDateKey(trip?.completedAt);
-  if (!dateKey) return completedKey;
-  if (!completedKey) return dateKey;
-  return dateKey > completedKey ? dateKey : completedKey;
-};
-const addDaysToDateKey = (dateKey, days) => {
-  const d = new Date(`${dateKey}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return dateKey;
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 const formatHistoryDayLabel = (dateKey) => {
   if (!dateKey) return 'Date not set';
   const d = new Date(`${dateKey}T12:00:00`);
@@ -5637,8 +5625,14 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
           trip={scheduleEditorTrip}
           onSave={(payload) => {
             advanceWorkflow(scheduleEditorTrip, payload.status || scheduleEditorTrip.status, payload);
+            // "Permanent" must actually persist: save as the client's default
+            // so every future trip for them picks up this schedule, not just
+            // this one occurrence.
+            if (payload.saveAsProfile && scheduleEditorTrip.patient) {
+              saveClientProfile(scheduleEditorTrip.patient, payload, currentUser).catch((err) => console.warn('[Schedule] Profile save non-blocking error:', err));
+            }
             closeScheduleEditor();
-            setShowToast({ message: 'Schedule updated' });
+            setShowToast({ message: payload.saveAsProfile ? 'Schedule updated permanently for this client' : 'Schedule updated' });
           }}
           onClose={closeScheduleEditor}
         />
@@ -5685,6 +5679,9 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
             onArchiveTrip={(role === 'admin' || role === 'dispatcher') ? () => {
               setShowMoreOptions(null);
               onDeleteTrip?.(trip.id);
+            } : null}
+            onReportBadClient={trip.patient ? async (t, details) => {
+              await reportBadClient(t.patient, { ...details, tripId: t.id, bookingId: t.bookingId }, currentUser);
             } : null}
           />
         );

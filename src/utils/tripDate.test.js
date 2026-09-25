@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tripCalendarDateKey, tripMatchesTodayOrTomorrow } from './tripDate';
+import { tripCalendarDateKey, tripMatchesTodayOrTomorrow, getTripHistoryDateKey, resolveTripCompletionTimestamp, addDaysToDateKey, calendarDateKeyDaysAgo } from './tripDate';
 
 describe('tripCalendarDateKey', () => {
   it('parses ISO YYYY-MM-DD without UTC shift', () => {
@@ -56,5 +56,68 @@ describe('tripMatchesTodayOrTomorrow', () => {
     const today = new Date();
     const key = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     expect(tripMatchesTodayOrTomorrow(key)).toBe(true);
+  });
+});
+
+describe('getTripHistoryDateKey', () => {
+  it('uses the trip service date when there is no completion', () => {
+    expect(getTripHistoryDateKey({ date: '2026-09-24' })).toBe('2026-09-24');
+  });
+
+  it('folds in a completion recorded the next calendar day (midnight crossing)', () => {
+    expect(getTripHistoryDateKey({
+      date: '2026-09-24',
+      completedAt: '2026-09-25T00:10:00',
+    })).toBe('2026-09-25');
+  });
+
+  it('never moves a backdated correction onto a much later completion date', () => {
+    expect(getTripHistoryDateKey({
+      date: '2026-09-10',
+      completedAt: '2026-09-25T14:00:00',
+    })).toBe('2026-09-10');
+  });
+});
+
+describe('resolveTripCompletionTimestamp', () => {
+  const now = new Date('2026-09-25T14:00:00');
+
+  it('stamps the live moment for a trip scheduled today', () => {
+    expect(resolveTripCompletionTimestamp({ date: '2026-09-25' }, now)).toBe(now.toISOString());
+  });
+
+  it('anchors a backdated trip to its own recorded dropoff time', () => {
+    const result = resolveTripCompletionTimestamp({
+      date: '2026-09-24',
+      arrivalDropoffTime: '2026-09-24T18:30:00',
+    }, now);
+    expect(tripCalendarDateKey(result)).toBe('2026-09-24');
+  });
+
+  it('anchors a backdated trip with no recorded dropoff time to its own date, not today', () => {
+    const result = resolveTripCompletionTimestamp({ date: '2026-09-24' }, now);
+    expect(tripCalendarDateKey(result)).toBe('2026-09-24');
+  });
+});
+
+describe('addDaysToDateKey', () => {
+  it('shifts forward and backward across a month boundary', () => {
+    expect(addDaysToDateKey('2026-09-30', 1)).toBe('2026-10-01');
+    expect(addDaysToDateKey('2026-10-01', -1)).toBe('2026-09-30');
+  });
+});
+
+describe('global (device-independent) date resolution', () => {
+  it('buckets a UTC timestamp by the fixed operating timezone, not the device clock', () => {
+    // 2026-06-15T03:30:00Z is 2026-06-14 23:30 in Indianapolis (EDT, UTC-4).
+    // A device set to UTC (or any zone ahead of Indianapolis) must still see
+    // this as the 14th, matching every other operator's view of the trip.
+    expect(tripCalendarDateKey('2026-06-15T03:30:00.000Z')).toBe('2026-06-14');
+  });
+
+  it('keeps calendarDateKeyDaysAgo consistent with the same fixed timezone', () => {
+    const from = new Date('2026-06-15T03:30:00.000Z');
+    expect(calendarDateKeyDaysAgo(0, from)).toBe('2026-06-14');
+    expect(calendarDateKeyDaysAgo(1, from)).toBe('2026-06-13');
   });
 });

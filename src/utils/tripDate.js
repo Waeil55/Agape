@@ -95,7 +95,30 @@ export function tripCalendarDateKey(value) {
   return undefined;
 }
 
+// One fixed operating timezone for the whole fleet, so "today" and every
+// trip's calendar date are the same for every operator regardless of which
+// timezone their own device happens to be set to. Without this, a dispatcher
+// on a device in a different zone (or with a wrong clock) sees a different
+// "today" — and a different bucket for the same trip — than everyone else.
+export const APP_TIMEZONE = 'America/Indiana/Indianapolis';
+
 function localYmd(d) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: APP_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(d);
+    const lookup = {};
+    parts.forEach(({ type, value }) => { lookup[type] = value; });
+    if (lookup.year && lookup.month && lookup.day) {
+      return `${lookup.year}-${lookup.month}-${lookup.day}`;
+    }
+  } catch {
+    // Intl/timeZone unsupported in this runtime: fall back to the device's
+    // own local calendar rather than crash date resolution app-wide.
+  }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -116,9 +139,10 @@ export function localCalendarYmd(d = new Date()) {
 export function calendarDateKeyDaysAgo(daysAgo = 0, from = new Date()) {
   const base = from instanceof Date ? from : new Date(from);
   const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
-  const d = new Date(safeBase.getFullYear(), safeBase.getMonth(), safeBase.getDate());
-  d.setDate(d.getDate() - Math.max(0, Number(daysAgo) || 0));
-  return localYmd(d);
+  // Resolve "today" in the fixed operating timezone first, then shift by
+  // whole calendar days on the date-key itself — never on device-local
+  // Y/M/D components, which would drift the result under a different zone.
+  return addDaysToDateKey(localYmd(safeBase), -Math.max(0, Number(daysAgo) || 0));
 }
 
 export function isCalendarDateKeyWithinLastDays(dateKey, days = 14, from = new Date()) {
@@ -127,6 +151,56 @@ export function isCalendarDateKeyWithinLastDays(dateKey, days = 14, from = new D
   const startKey = calendarDateKeyDaysAgo(lookbackDays - 1, from);
   const endKey = localCalendarYmd(from);
   return dateKey >= startKey && dateKey <= endKey;
+}
+
+/** Shift a YYYY-MM-DD date key by a signed number of calendar days. */
+export function addDaysToDateKey(dateKey, days) {
+  const d = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateKey;
+  d.setDate(d.getDate() + (Number(days) || 0));
+  return localYmd(d);
+}
+
+/**
+ * The single authoritative "which calendar day does this trip belong to"
+ * resolver, shared by every history/report view. A trip's own service date
+ * is authoritative. A completion recorded the very next calendar day is
+ * folded in too, so a trip that crosses midnight lands on the day it
+ * actually finished. A completion recorded much later — an admin backdating
+ * a past trip's odometer/times today — must never move the trip onto
+ * today's date; it still belongs to its original service date.
+ */
+/**
+ * Timestamp to stamp as `completedAt` when a trip auto-completes. A trip
+ * scheduled today (or with no date) really is finishing right now. A trip
+ * scheduled in the past is being backdated — an admin filling in a past
+ * trip's odometer/times — and must be anchored to its own service date
+ * instead of the current moment, or it would misfile as today's work.
+ */
+export function resolveTripCompletionTimestamp(trip, now = new Date()) {
+  const dateKey = tripCalendarDateKey(trip?.date);
+  const todayKey = localCalendarYmd(now);
+  if (!dateKey || dateKey >= todayKey) return now.toISOString();
+
+  const recordedDropoff = trip?.arrivalDropoffTime || trip?.dropoffArrival;
+  if (recordedDropoff) {
+    const parsed = new Date(recordedDropoff);
+    if (!Number.isNaN(parsed.getTime()) && tripCalendarDateKey(parsed) === dateKey) {
+      return parsed.toISOString();
+    }
+  }
+  // No recorded dropoff time on that date: anchor late in that day so it
+  // still sorts after other same-day activity without claiming to be "now".
+  const anchor = new Date(`${dateKey}T23:59:00`);
+  return Number.isNaN(anchor.getTime()) ? now.toISOString() : anchor.toISOString();
+}
+
+export function getTripHistoryDateKey(trip) {
+  const dateKey = tripCalendarDateKey(trip?.date);
+  const completedKey = tripCalendarDateKey(trip?.completedAt);
+  if (!dateKey) return completedKey;
+  if (!completedKey || completedKey === dateKey) return dateKey;
+  return completedKey === addDaysToDateKey(dateKey, 1) ? completedKey : dateKey;
 }
 
 /**
