@@ -102,24 +102,44 @@ export function tripCalendarDateKey(value) {
 // "today" — and a different bucket for the same trip — than everyone else.
 export const APP_TIMEZONE = 'America/Indiana/Indianapolis';
 
-function localYmd(d) {
-  try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: APP_TIMEZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(d);
-    const lookup = {};
-    parts.forEach(({ type, value }) => { lookup[type] = value; });
-    if (lookup.year && lookup.month && lookup.day) {
-      return `${lookup.year}-${lookup.month}-${lookup.day}`;
-    }
-  } catch {
-    // Intl/timeZone unsupported in this runtime: fall back to the device's
-    // own local calendar rather than crash date resolution app-wide.
-  }
+// Constructing an Intl.DateTimeFormat is expensive and this runs thousands
+// of times per render (every trip, every filter/sort). Build it once, and
+// memoize results per minute so repeated lookups are a Map hit.
+let zonedFormatter = null;
+try {
+  zonedFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+} catch {
+  zonedFormatter = null;
+}
+const ymdCache = new Map();
+const YMD_CACHE_LIMIT = 5000;
+
+function deviceLocalYmd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function localYmd(d) {
+  const ms = d.getTime();
+  if (!zonedFormatter || Number.isNaN(ms)) return deviceLocalYmd(d);
+  const minuteKey = Math.floor(ms / 60000);
+  const cached = ymdCache.get(minuteKey);
+  if (cached) return cached;
+  let result;
+  try {
+    // en-CA formats as YYYY-MM-DD directly — no formatToParts allocation.
+    result = zonedFormatter.format(d);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(result)) result = deviceLocalYmd(d);
+  } catch {
+    result = deviceLocalYmd(d);
+  }
+  if (ymdCache.size >= YMD_CACHE_LIMIT) ymdCache.clear();
+  ymdCache.set(minuteKey, result);
+  return result;
 }
 
 /** Convert a UTC ISO timestamp string to a local YYYY-MM-DD date key. */

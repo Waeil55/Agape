@@ -5971,7 +5971,6 @@ textarea:focus,
 }
 .fixed.inset-0:not([class*="trip-window"]) > :is([class*="rounded-t-"], [class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[2"]):not([class*="animate"]):not([class*="anim-"]):not([class*="slide"]):not([class*="zoom"]) {
   animation: agape-panel-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-  will-change: transform, opacity;
 }
 @media (prefers-reduced-motion: reduce) {
   .fixed.inset-0:not([class*="trip-window"]),
