@@ -88,7 +88,12 @@ export function formatManifestMileage(mileage, trip = {}) {
   if (value === undefined || value === null || value === '') return '— mi';
   const text = String(value).trim();
   if (!text) return '— mi';
-  return /\bmi(?:les)?\b/i.test(text) ? text : `${text} mi`;
+  if (/\bmi(?:les)?\b/i.test(text)) return text;
+  const num = parseFloat(text);
+  if (!Number.isNaN(num) && Number.isFinite(num)) {
+    return `${Number(num.toFixed(1))} mi`;
+  }
+  return `${text} mi`;
 }
 
 export function getManifestLegs(trip, trips = []) {
@@ -556,10 +561,10 @@ export function ManifestTripCard({
 
       {/* ── CARD BODY: Addresses (Hidden before opened in reports/history) ── */}
       {showAddresses && (
-        <div className="px-3.5 py-2 space-y-1.5 text-[14px] leading-tight">
+        <div className="px-3.5 py-1.5 space-y-1 text-[12px] leading-snug">
           {/* Pickup Address */}
           <div className="flex items-center space-x-2 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
             <span className={`${mutedAddress ? 'text-slate-500' : 'text-slate-700'} font-medium tracking-tight truncate flex-1 min-w-0`} title={pickupAddress}>
               {pickupAddress}
             </span>
@@ -567,7 +572,7 @@ export function ManifestTripCard({
 
           {/* Dropoff Address */}
           <div className="flex items-center space-x-2 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
             <span className={`${mutedAddress ? 'text-slate-500' : 'text-slate-700'} font-medium tracking-tight truncate flex-1 min-w-0`} title={dropoffAddress}>
               {dropoffAddress}
             </span>
@@ -578,12 +583,12 @@ export function ManifestTripCard({
       {assignSlot}
 
       {/* ── CARD FOOTER ── */}
-      <div className="px-3 py-1.5 bg-slate-50/20 border-t border-slate-100/70 flex items-center justify-between text-[13px]">
+      <div className="px-3 py-1.5 bg-slate-50/20 border-t border-slate-100/70 flex items-center justify-between text-[13px] gap-2">
         {/* Driver & Comm Icons */}
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1.5">
-            <span className={`w-2 h-2 rounded-full ${statusPulseColor}`} />
-            <span className="font-semibold text-slate-700 text-[13px] truncate max-w-[100px]">
+        <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+          <div className="flex items-center space-x-1.5 min-w-0">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${statusPulseColor}`} />
+            <span className="font-semibold text-slate-700 text-[12px] truncate max-w-[85px]">
               {driverName || trip?.driverName || '—'}
             </span>
           </div>
@@ -593,7 +598,7 @@ export function ManifestTripCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'call')?.onClick?.(e); }}
-              className="text-slate-400 hover:text-blue-600 p-0.5 transition-colors cursor-pointer"
+              className="text-slate-400 hover:text-blue-600 p-0.5 transition-colors cursor-pointer shrink-0"
               title="Call Passenger"
               aria-label="Call Passenger"
             >
@@ -606,7 +611,7 @@ export function ManifestTripCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); iconActions.find(a => a.id === 'message')?.onClick?.(e); }}
-              className="text-slate-400 hover:text-blue-600 p-0.5 transition-colors cursor-pointer"
+              className="text-slate-400 hover:text-blue-600 p-0.5 transition-colors cursor-pointer shrink-0"
               title="Chat Passenger"
               aria-label="Chat Passenger"
             >
@@ -619,20 +624,20 @@ export function ManifestTripCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onLegsClick(trip); }}
-              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 transition-colors hover:bg-indigo-100 cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 transition-colors hover:bg-indigo-100 cursor-pointer shrink-0 whitespace-nowrap"
               title={`View ${legsLabel || `${legs} ${Number(legs) === 1 ? 'leg' : 'legs'}`} details`}
               aria-label={`View ${legsLabel || `${legs} ${Number(legs) === 1 ? 'leg' : 'legs'}`} details`}
             >
-              <Layers className="h-3 w-3" />
-              <span>{legsLabel || `${legs} ${Number(legs) === 1 ? 'Leg' : 'Legs'}`}</span>
+              <Layers className="h-3 w-3 shrink-0" />
+              <span className="whitespace-nowrap leading-none">{legsLabel || `${legs} ${Number(legs) === 1 ? 'Leg' : 'Legs'}`}</span>
             </button>
           ) : null}
 
         </div>
 
         {/* Route Metrics & Status Pill */}
-        <div className="flex items-center space-x-1.5 shrink-0">
-          <div className="inline-flex items-center text-[12.5px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200" aria-label={`Trip mileage ${mileageLabel}`}>
+        <div className="flex items-center space-x-1 shrink-0">
+          <div className="inline-flex items-center text-[11.5px] font-medium text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 shrink-0" aria-label={`Trip mileage ${mileageLabel}`}>
               {hideCountdown ? (
                 <>
                   <Navigation className="w-2.5 h-2.5 mr-1 text-sky-600 fill-current" />
@@ -650,7 +655,7 @@ export function ManifestTripCard({
 
           <button
             type="button"
-            className={`status-btn inline-flex items-center text-[13px] font-bold px-2 py-0.5 rounded border transition hover:opacity-90 ${statusBadge.cls}`}
+            className={`status-btn inline-flex items-center text-[12px] font-bold px-2 py-0.5 rounded border transition hover:opacity-90 shrink-0 ${statusBadge.cls}`}
             title={displayStatus}
             onClick={(e) => {
               if (primaryAction?.onClick) {
