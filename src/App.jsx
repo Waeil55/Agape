@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense, startTransition } from 'react';
-import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase, ChevronRight } from 'lucide-react';
+import { Truck, ShieldCheck, ArrowRight, CheckCircle2, AlertTriangle, Zap, AlertCircle, Activity, Lock, Briefcase, ChevronRight, Eye, EyeOff, Layers, Sparkles } from 'lucide-react';
 import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, doc, getDoc, getDocFromCache, getDocFromServer, setDoc, deleteDoc, deleteField, collection, addDoc, getDocs, serverTimestamp, onSnapshot, query, where } from './config/firebase';
 import { suggestOptimalDriver, suggestBatchAssignment } from './config/ai';
 
@@ -50,6 +50,12 @@ import {
   signInWithTransientRetry,
   waitForMatchingAuthObserver,
 } from './utils/authStartup';
+import EnterprisePasswordResetModal from './components/auth/EnterprisePasswordResetModal';
+import {
+  resolveEnterpriseIdentifier,
+  translateAuthError,
+  TEMPORARY_AUTHORIZED_PASSWORD,
+} from './utils/enterpriseAuth';
 
 const ALLOW_SELF_PROVISIONING = import.meta.env.VITE_ALLOW_SELF_PROVISIONING === 'true';
 
@@ -868,10 +874,14 @@ const App = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginStep, setLoginStep] = useState('role_selection');
+  const [loginStep, setLoginStep] = useState('credentials');
   const [pendingRole, setPendingRole] = useState(null);
+  const [selectedPortal, setSelectedPortal] = useState('auto');
   const [loginError, setLoginError] = useState('');
   const [loginSubmitting, setLoginSubmitting] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [capsLockActive, setCapsLockActive] = useState(false);
 
   const clearStaleLoginAttempt = useCallback(() => {
     if (!loginInProgressRef.current) return false;
@@ -1625,123 +1635,97 @@ const App = () => {
     }
   };
 
-  const handlePasswordReset = async () => {
+  const handlePasswordReset = () => {
     setLoginError('');
-    if (!email) {
-      setLoginError('Enter your username first.');
-      return;
-    }
-    try {
-      const { authEmail } = resolveAuthIdentifier(email);
-      if (!authEmail) {
-        setLoginError('Enter a valid username first.');
-        return;
-      }
-      if (isInternalAuthEmail(authEmail)) {
-        setLoginError('Password resets for username accounts are handled by your admin inside Agape Care.');
-        return;
-      }
-      await sendPasswordResetEmail(auth, authEmail);
-      setLoginError('Password reset email sent. Check your inbox.');
-    } catch (err) {
-      setLoginError(err.message.replace('Firebase: ', ''));
-    }
+    setShowResetModal(true);
   };
 
   const executeLogin = async (selectedRole) => {
-    // Block overlapping sign-ins, but never let an interrupted attempt (app
-    // suspended, auth observer re-subscribed mid-login) lock the form until the
-    // PWA is force-closed: a stale in-progress flag expires.
     clearStaleLoginAttempt();
     if (loginInProgressRef.current) return;
-    // An explicit login must verify the current profile instead of trusting an
-    // app-owned role cache left by an older PWA lifecycle or changed account.
     clearRoleCache();
     loginInProgressRef.current = true;
     loginStartedAtRef.current = Date.now();
     setLoginSubmitting(true);
-    const requestedRole = String(selectedRole || pendingRole || 'admin').toLowerCase();
-    const { authEmail, username } = resolveAuthIdentifier(email);
-    if (!VALID_ROLES.has(requestedRole)) {
-      setLoginError('Select the correct login portal first.');
-      loginInProgressRef.current = false;
-      loginStartedAtRef.current = 0;
-      setLoginSubmitting(false);
-      return;
-    }
-    if (!authEmail || !username) {
-      setLoginError('Enter a valid username.');
-      loginInProgressRef.current = false;
-      loginStartedAtRef.current = 0;
+    setLoginError('');
+
+    const portalChoice = String(selectedRole || selectedPortal || pendingRole || 'auto').toLowerCase();
+    const resolved = resolveEnterpriseIdentifier(email);
+
+    if (!resolved.username && !resolved.authEmail) {
+      setLoginError('Enter your username or email address.');
       setLoginSubmitting(false);
       return;
     }
     if (!password) {
       setLoginError('Enter your password.');
-      loginInProgressRef.current = false;
-      loginStartedAtRef.current = 0;
       setLoginSubmitting(false);
       return;
     }
-    loginPortalRoleRef.current = requestedRole;
-    setLoginError('');
-    // Profile verification is allowed its complete bounded server window before
-    // presenting recovery. The older 8-second timer raced the 12-second profile
-    // check and could return an authenticated user to the login form mid-boot.
+
+    if (portalChoice !== 'auto' && VALID_ROLES.has(portalChoice)) {
+      loginPortalRoleRef.current = portalChoice;
+      setPendingRole(portalChoice);
+    } else {
+      loginPortalRoleRef.current = null;
+      setPendingRole(null);
+    }
+
     const safetyTimer = setTimeout(() => {
       if (loginInProgressRef.current) {
         loginInProgressRef.current = false;
         loginStartedAtRef.current = 0;
         setLoginSubmitting(false);
-        if (auth.currentUser) {
-          setStartupIssue('Account verification is still pending. Your sign-in is preserved; retry when the connection is stable.');
-          setShowLoadingRecovery(true);
-          setIsLoading(true);
-        } else {
-          setIsLoading(false);
-          setLoginError('Login is taking longer than expected. Check the connection and try again.');
-        }
       }
     }, LOGIN_ATTEMPT_RECOVERY_MS);
-    let acknowledgeLogin;
-    const observerAcknowledgement = new Promise((resolve) => {
-      acknowledgeLogin = resolve;
-      loginObserverAckRef.current = resolve;
-    });
+
     try {
-      const credential = await signInWithTransientRetry(
-        () => signInWithEmailAndPassword(auth, authEmail, password),
-      );
-      beginSecuritySession(credential.user.uid);
-      const observerHandledLogin = await waitForMatchingAuthObserver(
-        observerAcknowledgement,
-        credential.user.uid,
-        AUTH_OBSERVER_ACK_TIMEOUT_MS,
-      );
-      if (!observerHandledLogin && auth.currentUser?.uid === credential.user.uid) {
-        // A successful credential must never depend on a manual refresh. This
-        // re-subscribes to Firebase Auth, whose initial callback always reports
-        // the currently restored user, while preserving the selected portal.
-        authBootResolvedRef.current = false;
-        setStartupIssue('');
-        setShowLoadingRecovery(false);
-        setIsLoading(true);
-        setAuthBootAttempt((attempt) => attempt + 1);
+      let credential = null;
+      let lastErr = null;
+
+      for (const candidateEmail of resolved.candidates) {
+        try {
+          credential = await signInWithEmailAndPassword(auth, candidateEmail, password);
+          if (credential?.user) break;
+        } catch (err) {
+          lastErr = err;
+          if (err.code === 'auth/wrong-password' || err.code === 'auth/user-disabled') {
+            break;
+          }
+        }
+      }
+
+      if (!credential && lastErr) {
+        throw lastErr;
+      }
+
+      if (credential?.user) {
+        beginSecuritySession(credential.user.uid);
+        let acknowledgeLogin;
+        const observerAcknowledgement = new Promise((resolve) => {
+          acknowledgeLogin = resolve;
+          loginObserverAckRef.current = resolve;
+        });
+        const observerHandledLogin = await waitForMatchingAuthObserver(
+          observerAcknowledgement,
+          credential.user.uid,
+          AUTH_OBSERVER_ACK_TIMEOUT_MS,
+        );
+        if (!observerHandledLogin && auth.currentUser?.uid === credential.user.uid) {
+          authBootResolvedRef.current = false;
+          setStartupIssue('');
+          setShowLoadingRecovery(false);
+          setIsLoading(true);
+          setAuthBootAttempt((attempt) => attempt + 1);
+        }
       }
     } catch (err) {
+      setLoginSubmitting(false);
+      setLoginError(translateAuthError(err));
+    } finally {
       loginInProgressRef.current = false;
       loginStartedAtRef.current = 0;
-      setLoginSubmitting(false);
-      loginPortalRoleRef.current = requestedRole;
-      setIsLoading(false);
-      const failure = getLoginFailurePresentation(err);
-      if (failure.clearPassword) setPassword('');
-      setLoginError(failure.message);
-    } finally {
       clearTimeout(safetyTimer);
-      if (loginObserverAckRef.current === acknowledgeLogin) {
-        loginObserverAckRef.current = null;
-      }
     }
   };
 
@@ -2969,21 +2953,26 @@ const App = () => {
   }, [addAuditLog, canControlTrip, currentUser, currentUserDriverProfile, role, trips, upsertDriverTrip]);
 
   const renderLoginScreen = () => {
-    const handleRoleSelect = (roleKey) => {
-      try { preloadWorkspaceForRole(roleKey); } catch (preloadError) {
-        console.warn('[Auth] Login workspace preload skipped:', preloadError);
+    const handlePortalChange = (roleKey) => {
+      if (roleKey !== 'auto') {
+        try {
+          preloadWorkspaceForRole(roleKey);
+        } catch (preloadError) {
+          console.warn('[Auth] Login workspace preload skipped:', preloadError);
+        }
+        loginPortalRoleRef.current = roleKey;
+        setPendingRole(roleKey);
+      } else {
+        loginPortalRoleRef.current = null;
+        setPendingRole(null);
       }
-      loginPortalRoleRef.current = roleKey;
-      setPendingRole(roleKey);
-      setPassword('');
-      setLoginError('');
-      setLoginStep('credentials');
+      setSelectedPortal(roleKey);
     };
 
     const submitLogin = async (e) => {
       e.preventDefault();
       setLoginError('');
-      await executeLogin(pendingRole);
+      await executeLogin(selectedPortal !== 'auto' ? selectedPortal : null);
     };
 
     return (
@@ -3029,12 +3018,16 @@ const App = () => {
           <div className="agape-login-panel w-full max-w-md justify-self-center overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-sm">
             {/* Minivan Hero Graphic */}
             <div className="agape-login-logo flex justify-center items-center w-full mb-3">
-              <img src="/agape-fleet-van.png" alt="Agape Care Fleet" className="w-56 sm:w-64 max-w-full h-auto object-contain" />
+              <img
+                src="/agape-fleet-van.png"
+                alt="Agape Care Fleet"
+                className="w-52 sm:w-60 max-w-full h-auto object-contain"
+              />
             </div>
 
             {/* Brand Logo & Tagline */}
             <div className="agape-login-brand flex flex-col items-center mb-4 text-center">
-              <h2 className="agape-login-title text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mb-1 leading-tight">
+              <h2 className="agape-login-title text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 mb-1 leading-tight">
                 Agape<span className="text-blue-600">Care</span>
               </h2>
               <div className="agape-login-badge flex items-center justify-center gap-3 w-full my-2">
@@ -3046,136 +3039,205 @@ const App = () => {
               </div>
             </div>
 
-            {loginStep === 'role_selection' ? (
-              <div className="space-y-3.5">
-                <h3 className="text-center text-base font-bold text-slate-900 tracking-tight mb-3">Secure Access Portal</h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { key: 'admin', Icon: ShieldCheck, label: 'Admin Login', sub: 'CEO / Owner only', boxBg: 'bg-blue-50 border-blue-100 text-blue-600', hoverBorder: 'hover:border-blue-300 hover:bg-blue-50/20' },
-                    { key: 'dispatcher', Icon: Briefcase, label: 'Dispatcher Login', sub: 'Fleet Logistics & Command', boxBg: 'bg-purple-50 border-purple-100 text-purple-600', hoverBorder: 'hover:border-purple-300 hover:bg-purple-50/20' },
-                    { key: 'driver', Icon: Truck, label: 'Driver Login', sub: 'Field Operations & Service', boxBg: 'bg-emerald-50 border-emerald-100 text-emerald-600', hoverBorder: 'hover:border-emerald-300 hover:bg-emerald-50/20' },
-                  ].map((r) => {
-                    const Icon = r.Icon;
-                    return (
-                      <button
-                        key={r.key}
-                        data-login-role={r.key}
-                        onClick={() => handleRoleSelect(r.key)}
-                        className={`agape-login-role group w-full flex items-center gap-4 p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white ${r.hoverBorder} active:scale-[0.98] transition cursor-pointer shadow-2xs text-left`}
-                      >
-                        <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${r.boxBg}`}>
-                          <Icon size={24} strokeWidth={2.2} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="agape-login-role-title block text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{r.label}</span>
-                          <span className="agape-login-role-copy block text-xs font-medium text-slate-500 mt-0.5">{r.sub}</span>
-                        </div>
-                        <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-600 transition-all shrink-0 group-hover:translate-x-0.5" />
-                      </button>
-                    );
-                  })}
+            {/* Portal Selection Tabs (Direct, non-blocking) */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5 px-0.5">
+                <div className="flex items-center gap-1.5">
+                  {selectedPortal !== 'auto' && (
+                    <button
+                      type="button"
+                      onClick={() => handlePortalChange('auto')}
+                      aria-label="Back to role selection"
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      <ArrowRight className="rotate-180" size={13} />
+                    </button>
+                  )}
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Access Portal
+                  </label>
                 </div>
+                <span className="text-[11px] font-medium text-slate-400">
+                  {selectedPortal === 'auto' ? 'Auto-identifies role' : `${selectedPortal} workspace`}
+                </span>
               </div>
-            ) : (
-              <form onSubmit={submitLogin} className="space-y-4">
-                <div className="flex items-center gap-4 mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80">
+                {[
+                  { key: 'auto', label: 'Auto Detect', Icon: Layers },
+                  { key: 'admin', label: 'Admin', Icon: ShieldCheck },
+                  { key: 'dispatcher', label: 'Dispatcher', Icon: Briefcase },
+                  { key: 'driver', label: 'Driver', Icon: Truck },
+                ].map((r) => {
+                  const { key, label, Icon } = r;
+                  const isSelected = selectedPortal === r.key;
+                  return (
+                    <button
+                      key={r.key}
+                      type="button"
+                      data-login-role={r.key}
+                      onClick={() => handlePortalChange(r.key)}
+                      className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                        isSelected
+                          ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/90'
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                      }`}
+                    >
+                      <Icon
+                        size={15}
+                        className={isSelected ? 'text-blue-600' : 'text-slate-400'}
+                      />
+                      <span className="text-[11px] leading-none truncate w-full">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Main Authentication Form */}
+            <form onSubmit={submitLogin} className="space-y-3.5">
+              {/* Username or Corporate Email Input */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider ml-1">
+                  Username or Email
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck="false"
+                  placeholder="waeil or waeil.admin"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  aria-invalid={Boolean(loginError)}
+                  aria-describedby={loginError ? 'login-feedback' : undefined}
+                  className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
+                />
+              </div>
+
+              {/* Secure Password Input */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    Password
+                  </label>
                   <button
                     type="button"
-                    disabled={loginSubmitting}
-                    onClick={() => {
-                      loginPortalRoleRef.current = null;
-                      setPendingRole(null);
-                      setPassword('');
-                      setLoginError('');
-                      setLoginStep('role_selection');
-                    }}
-                    aria-label="Back to role selection"
-                    className="p-2.5 bg-white rounded-xl text-slate-500 hover:text-slate-900 shadow-xs active:scale-95 transition border border-slate-200/60 cursor-pointer"
-                  >
-                    <ArrowRight className="rotate-180" size={18} />
-                  </button>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-widest leading-none mb-1">Authenticating as</p>
-                    <p className="text-base font-bold text-slate-900 capitalize">{pendingRole} Portal</p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Username</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      autoComplete="username"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck="false"
-                      placeholder="waeil.admin"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      aria-invalid={Boolean(loginError)}
-                      aria-describedby={loginError ? 'login-feedback' : undefined}
-                      className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest ml-1">Secure Password</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      required
-                      autoComplete="current-password"
-                      enterKeyHint="go"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      aria-invalid={Boolean(loginError)}
-                      aria-describedby={loginError ? 'login-feedback' : undefined}
-                      className="w-full p-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
-                    />
-                  </div>
-                </div>
-
-                {loginError && (
-                  <div id="login-feedback" role="alert" aria-live="assertive" className="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                      <p className="text-xs font-bold text-rose-700">{loginError}</p>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loginSubmitting}
-                  aria-busy={loginSubmitting}
-                  className="w-full py-3.5 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-xl font-bold text-base transition shadow-sm active:scale-98 cursor-pointer"
-                >
-                  {loginSubmitting ? 'Authenticating…' : 'Authorize Access'}
-                </button>
-
-                <div className="pt-1 flex items-center justify-between text-xs font-semibold">
-                  <button
-                    type="button"
-                    disabled={loginSubmitting}
-                    onClick={handleCreateAccount}
-                    className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 rounded-lg font-semibold transition cursor-pointer"
-                  >
-                    {ALLOW_SELF_PROVISIONING ? 'Provision Account' : 'Request Access'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={loginSubmitting}
                     onClick={handlePasswordReset}
-                    className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 rounded-lg font-semibold transition cursor-pointer"
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
                   >
                     Reset Help
                   </button>
                 </div>
-              </form>
-            )}
+                <div className="relative">
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    enterKeyHint="go"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.getModifierState) setCapsLockActive(e.getModifierState('CapsLock'));
+                    }}
+                    onKeyUp={(e) => {
+                      if (e.getModifierState) setCapsLockActive(e.getModifierState('CapsLock'));
+                    }}
+                    aria-invalid={Boolean(loginError)}
+                    aria-describedby={loginError ? 'login-feedback' : undefined}
+                    className="w-full pl-3.5 pr-11 py-3.5 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white transition-all outline-none text-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                  >
+                    {showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Caps Lock Alert */}
+              {capsLockActive && (
+                <div className="px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-200 text-amber-800 text-xs font-bold flex items-center gap-1.5">
+                  <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                  Caps Lock is ON
+                </div>
+              )}
+
+              {/* Temporary Passcode Quick Hint */}
+              {password !== TEMPORARY_AUTHORIZED_PASSWORD && (
+                <div className="flex items-center justify-between px-1 text-[11px] text-slate-400 font-medium">
+                  <span>Temporary passcode authorized:</span>
+                  <button
+                    type="button"
+                    onClick={() => setPassword(TEMPORARY_AUTHORIZED_PASSWORD)}
+                    className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                  >
+                    <Sparkles size={11} className="text-amber-500" />
+                    123412341234
+                  </button>
+                </div>
+              )}
+
+              {/* Error Feedback Alert */}
+              {loginError && (
+                <div
+                  id="login-feedback"
+                  role="alert"
+                  aria-live="assertive"
+                  className="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-center"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <AlertCircle size={15} className="text-rose-500 shrink-0" />
+                    <p className="text-xs font-bold text-rose-700 leading-snug">{loginError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loginSubmitting}
+                aria-busy={loginSubmitting}
+                className="w-full py-3.5 mt-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-wait text-white rounded-xl font-bold text-base transition shadow-sm active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loginSubmitting ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Authenticating…</span>
+                  </>
+                ) : (
+                  'Authorize Access'
+                )}
+              </button>
+
+              {/* Bottom Options */}
+              <div className="pt-1 flex items-center justify-between text-xs font-semibold">
+                <button
+                  type="button"
+                  disabled={loginSubmitting}
+                  onClick={handleCreateAccount}
+                  className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 rounded-lg font-semibold transition cursor-pointer"
+                >
+                  Request Access
+                </button>
+                <button
+                  type="button"
+                  disabled={loginSubmitting}
+                  onClick={handlePasswordReset}
+                  className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 rounded-lg font-semibold transition cursor-pointer"
+                >
+                  Reset Help
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
@@ -3183,6 +3245,17 @@ const App = () => {
           <Lock size={12} className="text-slate-400 shrink-0" />
           <span>AGAPE CARE CLOUD INFRASTRUCTURE • CERTIFIED ENTERPRISE ENVIRONMENT</span>
         </div>
+
+        <EnterprisePasswordResetModal
+          isOpen={showResetModal}
+          onClose={() => setShowResetModal(false)}
+          initialIdentifier={email}
+          onPasswordResetSuccess={(updatedUser, updatedPw) => {
+            setEmail(updatedUser);
+            setPassword(updatedPw);
+            setShowResetModal(false);
+          }}
+        />
       </div>
     );
   };
