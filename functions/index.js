@@ -2541,6 +2541,7 @@ exports.createUser = functions.https.onCall(async (data, context) => {
     accessStatus: "active",
     employmentStatus: "active",
     disabled: false,
+    mustChangePassword: data?.mustChangePassword !== undefined ? Boolean(data.mustChangePassword) : (role === "driver" || role === "dispatcher"),
     createdBy: context.auth.uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -2869,6 +2870,7 @@ exports.explainWellTransFailureAI = functions
 exports.enterpriseResetPassword = functions.https.onCall(async (data, context) => {
   const identifier = String(data?.identifier || "").trim().toLowerCase();
   const newPassword = String(data?.newPassword || "");
+  const isFirstTimeSetup = Boolean(data?.isFirstTimeSetup);
 
   if (!identifier) {
     throw new functions.https.HttpsError("invalid-argument", "Account username or email is required.");
@@ -2898,17 +2900,93 @@ exports.enterpriseResetPassword = functions.https.onCall(async (data, context) =
     throw new functions.https.HttpsError("not-found", "No account matching this username or email was found.");
   }
 
+  const userRef = db.doc(`users/${userUid}`);
+  const userSnap = await userRef.get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+
+  // If this account is undergoing mandatory first-time / temp password setup, they cannot keep 123412341234
+  if ((isFirstTimeSetup || userData.mustChangePassword) && newPassword === "123412341234") {
+    throw new functions.https.HttpsError("invalid-argument", "You must choose a new secure password. You cannot keep the temporary password.");
+  }
+
   await admin.auth().updateUser(userUid, { password: newPassword });
   await admin.auth().revokeRefreshTokens(userUid);
+
+  await userRef.set({
+    mustChangePassword: false,
+    passwordLastChangedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
 
   await db.collection("audit_logs").add({
     action: "security.enterprise_password_reset",
     entityType: "user",
     entityId: userUid,
     identifier,
-    method: "self_service_recovery",
+    method: isFirstTimeSetup ? "first_time_setup" : "self_service_recovery",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { success: true, message: "Password updated successfully." };
 });
+
+exports.adminSetTemporaryPassword = functions.https.onCall(async (data, context) => {
+  const actor = await requireAdmin(context);
+  const uid = String(data?.uid || "").trim();
+  const temporaryPassword = String(data?.temporaryPassword || "123412341234").trim();
+  const mustChangePassword = data?.mustChangePassword !== false;
+
+  if (!uid) {
+    throw new functions.https.HttpsError("invalid-argument", "A valid employee uid is required.");
+  }
+  if (!temporaryPassword || temporaryPassword.length < 6) {
+    throw new functions.https.HttpsError("invalid-argument", "Temporary password must be at least 6 characters.");
+  }
+
+  const db = admin.firestore();
+  const targetRef = db.doc(`users/${uid}`);
+  const targetSnap = await targetRef.get();
+
+  if (!targetSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "The specified user profile was not found.");
+  }
+
+  const targetData = targetSnap.data();
+  if (targetData.tenantId && targetData.tenantId !== actor.tenantId) {
+    throw new functions.https.HttpsError("permission-denied", "This user belongs to another organization.");
+  }
+
+  // Update password in Firebase Auth
+  await admin.auth().updateUser(uid, { password: temporaryPassword });
+  await admin.auth().revokeRefreshTokens(uid);
+
+  // Invalidate any existing active sessions
+  await invalidateUserSessions(uid, "temporary_password_assigned", context.auth.uid);
+
+  // Mark Firestore user profile as requiring password change
+  await targetRef.set({
+    mustChangePassword,
+    tempPasswordAssignedAt: admin.firestore.FieldValue.serverTimestamp(),
+    tempPasswordAssignedBy: context.auth.uid,
+  }, { merge: true });
+
+  await db.collection("audit_logs").add({
+    action: "security.temp_password_assigned",
+    entityType: "user",
+    entityId: uid,
+    username: targetData.username || "",
+    role: targetData.role || "",
+    actorId: context.auth.uid,
+    tenantId: actor.tenantId,
+    mustChangePassword,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {
+    success: true,
+    uid,
+    username: targetData.username || "",
+    mustChangePassword,
+    message: "Temporary password assigned successfully. User must change password upon next sign in.",
+  };
+});
+

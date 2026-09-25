@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle, Edit2, BrainCircuit, Activity, UserCheck, UserX } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Briefcase, Truck, Save, X, Users, AlertCircle, Edit2, BrainCircuit, Activity, UserCheck, UserX, KeyRound, Sparkles, Eye, EyeOff, Lock, CheckCircle2 } from 'lucide-react';
 import { db, collection, getDocs, functions, httpsCallable, onSnapshot } from '../config/firebase';
 import { analyzeActivityLogs } from '../config/ai';
 
@@ -22,6 +22,13 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
   const [showForm, setShowForm] = useState(false);
   const [showAssign, setShowAssign] = useState(null);
   const [form, setForm] = useState({ username: '', password: '', role: 'driver', phone: '', hourlyRate: '' });
+  const [showFormPassword, setShowFormPassword] = useState(false);
+  const [tempPasswordUser, setTempPasswordUser] = useState(null);
+  const [tempPasswordValue, setTempPasswordValue] = useState('123412341234');
+  const [showTempPassword, setShowTempPassword] = useState(false);
+  const [tempPasswordMustChange, setTempPasswordMustChange] = useState(true);
+  const [tempPasswordSubmitting, setTempPasswordSubmitting] = useState(false);
+  const [tempPasswordMessage, setTempPasswordMessage] = useState('');
   const [formError, setFormError] = useState('');
   const [editingDispatcher, setEditingDispatcher] = useState(null);
   const [editName, setEditName] = useState('');
@@ -96,14 +103,58 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
     try {
       const authEmail = usernameToAuthEmail(username);
       const createUserFn = httpsCallable(functions, 'createUser');
-      await createUserFn({ email: authEmail, username, name: username, password: form.password, role: form.role, phone: form.phone, hourlyRate: form.hourlyRate });
+      await createUserFn({
+        email: authEmail,
+        username,
+        name: username,
+        password: form.password,
+        role: form.role,
+        phone: form.phone,
+        hourlyRate: form.hourlyRate,
+        mustChangePassword: true,
+      });
 
-      addAuditLog('User Created', `${currentUser} created ${form.role} account: ${username}`, 'emerald', { entity: 'user', id: username, diffs: [{ field: 'role', before: null, after: form.role }, { field: 'username', before: null, after: username }] });
+      addAuditLog('User Created', `${currentUser} created ${form.role} account: ${username} (first-time password change required)`, 'emerald', { entity: 'user', id: username, diffs: [{ field: 'role', before: null, after: form.role }, { field: 'username', before: null, after: username }] });
       await loadUsers();
       setShowForm(false);
       setForm({ username: '', password: '', role: 'driver', phone: '', hourlyRate: '' });
+      setShowFormPassword(false);
     } catch (err) {
       setFormError(err.message.replace('Firebase: ', ''));
+    }
+  };
+
+  const handleSetTemporaryPassword = async (e) => {
+    if (e) e.preventDefault();
+    if (!tempPasswordUser?.uid) return;
+    setFormError('');
+    setTempPasswordMessage('');
+    setTempPasswordSubmitting(true);
+    try {
+      const setTempFn = httpsCallable(functions, 'adminSetTemporaryPassword');
+      await setTempFn({
+        uid: tempPasswordUser.uid,
+        temporaryPassword: tempPasswordValue,
+        mustChangePassword: tempPasswordMustChange,
+      });
+      addAuditLog(
+        'Temporary Password Assigned',
+        `${currentUser} assigned temporary password for ${tempPasswordUser.username || authEmailToUsername(tempPasswordUser.email)} (${tempPasswordMustChange ? 'must change on login' : 'permanent'})`,
+        'amber',
+        { entity: 'user', id: tempPasswordUser.uid }
+      );
+      setTempPasswordMessage('Temporary password successfully assigned!');
+      setTimeout(() => {
+        setTempPasswordUser(null);
+        setTempPasswordMessage('');
+        setTempPasswordValue('123412341234');
+        setShowTempPassword(false);
+      }, 1400);
+      await loadUsers();
+    } catch (err) {
+      setFormError(String(err?.message || 'Could not assign temporary password.').replace('Firebase: ', ''));
+    } finally {
+      setTempPasswordSubmitting(false);
     }
   };
 
@@ -327,6 +378,22 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                       );
                     })()}
                     {role === 'admin' && user.email !== currentUser && (
+                      <button
+                        onClick={() => {
+                          setTempPasswordUser(user);
+                          setTempPasswordValue('123412341234');
+                          setTempPasswordMustChange(true);
+                          setTempPasswordMessage('');
+                          setShowTempPassword(false);
+                        }}
+                        className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
+                        title="Assign Temporary Password"
+                        aria-label="Assign Temporary Password"
+                      >
+                        <KeyRound size={14} />
+                      </button>
+                    )}
+                    {role === 'admin' && user.email !== currentUser && (
                       <button onClick={() => requestAuthAction ? requestAuthAction(accessEnabled ? 'Disable User Access' : 'Restore User Access', () => setUserAccess(user, !accessEnabled)) : setUserAccess(user, !accessEnabled)} className={`rounded-lg p-2 ${accessEnabled ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`} title={accessEnabled ? 'Disable access immediately' : 'Restore access'} aria-label={accessEnabled ? 'Disable access' : 'Restore access'}>
                         {accessEnabled ? <UserX size={14} /> : <UserCheck size={14} />}
                       </button>
@@ -384,6 +451,22 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                               </button>
                             );
                           })()}
+                          {role === 'admin' && user.email !== currentUser && (
+                            <button
+                              onClick={() => {
+                                setTempPasswordUser(user);
+                                setTempPasswordValue('123412341234');
+                                setTempPasswordMustChange(true);
+                                setTempPasswordMessage('');
+                                setShowTempPassword(false);
+                              }}
+                              className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              title="Assign Temporary Password"
+                              aria-label="Assign Temporary Password"
+                            >
+                              <KeyRound size={14} />
+                            </button>
+                          )}
                           {role === 'admin' && user.email !== currentUser && (
                             <button onClick={() => requestAuthAction ? requestAuthAction(accessEnabled ? 'Disable User Access' : 'Restore User Access', () => setUserAccess(user, !accessEnabled)) : setUserAccess(user, !accessEnabled)} className={`p-1.5 sm:p-2 rounded-lg transition ${accessEnabled ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`} title={accessEnabled ? 'Disable access immediately' : 'Restore access'} aria-label={accessEnabled ? 'Disable access' : 'Restore access'}>
                               {accessEnabled ? <UserX size={14} /> : <UserCheck size={14} />}
@@ -644,9 +727,35 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs" placeholder="driver.waeil" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-                  <input type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs" placeholder="Min 6 characters" />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, password: '123412341234' }))}
+                      className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles size={11} className="text-amber-500" /> Use 123412341234
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showFormPassword ? 'text' : 'password'}
+                      required
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="w-full pl-3 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-xs"
+                      placeholder="Min 6 characters"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowFormPassword(!showFormPassword)}
+                      aria-label={showFormPassword ? 'Hide password' : 'Show password'}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                    >
+                      {showFormPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">Employee will be required to change password upon first sign-in.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
@@ -680,10 +789,113 @@ const UsersPage = ({ drivers = [], setDrivers, dispatchers = [], setDispatchers,
                 </div>
               </form>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6">
-                <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-xs">Cancel</button>
-                <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs"><Save size={16} /> Create</button>
+                <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="w-full sm:flex-1 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-xs cursor-pointer">Cancel</button>
+                <button type="submit" onClick={createUser} className="w-full sm:flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"><Save size={16} /> Create</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Temporary Password Modal */}
+      {tempPasswordUser && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 max-w-md w-full p-5 sm:p-6 shadow-2xl relative">
+            <button
+              onClick={() => { setTempPasswordUser(null); setTempPasswordMessage(''); setFormError(''); }}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
+                <KeyRound size={20} />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">Set Temporary Password</h3>
+                <p className="text-xs text-slate-500 font-medium">For: <span className="font-bold text-slate-800">{tempPasswordUser.username || authEmailToUsername(tempPasswordUser.email)}</span> ({tempPasswordUser.role})</p>
+              </div>
+            </div>
+
+            {tempPasswordMessage && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 size={16} className="shrink-0" />
+                {tempPasswordMessage}
+              </div>
+            )}
+
+            {formError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleSetTemporaryPassword} className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Temporary Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setTempPasswordValue('123412341234')}
+                    className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles size={11} className="text-amber-500" />
+                    Reset to 123412341234
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showTempPassword ? 'text' : 'password'}
+                    required
+                    value={tempPasswordValue}
+                    onChange={(e) => setTempPasswordValue(e.target.value)}
+                    placeholder="Enter temporary password"
+                    className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base font-semibold text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTempPassword(!showTempPassword)}
+                    aria-label={showTempPassword ? 'Hide password' : 'Show password'}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                  >
+                    {showTempPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tempPasswordMustChange}
+                  onChange={(e) => setTempPasswordMustChange(e.target.checked)}
+                  className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-slate-800 block">Require password change on next sign in</span>
+                  <span className="text-slate-500 block mt-0.5">The employee will be forced to create a new secure permanent password before accessing their portal.</span>
+                </div>
+              </label>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setTempPasswordUser(null); setTempPasswordMessage(''); setFormError(''); }}
+                  className="flex-1 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={tempPasswordSubmitting || !tempPasswordValue}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Lock size={14} />
+                  {tempPasswordSubmitting ? 'Assigning…' : 'Assign Temp Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

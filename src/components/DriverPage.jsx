@@ -20,7 +20,7 @@ const OfflineIndicator = lazy(() => import('./pwa/OfflineIndicator'));
 import { getDriverActiveRoutePlan, ROUTE_ASSIGNMENT_STATUS } from '../utils/routePlans';
 import { useDriverLocationStream } from '../hooks/useDriverLocationStream';
 const TaskCard = lazy(() => import('./TaskCard'));
-import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Upload } from 'lucide-react';
+import { Truck, MapPin, Phone, MessageCircle, CheckCircle2, XCircle, AlertCircle, Navigation, Gauge, Clock, User, ChevronRight, Play, Check, ChevronLeft, ChevronDown, RotateCcw, Undo2, Lock, RefreshCw, Forward, Home, Settings, LogOut, ArrowRight, Search, Repeat, Zap, X, Route, Plus, CheckSquare, Map, BarChart3, Calendar, Download, FileText, AlertTriangle, Info, Copy, PhoneForwarded, Shield, Headphones, Building, Edit2, MoreHorizontal, Ruler, Crosshair, Upload, Eye, EyeOff } from 'lucide-react';
 import { openNavigation, makeCall, sendSMS, showCallActionSheet } from '../utils/nativeActions';
 import { DestinationNavButtons } from './shared';
 import { TripOptionsModal } from './shared/TripOptionsModal';
@@ -1008,6 +1008,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
   const undoTimeoutRef = useRef(null);
   const [passwordPrompt, setPasswordPrompt] = useState(null);
   const [passwordValue, setPasswordValue] = useState('');
+  const [showDriverPasswordValue, setShowDriverPasswordValue] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordVerifying, setPasswordVerifying] = useState(false);
   const [transferPrompt, setTransferPrompt] = useState(null);
@@ -7342,15 +7343,25 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
                 {!(role === 'admin' || role === 'dispatcher') ? (
                   <div>
                     <label className="block text-micro font-semibold uppercase tracking-wide text-slate-500 mb-1">Password</label>
-                    <input
-                      type="password"
-                      value={passwordValue}
-                      onChange={(e) => setPasswordValue(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
-                      placeholder="Enter password"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-sm text-center focus:border-rose-500 outline-none"
-                      autoFocus
-                    />
+                    <div className="relative">
+                      <input
+                        type={showDriverPasswordValue ? 'text' : 'password'}
+                        value={passwordValue}
+                        onChange={(e) => setPasswordValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && verifyPasswordAndProceed()}
+                        placeholder="Enter password"
+                        className="w-full pl-3 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-base text-center focus:border-rose-500 outline-none"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowDriverPasswordValue(!showDriverPasswordValue)}
+                        aria-label={showDriverPasswordValue ? 'Hide password' : 'Show password'}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                      >
+                        {showDriverPasswordValue ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                     {passwordError && <p className="text-xs text-rose-600 font-semibold mt-1 text-center">{passwordError}</p>}
                   </div>
                 ) : (
@@ -7359,7 +7370,7 @@ const DriverPage = ({ currentUser, role, tenantId, drivers = [], trips = [], tri
               </div>
             </div>
             <div className="trip-window-footer px-4 pb-4">
-              <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
+              <button type="button" onClick={() => { setPasswordPrompt(null); setPasswordValue(''); setPasswordError(''); setShowDriverPasswordValue(false); }} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all cursor-pointer">
                 Back
               </button>
               <button type="button" onClick={verifyPasswordAndProceed} disabled={(!(role === 'admin' || role === 'dispatcher') && !passwordValue) || passwordVerifying} className={`flex-1 py-3 text-white rounded-xl font-semibold disabled:opacity-40 transition-all cursor-pointer ${passwordPrompt.type === 'restore' || String(passwordPrompt.type || '').includes('transfer') ? 'bg-blue-600 hover:bg-blue-700' : passwordPrompt.type === 'reroute' ? 'bg-purple-600 hover:bg-purple-700' : passwordPrompt.type === 'edittrip' || passwordPrompt.type === 'edittripcomplete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'}`}>

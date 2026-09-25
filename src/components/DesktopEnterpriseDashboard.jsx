@@ -1,5 +1,5 @@
 import React, { useState, Suspense, useEffect, useCallback, useMemo, startTransition } from 'react';
-import { Users, MapPin, Settings, BarChart2, Archive, MessageCircle, Bell, CheckCircle2, BrainCircuit, Upload, Wand2, Search, AlertTriangle, X, Zap, Clock, PanelRight, Eye, Hash, Route, Activity, ClipboardList, CarFront, RefreshCw } from 'lucide-react';
+import { Users, MapPin, Settings, BarChart2, Archive, MessageCircle, Bell, CheckCircle2, BrainCircuit, Upload, Wand2, Search, AlertTriangle, X, Zap, Clock, PanelRight, Eye, EyeOff, Hash, Route, Activity, ClipboardList, CarFront, RefreshCw } from 'lucide-react';
 import { auth, EmailAuthProvider, reauthenticateWithCredential } from '../config/firebase';
 
 import { isTripLate, tripCalendarDateKey, localCalendarYmd } from '../utils/tripDate';
@@ -179,6 +179,7 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
   });
   const [operationsTab, setOperationsTab] = useState(() => localStorage.getItem('agape_operationsTab') || 'manifest');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [authActionPayload, setAuthActionPayload] = useState(null);
   const [authPassword, setAuthPassword] = useState('');
   const [reAuthError, setReAuthError] = useState('');
@@ -1657,18 +1658,28 @@ const DesktopEnterpriseDashboard = ({ role, currentUser, trips = [], setTrips, d
               <div className="space-y-1 mb-2">
                 <p className="text-xs text-slate-500">Enter your password to confirm this action.</p>
               </div>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 mb-3 transition-all"
-                autoFocus
-              />
+              <div className="relative mb-3">
+                <input
+                  type={showAuthPassword ? 'text' : 'password'}
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAuthPassword(!showAuthPassword)}
+                  aria-label={showAuthPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                >
+                  {showAuthPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {reAuthError && <p className="text-xs text-rose-700 mb-3">{reAuthError}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all duration-200">Cancel</button>
-                <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200">Confirm</button>
+                <button type="button" onClick={() => { setShowAuthModal(false); setShowAuthPassword(false); }} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-all duration-200 cursor-pointer">Cancel</button>
+                <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all duration-200 cursor-pointer">Confirm</button>
               </div>
             </form>
           </div>

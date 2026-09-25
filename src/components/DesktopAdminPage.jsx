@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Truck, Activity, ExternalLink, UserCog, AlertTriangle, Plus, Save, X, Briefcase, MessageCircle, DollarSign, LayoutDashboard, RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2, CalendarClock, Wrench, ServerCog } from 'lucide-react';
+import { Truck, Activity, ExternalLink, UserCog, AlertTriangle, Plus, Save, X, Briefcase, MessageCircle, DollarSign, LayoutDashboard, RadioTower, CircleDot, FileDown, UserPlus, BellRing, TrendingUp, CheckCircle2, CalendarClock, Wrench, ServerCog, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { functions, httpsCallable } from '../config/firebase';
 
 
@@ -279,6 +279,7 @@ const DesktopAdminPage = ({
   const [createForm, setCreateForm] = useState({ username: '', password: '', phone: '' });
   const [createError, setCreateError] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [vehicleCreateIntent, setVehicleCreateIntent] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [payrollPolicy, setPayrollPolicy] = useState('SMART_MODE');
@@ -341,7 +342,15 @@ const DesktopAdminPage = ({
     setCreatingUser(true);
     try {
       const createUserFn = httpsCallable(functions, 'createUser');
-      const result = await createUserFn({ email: authEmail, username, name: username, password: createForm.password, role: createUserRole, phone: createForm.phone });
+      const result = await createUserFn({
+        email: authEmail,
+        username,
+        name: username,
+        password: createForm.password,
+        role: createUserRole,
+        phone: createForm.phone,
+        mustChangePassword: true,
+      });
       const profileId = result?.data?.profileId;
 
       addAuditLog(
@@ -715,13 +724,35 @@ const DesktopAdminPage = ({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-800">Password</label>
-                <input type="password" required
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
-                  className="adm-input"
-                  placeholder="Min 6 characters"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-semibold text-slate-800">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setCreateForm(prev => ({ ...prev, password: '123412341234' }))}
+                    className="text-xs font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles size={12} className="text-amber-500" /> Use 123412341234
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showCreatePassword ? 'text' : 'password'}
+                    required
+                    value={createForm.password}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
+                    className="adm-input pr-10"
+                    placeholder="Min 6 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword(!showCreatePassword)}
+                    aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                  >
+                    {showCreatePassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Employee will be required to set their personal password upon first login.</p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-800">Phone Number</label>

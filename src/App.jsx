@@ -51,6 +51,7 @@ import {
   waitForMatchingAuthObserver,
 } from './utils/authStartup';
 import EnterprisePasswordResetModal from './components/auth/EnterprisePasswordResetModal';
+import ForcePasswordChangeModal from './components/auth/ForcePasswordChangeModal';
 import {
   resolveEnterpriseIdentifier,
   translateAuthError,
@@ -882,6 +883,8 @@ const App = () => {
   const [showResetModal, setShowResetModal] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [capsLockActive, setCapsLockActive] = useState(false);
+  const [mustChangePasswordUser, setMustChangePasswordUser] = useState(null);
+  const [showReAuthPassword, setShowReAuthPassword] = useState(false);
 
   const clearStaleLoginAttempt = useCallback(() => {
     if (!loginInProgressRef.current) return false;
@@ -1182,6 +1185,17 @@ const App = () => {
       writeRoleCache(capturedUser.uid, userRole, userEmail, sessionTenantId);
       setTenantId(sessionTenantId);
 
+      if (profile.mustChangePassword === true) {
+        setMustChangePasswordUser({
+          uid: capturedUser.uid,
+          email: userEmail,
+          username: profile.username || authEmailToUsername(userEmail),
+          role: userRole,
+        });
+      } else {
+        setMustChangePasswordUser(null);
+      }
+
       loginPortalRoleRef.current = null;
       roleRef.current = userRole;
       currentUserRef.current = userEmail || '';
@@ -1258,6 +1272,14 @@ const App = () => {
         if (freshTenantId !== tenantIdFromProfile({ tenantId: cachedTenantId })) {
           writeRoleCache(capturedUser.uid, freshRole, capturedUser.email || '', freshTenantId);
           setTenantId(freshTenantId);
+        }
+        if (freshDoc.data()?.mustChangePassword === true) {
+          setMustChangePasswordUser({
+            uid: capturedUser.uid,
+            email: capturedUser.email || '',
+            username: freshDoc.data()?.username || authEmailToUsername(capturedUser.email || ''),
+            role: freshRole,
+          });
         }
         const settings = freshDoc.data()?.settings || {};
         if (Object.keys(settings).length > 0) {
@@ -3017,11 +3039,11 @@ const App = () => {
 
           <div className="agape-login-panel w-full max-w-md justify-self-center overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-sm">
             {/* Minivan Hero Graphic */}
-            <div className="agape-login-logo flex justify-center items-center w-full mb-3">
+            <div className="agape-login-logo flex justify-center items-center w-full mb-2 sm:mb-3">
               <img
                 src="/agape-fleet-van.png"
                 alt="Agape Care Fleet"
-                className="w-52 sm:w-60 max-w-full h-auto object-contain"
+                className="w-auto h-14 sm:h-20 max-w-full object-contain"
               />
             </div>
 
@@ -3265,18 +3287,36 @@ const App = () => {
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowAuthModal(false)} />
-        <div className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-sm relative z-10 border border-slate-200">
-          <div className="w-16 h-16 bg-gradient-to-tr from-rose-600 to-rose-400 text-white rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/30">
-            <Lock size={32} />
+        <div className="bg-white w-full max-w-sm rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 border border-slate-200">
+          <div className="w-14 h-14 bg-gradient-to-tr from-rose-600 to-rose-400 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-rose-500/20">
+            <Lock size={28} />
           </div>
-          <h3 className="text-xl font-semibold text-center text-slate-900 mb-2">Security Verification</h3>
-          <p className="text-xs text-center text-slate-500 font-medium mb-2">Re-enter your password to authorize: <span className="font-semibold text-slate-800">{authActionPayload?.label || 'Action'}</span></p>
-          {reAuthError && <p className="text-xs text-center text-rose-600 font-semibold mb-4">{reAuthError}</p>}
-          <form onSubmit={submitAuthAction}>
-            <input type="password" required placeholder="Enter your password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full p-4 bg-slate-100/50 rounded-[1rem] font-semibold border border-slate-200/50 focus:border-rose-500 focus:bg-white mb-4" />
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold active:scale-95 transition-all">Cancel</button>
-              <button type="submit" className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-rose-500/20">Authorize</button>
+          <h3 className="text-xl font-bold text-center text-slate-900 mb-1">Security Verification</h3>
+          <p className="text-xs text-center text-slate-500 font-medium mb-3">Re-enter your password to authorize: <span className="font-semibold text-slate-800">{authActionPayload?.label || 'Action'}</span></p>
+          {reAuthError && <p className="text-xs text-center text-rose-600 font-bold mb-3">{reAuthError}</p>}
+          <form onSubmit={submitAuthAction} className="space-y-3">
+            <div className="relative">
+              <input
+                type={showReAuthPassword ? 'text' : 'password'}
+                required
+                autoFocus
+                placeholder="Enter your password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                className="w-full pl-4 pr-11 py-3 bg-slate-50 rounded-xl font-semibold border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-rose-500 focus:bg-white outline-none text-base transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowReAuthPassword(!showReAuthPassword)}
+                aria-label={showReAuthPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              >
+                {showReAuthPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={() => setShowAuthModal(false)} className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold active:scale-95 transition-all text-xs cursor-pointer">Cancel</button>
+              <button type="submit" className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-rose-500/20 text-xs cursor-pointer">Authorize</button>
             </div>
           </form>
         </div>
@@ -3532,6 +3572,13 @@ const App = () => {
             </Suspense>
           )}
           {renderSecurityAuthModal()}
+          {mustChangePasswordUser && (
+            <ForcePasswordChangeModal
+              user={mustChangePasswordUser}
+              onComplete={() => setMustChangePasswordUser(null)}
+              onSignOut={handleLogout}
+            />
+          )}
 
 
 
