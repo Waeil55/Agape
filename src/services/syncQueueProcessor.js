@@ -140,6 +140,9 @@ export class SyncQueueProcessor {
     this._processing = true;
     try {
       const pending = await getPendingSyncOperations(ownership);
+      // At most one forced token refresh per pass, however many writes hit
+      // an auth race — refreshing per write floods the network on a phone.
+      let tokenRefreshedThisPass = false;
       for (const operation of pending) {
         if (!navigator.onLine || !this._authContext || !syncOperationBelongsTo(this._authContext, ownership)) break;
         try {
@@ -168,7 +171,10 @@ export class SyncQueueProcessor {
           this._onProcess?.({ type: 'completed', op: operation });
         } catch (error) {
           if (isRetryableAuthRace(error, operation)) {
-            try { await auth?.currentUser?.getIdToken(true); } catch { /* next retry re-attempts the refresh */ }
+            if (!tokenRefreshedThisPass) {
+              tokenRefreshedThisPass = true;
+              try { await auth?.currentUser?.getIdToken(true); } catch { /* next retry re-attempts the refresh */ }
+            }
             await failSyncOperation(operation.id, error);
             this._onProcess?.({ type: 'failed', op: operation, error: error.message });
           } else if (isPermanentSyncFailure(error)) {

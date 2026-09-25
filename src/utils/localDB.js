@@ -556,10 +556,6 @@ export function isRepairableDeadLetterOperation(operation = {}) {
   if (Number(operation.recoveryAttempts || 0) >= 1) return false;
   const code = String(operation.errorCode || '').replace(/^firestore\//, '').toLowerCase();
   const message = String(operation.error || '').toLowerCase();
-  // A stale-token/App Check race used to dead-letter valid writes as
-  // permission failures. They are idempotent merges guarded by the
-  // newer-server-record check on replay, so give each one a single recovery.
-  if (code === 'permission-denied' || code === 'unauthenticated') return true;
   return code === 'invalid-argument'
     && message.includes('unsupported field value: undefined');
 }

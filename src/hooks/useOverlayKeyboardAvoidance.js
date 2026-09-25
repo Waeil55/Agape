@@ -26,12 +26,21 @@ const isTextField = (el) => {
   return !(el.tagName === 'INPUT' && NON_TEXT_INPUTS.has(String(el.type).toLowerCase()));
 };
 
+// Only a real pop-up window qualifies: a full-screen scrim whose direct child
+// is a rounded sheet/dialog panel. Full-screen *workspaces* (e.g. an embedded
+// portal that is itself `fixed inset-0`) must never be lifted or squeezed
+// when an ordinary search box inside them is focused.
+const PANEL_CHILD = ':scope > :is([role="dialog"], [class*="rounded-t-"], [class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[2"])';
+
 const findOverlay = (el) => {
-  let overlay = null;
   for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
-    if (window.getComputedStyle(node).position === 'fixed') overlay = node;
+    if (!node.classList?.contains('fixed') || !node.classList.contains('inset-0')) continue;
+    if (node.closest(EXCLUDED)) return null;
+    let hasPanel = false;
+    try { hasPanel = Boolean(node.querySelector(PANEL_CHILD)); } catch { hasPanel = false; }
+    return hasPanel ? node : null;
   }
-  return overlay && !overlay.closest(EXCLUDED) ? overlay : null;
+  return null;
 };
 
 export default function useOverlayKeyboardAvoidance(enabled) {

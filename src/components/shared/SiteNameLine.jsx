@@ -15,7 +15,12 @@ export default function SiteNameLine({ siteName, address, className }) {
     setResolved(null);
     if (siteName || !address) return undefined;
     let cancelled = false;
-    resolveSiteName(address).then((name) => {
+    // Loading the full Google Maps library just to name a site is too heavy
+    // for a phone; there, only use an existing shared-cache hit unless Maps
+    // is already loaded for another reason.
+    const isPhone = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)')?.matches;
+    const allowLiveLookup = !isPhone || Boolean(window.google?.maps?.places);
+    resolveSiteName(address, { allowLiveLookup }).then((name) => {
       if (!cancelled) setResolved(name);
     });
     return () => { cancelled = true; };

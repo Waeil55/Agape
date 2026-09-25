@@ -50,7 +50,7 @@ function findPlaceFromQuery(service, address) {
  * including a "not found" result, to avoid retry storms on addresses with
  * no matching place. Never throws; a failed lookup just yields no name.
  */
-export async function resolveSiteName(address) {
+export async function resolveSiteName(address, { allowLiveLookup = true } = {}) {
   const key = normalizeAddressKey(address);
   if (!key || key.length < 6) return null;
   if (memoryCache.has(key)) return memoryCache.get(key);
@@ -66,6 +66,10 @@ export async function resolveSiteName(address) {
   } catch {
     // Cache read is best-effort; fall through to a live lookup.
   }
+
+  // Without a live lookup (e.g. on a phone where the Maps library is not
+  // already loaded), only the shared cache is consulted — never cache a miss.
+  if (!allowLiveLookup) return null;
 
   let name = null;
   try {
