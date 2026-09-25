@@ -217,10 +217,8 @@ export function resolveTripCompletionTimestamp(trip, now = new Date()) {
 
 export function getTripHistoryDateKey(trip) {
   const dateKey = tripCalendarDateKey(trip?.date);
-  const completedKey = tripCalendarDateKey(trip?.completedAt);
-  if (!dateKey) return completedKey;
-  if (!completedKey || completedKey === dateKey) return dateKey;
-  return completedKey === addDaysToDateKey(dateKey, 1) ? completedKey : dateKey;
+  if (dateKey) return dateKey;
+  return tripCalendarDateKey(trip?.completedAt);
 }
 
 /**

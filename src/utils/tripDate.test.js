@@ -64,11 +64,11 @@ describe('getTripHistoryDateKey', () => {
     expect(getTripHistoryDateKey({ date: '2026-09-24' })).toBe('2026-09-24');
   });
 
-  it('folds in a completion recorded the next calendar day (midnight crossing)', () => {
+  it('anchors to the service date even when completed or updated the next day', () => {
     expect(getTripHistoryDateKey({
       date: '2026-09-24',
       completedAt: '2026-09-25T00:10:00',
-    })).toBe('2026-09-25');
+    })).toBe('2026-09-24');
   });
 
   it('never moves a backdated correction onto a much later completion date', () => {
@@ -76,6 +76,12 @@ describe('getTripHistoryDateKey', () => {
       date: '2026-09-10',
       completedAt: '2026-09-25T14:00:00',
     })).toBe('2026-09-10');
+  });
+
+  it('falls back to completion date if trip has no service date', () => {
+    expect(getTripHistoryDateKey({
+      completedAt: '2026-09-25T14:00:00',
+    })).toBe('2026-09-25');
   });
 });
 
